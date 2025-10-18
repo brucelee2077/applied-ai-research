@@ -40,7 +40,7 @@ This repository serves as a comprehensive learning resource for Large Language M
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ruifengli-cs/applied-ai-research.git
+git clone https://github.com/brucelee2077/applied-ai-research.git
 cd applied-ai-research
 ```
 

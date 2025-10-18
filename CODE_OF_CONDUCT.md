@@ -87,7 +87,7 @@ Community leaders will follow these Community Impact Guidelines in determining t
 
 For questions about this Code of Conduct, please contact:
 - Email: li.rui.ce@gmail.com
-- GitHub: [@ruifengli-cs](https://github.com/ruifengli-cs)
+- GitHub: [@brucelee2077](https://github.com/brucelee2077)
 
 ## 🙏 Attribution
 

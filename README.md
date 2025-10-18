@@ -2,8 +2,8 @@
 
 > A comprehensive applied research repository exploring deep learning, from neural network fundamentals through large language models to production deployment
 
-![GitHub last commit](https://img.shields.io/github/last-commit/ruifengli-cs/applied-ai-research)
-![GitHub repo size](https://img.shields.io/github/repo-size/ruifengli-cs/applied-ai-research)
+![GitHub last commit](https://img.shields.io/github/last-commit/brucelee2077/applied-ai-research)
+![GitHub repo size](https://img.shields.io/github/repo-size/brucelee2077/applied-ai-research)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ---
@@ -132,9 +132,8 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ## 🔗 Connect
 
 **[Your Name]**
-- GitHub: [ruifengli-cs](https://github.com/ruifengli-cs)
-- LinkedIn: [Your Profile](https://linkedin.com/in/ruifengli)
-- Email: li.rui.ce@gmail.com
+- GitHub: [brucelee2077](https://github.com/brucelee2077)
+
 
 ---
 
