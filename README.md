@@ -42,6 +42,12 @@ Comprehensive evaluation metrics (perplexity, BLEU, ROUGE), benchmark datasets, 
 ### 7️⃣ [Deployment](./07-deployment/)
 Production optimization techniques including quantization, model compression, inference optimization, and serving infrastructure.
 
+### 8️⃣ [AI Agents](./08-ai-agents/)
+Building autonomous AI agents with LangGraph. Covers agent architectures, state management, tool integration, and advanced patterns (ReAct, Plan-Execute, Multi-Agent). Learn to build agents that can reason, act, and collaborate to solve complex tasks.
+
+### 9️⃣ [Engineering Productivity & Vibe Coding](./09-engineering-productivity/) **NEW!**
+Master modern AI-assisted development workflows with Claude Code. Learn "vibe coding" - an intuitive, flow-state approach to ML development that accelerates research, experimentation, and production deployment. Includes practical workflows, real examples, and productivity techniques for 3-5x faster development.
+
 ---
 
 ## 🛠️ Technical Stack
@@ -50,6 +56,7 @@ Production optimization techniques including quantization, model compression, in
 - PyTorch / TensorFlow
 - Hugging Face Transformers
 - LangChain / LlamaIndex
+- LangGraph (for AI agents)
 
 **Deployment & Optimization:**
 - ONNX Runtime
@@ -75,20 +82,22 @@ Production optimization techniques including quantization, model compression, in
 
 ```
 applied-ai-research/
-├── 00-neural-networks/     # NN fundamentals (NN, CNN, RNN)
-├── 01-transformers/        # Transformer architecture deep dive
-├── 02-fine-tuning/         # Fine-tuning methodologies
-├── 03-rag/                 # RAG systems and retrieval
-├── 04-prompt-engineering/  # Prompting techniques
-├── 05-multimodal/          # Multimodal models
-├── 06-evaluation/          # Metrics and benchmarks
-├── 07-deployment/          # Production deployment
-├── papers/                 # Paper summaries and implementations
-├── projects/               # End-to-end projects
-├── notebooks/              # Jupyter experiments
-├── scripts/                # Utility scripts
-├── docs/                   # Additional documentation
-└── assets/                 # Images, diagrams, badges
+├── 00-neural-networks/          # NN fundamentals (NN, CNN, RNN)
+├── 01-transformers/             # Transformer architecture deep dive
+├── 02-fine-tuning/              # Fine-tuning methodologies
+├── 03-rag/                      # RAG systems and retrieval
+├── 04-prompt-engineering/       # Prompting techniques
+├── 05-multimodal/               # Multimodal models
+├── 06-evaluation/               # Metrics and benchmarks
+├── 07-deployment/               # Production deployment
+├── 08-ai-agents/                # AI agents with LangGraph
+├── 09-engineering-productivity/ # Vibe coding & Claude Code workflows
+├── papers/                      # Paper summaries and implementations
+├── projects/                    # End-to-end projects
+├── notebooks/                   # Jupyter experiments
+├── scripts/                     # Utility scripts
+├── docs/                        # Additional documentation
+└── assets/                      # Images, diagrams, badges
 ```
 
 ---
@@ -104,7 +113,9 @@ applied-ai-research/
 5. **Optimization** → Master [Prompt Engineering](./04-prompt-engineering/) for better outputs
 6. **Evaluation** → Study [Evaluation](./06-evaluation/) methods for systematic assessment
 7. **Production** → Implement [Deployment](./07-deployment/) strategies for real-world use
-8. **Advanced** → Dive into [Multimodal](./05-multimodal/) models for cross-domain tasks
+8. **Advanced Topics** → Dive into [Multimodal](./05-multimodal/) models for cross-domain tasks
+9. **Agents** → Build [AI Agents](./08-ai-agents/) that can reason, plan, and use tools autonomously
+10. **Productivity** → Master [Vibe Coding](./09-engineering-productivity/) with Claude Code to accelerate all of the above
 
 ---
 
