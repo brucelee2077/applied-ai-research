@@ -1,93 +1,138 @@
-# Recurrent Neural Networks (RNN)
+# Recurrent Neural Networks (RNNs)
 
-## Overview
-
-Recurrent Neural Networks are designed for sequential data processing, maintaining hidden states that capture information from previous time steps. This section covers RNN architectures and their evolution leading to transformers.
-
-## Key Concepts
-
-### RNN Fundamentals
-- Sequential data processing
-- Hidden state and memory
-- Recurrent connections
-- Unrolling through time
-- Backpropagation through time (BPTT)
-
-### Challenges
-- Vanishing gradients
-- Exploding gradients
-- Long-term dependencies
-- Computational inefficiency (sequential nature)
-
-### LSTM (Long Short-Term Memory)
-- Cell state and gates
-- Forget gate
-- Input gate
-- Output gate
-- Solving vanishing gradient problem
-- Long-term memory retention
-
-### GRU (Gated Recurrent Unit)
-- Simplified architecture
-- Update and reset gates
-- Computational efficiency
-- Comparison with LSTM
-
-### Advanced Architectures
-- Bidirectional RNNs
-- Deep RNNs (stacked layers)
-- Encoder-decoder architectures
-- Sequence-to-sequence models
-- Attention mechanisms in RNNs
-
-### Applications
-- Language modeling
-- Machine translation
-- Text generation
-- Speech recognition
-- Time series prediction
-- Video analysis
-
-## Transition to Transformers
-
-Understanding RNNs is crucial for appreciating transformers:
-
-### Limitations of RNNs
-- Sequential processing (no parallelization)
-- Difficulty with very long sequences
-- Information bottleneck
-- Slow training
-
-### How Transformers Address These
-- Self-attention replaces recurrence
-- Parallel processing of sequences
-- Direct connections between all positions
-- Positional encodings for sequence order
-
-## Content to be Added
-
-- [ ] RNN mathematics and derivations
-- [ ] LSTM and GRU implementations
-- [ ] Attention mechanism in RNNs
-- [ ] Seq2seq model examples
-- [ ] Comparison with transformers
-- [ ] Training notebooks
-
-## Classic Papers
-
-- **LSTM** - Hochreiter & Schmidhuber, 1997
-- **GRU** - Cho et al., 2014
-- **Seq2Seq** - Sutskever et al., 2014
-- **Neural Machine Translation** - Bahdanau et al., 2014
-- **Attention Mechanisms** - Bahdanau et al., 2014
-
-## Further Reading
-
-- Deep Learning Book - Chapter 10 (Sequence Modeling)
-- Understanding LSTM Networks - Christopher Olah
-- The Unreasonable Effectiveness of RNNs - Andrej Karpathy
-- CS224n: NLP with Deep Learning
+> **How neural networks handle sequences - text, speech, time series.**
+> This section is coming soon. Below is a preview of what will be covered.
 
 ---
 
-[Back to Neural Networks](../README.md) | [Previous: CNN](../cnn/README.md) | [Next: Transformers](../../01-transformers/README.md)
+## What's an RNN?
+
+Regular neural networks see each input independently. Show them a sentence one
+word at a time, and they have no memory of previous words. That's a problem when
+order matters - "dog bites man" and "man bites dog" use the same words but mean
+very different things.
+
+**RNNs have memory.** As they process each word (or data point), they keep a
+"hidden state" - a summary of everything they've seen so far. When they read
+"bites," they remember whether "dog" or "man" came first.
+
+```
+HOW AN RNN READS A SENTENCE
+============================
+
+  Input:    "The"    "cat"    "sat"    "on"     "the"    "mat"
+              |        |        |        |        |        |
+              v        v        v        v        v        v
+           +------+ +------+ +------+ +------+ +------+ +------+
+           | RNN  |→| RNN  |→| RNN  |→| RNN  |→| RNN  |→| RNN  |
+           +------+ +------+ +------+ +------+ +------+ +------+
+              |        |        |        |        |        |
+         "Saw a    "Saw a    "Saw a   "A cat   "A cat   "A cat
+          word"     noun"     verb"    did      did      sat on
+                                     something something something"
+                                               somewhere
+                                                         ↓
+                                                   OUTPUT: Next
+                                                   word prediction
+
+  The same RNN is reused at every step (parameter sharing, just like CNNs!)
+  The arrow → represents the "hidden state" being passed forward
+```
+
+**Plain English:** Reading a book one word at a time, and keeping a running
+summary in your head. Each new word updates your understanding. By the end
+of the sentence, your mental summary captures the meaning of the whole thing.
+
+---
+
+## Why RNNs Matter (and Why They Were Replaced)
+
+RNNs were the go-to architecture for language tasks from ~2014-2017. They're
+important to understand because:
+
+1. **They introduced key ideas** - hidden states, sequence processing, attention
+   mechanisms - that transformers later built on
+2. **They're still used** for some time-series and streaming applications
+3. **Understanding their limitations** explains why transformers were invented
+
+### The Big Problem: Forgetting
+
+RNNs struggle with long sequences. By the time they reach word 100, they've
+mostly forgotten word 1. This is the **vanishing gradient problem** - the
+learning signal fades as it travels backwards through many steps.
+
+```
+Sentence: "The cat, which was sitting on the mat near the window
+           overlooking the garden where the birds were singing on
+           a sunny afternoon, ______."
+
+RNN trying to fill the blank: "Umm... I remember something about
+birds? Or was it a garden? The beginning is fuzzy..."
+
+The fix → LSTM and GRU cells (covered below)
+```
+
+---
+
+## What Will Be Covered
+
+### Planned Notebooks
+
+| # | Topic | What You'll Learn |
+|---|-------|-------------------|
+| 01 | RNN Fundamentals | How the hidden state works, unrolling through time |
+| 02 | Backpropagation Through Time | How RNNs learn (and why it's hard) |
+| 03 | LSTM | "Long Short-Term Memory" - the forgetting problem solved with gates |
+| 04 | GRU | A simpler alternative to LSTM that works almost as well |
+| 05 | Sequence Tasks | Text generation, sentiment analysis, time series prediction |
+| 06 | Bidirectional RNNs | Reading the sentence forwards AND backwards |
+| 07 | Seq2Seq & Attention | Translation, and the bridge to transformers |
+
+### Key Terms Preview
+
+| Term | Meaning |
+|------|---------|
+| **Hidden state** | The RNN's "memory" - a summary of everything it's seen so far |
+| **Time step** | One position in the sequence (one word, one data point) |
+| **Unrolling** | Drawing out the RNN at each time step to see the full picture |
+| **Vanishing gradient** | The learning signal fading over long sequences (the core RNN problem) |
+| **LSTM** | Long Short-Term Memory - an RNN cell with "gates" that control what to remember and forget |
+| **GRU** | Gated Recurrent Unit - a simpler version of LSTM with fewer parameters |
+| **Gate** | A learned switch (0-1) that controls information flow - like a valve on a pipe |
+| **Seq2Seq** | Sequence-to-sequence - read an entire input, then generate an output (translation) |
+| **Attention** | "Look back at the input" instead of relying only on the hidden state summary |
+
+### Why This Leads to Transformers
+
+The attention mechanism, first added to RNNs for machine translation, turned out
+to be so powerful that researchers asked: "What if we ONLY use attention and drop
+the recurrence entirely?" The answer was the Transformer (2017), which powers
+ChatGPT, Claude, GPT-4, and virtually all modern language AI.
+
+```
+RNNs (1990s)
+  ↓
+LSTMs (1997) - solved forgetting
+  ↓
+Attention in RNNs (2014) - solved the information bottleneck
+  ↓
+"Attention is All You Need" (2017) - dropped recurrence entirely
+  ↓
+Transformers → GPT → ChatGPT → modern AI
+```
+
+Understanding RNNs and their limitations makes the motivation for transformers
+click instantly.
+
+---
+
+## Prerequisites
+
+Before this section, you should have completed:
+
+- **All Fundamentals notebooks** (especially backpropagation and training loops)
+- **Basic understanding of CNNs** (helpful but not required)
+
+---
+
+[Previous: CNN](../cnn/README.md) | [Back to Neural Networks](../README.md)
