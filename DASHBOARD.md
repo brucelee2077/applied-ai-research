@@ -1,23 +1,23 @@
 # ML Interview Training Dashboard
-> Last updated: 2026-02-27 12:46 | Session #12
+> Last updated: 2026-02-28 07:16 | Session #14
 
 ---
 
 ## Player Status
 
-**Level 1 — ML Intern** | 70 XP total | 7 Tokens | 2 Streak Shield(s)
+**Level 1 — ML Intern** | 105 XP total | 10 Tokens | 2 Streak Shield(s)
 
 **XP Progress → Level 2 (Junior MLE):**
-[###################.....................]  70 / 150 XP
+[############################............]  105 / 150 XP
 
 ---
 
 ## Streak
 
-**Current:** 1 days | **Longest:** 0 days | **XP Multiplier:** 1.0x
+**Current:** 2 days | **Longest:** 2 days | **XP Multiplier:** 1.0x
 
 Last 21 days:
-[·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][✓]
+[·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][·][✓][✓]
 
 ---
 
@@ -70,17 +70,17 @@ Last 21 days:
 
 ## Power Rankings (vs Cohort)
 
-**You are in the top 87% of ML design studiers.**
+**You are in the top 84% of ML design studiers.**
 
-Position: **#1085 of 1247** active students
+Position: **#1047 of 1247** active students
 
 ```
-YOU  (    70 XP)  [..............................]
+YOU  (   105 XP)  [..............................]
 TOP  ( 8,200 XP)  [##############################]
 AVG  (   400 XP)  [#.............................]
 ```
 
-Your XP this week: **+20 XP**
+Your XP this week: **+30 XP**
 
 
 ---
@@ -94,7 +94,7 @@ Your XP this week: **+20 XP**
   [·] 🔵 **Speed Runner** (rare) — Beat boss in under 30 min  [locked]
   [·] 🟢 **Comeback Kid** (uncommon) — Resume after a 3+ day break  [locked]
   [·] 🟢 **Night Owl** (uncommon) — Study after 11pm  [locked]
-  [·] 🟢 **Early Bird** (uncommon) — Study before 7am  [locked]
+  [✓] 🟢 **Early Bird** (uncommon) — Study before 7am
   [·] 🟣 **Half Way There** (epic) — Master 5+ modules  [locked]
   [·] 🟣 **Perfectionist** (epic) — Score 100% on 3+ quizzes  [locked]
   [·] 🟡 **30-Day Legend** (legendary) — 30-day streak  [locked]
@@ -102,7 +102,7 @@ Your XP this week: **+20 XP**
   [·] 🟡 **Legend Tier** (legendary) — Reach level 10 (AI Legend)  [locked]
   [·] 🟡 **Interview Ready** (legendary) — Master all 11 modules  [locked]
 
-**1 / 14 badges earned**
+**2 / 14 badges earned**
 
 ---
 
@@ -116,6 +116,8 @@ No concepts due for review today. Keep studying to build your queue!
 
 | Date | Module | Minutes | XP |
 |------|--------|---------|-----|
+| 2026-02-28 | Rnn | 0 min | +10 XP |
+| 2026-02-28 | Rnn | 0 min | +0 XP |
 | 2026-02-27 | Rnn | 0 min | +10 XP |
 | 2026-02-27 | Rnn | 0 min | +0 XP |
 | 2026-02-27 | Rnn | 0 min | +10 XP |
