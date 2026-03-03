@@ -36,6 +36,16 @@ This section covers policy-based methods that directly learn a policy without co
 | A2C | Advantage Actor-Critic (synchronous) |
 | A3C | Asynchronous Advantage Actor-Critic |
 
+## Coverage Map
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Policy Gradient Intuition — why optimize policies directly | [Core] | [md](./policy-gradient-intuition.md) · [interview](./policy-gradient-intuition-interview.md) · [notebook](./01_policy_gradient_intuition.ipynb) · [experiments](./01_policy_gradient_intuition_experiments.ipynb) |
+| REINFORCE Algorithm — Monte Carlo policy gradient | [Core] | [md](./reinforce-algorithm.md) · [interview](./reinforce-algorithm-interview.md) · [notebook](./02_reinforce_algorithm.ipynb) · [experiments](./02_reinforce_algorithm_experiments.ipynb) |
+| Variance Reduction — baselines and advantages | [Core] | [md](./variance-reduction.md) · [interview](./variance-reduction-interview.md) · [notebook](./03_variance_reduction.ipynb) · [experiments](./03_variance_reduction_experiments.ipynb) |
+| Actor-Critic — combining value and policy learning | [Core] | [md](./actor-critic.md) · [interview](./actor-critic-interview.md) · [notebook](./04_actor_critic.ipynb) · [experiments](./04_actor_critic_experiments.ipynb) |
+| A2C and A3C — advantage actor-critic methods | [Core] | [md](./a2c-a3c.md) · [interview](./a2c-a3c-interview.md) · [notebook](./05_a2c_a3c.ipynb) · [experiments](./05_a2c_a3c_experiments.ipynb) |
+
 ## What's Next?
 
 After this section:

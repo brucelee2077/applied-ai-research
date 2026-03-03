@@ -26,6 +26,16 @@ By completing this section, you'll understand:
 - Basic Python and NumPy
 - No prior RL knowledge required!
 
+## Coverage Map
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| What is Reinforcement Learning — RL paradigm, agent-environment loop, exploration vs exploitation | [Core] | [md](./what-is-reinforcement-learning.md) · [interview](./what-is-reinforcement-learning-interview.md) · [notebook](./01_what_is_reinforcement_learning.ipynb) · [experiments](./01_what_is_reinforcement_learning_experiments.ipynb) |
+| Markov Decision Processes — states, actions, transitions, the Markov property | [Core] | [md](./markov-decision-processes.md) · [interview](./markov-decision-processes-interview.md) · [notebook](./02_markov_decision_processes.ipynb) · [experiments](./02_markov_decision_processes_experiments.ipynb) |
+| Rewards and Returns — reward design, discounting, cumulative returns | [Core] | [md](./rewards-and-returns.md) · [interview](./rewards-and-returns-interview.md) · [notebook](./03_rewards_and_returns.ipynb) · [experiments](./03_rewards_and_returns_experiments.ipynb) |
+| Policies and Value Functions — V(s), Q(s,a), deterministic vs stochastic policies | [Core] | [md](./policies-and-value-functions.md) · [interview](./policies-and-value-functions-interview.md) · [notebook](./04_policies_and_value_functions.ipynb) · [experiments](./04_policies_and_value_functions_experiments.ipynb) |
+| Bellman Equations — Bellman expectation, optimality, dynamic programming | [Core] | [md](./bellman-equations.md) · [interview](./bellman-equations-interview.md) · [notebook](./05_bellman_equations.ipynb) · [experiments](./05_bellman_equations_experiments.ipynb) |
+
 ## What's Next?
 
 After completing this section, proceed to:

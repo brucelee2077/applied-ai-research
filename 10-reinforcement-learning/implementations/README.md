@@ -1,6 +1,8 @@
 # RL Implementations
 
-Reusable code for RL experiments.
+Reusable code library for RL experiments. This directory contains shared agent implementations, custom environments, and utility functions used across the module's notebooks.
+
+This is a code utility directory — it has no topic files or coverage map.
 
 ## Structure
 

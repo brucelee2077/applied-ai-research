@@ -1,12 +1,27 @@
 # Human Evaluation
 
-## Why Do We Need Humans?
+Two AI chatbots are tested on the same question. Bot A gives a technically correct answer that is dry and confusing. Bot B gives a slightly less precise answer that is clear, helpful, and friendly. Which one is better?
 
-Imagine you wrote a poem and asked a calculator to grade it. The calculator could
-count the words, check the spelling, and verify the rhyming pattern. But could it
-tell you if the poem was **beautiful**? **Moving**? **Creative**?
+BLEU says A. ROUGE says A. Perplexity says A. Every automatic metric picks A. But every human who reads both answers picks B. This is why human evaluation exists — some qualities that matter most can only be measured by people.
 
-No way! Some things only humans can judge.
+---
+
+**Before you start, you need to know:**
+- What automatic metrics are (BLEU, ROUGE, perplexity) — covered in the other files in this folder
+- Why automatic metrics sometimes miss important qualities
+- No math needed for this file
+
+---
+
+## The Poem-Grading Analogy
+
+Imagine you wrote a poem and asked a calculator to grade it. The calculator could count the words, check the spelling, and verify the rhyming pattern. But could it tell you if the poem was **beautiful**? **Moving**? **Creative**?
+
+No way. Some things only humans can judge.
+
+**What the analogy gets right:** human evaluation really is about judging qualities that are hard to turn into numbers — creativity, helpfulness, naturalness, safety.
+
+**Where the analogy breaks down:** in real human evaluation for AI, we DO try to turn these qualities into numbers (using rating scales and agreement metrics). The challenge is making those numbers reliable and consistent.
 
 **Human evaluation** is when we ask real people to read AI-generated text and rate
 its quality. It's the "gold standard" of evaluation -- more reliable than automatic
@@ -389,6 +404,25 @@ final evaluations and published results, human evaluation is still preferred.
 |               agreement = reliable evaluation                     |
 +------------------------------------------------------------------+
 ```
+
+---
+
+**Quick check — can you answer these?**
+- When would you choose human evaluation over automatic metrics?
+- Why do you need multiple judges instead of just one?
+- What is the difference between a Likert scale and A/B testing?
+
+If any of these feel unclear, go back and re-read that section. That is completely normal.
+
+---
+
+## You Just Learned the Gold Standard of AI Evaluation
+
+When OpenAI tests GPT, when Anthropic evaluates Claude, when Google assesses Gemini — they all use human evaluation as the final arbiter of quality. The Chatbot Arena leaderboard, the most influential AI ranking in the world, is powered entirely by human preferences. You now understand how that evaluation is designed, what makes it reliable, and what can go wrong. This is the real thing.
+
+---
+
+Ready to go deeper? The [interview deep-dive](./human-evaluation-interview.md) covers Cohen's and Fleiss' Kappa derivations, Krippendorff's alpha, study design (sample size, power analysis), ELO rating systems, LLM-as-Judge pitfalls, and staff-level interview questions.
 
 ---
 

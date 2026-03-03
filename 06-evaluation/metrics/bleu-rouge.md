@@ -1,16 +1,30 @@
 # BLEU & ROUGE
 
-## The Big Idea
+Here is a puzzle: you ask an AI to translate "The dog is happy" into French. It outputs "Le chien est joyeux." A human translator wrote "Le chien est content." Both are perfectly correct translations — but the AI used completely different words from the reference. How do you score that automatically?
 
-Imagine you asked two students to summarize the same book chapter. How would you
-grade them? You'd probably compare their summaries to a "model answer" and see
-how much they match.
+This is the core challenge of measuring translation and summarization quality. BLEU and ROUGE are the two most widely used metrics for this problem. They are not perfect — that puzzle above is one of their known weaknesses — but they are fast, standardized, and good enough to have been the default metrics in NLP for over two decades.
 
-**BLEU and ROUGE work the same way.** They compare text that an AI generated
-to a "reference" (the correct or ideal answer) and measure how similar they are.
+---
 
-- **BLEU** = Used mostly for **translation** ("Did the AI translate this correctly?")
-- **ROUGE** = Used mostly for **summarization** ("Did the AI capture the key points?")
+**Before you start, you need to know:**
+- What a "reference" answer is — the correct or ideal output written by a human
+- What precision and recall mean — covered in [classification-metrics.md](./classification-metrics.md)
+- No math needed for this file
+
+---
+
+## The Grading Analogy
+
+Imagine you asked two students to summarize the same book chapter. How would you grade them? You would probably compare their summaries to a "model answer" and see how much they match.
+
+**BLEU and ROUGE work the same way.** They compare text that an AI generated to a reference (the correct or ideal answer) and measure how similar they are.
+
+- **BLEU** is used mostly for **translation** — "Did the AI translate this correctly?"
+- **ROUGE** is used mostly for **summarization** — "Did the AI capture the key points?"
+
+**What the analogy gets right:** both metrics really do compare the AI's output word-by-word against a reference answer, just like a teacher checking answers against an answer key.
+
+**Where the analogy breaks down:** a real teacher understands meaning — they would give full credit for "happy" and "joyful" because they mean the same thing. BLEU and ROUGE only match exact words. Synonyms get zero credit.
 
 ```
 +----------------------------------------------------------------+
@@ -28,12 +42,11 @@ to a "reference" (the correct or ideal answer) and measure how similar they are.
 
 ---
 
-## Understanding BLEU (Bilingual Evaluation Understudy)
+## Understanding BLEU
 
-Don't worry about the fancy name. BLEU just means: "How many words and phrases
-in the AI's translation also appear in the correct translation?"
+BLEU stands for Bilingual Evaluation Understudy. It answers: "How many words and phrases in the AI's translation also appear in the correct translation?"
 
-### The Simplest Version: Word Matching
+### Word Matching: The Simplest Version
 
 ```
 Reference (correct translation):
@@ -59,8 +72,7 @@ BLEU score = lower (but still decent because most words match)
 
 ### N-grams: Not Just Single Words
 
-BLEU doesn't just check individual words. It also checks **n-grams** -- groups
-of consecutive words.
+BLEU does not just check individual words. It also checks **n-grams** — groups of consecutive words.
 
 ```
 What are n-grams? Just groups of words next to each other:
@@ -85,25 +97,18 @@ But wait -- the sentence makes no sense!
 2-gram check: "mat the" -- nope! "the on" -- nope!
               0 out of 5 match (0%)
 
-This is why n-grams are important -- they check word ORDER too.
+N-grams catch word order problems that single words miss.
 ```
 
-### How BLEU Is Calculated (Simplified)
+### How BLEU Works (Plain Language)
 
-```
-+------------------------------------------------------------------+
-|                     BLEU Calculation Steps                        |
-|                                                                  |
-|  1. Count matching 1-grams  -->  Precision_1                    |
-|  2. Count matching 2-grams  -->  Precision_2                    |
-|  3. Count matching 3-grams  -->  Precision_3                    |
-|  4. Count matching 4-grams  -->  Precision_4                    |
-|  5. Average them together (using geometric mean)                 |
-|  6. Apply "brevity penalty" (if AI's text is too short)          |
-|                                                                  |
-|  BLEU = Brevity_Penalty x exp(average of log precisions)         |
-+------------------------------------------------------------------+
-```
+BLEU follows these steps:
+
+1. Count how many 1-grams (single words) in the AI's output match the reference
+2. Count how many 2-grams (word pairs) match
+3. Count how many 3-grams and 4-grams match
+4. Combine all four scores together
+5. Apply a **brevity penalty** if the AI's output is much shorter than the reference
 
 **Why the brevity penalty?** Without it, an AI could cheat:
 
@@ -111,7 +116,7 @@ This is why n-grams are important -- they check word ORDER too.
 Reference: "The beautiful cat sat gracefully on the soft mat"
 AI output: "The"
 
-Precision = 1/1 = 100% (the one word it said was correct!)
+Word precision = 1/1 = 100% (the one word it said was correct!)
 But that's obviously a terrible translation.
 
 The brevity penalty reduces the score when the AI's output
@@ -123,27 +128,21 @@ is much shorter than the reference.
 | BLEU Score | Quality | What It Means |
 |-----------|---------|---------------|
 | 0.0 | Terrible | Nothing matches at all |
-| 0.1 - 0.2 | Poor | Some words match but mostly wrong |
-| 0.2 - 0.3 | Okay | Understandable but has many errors |
-| 0.3 - 0.4 | Good | Good translation with some issues |
-| 0.4 - 0.5 | Very good | High quality translation |
+| 0.1 – 0.2 | Poor | Some words match but mostly wrong |
+| 0.2 – 0.3 | Okay | Understandable but has many errors |
+| 0.3 – 0.4 | Good | Good translation with some issues |
+| 0.4 – 0.5 | Very good | High quality translation |
 | 0.5+ | Excellent | Near-human quality (rare!) |
 
 ---
 
-## Understanding ROUGE (Recall-Oriented Understudy for Gisting Evaluation)
+## Understanding ROUGE
 
-Another fancy name, but ROUGE is just BLEU's cousin with a different focus.
+ROUGE stands for Recall-Oriented Understudy for Gisting Evaluation. Where BLEU asks "How much of what the AI said is correct?" (precision), ROUGE asks "How much of the important stuff did the AI include?" (recall).
 
-Where BLEU asks "How much of what the AI said is correct?" (precision),
-ROUGE asks "How much of the important stuff did the AI include?" (recall).
-
-This makes ROUGE perfect for **summarization**, where we want to make sure
-the AI captured all the key points.
+This makes ROUGE a natural fit for **summarization**, where we want to make sure the AI captured all the key points.
 
 ### ROUGE Variants
-
-There are several types of ROUGE. Here are the main ones:
 
 ```
 +-------------------------------------------------------------------+
@@ -172,35 +171,25 @@ AI's summary:
 ROUGE-1 (word overlap):
   Matching words: "The", "president", "signed", "new", "climate", "bill"
   Reference has 10 words, 6 match
-  ROUGE-1 Recall = 6/10 = 0.60
-
-  AI output has 9 words, 6 match
-  ROUGE-1 Precision = 6/9 = 0.67
-
-  F1 = 2 x (0.60 x 0.67) / (0.60 + 0.67) = 0.63
+  ROUGE-1 Recall = 6 out of 10 = 60%
 
 ROUGE-2 (pair overlap):
-  Reference pairs: "The president", "president signed", "signed the",
-                   "the new", "new climate", "climate bill", etc.
-  AI pairs:        "The president", "president signed", "signed a",
-                   "a new", "new bill", etc.
+  Reference pairs: "The president", "president signed", "signed the", ...
+  AI pairs:        "The president", "president signed", "signed a", ...
   Matching pairs: "The president", "president signed"
   Fewer matches because word ORDER matters more with pairs.
 ```
 
 ### ROUGE-L: Longest Common Subsequence
 
-ROUGE-L uses a clever trick called **Longest Common Subsequence (LCS)**.
-Instead of checking exact consecutive matches, it finds the longest sequence
-of words that appear in the same ORDER in both texts (they don't have to be
-right next to each other).
+ROUGE-L uses a clever trick. Instead of checking exact consecutive matches, it finds the longest sequence of words that appear in the same ORDER in both texts. The words do not have to be right next to each other.
 
 ```
 Reference: "The cat sat on the mat"
 AI output: "The cat was sitting on a mat"
 
-LCS: "The cat" ... "on" ... "mat" = 4 words in order
-     (skips "was sitting" and "a")
+Longest Common Subsequence: "The cat" ... "on" ... "mat" = 4 words in order
+(skips "was sitting" and "a")
 
 This is forgiving of minor wording differences while still
 checking that the key content appears in the right order.
@@ -216,7 +205,6 @@ checking that the key content appears in the right order.
 | **Best for** | Machine translation | Text summarization |
 | **Question it answers** | "How much of what the AI wrote matches the reference?" | "How much of the reference did the AI capture?" |
 | **Score range** | 0 to 1 (higher = better) | 0 to 1 (higher = better) |
-| **Typical use** | Comparing translation models | Comparing summarization models |
 
 ```
 +-------------------------------------------------------------------+
@@ -233,81 +221,36 @@ checking that the key content appears in the right order.
 
 ---
 
-## Limitations -- What BLEU and ROUGE Miss
+## What BLEU and ROUGE Miss
 
-Both BLEU and ROUGE have significant limitations:
+Both metrics have real limitations:
 
-```
-+-------------------------------------------------------------------+
-|         Why These Metrics Aren't Perfect                          |
-|                                                                   |
-|  1. WORD MATCHING ISN'T UNDERSTANDING                            |
-|                                                                   |
-|     Reference: "The dog is happy"                                 |
-|     AI output: "The puppy is joyful"                              |
-|     BLEU/ROUGE: Low score! (different words)                      |
-|     Reality: This is a GREAT answer! Same meaning!                |
-|                                                                   |
-|  2. SAME WORDS DON'T MEAN SAME THING                            |
-|                                                                   |
-|     Reference: "The bank is by the river"                         |
-|     AI output: "I went to the bank for money by the river"       |
-|     BLEU/ROUGE: High score! (many matching words)                 |
-|     Reality: "bank" means different things!                       |
-|                                                                   |
-|  3. ONLY ONE "RIGHT" ANSWER                                     |
-|                                                                   |
-|     There are many ways to say the same thing.                    |
-|     These metrics penalize valid alternatives.                    |
-+-------------------------------------------------------------------+
-```
+**1. Word matching is not understanding.** "The dog is happy" and "The puppy is joyful" mean the same thing, but BLEU and ROUGE give low scores because the words are different.
 
-Despite these limitations, BLEU and ROUGE remain widely used because:
-- They're fast and automatic (no humans needed)
-- They're standardized (everyone uses the same formula)
-- They correlate reasonably well with human judgment for their specific tasks
-- They're useful for comparing models during development
+**2. Same words can mean different things.** "The bank is by the river" and "I went to the bank for money by the river" share many words, but "bank" means different things.
 
-For tasks where these limitations matter most, use [Human Evaluation](./human-evaluation.md)
-alongside these metrics.
+**3. Only one "right" answer.** There are many ways to say the same thing. These metrics penalize valid alternatives.
+
+Despite these limitations, BLEU and ROUGE remain widely used because they are fast, automatic, standardized, and correlate reasonably well with human judgment for their specific tasks. For tasks where these limitations matter most, use [Human Evaluation](./human-evaluation.md) alongside these metrics.
 
 ---
 
-## Summary
+**Quick check — can you answer these?**
+- What is the difference between what BLEU measures and what ROUGE measures?
+- Why does BLEU use n-grams instead of just single words?
+- Give an example of a good translation that BLEU would score poorly.
 
-```
-+------------------------------------------------------------------+
-|                  BLEU & ROUGE Cheat Sheet                        |
-|                                                                  |
-|  BLEU:                                                           |
-|    What:     Measures translation quality via word matching       |
-|    Focus:    Precision (is the output correct?)                   |
-|    Range:    0 to 1 (higher = better, 0.4+ is very good)         |
-|    Method:   Compares n-grams + brevity penalty                  |
-|                                                                  |
-|  ROUGE:                                                          |
-|    What:     Measures summary quality via content overlap         |
-|    Focus:    Recall (did it capture the key points?)              |
-|    Range:    0 to 1 (higher = better)                             |
-|    Variants: ROUGE-1 (words), ROUGE-2 (pairs), ROUGE-L (longest) |
-|                                                                  |
-|  Both:                                                           |
-|    Limitation: Word matching != understanding meaning             |
-|    Use with:   Human evaluation for best results                  |
-+------------------------------------------------------------------+
-```
+If any of these feel unclear, go back and re-read that section. That is completely normal.
 
 ---
 
-## Further Reading
+## You Just Learned How AI Translations and Summaries Are Graded
 
-- **BLEU: a Method for Automatic Evaluation of Machine Translation** -- Papineni et al., 2002
-  - The original paper that introduced BLEU
-- **ROUGE: A Package for Automatic Evaluation of Summaries** -- Lin, 2004
-  - The original paper that introduced ROUGE
-- **BERTScore** -- Zhang et al., 2020
-  - A newer metric that uses word meanings (embeddings) instead of exact word matching,
-    addressing many BLEU/ROUGE limitations
+Every machine translation paper since 2002 reports BLEU scores. Every summarization paper reports ROUGE. When Google Translate improves, they measure it with BLEU. When a new summarization model is released, they compare it using ROUGE. You now know exactly what those numbers mean, why they are useful, and where they fall short. That knowledge puts you ahead of most people who just see the numbers without understanding what is behind them.
+
+---
+
+Ready to go deeper? The [interview deep-dive](./bleu-rouge-interview.md) covers the exact formulas (modified n-gram precision with clipping, brevity penalty derivation, ROUGE-L LCS algorithm), failure modes, BERTScore/METEOR/CIDEr alternatives, and staff-level interview questions.
 
 ---
 

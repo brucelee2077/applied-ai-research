@@ -102,6 +102,10 @@ ALL_MODULES = [
     # Neural networks / foundations
     "rnn",
     "transformers",
+    # RAG
+    "rag",
+    # Fine-tuning
+    "fine-tuning",
 ]
 
 # Study notebooks per module (not the boss notebook)
@@ -183,13 +187,28 @@ MODULE_STUDY_NOTEBOOKS: dict[str, list[str]] = {
         "03_positional_encoding.ipynb",
         "04_transformer_block.ipynb",
     ],
+    # RAG
+    "rag": [
+        "01_what_is_rag.ipynb",
+    ],
+    # Fine-tuning
+    "fine-tuning": [
+        "01_what_is_fine_tuning.ipynb",
+        "02_full_fine_tuning.ipynb",
+        "02_full_fine_tuning_experiments.ipynb",
+        "03_lora.ipynb",
+        "03_lora_experiments.ipynb",
+        "04_qlora.ipynb",
+        "05_instruction_tuning.ipynb",
+        "05_instruction_tuning_experiments.ipynb",
+    ],
 }
 
 # ── Default state factory ──────────────────────────────────────────────────────
 def _default_state() -> dict:
     modules = {}
     # Foundations modules are always unlocked; ML Design skill tree starts at module 01
-    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers"}
+    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning"}
     for mid in ALL_MODULES:
         modules[mid] = {
             "unlocked": mid in ALWAYS_UNLOCKED,

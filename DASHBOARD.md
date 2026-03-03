@@ -1,14 +1,14 @@
 # ML Interview Training Dashboard
-> Last updated: 2026-02-28 08:08 | Session #16
+> Last updated: 2026-02-28 09:44 | Session #20
 
 ---
 
 ## Player Status
 
-**Level 1 — ML Intern** | 115 XP total | 11 Tokens | 2 Streak Shield(s)
+**Level 1 — ML Intern** | 125 XP total | 12 Tokens | 2 Streak Shield(s)
 
 **XP Progress → Level 2 (Junior MLE):**
-[###############################.........]  115 / 150 XP
+[#################################.......]  125 / 150 XP
 
 ---
 
@@ -75,12 +75,12 @@ Last 21 days:
 Position: **#1035 of 1247** active students
 
 ```
-YOU  (   115 XP)  [..............................]
+YOU  (   125 XP)  [..............................]
 TOP  ( 8,200 XP)  [##############################]
 AVG  (   400 XP)  [#.............................]
 ```
 
-Your XP this week: **+40 XP**
+Your XP this week: **+50 XP**
 
 
 ---
@@ -120,8 +120,8 @@ No concepts due for review today. Keep studying to build your queue!
 | 2026-02-28 | Rnn | 0 min | +0 XP |
 | 2026-02-28 | Transformers | 0 min | +10 XP |
 | 2026-02-28 | Transformers | 0 min | +0 XP |
-| 2026-02-27 | Rnn | 0 min | +10 XP |
-| 2026-02-27 | Rnn | 0 min | +0 XP |
+| 2026-02-28 | Rag | 0 min | +10 XP |
+| 2026-02-28 | Rag | 0 min | +0 XP |
 | 2026-02-27 | Rnn | 0 min | +10 XP |
 
 ---

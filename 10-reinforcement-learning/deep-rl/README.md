@@ -37,6 +37,17 @@ This section covers combining deep neural networks with reinforcement learning t
 | Double DQN | Reduce overestimation bias |
 | Dueling DQN | Separate state value and advantage |
 
+## Coverage Map
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Function Approximation — why tabular methods fail at scale | [Core] | [md](./function-approximation.md) · [interview](./function-approximation-interview.md) · [notebook](./01_function_approximation.ipynb) · [experiments](./01_function_approximation_experiments.ipynb) |
+| DQN from Scratch — implementing DQN in PyTorch | [Core] | [md](./dqn-from-scratch.md) · [interview](./dqn-from-scratch-interview.md) · [notebook](./02_dqn_from_scratch.ipynb) · [experiments](./02_dqn_from_scratch_experiments.ipynb) |
+| Experience Replay — breaking correlation with replay buffers | [Core] | [md](./experience-replay.md) · [interview](./experience-replay-interview.md) · [notebook](./03_experience_replay.ipynb) · [experiments](./03_experience_replay_experiments.ipynb) |
+| Target Networks — stabilizing DQN training | [Core] | [md](./target-networks.md) · [interview](./target-networks-interview.md) · [notebook](./04_target_networks.ipynb) · [experiments](./04_target_networks_experiments.ipynb) |
+| DQN Improvements — Double DQN, Dueling DQN, Rainbow | [Core] | [md](./dqn-improvements.md) · [interview](./dqn-improvements-interview.md) · [notebook](./05_dqn_improvements.ipynb) · [experiments](./05_dqn_improvements_experiments.ipynb) |
+| Atari Games — playing games with learned agents | [Core] | [md](./atari-games.md) · [interview](./atari-games-interview.md) · [notebook](./06_atari_games.ipynb) · [experiments](./06_atari_games_experiments.ipynb) |
+
 ## What's Next?
 
 After this section:

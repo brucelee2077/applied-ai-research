@@ -1,176 +1,89 @@
 # Audio-Language Models
 
-## What Are Audio-Language Models?
+Close your eyes and listen. You can tell if someone is happy or sad just from their voice. You can recognize a song after hearing two seconds. You can follow a conversation in a noisy restaurant. Your brain turns sound waves into meaning effortlessly.
 
-Think about how you experience a conversation. You **hear** words (audio), your brain
-converts them to **meaning** (language), and you respond with **speech** (back to audio).
-Audio-language models do the same thing for computers.
+Computers struggled with this for decades. Then, in 2022, a model called Whisper listened to 680,000 hours of audio and learned to do what seemed impossible: transcribe speech in 99 languages, translate between them, and handle accents, background noise, and technical terms — all in a single model. How?
 
-These models bridge the gap between **sound** and **text**, enabling:
-- **Speech-to-text** (transcription) -- Hear audio, write it down
-- **Text-to-speech** (synthesis) -- Read text, speak it aloud
-- **Audio understanding** -- Understand what's happening in audio (music, sounds, speech)
+The answer starts with a surprisingly visual trick: turn sound into a picture.
 
-```
-+-------------------------------------------------------------------+
-|              Audio-Language Model Tasks                            |
-|                                                                   |
-|   Speech Recognition (ASR):                                       |
-|     [audio: "Hello, how are you?"] --> "Hello, how are you?"     |
-|                                                                   |
-|   Text-to-Speech (TTS):                                           |
-|     "Welcome to the show" --> [natural-sounding audio]           |
-|                                                                   |
-|   Audio Classification:                                            |
-|     [sound clip] --> "Dog barking" / "Car horn" / "Piano music"  |
-|                                                                   |
-|   Speech Translation:                                              |
-|     [audio in French] --> "Hello" (translated English text)       |
-+-------------------------------------------------------------------+
-```
+**Before you start, you need to know:**
+- What a neural network does at a high level — covered in [00-neural-networks](../../00-neural-networks/)
+- What an encoder and decoder are — covered in [multimodal README](../README.md)
 
 ---
 
-## Speech Recognition: How AI Hears
+## The Analogy: A Conversation with a Friend
 
-**Automatic Speech Recognition (ASR)** converts spoken audio into written text.
-This is what powers voice assistants (Siri, Alexa), video subtitles, and
-meeting transcription tools.
+Think about how you experience a conversation. You **hear** words (sound waves hit your ears), your brain converts them into **meaning** (you understand what was said), and you can respond with **speech** (your vocal cords produce sound waves). Audio-language models do the same three things:
 
-### How It Works (Simplified)
+- **Speech-to-text (ASR):** Hear audio, write it down
+- **Text-to-speech (TTS):** Read text, speak it aloud
+- **Audio understanding:** Listen to any sound and describe what is happening
 
-```
-+-------------------------------------------------------------------+
-|              Speech Recognition Pipeline                          |
-|                                                                   |
-|   1. RAW AUDIO                                                    |
-|      Sound waves captured by a microphone                         |
-|      (just a list of numbers representing air pressure)           |
-|                                                                   |
-|   2. SPECTROGRAM                                                   |
-|      Convert audio to a visual representation                     |
-|      (an "image" of the sound over time)                          |
-|                                                                   |
-|      Time  -->                                                    |
-|      Freq  ........###.......                                     |
-|       |    .....###...###....                                     |
-|       v    ..###.........###.                                     |
-|            ###.............##                                     |
-|                                                                   |
-|   3. ENCODER                                                      |
-|      Process the spectrogram with a neural network                |
-|      (like reading the "image" of the sound)                      |
-|                                                                   |
-|   4. DECODER                                                      |
-|      Generate text tokens one at a time                           |
-|      "Hello" --> "how" --> "are" --> "you"                        |
-+-------------------------------------------------------------------+
-```
+**What the analogy gets right:**
+- Your brain processes sound in stages: raw sound waves first, then patterns (phonemes, words), then meaning. Audio models follow the same pipeline.
+- You can handle noise, accents, and overlapping voices — and so can modern models like Whisper.
+- You can both listen (ASR) and speak (TTS) — models can do both directions too.
 
-### Whisper: OpenAI's Speech Model
-
-**Whisper** (2022) is the most popular open-source speech recognition model.
-
-```
-+-------------------------------------------------------------------+
-|                    Whisper Overview                                |
-|                                                                   |
-|   Trained on: 680,000 hours of audio from the internet            |
-|   Languages:  99 languages                                        |
-|   Tasks:      Transcription, translation, language detection      |
-|                                                                   |
-|   Model sizes:                                                    |
-|     tiny   (39M params)  -- Fast, less accurate                  |
-|     base   (74M params)  -- Good balance                          |
-|     small  (244M params) -- Better accuracy                       |
-|     medium (769M params) -- High quality                          |
-|     large  (1.5B params) -- Best quality                          |
-|                                                                   |
-|   Architecture: Encoder-Decoder Transformer                       |
-|     Encoder: Processes the audio spectrogram                      |
-|     Decoder: Generates text tokens                                |
-+-------------------------------------------------------------------+
-```
-
-**What makes Whisper special:**
-- Works across 99 languages
-- Can translate speech from one language to English text
-- Handles background noise, accents, and technical terms well
-- Completely open-source and free
+**Where the analogy breaks down:** Your brain learns language from a few thousand hours of conversation over years. Whisper learned from 680,000 hours of audio in one massive training run. You understand *meaning* — Whisper finds statistical patterns. You can ask "what did you mean by that?" — Whisper cannot.
 
 ---
 
-## Text-to-Speech: How AI Speaks
+## Turning Sound into a Picture: The Spectrogram
 
-**Text-to-Speech (TTS)** does the reverse -- it converts written text into
-natural-sounding speech.
+Here is the surprising trick at the heart of speech recognition: **convert audio into an image, then process that image with a neural network.**
 
-### The Evolution of TTS
+A **spectrogram** is a picture of sound. The horizontal axis is time. The vertical axis is pitch (frequency). The brightness shows how loud each pitch is at each moment.
 
 ```
-+-------------------------------------------------------------------+
-|              TTS Through the Ages                                 |
-|                                                                   |
-|   1960s-1990s: Rule-based                                          |
-|     "Hello" --> [robotic voice, like old GPS]                     |
-|     Method: Manually programmed pronunciation rules               |
-|                                                                   |
-|   2000s-2015: Concatenative                                        |
-|     "Hello" --> [more natural but slightly choppy]                |
-|     Method: Stitch together recorded audio snippets               |
-|                                                                   |
-|   2016-2020: Neural TTS (WaveNet, Tacotron)                       |
-|     "Hello" --> [very natural sounding]                           |
-|     Method: Neural networks generate audio directly               |
-|                                                                   |
-|   2023+: LLM-based TTS                                            |
-|     "Hello" --> [indistinguishable from human]                    |
-|     Method: Treat speech as "tokens" like text                    |
-|     Models: ElevenLabs, OpenAI TTS, Bark                         |
-+-------------------------------------------------------------------+
+   Spectrogram: "Hello"
+
+   High pitch  |  .   .       .  .
+               |  ..  ..     ..  ..
+               | ... ....   ... ...
+   Low pitch   | .... ..... ........
+               +------------------------
+                  H   e   l   l   o
+                       Time -->
 ```
 
-### Modern TTS Models
+Your voice makes different pitch patterns for each sound. The letter "s" has energy at high pitches. The letter "o" has energy at low pitches. A spectrogram captures all of this in one picture.
 
-| Model | Type | Key Feature |
-|-------|------|-------------|
-| **OpenAI TTS** | API | High quality, multiple voices |
-| **ElevenLabs** | API | Voice cloning, emotional control |
-| **Bark** | Open-source | Can generate music and sound effects too |
-| **Coqui TTS** | Open-source | Many languages, voice cloning |
-| **XTTS** | Open-source | Cross-lingual voice cloning |
+Once speech is a picture, you can use the same tools that work for images — transformers, convolutions, attention — to process it. That is why modern speech models are so powerful: they reuse all the advances from computer vision.
 
 ---
 
-## Cross-Modal Learning
+## How Speech Recognition Works
 
-The frontier of audio-language research is building models that truly
-**understand** the connection between audio and language, not just convert
-one to the other.
-
-### Audio-Language Models (Beyond ASR/TTS)
+The pipeline is simple once you know the spectrogram trick:
 
 ```
-+-------------------------------------------------------------------+
-|              Audio Understanding Models                            |
-|                                                                   |
-|   CLAP (Contrastive Language-Audio Pre-training):                 |
-|     Like CLIP but for audio! Aligns audio and text in             |
-|     a shared embedding space.                                      |
-|                                                                   |
-|     "Sound of rain" <--> [audio of rainfall]                     |
-|     "Dog barking"   <--> [audio of dog bark]                     |
-|                                                                   |
-|   AudioPaLM / Gemini:                                              |
-|     Natively multimodal -- can process text, images, AND          |
-|     audio in a single model.                                       |
-|                                                                   |
-|   Use cases:                                                       |
-|     - "What instrument is playing?" (audio QA)                    |
-|     - "Find sounds similar to this clip" (audio search)           |
-|     - "Describe what you hear" (audio captioning)                 |
-+-------------------------------------------------------------------+
+   1. RAW AUDIO
+      Sound waves from a microphone
+      (just a list of numbers: air pressure over time)
+
+   2. SPECTROGRAM
+      Convert audio to a picture of sound
+      (which pitches are present at each moment)
+
+   3. ENCODER
+      A neural network reads the "picture"
+      (extracts patterns: phonemes, words, context)
+
+   4. DECODER
+      Generates text tokens one at a time
+      "Hello" --> "how" --> "are" --> "you"
 ```
+
+This is the architecture Whisper uses. The encoder is a transformer that processes the spectrogram. The decoder is a transformer that generates text. The two are connected by cross-attention — the decoder can look back at any part of the audio while generating each word.
+
+---
+
+## Text-to-Speech: Going the Other Way
+
+Text-to-speech (TTS) does the reverse — it takes written text and produces natural-sounding audio. Modern TTS models sound so natural that most people cannot tell the difference from a real human voice.
+
+The key breakthrough: instead of hand-coding pronunciation rules, modern TTS models learn to generate audio by training on thousands of hours of recorded speech. They learn rhythm, stress, emotion, and natural pauses directly from data.
 
 ---
 
@@ -178,45 +91,29 @@ one to the other.
 
 | Concept | Explanation |
 |---------|-------------|
-| **Spectrogram** | A visual representation of audio -- shows which frequencies are present at each moment in time |
-| **Mel scale** | A frequency scale that matches how humans perceive sound (we're better at distinguishing low-pitched sounds) |
-| **ASR** | Automatic Speech Recognition -- audio to text |
-| **TTS** | Text-to-Speech -- text to audio |
+| **Spectrogram** | A picture of sound — shows which pitches are present at each moment in time |
+| **Mel scale** | A way of measuring pitch that matches how humans hear — we are better at telling apart low sounds than high sounds |
+| **ASR** | Automatic Speech Recognition — audio to text |
+| **TTS** | Text-to-Speech — text to audio |
 | **Diarization** | Figuring out "who spoke when" in a conversation with multiple speakers |
-| **Voice cloning** | Creating a synthetic voice that sounds like a specific person |
-| **Prosody** | The rhythm, stress, and intonation of speech (what makes it sound natural vs robotic) |
 
 ---
 
-## Summary
+## Quick Check — Can You Answer These?
 
-```
-+------------------------------------------------------------------+
-|            Audio-Language Models Cheat Sheet                      |
-|                                                                  |
-|  Speech-to-Text (ASR):                                           |
-|    Best model: Whisper (open-source, 99 languages)               |
-|    How: Audio --> Spectrogram --> Encoder --> Decoder --> Text    |
-|                                                                  |
-|  Text-to-Speech (TTS):                                           |
-|    Best models: OpenAI TTS, ElevenLabs (API), Bark (open)       |
-|    How: Text --> Neural network --> Audio waveform               |
-|                                                                  |
-|  Audio Understanding:                                             |
-|    Emerging area: CLAP, AudioPaLM                                |
-|    Like CLIP but for audio + text alignment                      |
-+------------------------------------------------------------------+
-```
+- Why is converting audio to a spectrogram useful? What does it allow us to reuse?
+- What are the four steps in the speech recognition pipeline?
+- What is the difference between ASR and TTS?
+
+If you cannot answer one, go back and re-read that section. That is completely normal.
 
 ---
 
-## Further Reading
+## What You Just Learned
 
-- **Whisper: Robust Speech Recognition via Large-Scale Weak Supervision** -- Radford et al., 2022
-- **WaveNet: A Generative Model for Raw Audio** -- van den Oord et al., 2016
-  - The paper that made neural TTS sound natural
-- **CLAP: Learning Audio Concepts From Natural Language Supervision** -- Elizalde et al., 2023
-- **AudioPaLM: A Large Language Model That Can Speak and Listen** -- Rubenstein et al., 2023
+You now understand how Siri, Alexa, Google Assistant, and every voice-powered app works under the hood. The spectrogram trick — turning sound into a picture — is the foundation of all modern speech recognition. And the encoder-decoder transformer architecture that Whisper uses is the same architecture behind machine translation, text generation, and dozens of other AI breakthroughs.
+
+Ready to go deeper? The math behind spectrograms, Whisper's architecture, failure modes, and interview questions are in [audio-language-interview.md](./audio-language-interview.md).
 
 ---
 

@@ -1,56 +1,33 @@
 # 6. Evaluation & Benchmarking
 
-## What is Evaluation?
+Your model just finished training. It took hours — maybe days. It cost real money. Now comes the question nobody can dodge: **is it actually any good?**
 
-Imagine you bake a cake. How do you know if it's any good? You could taste it yourself,
-ask your friends to rate it, or enter it in a baking contest where judges score it
-against other cakes.
+Here is the strange part. A model can get 99% accuracy and still be completely useless. A model can score perfectly on a standardized test and fail at real conversations. Two teams can test the same model and get opposite conclusions. How is that possible?
 
-**Evaluation in AI works the same way.** When we build an AI model (like a chatbot or
-a translator), we need ways to measure: _"Is this model actually doing a good job?"_
-
-Without evaluation, we'd be flying blind -- we'd have no idea if our AI is getting
-better, getting worse, or just making things up.
-
-```
-+-----------------------------------------------------------------------+
-|                    Why Evaluation Matters                              |
-|                                                                       |
-|   Without evaluation:          With evaluation:                       |
-|                                                                       |
-|   "I think the model           "The model gets 92% of                 |
-|    is pretty good?"    vs       answers correct, up from              |
-|         /                       85% last week"                        |
-|      (shrug)                         |                                |
-|                                (confident!)                           |
-+-----------------------------------------------------------------------+
-```
+Evaluation is how you answer the question "is this model working?" — and the answer is almost never a single number. This module gives you the tools to ask that question properly.
 
 ---
 
-## Wait, What Are We Evaluating?
+**Before you start, you need to know:**
+- What an AI model does at a high level — it takes input and produces output
+- What training means — the model learns patterns from data
+- No math needed for this overview
 
-Before we dive in, let's cover some terms you'll see everywhere:
+---
 
-**AI Model** -- A computer program that has learned patterns from data. Think of it
-like a student who studied millions of examples and can now answer new questions.
+## The Cake-Baking Analogy
 
-**LLM (Large Language Model)** -- A specific type of AI model that works with text.
-It has read billions of pages and can write, translate, summarize, and answer questions.
+Imagine you bake a cake. How do you know if it is any good?
 
-**Key terms explained simply:**
+You could taste it yourself. You could ask your friends to rate it. You could enter it in a baking contest where judges score it against other cakes. Each method tells you something different, and none of them alone tells the whole story.
 
-| Term | Simple Explanation |
-|------|-------------------|
-| **Metric** | A number that tells you how good (or bad) your model is. Like a grade on a test |
-| **Benchmark** | A standardized test for AI models -- like the SATs, but for AI. Everyone takes the same test so you can compare scores fairly |
-| **Ground truth** | The correct answer. When testing a model, you need to know what the RIGHT answer is so you can check if the model got it right |
-| **Accuracy** | The simplest metric: what percentage of answers did the model get correct? (e.g., 90% = got 9 out of 10 right) |
-| **Precision** | Out of all the things the model SAID were correct, how many actually were? (If it says "these 10 emails are spam," and 8 really are, precision = 80%) |
-| **Recall** | Out of all the things that ARE correct, how many did the model find? (If there are 10 spam emails and the model only caught 6, recall = 60%) |
-| **F1 Score** | A single number that balances precision and recall. Think of it as the "overall grade" when you care about both |
-| **Loss** | How wrong the model is. Lower loss = better model. Like golf -- lower scores win |
-| **Overfitting** | When a model memorizes the test answers instead of actually learning. It scores great on practice tests but fails on new ones |
+**Evaluation in AI works the same way.** When we build a model (like a chatbot or a translator), we need ways to measure: _"Is this model actually doing a good job?"_
+
+Without evaluation, we are flying blind — we have no idea if our AI is getting better, getting worse, or just making things up.
+
+**What the analogy gets right:** just like cake tasting, AI evaluation comes in different forms — automatic scoring (like a recipe checklist), human judgment (like a taste test), and standardized competitions (like a baking contest). You need more than one method to get the full picture.
+
+**Where the analogy breaks down:** cake quality is subjective — there is no single "correct" cake. Some AI tasks DO have objectively correct answers, which makes automatic evaluation possible in ways that cake-judging never could be.
 
 ---
 
@@ -75,13 +52,11 @@ Some tasks have clear right/wrong answers. A computer can check them automatical
 +-----------------------------------------------+
 ```
 
-We use **metrics** (like BLEU, ROUGE, and Perplexity) to automatically score models.
-These are covered in the [Metrics](./metrics/) section.
+We use **metrics** — numbers that score how well a model performs — to automatically grade models. Classification metrics, perplexity, BLEU, and ROUGE are all covered in the [Metrics](./metrics/) section.
 
 ### 2. Human Evaluation: "Do we need a human to judge it?"
 
-Some tasks don't have one right answer. Is a poem "good"? Is a summary "helpful"?
-Only humans can judge these things well.
+Some tasks do not have one right answer. Is a poem "good"? Is a summary "helpful"? Only humans can judge these things well.
 
 ```
 +-----------------------------------------------+
@@ -99,100 +74,13 @@ Only humans can judge these things well.
 +-----------------------------------------------+
 ```
 
-This is why we need both automatic AND human evaluation. They each catch
-different things.
-
----
-
-## Precision, Recall, and F1 -- The Big Three
-
-These three metrics show up everywhere in ML. Let's use a simple example to
-understand them.
-
-**Scenario:** You have a basket of 10 fruits. 4 are apples, 6 are oranges.
-You ask your AI to find all the apples.
-
-```
-Actual fruits:   [A] [A] [A] [A] [O] [O] [O] [O] [O] [O]
-                  4 apples         6 oranges
-
-AI's picks:      [A] [A] [A] [O]
-                  3 correct     1 wrong (it thought this orange was an apple!)
-                  (but it missed 1 real apple)
-```
-
-Now let's calculate:
-
-```
-Precision = Correct picks / Total picks = 3 / 4 = 75%
-            "Of everything I picked, how many were actually apples?"
-
-Recall    = Correct picks / Total apples = 3 / 4 = 75%
-            "Of all the real apples, how many did I find?"
-
-F1 Score  = 2 x (Precision x Recall) / (Precision + Recall)
-          = 2 x (0.75 x 0.75) / (0.75 + 0.75) = 75%
-            "A balanced grade combining both"
-```
-
-**Why do we need both Precision and Recall?**
-
-```
-+----------------------------------------------------------------+
-|  Imagine a spam filter for your email:                         |
-|                                                                |
-|  HIGH PRECISION, LOW RECALL:                                   |
-|  "I only mark emails as spam when I'm REALLY sure"            |
-|   Result: Few mistakes, but lots of spam gets through          |
-|                                                                |
-|  LOW PRECISION, HIGH RECALL:                                   |
-|  "I mark EVERYTHING suspicious as spam"                        |
-|   Result: Catches all spam, but also blocks real emails!       |
-|                                                                |
-|  F1 SCORE: Helps you find the sweet spot between them          |
-+----------------------------------------------------------------+
-```
-
----
-
-## The Confusion Matrix -- Sounds Scary, Isn't!
-
-A confusion matrix is just a 2x2 table that shows what your model got right
-and wrong. Let's use our spam filter example:
-
-```
-                        What the model predicted
-                    +--------------+--------------+
-                    |  "It's Spam" | "Not Spam"   |
-    +---------------+--------------+--------------+
-    | Actually Spam |     TP       |     FN       |
-  A |               | (True Pos.)  | (False Neg.) |
-  c |               | "Correct!    | "Oops, missed|
-  t |               |  Caught it!" |  this spam"  |
-  u +---------------+--------------+--------------+
-  a | Actually NOT  |     FP       |     TN       |
-  l | Spam          | (False Pos.) | (True Neg.)  |
-    |               | "Oops, this  | "Correct!    |
-    |               |  was real"   |  It's real"  |
-    +---------------+--------------+--------------+
-
-TP = True Positive  -- Model said spam, and it WAS spam (correct!)
-FP = False Positive -- Model said spam, but it WASN'T spam (mistake!)
-FN = False Negative -- Model said not spam, but it WAS spam (mistake!)
-TN = True Negative  -- Model said not spam, and it WASN'T spam (correct!)
-```
-
-From this table, you can calculate everything:
-- **Precision** = TP / (TP + FP) -- "Of my spam predictions, how many were right?"
-- **Recall** = TP / (TP + FN) -- "Of all real spam, how much did I catch?"
-- **Accuracy** = (TP + TN) / Total -- "Overall, how many did I get right?"
+This is why we need both automatic AND human evaluation. They each catch different things.
 
 ---
 
 ## Study Plan
 
-Here's the recommended order to learn the topics in this module. Start from the top
-and work your way down -- each topic builds on the one before it.
+Here is the recommended order to learn the topics in this module. Start from the top and work your way down — each topic builds on the one before it.
 
 ```
     START HERE
@@ -205,77 +93,68 @@ and work your way down -- each topic builds on the one before it.
             |
             v
 +---------------------------+
-|  2. Perplexity            |  The go-to metric for language models.
+|  2. Classification        |  Accuracy, precision, recall, F1 —
+|     Metrics (metrics/)    |  the foundation of all evaluation
++-----------+---------------+
+            |
+            v
++---------------------------+
+|  3. Perplexity            |  The go-to metric for language models.
 |     (metrics/)            |  "How surprised is the model?"
 +-----------+---------------+
             |
             v
 +---------------------------+
-|  3. BLEU & ROUGE          |  Metrics for translation and
+|  4. BLEU & ROUGE          |  Metrics for translation and
 |     (metrics/)            |  summarization tasks
 +-----------+---------------+
             |
             v
 +---------------------------+
-|  4. Human Evaluation      |  When numbers aren't enough --
+|  5. Human Evaluation      |  When numbers aren't enough —
 |     (metrics/)            |  getting human judges involved
 +-----------+---------------+
             |
             v
 +---------------------------+
-|  5. Benchmarks            |  The standardized "exams" used to
+|  6. Benchmarks            |  The standardized "exams" used to
 |     (benchmarks/)         |  compare AI models fairly
-+-----------+---------------+
-            |
-            v
 +---------------------------+
-|  6. Experiments           |  Try it yourself! Evaluate
-|     (experiments/)        |  models hands-on
-+---------------------------+
-```
-
-**Prerequisites:** Basic understanding of what an AI/ML model is. If you've read
-through the earlier modules (especially [00-Neural Networks](../00-neural-networks/)
-and [01-Transformers](../01-transformers/)), you're all set. If not, the explanations
-here are written to be self-contained.
-
----
-
-## Directory Structure
-
-```
-06-evaluation/
-+-- README.md                          # You are here
-+-- metrics/                           # How to measure model quality
-|   +-- README.md                      #   Overview & comparison of all metrics
-|   +-- perplexity.md                  #   How "surprised" is the model?
-|   +-- bleu-rouge.md                  #   Scoring translations & summaries
-|   +-- human-evaluation.md            #   When you need human judges
-+-- benchmarks/                        # Standardized tests for AI
-|   +-- README.md                      #   Major benchmarks explained
-+-- notebooks/                         # Hands-on Jupyter notebooks
-|   +-- 01_classification_metrics.ipynb #   Accuracy, Precision, Recall, F1
-|   +-- 02_perplexity.ipynb            #   Perplexity from scratch + GPT-2
-|   +-- 03_bleu_rouge.ipynb            #   BLEU & ROUGE from scratch
-|   +-- 04_benchmarks_demo.ipynb       #   Explore real benchmarks + MMLU
-+-- experiments/                       # Your own experiments
-    +-- (your experiments go here!)
 ```
 
 ---
 
-## Key Concepts at a Glance
+## Coverage Map
 
-| Concept | One-Line Summary | When You'll Use It |
-|---------|-----------------|-------------------|
-| **Accuracy** | % of answers the model got right | Simple classification tasks |
-| **Precision & Recall** | How exact vs. how complete the model is | When mistakes have different costs (spam, medical) |
-| **F1 Score** | Balanced grade of precision + recall | When you need one number to compare models |
-| **Perplexity** | How "surprised" the model is by text | Evaluating language models |
-| **BLEU** | Does the translation match the reference? | Machine translation |
-| **ROUGE** | Does the summary capture key content? | Text summarization |
-| **Human Evaluation** | Real people judge the output quality | Creative tasks, chatbots, anything subjective |
-| **Benchmarks** | Standardized exams for fair comparison | Comparing models against each other |
+### Metrics
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Classification Metrics — accuracy, precision, recall, F1, confusion matrix | [Core] | [classification-metrics.md](./metrics/classification-metrics.md) · [classification-metrics-interview.md](./metrics/classification-metrics-interview.md) · [01_classification_metrics.ipynb](./metrics/01_classification_metrics.ipynb) · [01_classification_metrics_experiments.ipynb](./metrics/01_classification_metrics_experiments.ipynb) |
+| Perplexity — how "surprised" the model is by text | [Core] | [perplexity.md](./metrics/perplexity.md) · [perplexity-interview.md](./metrics/perplexity-interview.md) · [02_perplexity.ipynb](./metrics/02_perplexity.ipynb) · [02_perplexity_experiments.ipynb](./metrics/02_perplexity_experiments.ipynb) |
+| BLEU & ROUGE — scoring translations and summaries | [Core] | [bleu-rouge.md](./metrics/bleu-rouge.md) · [bleu-rouge-interview.md](./metrics/bleu-rouge-interview.md) · [03_bleu_rouge.ipynb](./metrics/03_bleu_rouge.ipynb) · [03_bleu_rouge_experiments.ipynb](./metrics/03_bleu_rouge_experiments.ipynb) |
+| Human Evaluation — when numbers are not enough | [Core] | [human-evaluation.md](./metrics/human-evaluation.md) · [human-evaluation-interview.md](./metrics/human-evaluation-interview.md) · [04_human_evaluation.ipynb](./metrics/04_human_evaluation.ipynb) · [04_human_evaluation_experiments.ipynb](./metrics/04_human_evaluation_experiments.ipynb) |
+
+### Benchmarks
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Benchmarks — standardized exams for AI models | [Applied] | [README.md](./benchmarks/README.md) · [01_benchmarks_demo.ipynb](./benchmarks/01_benchmarks_demo.ipynb) |
+
+---
+
+**Quick check — can you answer these?**
+- Why is automatic evaluation not enough on its own?
+- What is the difference between a metric and a benchmark?
+- When would you choose human evaluation over automatic scoring?
+
+If any of these feel unclear, re-read the sections above. That is completely normal.
+
+---
+
+## You Just Unlocked the Toolkit
+
+Every time someone says "our model is better" — in a paper, in a product launch, in an interview — they are making an evaluation claim. After this module, you will know how to verify those claims, poke holes in them, and make your own with confidence. The tools here are the same ones used by OpenAI, Google DeepMind, and Anthropic to measure their models. You are learning the real thing.
 
 ---
 
@@ -283,18 +162,12 @@ here are written to be self-contained.
 
 If you want to go deeper, these are the landmark research papers in evaluation:
 
-- **BLEU: a Method for Automatic Evaluation of Machine Translation** -- Papineni et al., 2002
-  - The foundational paper that introduced BLEU, still the most widely used translation metric
-- **ROUGE: A Package for Automatic Evaluation of Summaries** -- Lin, 2004
-  - Introduced the ROUGE family of metrics for measuring summarization quality
-- **GLUE: A Multi-Task Benchmark and Analysis Platform** -- Wang et al., 2018
-  - Created a standardized benchmark for testing language understanding (like SATs for AI)
-- **SuperGLUE: A Stickier Benchmark for General-Purpose Language Understanding** -- Wang et al., 2019
-  - A harder version of GLUE, because models got too good at the original
-- **Measuring Massive Multitask Language Understanding (MMLU)** -- Hendrycks et al., 2021
-  - Tests AI across 57 subjects from math to law to medicine
-- **Beyond the Imitation Game (BIG-Bench)** -- Srivastava et al., 2022
-  - A massive collaborative benchmark with 200+ tasks to test model capabilities
+- **BLEU: a Method for Automatic Evaluation of Machine Translation** — Papineni et al., 2002
+- **ROUGE: A Package for Automatic Evaluation of Summaries** — Lin, 2004
+- **GLUE: A Multi-Task Benchmark and Analysis Platform** — Wang et al., 2018
+- **SuperGLUE: A Stickier Benchmark for General-Purpose Language Understanding** — Wang et al., 2019
+- **Measuring Massive Multitask Language Understanding (MMLU)** — Hendrycks et al., 2021
+- **Beyond the Imitation Game (BIG-Bench)** — Srivastava et al., 2022
 
 ---
 

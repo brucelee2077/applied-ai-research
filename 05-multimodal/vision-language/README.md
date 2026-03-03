@@ -1,68 +1,59 @@
 # Vision-Language Models
 
-## What Are Vision-Language Models?
+In 2021, a model called CLIP did something that no one expected. Without being trained to identify a single animal species, it could look at a photo of a pangolin and tell you it was a pangolin — just by comparing the photo to the words "a photo of a pangolin." It had never seen a labeled pangolin training example. How?
 
-Imagine showing a photo to a friend and asking "What's happening in this picture?"
-Your friend uses both their **eyes** (vision) and their **language skills** (words)
-to give you an answer.
+The answer is one of the most elegant ideas in AI: teach a model to connect images and text in the same space, and it can do things you never trained it to do.
 
-**Vision-language models** do the same thing -- they combine computer vision
-(understanding images) with language understanding (reading and writing text).
-
-```
-+-------------------------------------------------------------------+
-|              What Vision-Language Models Can Do                    |
-|                                                                   |
-|   Image Captioning:                                                |
-|     [photo of sunset over ocean] --> "A beautiful sunset over     |
-|                                       the Pacific Ocean"          |
-|                                                                   |
-|   Visual Question Answering (VQA):                                 |
-|     [photo of kitchen] + "How many chairs are there?" --> "Four"  |
-|                                                                   |
-|   Image-Text Matching:                                             |
-|     "A dog playing fetch" + [5 photos] --> picks the right photo  |
-|                                                                   |
-|   Zero-Shot Classification:                                        |
-|     [photo of animal] + ["cat", "dog", "bird"] --> "dog" (85%)    |
-+-------------------------------------------------------------------+
-```
+**Before you start, you need to know:**
+- What an embedding is (a list of numbers that captures meaning) — covered in [multimodal README](../README.md)
+- What a neural network does at a high level — covered in [00-neural-networks](../../00-neural-networks/)
 
 ---
 
-## CLIP: The Breakthrough Model
+## The Analogy: Showing a Photo to a Friend
 
-**CLIP (Contrastive Language-Image Pre-training)** by OpenAI (2021) changed
-everything. It's the foundational model for modern vision-language AI.
+Imagine showing a photo to a friend and asking "What's happening in this picture?" Your friend uses both their **eyes** (vision) and their **language skills** (words) to give you an answer.
 
-### How CLIP Works
+Vision-language models do the same thing — they combine understanding images with understanding text.
 
-CLIP learns to connect images and text by training on **400 million
-image-text pairs** scraped from the internet.
+**What the analogy gets right:**
+- Your friend processes two different types of information (the image they see, the words they know) and connects them
+- The model also has two separate parts — one for images, one for text — and learns to connect their outputs
+- Your friend can answer questions about photos they have never seen before, and so can the model
+
+**The concept in plain words:**
+A vision-language model turns images and text into lists of numbers (embeddings) that live in the same space. A photo of a dog and the sentence "a photo of a dog" end up close together in that space. A photo of a dog and the sentence "a photo of a car" end up far apart. Once images and text live in the same space, you can compare them, search through them, and even classify images using only text descriptions.
+
+**Where the analogy breaks down:** Your friend deeply understands what a dog is — they know dogs bark, have four legs, and are pets. The model does not understand any of this. It only knows that photos labeled "dog" tend to produce embeddings close to the text "dog." It learned patterns from 400 million image-text pairs, not from understanding the world.
+
+---
+
+## CLIP: The Breakthrough
+
+**CLIP (Contrastive Language-Image Pre-training)** by OpenAI (2021) changed how we think about vision-language models. It has two separate parts:
+
+1. **An image encoder** — takes a photo and outputs a list of numbers
+2. **A text encoder** — takes a sentence and outputs a list of numbers
+
+Both lists live in the same space. If the photo and sentence describe the same thing, their lists will be close together.
 
 ```
-+-------------------------------------------------------------------+
-|                    CLIP Architecture                               |
-|                                                                   |
-|   Image: [photo of a dog]     Text: "a photo of a dog"           |
-|           |                          |                            |
-|           v                          v                            |
-|     [Image Encoder]           [Text Encoder]                      |
-|     (ViT or ResNet)           (Transformer)                       |
-|           |                          |                            |
-|           v                          v                            |
-|     Image Embedding            Text Embedding                     |
-|     [0.3, 0.7, -0.2, ...]     [0.31, 0.69, -0.18, ...]          |
-|                                                                   |
-|     These should be CLOSE together (same concept)                 |
-|     "A photo of a cat" would be FAR away                         |
-+-------------------------------------------------------------------+
+   Image: [photo of a dog]     Text: "a photo of a dog"
+           |                          |
+           v                          v
+     [Image Encoder]           [Text Encoder]
+           |                          |
+           v                          v
+     Image Embedding            Text Embedding
+     [0.3, 0.7, -0.2, ...]     [0.31, 0.69, -0.18, ...]
+
+     These are CLOSE together (same concept)
+     "A photo of a cat" would be FAR away
 ```
 
-### Contrastive Learning: How CLIP Trains
+### How CLIP Learns: Contrastive Training
 
-CLIP uses **contrastive learning** -- it learns by seeing matching and
-non-matching pairs.
+CLIP learns by seeing matching and non-matching pairs. In each training batch, the model sees several images and several texts. It learns to push matching pairs together and non-matching pairs apart.
 
 ```
 Training batch with 4 image-text pairs:
@@ -74,143 +65,60 @@ Image 2 (sunset)  [mismatch] [MATCH]     [mismatch]  [mismatch]
 Image 3 (pizza)   [mismatch] [mismatch]  [MATCH]     [mismatch]
 Image 4 (car)     [mismatch] [mismatch]  [mismatch]  [MATCH]
 
-Goal: Maximize similarity for diagonal (matches)
-      Minimize similarity for off-diagonal (mismatches)
+Goal: Make diagonal scores (matches) high
+      Make off-diagonal scores (mismatches) low
 ```
 
-### Why CLIP Is Special: Zero-Shot Classification
+### Zero-Shot Classification: The Surprising Superpower
 
-CLIP can classify images into categories **it has never been trained on**,
-just by comparing image embeddings to text embeddings of category names.
+CLIP can classify images into categories **it has never been trained on**, just by comparing image embeddings to text embeddings of category names.
 
 ```
-+-------------------------------------------------------------------+
-|              CLIP Zero-Shot Classification                         |
-|                                                                   |
-|   1. Encode the image:                                             |
-|      [photo of a husky] --> image_embedding                       |
-|                                                                   |
-|   2. Encode each category as text:                                 |
-|      "a photo of a cat"   --> text_embedding_1                    |
-|      "a photo of a dog"   --> text_embedding_2                    |
-|      "a photo of a bird"  --> text_embedding_3                    |
-|                                                                   |
-|   3. Compare similarities:                                         |
-|      Image vs "cat":  similarity = 0.15                           |
-|      Image vs "dog":  similarity = 0.92  <-- HIGHEST!             |
-|      Image vs "bird": similarity = 0.08                           |
-|                                                                   |
-|   4. Result: "This is a dog" (92% confident)                      |
-|                                                                   |
-|   No training on these specific categories was needed!            |
-+-------------------------------------------------------------------+
+   1. Encode the image:
+      [photo of a husky] --> image_embedding
+
+   2. Encode each category as text:
+      "a photo of a cat"   --> text_embedding_1
+      "a photo of a dog"   --> text_embedding_2
+      "a photo of a bird"  --> text_embedding_3
+
+   3. Compare similarities:
+      Image vs "cat":  similarity = 0.15
+      Image vs "dog":  similarity = 0.92  <-- HIGHEST
+      Image vs "bird": similarity = 0.08
+
+   4. Result: "This is a dog" (92% confident)
+
+   No training on these specific categories was needed!
 ```
 
 ---
 
-## Beyond CLIP: Modern Vision-Language Models
+## Beyond CLIP
 
-### BLIP / BLIP-2
+CLIP can match images with text, but it cannot generate text. Newer models build on CLIP's idea:
 
-**BLIP (Bootstrapping Language-Image Pre-training)** extends CLIP to also
-**generate** text, not just match images with text.
-
-```
-CLIP:   Image + Text --> "Do these match?" (yes/no)
-BLIP:   Image --> "Describe this image" (generates caption)
-BLIP-2: Image --> Connects to an LLM for complex reasoning
-```
-
-### LLaVA (Large Language-and-Vision Assistant)
-
-Connects a vision encoder to an LLM, creating a model that can have
-conversations about images.
-
-```
-User: [uploads photo of a messy room] "What should I clean first?"
-LLaVA: "I'd start with the clothes on the floor, then organize
-        the desk. The bookshelf looks manageable after that."
-```
-
-### GPT-4V / Claude Vision / Gemini
-
-The latest commercial models that natively understand both text and images
-as part of their core training, enabling sophisticated visual reasoning.
+- **BLIP / BLIP-2** — Can also *generate* captions for images, not just match them
+- **LLaVA** — Connects a vision encoder to an LLM so you can have conversations about images
+- **GPT-4V / Claude Vision / Gemini** — Commercial models that natively understand both text and images as part of their core training
 
 ---
 
-## The Image Encoder: How AI "Sees"
+## Quick Check — Can You Answer These?
 
-Vision-language models use an **image encoder** to convert images into
-embeddings. The two main approaches:
+- What does CLIP do differently from a regular image classifier?
+- Why is zero-shot classification possible with CLIP but not with a standard image classifier?
+- In the contrastive training matrix above, what does it mean for a diagonal score to be high?
 
-| Encoder | How It Works | Used In |
-|---------|-------------|---------|
-| **CNN (ResNet)** | Slides filters across the image to detect patterns | Older CLIP models |
-| **ViT (Vision Transformer)** | Splits image into patches, processes like text tokens | Modern CLIP, BLIP-2 |
-
-```
-+-------------------------------------------------------------------+
-|          Vision Transformer (ViT): How It Works                   |
-|                                                                   |
-|   1. Split image into 16x16 patches (like puzzle pieces)          |
-|                                                                   |
-|      [patch1][patch2][patch3][patch4]                              |
-|      [patch5][patch6][patch7][patch8]                              |
-|      [patch9][...  ][...  ][patch16]                              |
-|                                                                   |
-|   2. Flatten each patch into a vector                              |
-|                                                                   |
-|   3. Process through a Transformer (same as text!)                |
-|                                                                   |
-|   4. Output: one embedding that captures the whole image          |
-|                                                                   |
-|   Key insight: Transformers work for images too!                  |
-|   Just treat image patches like words in a sentence.              |
-+-------------------------------------------------------------------+
-```
+If you cannot answer one, go back and re-read that section. That is completely normal.
 
 ---
 
-## Applications
+## What You Just Learned
 
-| Application | Description | Models Used |
-|-------------|-------------|-------------|
-| **Image search** | Find images matching a text query | CLIP |
-| **Image captioning** | Generate text describing an image | BLIP, LLaVA |
-| **Visual QA** | Answer questions about images | BLIP-2, GPT-4V |
-| **Content moderation** | Detect inappropriate images | CLIP + classifier |
-| **Image generation** | Create images from text descriptions | DALL-E, Stable Diffusion (use CLIP) |
-| **Accessibility** | Describe images for visually impaired users | BLIP, GPT-4V |
+You now understand the core idea behind image search engines, visual question answering, image captioning, content moderation systems, and AI accessibility tools. The principle — map images and text to the same embedding space, then compare — is used in production at Google, OpenAI, Meta, and thousands of other companies. CLIP alone has been cited over 10,000 times and inspired an entire family of models.
 
----
-
-## Summary
-
-```
-+------------------------------------------------------------------+
-|           Vision-Language Models Cheat Sheet                      |
-|                                                                  |
-|  What:     AI that understands both images and text              |
-|  Key model: CLIP (contrastive learning on image-text pairs)      |
-|  Key idea: Map images and text to the same embedding space       |
-|                                                                  |
-|  Evolution:                                                      |
-|    CLIP (2021) -- match images with text                         |
-|    BLIP (2022) -- generate text from images                      |
-|    LLaVA (2023) -- have conversations about images               |
-|    GPT-4V (2023) -- native multimodal understanding              |
-+------------------------------------------------------------------+
-```
-
----
-
-## Further Reading
-
-- **CLIP** -- Radford et al., 2021 -- The foundational paper
-- **BLIP-2** -- Li et al., 2023 -- Efficient vision-language pre-training
-- **LLaVA** -- Liu et al., 2023 -- Visual instruction tuning
-- **An Image is Worth 16x16 Words (ViT)** -- Dosovitskiy et al., 2020 -- Vision Transformers
+Ready to go deeper? The math behind contrastive loss, failure modes, and interview questions are in [vision-language-interview.md](./vision-language-interview.md).
 
 ---
 
