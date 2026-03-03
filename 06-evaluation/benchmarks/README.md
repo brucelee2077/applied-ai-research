@@ -1,5 +1,16 @@
 # Benchmarks
 
+GPT-4 scores 86% on a test. Claude scores 89%. Gemini scores 84%. But wait — how do we know they all took the same test? And what if the test does not cover what actually matters? Welcome to the world of AI benchmarks — where measuring intelligence is harder than building it.
+
+---
+
+**Before you start, you need to know:**
+- What a language model does at a high level — it predicts text
+- No math needed for this file
+- No prior knowledge of specific models needed
+
+---
+
 ## What's a Benchmark?
 
 Imagine every school in the country gave students a completely different final exam.
@@ -358,6 +369,15 @@ Benchmarks are useful but not perfect:
 
 ---
 
+**Quick check — can you answer these?**
+- What is the difference between GLUE and MMLU?
+- Why do benchmarks get "solved" over time?
+- Name two reasons why a high benchmark score does not guarantee a model will work well for your task.
+
+If any of these feel unclear, go back and re-read that section. That is completely normal.
+
+---
+
 ## Summary
 
 ```
@@ -377,6 +397,12 @@ Benchmarks are useful but not perfect:
 |    - Watch out for data contamination                            |
 +------------------------------------------------------------------+
 ```
+
+---
+
+## You Now Speak the Language of AI Evaluation
+
+Every time you read an AI paper, a product launch, or a model comparison blog post, you will see benchmark names: MMLU, HumanEval, BIG-Bench, HellaSwag. You now know what each one tests, why they exist, and — just as importantly — why they are not the whole story. You can read a leaderboard and know what the numbers mean and what they leave out.
 
 ---
 

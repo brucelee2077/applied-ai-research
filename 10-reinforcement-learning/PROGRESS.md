@@ -1,6 +1,6 @@
 # Reinforcement Learning — Progress
 
-## Status: In Progress
+## Status: Complete
 
 ---
 
@@ -181,18 +181,18 @@
 | robotics-simulation-interview.md | Layer 2 | ✅ Done |
 | 02_robotics_simulation.ipynb | Concept notebook | ✅ Done |
 | 02_robotics_simulation_experiments.ipynb | Experiments notebook | ✅ Done |
-| recommendation-systems.md | Layer 1 | ⬜ Not started |
-| recommendation-systems-interview.md | Layer 2 | ⬜ Not started |
+| recommendation-systems.md | Layer 1 | ✅ Done |
+| recommendation-systems-interview.md | Layer 2 | ✅ Done |
 | 03_recommendation_systems.ipynb | Concept notebook | ✅ Done |
-| 03_recommendation_systems_experiments.ipynb | Experiments notebook | ⬜ Not started |
-| llm-alignment-case-study.md | Layer 1 | ⬜ Not started |
-| llm-alignment-case-study-interview.md | Layer 2 | ⬜ Not started |
+| 03_recommendation_systems_experiments.ipynb | Experiments notebook | ✅ Done |
+| llm-alignment-case-study.md | Layer 1 | ✅ Done |
+| llm-alignment-case-study-interview.md | Layer 2 | ✅ Done |
 | 04_llm_alignment_case_study.ipynb | Concept notebook | ✅ Done |
-| 04_llm_alignment_case_study_experiments.ipynb | Experiments notebook | ⬜ Not started |
-| multi-agent-systems.md | Layer 1 | ⬜ Not started |
-| multi-agent-systems-interview.md | Layer 2 | ⬜ Not started |
+| 04_llm_alignment_case_study_experiments.ipynb | Experiments notebook | ✅ Done |
+| multi-agent-systems.md | Layer 1 | ✅ Done |
+| multi-agent-systems-interview.md | Layer 2 | ✅ Done |
 | 05_multi_agent_systems.ipynb | Concept notebook | ✅ Done |
-| 05_multi_agent_systems_experiments.ipynb | Experiments notebook | ⬜ Not started |
+| 05_multi_agent_systems_experiments.ipynb | Experiments notebook | ✅ Done |
 
 ## implementations/
 

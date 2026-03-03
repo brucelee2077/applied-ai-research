@@ -15,10 +15,10 @@ scoring rules. You wouldn't use basketball scores to judge a swimming race!
 |                                                                   |
 |   What is your model doing?                                       |
 |                                                                   |
+|   Classifying (spam/not spam)      -->  Accuracy, F1, Precision   |
 |   Predicting text / Language model  -->  Perplexity               |
 |   Translating languages            -->  BLEU                      |
 |   Summarizing text                 -->  ROUGE                     |
-|   Classifying (spam/not spam)      -->  Accuracy, F1, Precision   |
 |   Creative writing / Chat          -->  Human Evaluation          |
 |   All of the above / General       -->  Benchmarks (MMLU, etc.)   |
 +-------------------------------------------------------------------+
@@ -26,9 +26,18 @@ scoring rules. You wouldn't use basketball scores to judge a swimming race!
 
 ---
 
-## Metrics Comparison Table
+## Coverage Map
 
-Here's a quick reference for all the metrics covered in this section:
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Classification Metrics — accuracy, precision, recall, F1, confusion matrix | [Core] | [classification-metrics.md](./classification-metrics.md) · [classification-metrics-interview.md](./classification-metrics-interview.md) · [01_classification_metrics.ipynb](./01_classification_metrics.ipynb) · [01_classification_metrics_experiments.ipynb](./01_classification_metrics_experiments.ipynb) |
+| Perplexity — measuring language model quality | [Core] | [perplexity.md](./perplexity.md) · [perplexity-interview.md](./perplexity-interview.md) · [02_perplexity.ipynb](./02_perplexity.ipynb) · [02_perplexity_experiments.ipynb](./02_perplexity_experiments.ipynb) |
+| BLEU & ROUGE — translation and summarization scoring | [Core] | [bleu-rouge.md](./bleu-rouge.md) · [bleu-rouge-interview.md](./bleu-rouge-interview.md) · [03_bleu_rouge.ipynb](./03_bleu_rouge.ipynb) · [03_bleu_rouge_experiments.ipynb](./03_bleu_rouge_experiments.ipynb) |
+| Human Evaluation — annotator agreement, pairwise comparison, LLM-as-Judge | [Core] | [human-evaluation.md](./human-evaluation.md) · [human-evaluation-interview.md](./human-evaluation-interview.md) · [04_human_evaluation.ipynb](./04_human_evaluation.ipynb) · [04_human_evaluation_experiments.ipynb](./04_human_evaluation_experiments.ipynb) |
+
+---
+
+## Metrics Comparison Table
 
 | Metric | What It Measures | Score Range | Higher or Lower = Better? | Best For |
 |--------|-----------------|-------------|--------------------------|----------|
@@ -78,13 +87,16 @@ Here's a quick reference for all the metrics covered in this section:
 
 If you're new to evaluation metrics, read these pages in order:
 
-1. **[Perplexity](./perplexity.md)** -- Start here to understand how language models
-   are measured. Uses a fun "guessing game" analogy.
+1. **[Classification Metrics](./classification-metrics.md)** -- Start here to understand
+   accuracy, precision, recall, F1, and why 99% accuracy can be useless.
 
-2. **[BLEU & ROUGE](./bleu-rouge.md)** -- Learn how we score translations and summaries
+2. **[Perplexity](./perplexity.md)** -- Learn how language models are measured using a
+   "guessing game" analogy.
+
+3. **[BLEU & ROUGE](./bleu-rouge.md)** -- Learn how we score translations and summaries
    by comparing them to reference answers.
 
-3. **[Human Evaluation](./human-evaluation.md)** -- When numbers aren't enough, learn
+4. **[Human Evaluation](./human-evaluation.md)** -- When numbers aren't enough, learn
    how to set up human judges to rate AI quality.
 
 ---
