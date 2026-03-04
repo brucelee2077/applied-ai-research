@@ -4,11 +4,25 @@
 
 ---
 
-## What's an RNN?
+## What You Need to Know First
 
-Regular neural networks treat every input as a standalone thing. Show one a sentence word by word, and it forgets each word the moment the next one arrives. That's a problem when order matters — "dog bites man" and "man bites dog" use the same words but mean very different things.
+- **What a neural network is** — layers of numbers that learn from data ([Neural Networks overview](../README.md))
+- **Backpropagation** — how neural networks learn by sending error signals backward through layers
+- **Matrix multiplication** — multiplying rows by columns to get new numbers
 
-**RNNs have memory.** As they process each element in a sequence, they keep a "hidden state" — a running summary of everything they've seen so far. When they read "bites," they remember whether "dog" or "man" came first.
+**That's it.** No prior sequence modeling knowledge needed. Start here.
+
+---
+
+## The Analogy: Reading a Book
+
+Think of reading a book one page at a time. You don't memorize every word — you keep a running summary in your head. Each new page updates that summary. By the end, you can tell someone what the book was about even though you only held one page at a time.
+
+**What the analogy gets right:** An RNN does exactly this. It processes one piece of a sequence at a time and keeps a "hidden state" — a running summary of everything it has seen so far. Each new input updates that summary.
+
+**In plain words:** Regular neural networks treat every input as a standalone thing. Show one a sentence word by word, and it forgets each word the moment the next one arrives. That's a problem when order matters — "dog bites man" and "man bites dog" use the same words but mean very different things. RNNs solve this by carrying information forward through the sequence.
+
+**Where the analogy breaks down:** When you read a book, you can flip back to earlier pages. An RNN cannot — it only moves forward, and its summary of early pages gets fuzzier over time.
 
 ```
 HOW AN RNN READS A SENTENCE
@@ -29,8 +43,6 @@ HOW AN RNN READS A SENTENCE
   The same RNN is reused at every step (parameter sharing)
   The arrow --> carries the "hidden state" forward
 ```
-
-Think of it like reading a book one page at a time. You don't memorize every word — you keep a running summary in your head. Each new page updates that summary. By the end, you can tell someone what the book was about even though you only held one page at a time.
 
 ---
 
@@ -59,35 +71,13 @@ The fix --> LSTM and GRU cells (Notebooks 03 and 04)
 
 ---
 
-## Notebooks
+## Checkpoint
 
-Every notebook builds from intuition to math to working code — all implemented from scratch in NumPy so you can see exactly what's happening. Each one ends with an **Interview Prep** section covering the questions you're most likely to face.
+Try answering these before moving on. If you can't answer one, re-read the sections above. That is completely normal.
 
-| # | Notebook | What You'll Learn |
-|---|----------|-------------------|
-| 01 | [RNN Fundamentals](01_rnn_fundamentals.ipynb) | Hidden state, unrolling through time, parameter sharing, character-level prediction |
-| 02 | [Backpropagation Through Time](02_bptt.ipynb) | How RNNs learn, why gradients vanish and explode, gradient clipping, truncated BPTT |
-| 03 | [LSTM](03_lstm.ipynb) | Long Short-Term Memory — forget, input, and output gates, cell state, why it fixes vanishing gradients |
-| 04 | [GRU](04_gru.ipynb) | Gated Recurrent Unit — a simpler alternative to LSTM with fewer parameters |
-| 05 | [Sequence Tasks](05_sequence_tasks.ipynb) | Text generation, sentiment analysis, time series — many-to-one vs many-to-many architectures |
-| 06 | [Bidirectional RNNs](06_bidirectional_rnns.ipynb) | Reading sequences forwards AND backwards, stacked/deep RNNs |
-| 07 | [Seq2Seq & Attention](07_seq2seq_attention.ipynb) | Encoder-decoder models, the attention mechanism, and the bridge to Transformers |
-
----
-
-## Key Terms
-
-| Term | Plain-English Meaning |
-|------|-----------------------|
-| **Hidden state** | The RNN's "memory" — a vector summarizing everything it's seen so far |
-| **Time step** | One position in the sequence (one word, one data point) |
-| **Unrolling** | Drawing the same RNN cell out at each time step so you can see the full chain |
-| **Vanishing gradient** | The learning signal fading over long sequences — the core RNN weakness |
-| **LSTM** | Long Short-Term Memory — an RNN cell with gates that control what to remember and forget |
-| **GRU** | Gated Recurrent Unit — a simpler cousin of LSTM with about 75% of the parameters |
-| **Gate** | A learned value between 0 and 1 that controls information flow — like a dimmer switch |
-| **Seq2Seq** | Sequence-to-sequence — read an entire input, then generate an output (e.g., translation) |
-| **Attention** | A mechanism that lets the decoder "look back" at every encoder step instead of relying on one summary vector |
+1. What makes an RNN different from a regular neural network?
+2. What is the "hidden state" and what does it do?
+3. Why do RNNs struggle with long sequences?
 
 ---
 
@@ -107,16 +97,47 @@ Attention added to RNNs (2014) — solved the information bottleneck
 Transformers --> GPT --> ChatGPT, Claude, and modern AI
 ```
 
-Understanding RNNs and their limitations is the fastest way to understand *why* Transformers were invented.
+Understanding RNNs and their limitations is the fastest way to understand *why* Transformers were invented. You've just learned the foundation that all of modern AI was built on.
 
 ---
 
-## Prerequisites
+## Coverage Map
 
-Before starting these notebooks, you should have completed:
+### RNN Architecture
 
-- **All Fundamentals notebooks** (especially backpropagation and training loops)
-- **Basic understanding of CNNs** (helpful but not required)
+| Topic | Depth | Files |
+|-------|-------|-------|
+| RNN Fundamentals — hidden states, unrolling, parameter sharing | [Core] | [01_rnn_fundamentals.ipynb](./01_rnn_fundamentals.ipynb) |
+| BPTT — backpropagation through time, vanishing/exploding gradients | [Core] | [02_bptt.ipynb](./02_bptt.ipynb) |
+| LSTM — gates, cell state, solving vanishing gradients | [Core] | [03_lstm.ipynb](./03_lstm.ipynb) |
+| GRU — simpler gated architecture, comparison with LSTM | [Core] | [04_gru.ipynb](./04_gru.ipynb) |
+
+### RNN Applications
+
+| Topic | Depth | Files |
+|-------|-------|-------|
+| Sequence Tasks — text generation, sentiment analysis, time series | [Applied] | [05_sequence_tasks.ipynb](./05_sequence_tasks.ipynb) |
+| Bidirectional RNNs — forward and backward reading, stacked layers | [Applied] | [06_bidirectional_rnns.ipynb](./06_bidirectional_rnns.ipynb) |
+
+### Not Covered Here
+
+| Topic | Depth | Where |
+|-------|-------|-------|
+| Seq2Seq & Attention | [Awareness] | Covered in the [Transformers module](../../01-transformers/README.md) — attention started in RNNs but is now a Transformer concept |
+
+---
+
+## Key Terms
+
+| Term | Plain-English Meaning |
+|------|-----------------------|
+| **Hidden state** | The RNN's "memory" — a vector summarizing everything it's seen so far |
+| **Time step** | One position in the sequence (one word, one data point) |
+| **Unrolling** | Drawing the same RNN cell out at each time step so you can see the full chain |
+| **Vanishing gradient** | The learning signal fading over long sequences — the core RNN weakness |
+| **LSTM** | Long Short-Term Memory — an RNN cell with gates that control what to remember and forget |
+| **GRU** | Gated Recurrent Unit — a simpler cousin of LSTM with about 75% of the parameters |
+| **Gate** | A learned value between 0 and 1 that controls information flow — like a dimmer switch |
 
 ---
 

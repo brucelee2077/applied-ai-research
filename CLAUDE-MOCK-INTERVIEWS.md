@@ -498,6 +498,8 @@ table:]
 #### [Component 3] (e.g., Output Layer)
 [Final prediction, calibration if needed.]
 
+**Multimodal architectures:** if the problem involves multiple modalities (text + image, audio + video), push the "Great Solution" beyond feature concatenation. Concatenation (encode each modality separately, concatenate vectors, feed to MLP) is a valid early fusion approach but misses cross-modal interactions. Cross-attention — where text tokens attend over visual tokens and vice versa — captures relationships between modalities (critical for memes, video with captions, image with text overlay). Reference architectures: FLAVA, ALIGN, CoCa. In an interview, naming cross-attention as the "Great" multimodal architecture vs. "concatenation + MLP" as "Good" demonstrates current research awareness.
+
 ### Loss Function
 
 [Present the loss function with inline code formatting:]
@@ -514,6 +516,13 @@ where:
 
 [Explain the hyperparameters and how to tune them.]
 
+**Critical requirement — connect loss to business metric.** The loss function must operationalize the business objective, not just handle the ML task. Ask: which examples hurt the business most when misclassified? Encode that asymmetry in the loss:
+- Content moderation: weight loss by content reach — `L_weighted = loss * min(log(1 + views), c)` ensures a viral harmful post has far more training signal than an obscure one
+- Ad click prediction: weight conversions higher than clicks because the business metric is revenue, not raw click volume
+- Fraud detection: weight high-value transactions — a $10,000 fraud and a $1 fraud are not equal
+
+If the business metric is "harmful impressions" but the loss treats all misclassified posts equally regardless of reach, the loss and the business objective are decoupled. Show explicitly how the loss formula encodes the business objective defined in "Establish a Business Objective."
+
 ## Inference and Evaluation
 
 ### Inference
@@ -525,9 +534,17 @@ where:
 "To serve 1B daily requests with p99 latency under 200ms..."]
 - Batching, caching, distillation, quantization strategies
 - Multi-stage pipeline if applicable (candidate generation -> ranking -> re-ranking)
+- **Classification systems at scale (>1K QPS):** consider a lightweight pre-filter before the expensive model. A logistic regression or small GBDT on cheap features (counts, metadata, simple text stats) can classify 80-90% of obviously negative items, so the expensive deep model only runs on the uncertain 10-20%. Quantify the savings: if the deep model costs 50ms and the pre-filter costs 2ms, routing 85% of traffic to the pre-filter saves ~40ms on average. This is standard production practice for content moderation, fraud, spam, and bot detection — any high-throughput binary classification system.
 
 #### Triggering
 [When does the system run? Real-time vs batch. Event-driven vs periodic.]
+
+For systems that act on items over time (content moderation, fraud, abuse detection): re-triggering on behavioral signal thresholds is a critical design decision. Specify the exact signals that cause re-evaluation and their thresholds:
+- "Re-score when user reports exceed 5"
+- "Re-score when view velocity crosses 10K views/minute"
+- "Re-score when a high-follower account (>100K) interacts"
+
+This is architecturally different from periodic batch re-scoring — it is event-driven and requires stream processing infrastructure (Kafka consumers watching signal streams). Candidates who design specific re-triggering logic demonstrate production awareness beyond the naive "we run it in real-time" answer.
 
 ### Evaluation
 
@@ -588,6 +605,18 @@ worth citing. Format as a bullet list with brief annotations:]
 
 - [Paper/Resource name] — [one-line description of relevance]
 ```
+
+### Cross-Section Consistency Check
+
+Before finalizing a case study, verify the business objective flows through every downstream section. These four connections are the most commonly broken:
+
+1. **Business metric → Loss function.** If the business metric weights by impact (harmful impressions, revenue, transaction value), the loss function must also weight by impact. A loss that treats all misclassifications equally when the business metric doesn't is a disconnect. Show the formula explicitly: `L_weighted = L_base * impact_weight(x)`. Example: if the business metric is "harmful impressions," the loss should weight each sample by `min(log(1 + views), c)` so viral harmful content has far more training signal than obscure content.
+
+2. **Business metric → Evaluation metrics.** Offline and online metrics should mirror the business objective. If the business cares about impression-weighted harm, the evaluation section should include impression-weighted precision/recall, not just unweighted versions. If the business cares about revenue, evaluation should weight by transaction value, not treat a $1 and $10,000 fraud equally.
+
+3. **Data characteristics → Evaluation methodology.** If positive prevalence is <1% (content moderation, fraud, bot detection), standard A/B testing requires impractically large samples. Address with importance sampling: down-sample high-confidence predictions, label only the uncertain region, reweight for statistical validity. If you propose A/B testing for a system with 0.1% positive rate and don't address sample size, there's a gap.
+
+4. **System actions → Training data.** If the system removes or suppresses items (content moderation, fraud blocking, bot banning), those items vanish from future training data. This "positive suppression" feedback loop makes the model gradually blind to the patterns it's best at catching. Address with holdout experiments (withhold enforcement on a random 1-5% sample), importance-weighted sampling, or enforcement-action logging. Any system that takes actions affecting its own training data must discuss this loop.
 
 ### Case study breakdown rules
 
@@ -795,6 +824,23 @@ Deep dives go at the end of case study breakdowns, before "What is Expected at E
 - Each deep dive should cover something an interviewer might probe — the long tail of follow-up questions
 - Deep dives should feel like the candidate is driving the conversation: "I see we've got only a few minutes left — I wanted to talk about cold start, explore/exploit, and feedback loops."
 - Organize deep dives from most likely to be asked to most advanced. The first 5 should be topics any Staff candidate must nail; the remaining 5-7 demonstrate exceptional depth and breadth.
+- **Structure deep dives by type.** Two patterns, choose based on whether the deep dive is about a *technical approach* or a *failure mode*:
+  - **Technical approach deep dives** (calibration, user modeling, retrieval architecture, anomaly detection, appeal handling): use the Bad → Good → Great progression, same as the Model Selection section. Show 2-3 approaches with increasing sophistication. Example: a calibration deep dive shows Histogram Binning (Good) → Isotonic Regression (Good) → Platt Scaling (Great), not just "calibration is important because..."
+  - **Failure mode deep dives** (adversarial evasion, label quality, cultural context, feedback loops): use Problem → Detection → Mitigation structure. State the problem concretely, explain how to detect it in production (specific metrics or signals), then give the mitigation. Example: adversarial evasion → detection via feature distribution shift monitoring → mitigation via adversarial training + red team probing.
+  - Both types must include concrete numbers or thresholds, not vague advice.
+
+### Signal coverage requirement
+
+Every case study's 8-12 deep dives must cover at least 3 of the following 4 signal layers. If any layer has zero coverage, add a deep dive for it:
+
+| Signal Layer | What it covers | Example deep dives |
+|-------------|---------------|-------------------|
+| **Content/item signals** | Features of the item being classified/ranked/recommended | Cross-modal fusion, adversarial content evasion, multimodal understanding |
+| **User/behavioral signals** | Features of the user, author, or actor — including graph-based modeling | User embeddings (GNN vs flat features), author risk modeling, behavioral sequences |
+| **System-level effects** | How the system's own actions affect future data, performance, or user experience | Positive suppression, feedback loops, filter bubbles, training data bias from enforcement |
+| **Evaluation & calibration** | How to measure performance given the specific challenges of this problem | Rare-event A/B testing, calibration methods, offline-online metric gaps, fairness auditing |
+
+This ensures deep dives aren't clustered in one signal layer (e.g., all content-focused) while ignoring others.
 
 ### Deep dive topic bank by problem type
 
@@ -827,6 +873,8 @@ Each case study should pick 8-12 from its relevant list. Every topic below is a 
 10. Edge cases — satire, news reporting about violence, educational content, artistic expression. Context-dependent classification. The "context window" for moderation decisions.
 11. Proactive vs reactive detection — scanning at upload vs acting on reports. Hash-matching (PhotoDNA, CSAM), near-duplicate detection, pre-publication review for high-risk content.
 12. System gaming and evasion measurement — how to measure what you're NOT catching. Red team operations, honeypot accounts, adversarial robustness benchmarks.
+13. Training data bias from enforcement actions (positive suppression) — when the system removes harmful content effectively, it vanishes from the training data distribution. Future models train only on content that survived enforcement, gradually becoming blind to the patterns they're best at catching. Mitigation: holdout experiments (withhold enforcement on a random 1-5% sample to observe natural engagement patterns), importance sampling to reweight the training distribution, logging enforcement actions and model scores as labels even for removed content. This is a systemic feedback loop that compounds over months — a Staff candidate recognizes it unprompted.
+14. Graph-based user/author modeling — flat author features (violation count, account age, follower count) miss the social graph signal. A user with 5 violations connected to 200 known bad actors is far higher risk than an isolated user with 5 violations. Progression: (Bad) flat feature vector → (Good) shallow network features (degree, clustering coefficient, neighbor violation rate) → (Great) GNN embeddings (GraphSAGE for inductive learning — handles new accounts by aggregating neighbor features; GCN for transductive when the full graph is available). Dual-branch architectures (GNN for graph structure + GRU/Transformer for temporal activity sequences) produce the strongest author risk signals. GraphSAGE enables cold start: new accounts inherit embeddings from their connections even without their own history.
 
 **Search/retrieval:**
 1. Query understanding and rewriting — intent classification, query expansion, spell correction, synonym mapping. When to rewrite vs when to show "did you mean?". Multilingual query understanding.
@@ -1095,6 +1143,9 @@ Run through this checklist after writing each file. Every box must be checked be
 - [ ] Sample candidate dialogue appears as blockquotes at key moments
 - [ ] Source material (README.md, staff_interview_guide.md, notebooks) was read before writing
 - [ ] Content is consistent with (but not duplicative of) the existing README and interview guides
+- [ ] "Loss Function" explicitly connects to the business metric from "Establish a Business Objective" — show how the loss encodes business priorities (e.g., view-weighting for harmful impressions, transaction-weighting for fraud)
+- [ ] For high-throughput classification systems: "Inference" section addresses whether a lightweight pre-filter is warranted before the expensive model
+- [ ] Deep dives cover at least 3 of 4 signal layers (content, user/behavioral, system-level, evaluation — see Section 9 signal coverage requirement)
 
 ---
 

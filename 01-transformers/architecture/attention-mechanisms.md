@@ -44,6 +44,8 @@ Processing the word "it":
 
 This is the heart of attention. It uses three concepts: **Query (Q)**, **Key (K)**, and **Value (V)**. Let's build intuition with a real-world analogy.
 
+🧒 **Kid-Friendly Explanation:** Imagine attention like three friends working together at school! Query is like the **curious friend** who asks questions ("What's fun to do at recess?"). Key is like the **helpful friend** who holds up signs about what they know ("I know about soccer!", "I know about art!"). Value is like the **knowledgeable friend** who actually has the good stuff to share (soccer tips, art supplies, etc.). The curious friend looks at all the signs, picks the most interesting ones, and gets the best information from the knowledgeable friend!
+
 ### The Library Analogy
 
 Imagine you walk into a library looking for a book about dinosaurs.
@@ -151,13 +153,19 @@ from each word.
 
 **What's a vector?** Think of it as a list of numbers that describes something. Like how GPS coordinates [latitude, longitude] describe a location, a word vector might be [0.2, -0.5, 0.8, ...] with hundreds of numbers that describe the word's meaning.
 
+🧒 **Kid-Friendly Explanation:** A vector is like a recipe card! Just like a recipe for chocolate chip cookies has specific amounts (2 cups flour, 1 cup sugar, 3 eggs), a word has specific numbers that describe what it means. The word "happy" might be described by numbers like [0.8, 0.2, 0.9] where the first number says "how positive is this word?" and so on. Every word gets its own special recipe card of numbers!
+
 **What's a matrix?** A grid of numbers. Multiplying a vector by a matrix transforms it — like putting on different colored glasses that highlight different features of the word.
+
+🧒 **Kid-Friendly Explanation:** A matrix is like a magic filter! Imagine you have a photo and you can put different colored glasses on to see different things better. Red glasses might make all the red things pop out, blue glasses make blue things stand out. A matrix does the same thing to our word recipe cards - it's like special glasses that help us see certain "flavors" of the word's meaning more clearly. When we "multiply" a word by a matrix, we're putting those special glasses on to transform how we see that word!
 
 ---
 
 ## Measuring Similarity: Dot Product
 
 The **dot product** measures how similar two vectors are. Think of it as a "compatibility score."
+
+🧒 **Kid-Friendly Explanation:** The dot product is like checking how much two people have in common! Imagine you and your friend both make lists of your favorite things (ice cream flavors, hobbies, etc.). To see how similar you are, you compare each item on your lists and give points for matches. If you both love chocolate ice cream, that's a point! If you both hate brussels sprouts, that's another point! The more things you agree on, the higher your "friendship score" (dot product) gets. Words work the same way - they compare their "preference lists" to see how similar they are!
 
 ```
 Simple dot product example:

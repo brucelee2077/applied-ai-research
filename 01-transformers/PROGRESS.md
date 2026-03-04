@@ -22,3 +22,8 @@
 | architecture/transformer-block-interview.md | Layer 2 | ✅ Done |
 | architecture/04_transformer_block.ipynb | Concept notebook | ✅ Done |
 | architecture/04_transformer_block_experiments.ipynb | Experiments notebook | ✅ Done |
+| experiments/README.md | Layer 1 overview | ✅ Done |
+| experiments/training-a-small-transformer.md | Layer 1 | ✅ Done |
+| experiments/01_training_a_small_transformer.ipynb | Concept notebook | ✅ Done |
+| experiments/encoder-vs-decoder.md | Layer 1 | ✅ Done |
+| experiments/02_encoder_vs_decoder.ipynb | Concept notebook | ✅ Done |
