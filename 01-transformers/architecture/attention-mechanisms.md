@@ -312,6 +312,121 @@ The output for "cat" is [0.330, 1.000]. It now carries blended information from 
 
 ---
 
+## Detailed Matrix Example: Understanding the Final Two Steps
+
+### Chinese Explanation (中文解释)
+
+所以每个词都有自己的softmax vector， 然后weighted sum 改了他自己的权重。你把最后两步用一个简单的矩阵的例子讲一下
+
+对，你理解得很接近了：每个"词"（更准确说：每个 Query 位置）都会得到自己的一条 softmax 权重向量（它对所有 Key 位置的注意力分布）。
+但要纠正一句：**weighted sum 不是"改了权重"——权重是 softmax 的输出；weighted sum 是拿着这些权重去"混合"V，得到这个词的新表示。**
+
+### English Translation
+
+Each "word" (more precisely: each Query position) gets its own softmax attention weight vector (its attention distribution over all Key positions).
+**Important correction: weighted sum doesn't "change weights" — the weights are the softmax output; weighted sum uses these weights to "mix" the Values to create new representations.**
+
+### Complete Matrix Walkthrough
+
+Let's work through a concrete example with 3 Key/Value positions and 2 Query positions using 2-dimensional vectors.
+
+**Setup:**
+- K (3×2): Three key vectors
+- V (3×2): Three value vectors
+- Q (2×2): Two query vectors
+
+```
+K = [1  0]    V = [10  0]     Q = [1  0]
+    [0  1]        [0  10]         [0  1]
+    [1  1]        [10 10]
+```
+
+**Step 1: Compute attention scores** (相似度打分)
+
+S = Q × K^T results in a 2×3 matrix (each query scores against 3 keys):
+
+```
+S = [1  0  1]  ← q₁ scores: [1,0,1] against k₁,k₂,k₃
+    [0  1  1]  ← q₂ scores: [0,1,1] against k₁,k₂,k₃
+```
+
+**Step 2: Apply softmax to each row** → get attention weights
+
+For row 1: [1,0,1]
+- exp([1,0,1]) = [2.718, 1.000, 2.718], sum = 6.436
+- α₁ = [0.422, 0.155, 0.422]
+
+For row 2: [0,1,1]
+- exp([0,1,1]) = [1.000, 2.718, 2.718], sum = 6.436
+- α₂ = [0.155, 0.422, 0.422]
+
+Attention matrix A (2×3):
+```
+A = [0.422  0.155  0.422]  ← q₁'s attention weights
+    [0.155  0.422  0.422]  ← q₂'s attention weights
+```
+
+**Key insight:** Each row sums to 1 — this is each word's attention distribution!
+
+**Step 3: Weighted sum** (加权求和) → get output vectors
+
+O = A × V
+
+For query 1:
+```
+o₁ = 0.422×[10,0] + 0.155×[0,10] + 0.422×[10,10]
+   = [4.22,0] + [0,1.55] + [4.22,4.22]
+   = [8.446, 5.777]
+```
+
+For query 2:
+```
+o₂ = 0.155×[10,0] + 0.422×[0,10] + 0.422×[10,10]
+   = [1.55,0] + [0,4.22] + [4.22,4.22]
+   = [5.777, 8.446]
+```
+
+Final output matrix O (2×2):
+```
+O = [8.446  5.777]  ← New representation for position 1
+    [5.777  8.446]  ← New representation for position 2
+```
+
+### What Does the Output Matrix Represent? (最后这个输出的矩阵代表什么)
+
+The output matrix O represents **each word's new representation after "looking at" others**.
+
+**Matrix dimensions:**
+- 2 rows: 2 query positions (2 words asking questions)
+- 2 columns: dimension of each value vector
+
+**Row interpretation:**
+- Row 1 = Query 1's new contextualized vector
+- Row 2 = Query 2's new contextualized vector
+
+**Intuitive analogy (直白的比喻):**
+Imagine 3 classmates providing information. Word 1 decides to:
+- Listen to classmate 1: 42.2%
+- Listen to classmate 2: 15.5%
+- Listen to classmate 3: 42.2%
+
+The resulting "comprehensive notes" [8.446, 5.777] become word 1's new representation.
+
+### Key Takeaway (关键理解)
+
+```
+softmax: 算"我该听谁多少"（权重分配表）
+weighted sum: 把"我听到的内容"做成一杯混合果汁（新的表示向量）
+```
+
+**English:**
+- **Softmax:** Calculate "how much should I listen to whom" (attention weight distribution)
+- **Weighted sum:** Blend "what I heard" into a mixed representation (new vector)
+
+In real transformers, this output matrix contains each token's **contextualized embedding** — the word's meaning updated with information from the entire sequence context.
+
+---
+
 ## Self-Attention vs. Cross-Attention
 
 There are two flavors of attention used in transformers:
