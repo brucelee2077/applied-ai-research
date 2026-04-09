@@ -184,15 +184,17 @@ Build 5 independent models (one per harm category), each using early fusion of a
 
 The limitation: 5 independent models means 5x the training cost, 5x the serving cost, and no knowledge sharing between tasks. Learning to detect disturbing imagery for the violence model doesn't help the self-harm model, even though disturbing imagery is relevant to both.
 
-#### Great Solution: Multi-task model with early fusion and shared base layers
+#### Great Solution: Multi-task model with cross-attention fusion and shared base layers
 
 One model with shared base layers (general "content understanding") and 5 task-specific heads (one per harm category). This captures cross-modal harm through early fusion, shares computation across tasks, and enables knowledge transfer — the shared layers learn features useful for all harm types.
+
+**Why cross-attention over concatenation:** Simple feature concatenation (encode each modality separately, concatenate vectors, feed to MLP) is a valid early fusion approach but limited — the MLP can only learn shallow interactions between modalities. Cross-attention is stronger: text tokens attend over visual tokens ("which image regions are relevant to this text?") and visual tokens attend over text tokens ("which words explain what's in this image?"). This is critical for memes where the spatial relationship between text overlay and image content carries the harmful signal. Reference architectures: FLAVA, ALIGN, CoCa. In an interview, naming cross-attention as the fusion mechanism — vs. "just concatenate" — demonstrates current multimodal research awareness.
 
 | Approach | Pros | Cons | When to use |
 |----------|------|------|-------------|
 | **Keyword blocklist** | Sub-1ms, no training needed, easy to update | Trivially evaded, context-blind, text-only | Fast pre-filter layer |
 | **Separate model per modality (late fusion)** | Each model specializes, easy to debug | Misses cross-modal harm (memes), 3x serving cost | When cross-modal harm is rare |
-| **Multi-task with early fusion (chosen)** | Captures cross-modal interactions, one model to serve, knowledge transfer between tasks | Harder to debug, requires multimodal training data | When cross-modal harm matters (social media) |
+| **Multi-task with cross-attention fusion (chosen)** | Captures cross-modal interactions via attention, one model to serve, knowledge transfer between tasks | More complex training, requires multimodal training data, higher compute than concatenation | When cross-modal harm matters (social media) |
 | **Separate model per harm type** | Each model fully specialized | 5x training/serving cost, no knowledge sharing | When harm categories have very different feature needs |
 
 ### Model Architecture
@@ -231,6 +233,20 @@ L_total = Σ_k w_k × FL_k
 
 Task weights `w_k` are set differently per harm category. CSAM gets the highest weight (missing it is catastrophic). Hate speech gets lower weight (noisier labels, more context-dependent). GradNorm can automatically tune these weights based on learning rate per task.
 
+**View-weighted loss — connecting loss to business metric:**
+
+The business metric is harmful impressions (total views of harmful content), but the focal loss above treats all misclassified posts equally. A missed harmful post that goes viral (10M views) and a missed post seen by 5 people contribute the same gradient. This disconnect means the model doesn't learn to prioritize the posts that matter most.
+
+Fix: weight each sample by its reach:
+
+```
+L_weighted = FL(p_t) × min(log(1 + views), c)
+```
+
+where `views` is the post's view count (or predicted view count for new posts), and `c` caps the weight to prevent outliers from dominating gradients. The logarithmic dampening prevents power-law outliers (a post with 100M views) from making the loss unstable. For posts evaluated at publication time (before any views), use predicted virality based on author follower count and post type as a proxy.
+
+This ensures the training loss directly mirrors the business objective: the model learns to be most careful about content that reaches the most users.
+
 **Calibration:** After training, apply Platt scaling (`P_calibrated = sigmoid(a × logit(ŷ) + b)`) on a held-out calibration set. Calibration is critical because thresholds drive the remove/demote/pass decision. If `P(violence) = 0.8` doesn't actually mean 80% of posts at that score are violent, our thresholds systematically misfire.
 
 ## Inference and Evaluation
@@ -255,23 +271,34 @@ This limits viral spread during the critical first 30 minutes while allowing the
 
 **Serving architecture (500M posts/day = 5,800/second):**
 
+At 5,800 posts/second, running the full multi-task model on every post is expensive. A lightweight pre-filter dramatically reduces compute: a logistic regression on cheap features (text length, profanity keyword count, author violation history, account age) classifies ~85% of posts as obviously benign in <2ms. Only the remaining ~15% (870 posts/second) go through the expensive deep model. This reduces GPU inference load by 6x.
+
 | Stage | What happens | Latency |
 |-------|-------------|---------|
 | Post enters Kafka queue | Stream processing, multiple consumers | <5ms |
-| Feature extraction | Text/image embedding (pre-computed by upload pipeline), author features from Redis | 10ms |
-| Model inference | Multi-task MLP forward pass on GPU, batch size 64 | 15ms |
+| **Lightweight pre-filter** | Logistic regression on cheap features; 85% of posts exit here as benign | 2ms |
+| Feature extraction (15% of posts) | Text/image embedding (pre-computed by upload pipeline), author features from Redis | 10ms |
+| Model inference (15% of posts) | Multi-task model forward pass on GPU, batch size 64 | 15ms |
 | Action routing | Compare scores against per-category thresholds | 5ms |
 | Enforcement/demotion | Write to enforcement service or human review queue | 5ms |
-| **Total** | | **~35ms P99** |
+| **Total (pre-filtered path)** | | **~7ms P99** |
+| **Total (full model path)** | | **~42ms P99** |
 
 **Infrastructure:**
+- Lightweight pre-filter: CPU-based logistic regression, trained via teacher-student distillation from the heavy model to ensure alignment
 - Kafka message queue for post ingestion (handles burst traffic)
-- GPU inference workers running batched forward passes (64 posts per batch)
+- GPU inference workers running batched forward passes (64 posts per batch) — only for the ~15% of posts that pass the pre-filter
 - Redis feature store for author features and reaction counts (updated every minute)
 - Pre-computed embeddings: text and image embeddings are generated as part of the post upload pipeline, not at inference time
 - Human review queue prioritized by virality signal (high-engagement posts first) and harm severity (CSAM always top priority, SLA: 1 hour)
 
-**Progressive confidence:** The system re-evaluates posts as reaction features accumulate. A post initially scored at P=0.4 (demoted) might be re-scored at P=0.85 (removed) after receiving 200 user reports in 30 minutes. This is implemented as periodic re-scoring of demoted posts.
+**Progressive confidence with behavioral re-triggering:** The system re-evaluates posts as reaction features accumulate. Re-scoring is event-driven, triggered by specific behavioral signal thresholds:
+- User reports exceed 5 on a single post
+- View velocity crosses 10K views/minute (virality signal)
+- Comment sentiment drops below threshold (negative reaction spike)
+- A high-follower account (>100K followers) interacts with the post
+
+This requires stream processing infrastructure — Kafka consumers watching signal streams per post, maintaining state, and scheduling re-scoring jobs. A post initially scored at P=0.4 (demoted) might be re-scored at P=0.85 (removed) after receiving 200 user reports in 30 minutes.
 
 ### Evaluation
 
@@ -282,6 +309,7 @@ This limits viral spread during the critical first 30 minutes while allowing the
 | **PR-AUC** (per harm type) | Area under precision-recall curve across all thresholds | Primary metric. More informative than ROC-AUC for imbalanced data — ROC-AUC can be misleadingly high when negatives vastly outnumber positives. |
 | **F_β Score** | Weighted harmonic mean of precision and recall | β varies by harm type: F₂ for CSAM (recall-heavy), F₀.₅ for hate speech (precision-heavy) |
 | **Precision at fixed recall** | Precision when recall = 95% (or 99% for CSAM) | Answers: "if we catch 95% of harmful content, how many false positives do we generate?" |
+| **Impression-weighted PR-AUC** | PR-AUC where each sample is weighted by view count | Mirrors the business metric (harmful impressions). A missed viral post hurts this metric 10,000x more than a missed obscure post. Standard unweighted PR-AUC treats them equally — impression-weighted PR-AUC doesn't. |
 
 **Online Metrics:**
 
@@ -294,6 +322,8 @@ This limits viral spread during the critical first 30 minutes while allowing the
 | **Per-category metrics** | All above, broken down by harm type | Track independently — violence improving while hate speech degrades is actionable |
 
 **Why harmful impressions > prevalence:** A viral harmful post with 10M views is 10,000x worse than 1,000 non-viral harmful posts each with 1,000 views (same total prevalence). Harmful impressions captures actual user exposure to harm.
+
+**A/B testing with rare events:** Harmful content is <0.5% of all posts. Running a standard A/B test — deploy model A to 50% of traffic, model B to 50%, compare harmful impressions — requires impractically large samples to reach statistical significance on a 0.5% event rate. Importance sampling solves this: instead of labeling a random sample of all posts, heavily sample posts in the uncertain region (model scores between 0.3 and 0.9) where the two models disagree, and down-sample posts where both models agree (scores near 0.0 or 1.0). Reweight the sample to recover unbiased estimates. This focuses the expensive human labeling budget on the posts that actually distinguish the two models, achieving ~10x label efficiency. Run both models in shadow mode on the same traffic, then label only the disagreement region.
 
 ## Deep Dives
 
@@ -414,6 +444,48 @@ Most content moderation systems are reactive — they wait for content to be pub
 
 The tradeoff between proactive and reactive detection is latency vs coverage. Proactive blocking must be extremely fast (<50ms to avoid noticeable publication delay) and extremely precise (blocking legitimate content at publication time is worse than removing it later, because the user sees the rejection immediately). Reactive detection has more time and can use richer features (reactions, reports) but allows some period of harm exposure.
 
+### 🔄 Positive Suppression: How Enforcement Biases Training Data
+
+**Problem:** When the content moderation system works well, it removes harmful content quickly — often within minutes of publication. But removed content vanishes from the training data distribution. Future models train only on content that survived enforcement: benign posts plus the harmful posts the system failed to catch. Over months, this creates a compounding feedback loop: the model becomes gradually blind to the exact patterns it's best at detecting, because those patterns no longer appear in training data.
+
+Concretely: if the model catches 95% of violent content, the remaining 5% is harder, more subtle violence that evaded detection. The next model trains on this harder distribution, never seeing the "easy" 95% it caught. It learns that violence is always subtle — and starts missing the obvious violence that the previous model caught effortlessly. Recall degrades silently because the training distribution drifts away from the production distribution.
+
+**Detection:** Monitor model recall on a held-out "golden set" of known harmful content that is never subject to enforcement. If recall drops 2%+ quarter-over-quarter on the golden set while the model's production metrics look stable, positive suppression is the likely cause. Another signal: track the difficulty distribution of caught harmful content over time — if it skews toward harder cases each quarter, the easy cases are being suppressed.
+
+**Mitigation:**
+- **Holdout experiments:** Withhold enforcement on a random 1-5% sample of flagged content. Let it stay live (with monitoring) to observe its natural engagement trajectory. This preserves the full distribution for training at the cost of a small amount of harm exposure. The sample must be tiny enough that aggregate harm is negligible but large enough for statistical validity.
+- **Enforcement-action logging:** For every removed post, log the post features, model scores, and the enforcement action taken. Include these posts in training as positive examples, weighted by model confidence at removal time, even though they have no post-removal engagement signals.
+- **Importance-weighted sampling:** When constructing training batches, up-weight posts that were similar to enforced content (by embedding distance) to counteract the suppression bias.
+
+A Staff candidate recognizes positive suppression unprompted as a systemic risk of any system that takes actions affecting its own training data — it applies equally to fraud blocking, bot banning, and spam filtering.
+
+### 💡 Graph-Based User/Author Modeling
+
+Our feature set includes flat author features — violation count, profanity rate, account age, follower count. These miss the social graph signal entirely. A user with 5 violations who is connected to 200 known bad actors is far higher risk than an isolated user with 5 violations. The graph encodes coordinated behavior, community membership, and trust networks that flat features cannot capture.
+
+#### Bad Solution: Flat feature vector
+
+Use only the author features listed in the feature engineering section: `violation_count_90d`, `profanity_rate`, `account_age_days`, `follower_count`, `country`. Each author is represented by ~20 scalar features concatenated into the main feature vector. This misses all relational information — who the author interacts with, what communities they belong to, whether their connections have been flagged.
+
+#### Good Solution: Shallow network features
+
+Augment the flat features with hand-engineered graph statistics: degree centrality, clustering coefficient, fraction of flagged neighbors (1-hop and 2-hop), average violation count of neighbors, membership in communities with high harm rates. These features capture first-order network effects and are cheap to compute (pre-computed in batch, served from Redis).
+
+The limitation: hand-engineered graph features capture what you think to look for but miss complex patterns. A user embedded in a tight cluster of new accounts with identical posting cadence is suspicious — but encoding that pattern as an explicit feature requires knowing to look for it.
+
+#### Great Solution: GNN-based author embeddings (GraphSAGE)
+
+Train a Graph Neural Network to generate author embeddings from the social graph. GraphSAGE (Graph Sample and Aggregate) is the right architecture because it is **inductive** — it learns a function to generate embeddings by aggregating neighbor features, rather than memorizing embeddings for each node. This means:
+- **New accounts get embeddings immediately** by aggregating their neighbors' features, solving cold start
+- **No full retraining needed** when the graph changes — just re-run the aggregation function
+- **Scales linearly** with neighbor sampling (k-hop, typically k=2, with fan-out capped at 10-25 neighbors per hop)
+
+The GraphSAGE embedding captures: community membership, network position (bridge vs. periphery), behavioral similarity to flagged accounts, and coordination signals (accounts created together, posting at the same time, sharing the same content).
+
+For the strongest signal, combine graph embeddings with temporal behavior in a **dual-branch architecture**: GraphSAGE for graph structure (who is this user connected to?) and a GRU/Transformer for temporal activity sequences (what has this user done over time?). Cross-attention between the branches lets the model ask: "Does anyone else in this user's cluster post with this same rhythm?" — catching coordinated campaigns that neither branch would detect alone.
+
+The graph embedding is concatenated with the existing feature vector before the shared base layers, adding ~64-128 dimensions. Recompute graph embeddings daily in batch; cache in the feature store alongside other author features.
+
 ## What is Expected at Each Level?
 
 ### Mid-Level Engineer
@@ -426,7 +498,7 @@ A senior candidate will articulate the multi-task architecture with shared layer
 
 ### Staff Engineer
 
-A Staff candidate will quickly establish the multi-task early-fusion architecture and then focus on the systemic challenges: the adversarial arms race (evasion techniques and countermeasures), the label quality problem (annotator disagreement, reviewer burnout, and how to weight tasks by label quality), and the organizational question of who controls moderation thresholds (policy teams, not ML engineers, with a configuration service for rapid adjustment during crises). They'll recognize that the biggest risk isn't model accuracy on known harm categories — it's the emergence of new harm categories that the model has never seen, and propose a multi-timescale response (rule-based filters → zero-shot classification → fine-tuned model). They think about the regulatory dimension (DSA compliance, audit logging, explainability) as architectural requirements, not afterthoughts.
+A Staff candidate will quickly establish the multi-task cross-attention fusion architecture and then focus on the systemic challenges: the adversarial arms race (evasion techniques and countermeasures), the label quality problem (annotator disagreement, reviewer burnout, and how to weight tasks by label quality), and the organizational question of who controls moderation thresholds (policy teams, not ML engineers, with a configuration service for rapid adjustment during crises). They'll recognize that the biggest risk isn't model accuracy on known harm categories — it's the systemic feedback loops: positive suppression (enforcement biasing training data away from the patterns the model catches best) and the emergence of new harm categories the model has never seen. They propose mitigations for both: holdout experiments for positive suppression, and a multi-timescale response for new categories (rule-based filters → zero-shot classification → fine-tuned model). They connect the loss function to the business metric (view-weighted loss for harmful impressions), propose graph-based author modeling (GraphSAGE embeddings capturing social network risk signals beyond flat features), and design the inference pipeline with a lightweight pre-filter for compute efficiency. They think about the regulatory dimension (DSA compliance, audit logging, explainability) as architectural requirements, not afterthoughts.
 
 ## References
 
@@ -434,4 +506,5 @@ A Staff candidate will quickly establish the multi-task early-fusion architectur
 - Kiela et al., "The Hateful Memes Challenge" (2020) — benchmark for cross-modal hate detection
 - Radford et al., "Learning Transferable Visual Models From Natural Language Supervision" (CLIP, 2021)
 - Chen et al., "GradNorm: Gradient Normalization for Adaptive Loss Balancing in Deep Multitask Networks" (2018)
+- Hamilton et al., "Inductive Representation Learning on Large Graphs" (GraphSAGE, 2017) — inductive graph embeddings for user/author modeling
 - EU Digital Services Act (2022) — regulatory requirements for content moderation

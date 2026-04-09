@@ -269,13 +269,34 @@ def _default_state() -> dict:
 
 # ── State I/O ──────────────────────────────────────────────────────────────────
 def load_state() -> dict:
-    """Load state.json, creating with defaults if absent."""
+    """Load state.json, creating with defaults if absent.
+    Backfills any modules added to ALL_MODULES since the file was created."""
     if not STATE_PATH.exists():
         state = _default_state()
         save_state(state)
         return state
     with open(STATE_PATH, "r") as f:
-        return json.load(f)
+        state = json.load(f)
+    # Backfill modules added after this state file was created
+    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning"}
+    changed = False
+    for mid in ALL_MODULES:
+        if mid not in state.get("modules", {}):
+            state.setdefault("modules", {})[mid] = {
+                "unlocked": mid in ALWAYS_UNLOCKED,
+                "notebooks_completed": [],
+                "boss_unlocked": False,
+                "boss_attempted": False,
+                "boss_passed": False,
+                "boss_expires_at": None,
+                "boss_score": None,
+                "boss_time_minutes": None,
+                "mastery_score": 0.0,
+            }
+            changed = True
+    if changed:
+        save_state(state)
+    return state
 
 def save_state(state: dict) -> None:
     """Atomically write state to state.json."""

@@ -193,11 +193,30 @@ For edge prediction between users u and v:
 
 **Edge features integration:** Pure GNN only captures graph structure. Critical edge features (profile view count, school overlap, company overlap) are injected via an MLP that takes edge features as input and adds its output to the dot product score. This combines graph-learned signals with explicit pair features.
 
-**Training loss — Binary Cross-Entropy with negative sampling:**
+**Training loss — Two-stage approach with interaction-weighted BCE:**
+
+The business objective weights connections by 90-day interaction value, but the embedding training loss must connect to this objective. A two-stage approach handles this cleanly:
+
+**Stage 1 — Embedding training with uniform BCE + negative sampling:**
 ```
-L = -Σ log σ(embed(u) · embed(v)) for positive edges
+L_embed = -Σ log σ(embed(u) · embed(v)) for positive edges
     -Σ log σ(-embed(u) · embed(w)) for negative samples
 ```
+
+Uniform positive labels here because the embedding's job is to learn graph structure — which pairs of users are likely to connect. Interaction quality is not yet observable at connection time.
+
+**Stage 2 — Ranking layer fine-tuned with interaction-weighted loss:**
+```
+L_rank = -Σ interaction_weight(u, v) × BCE(MLP(embed(u), embed(v), edge_features), y)
+```
+
+where `interaction_weight(u, v)` reflects the 90-day interaction value of the connection:
+- `weight = 3.0` if the pair exchanged messages within 90 days
+- `weight = 2.0` if endorsements or content engagement occurred
+- `weight = 1.0` for accepted connections with no subsequent interaction
+- `weight = 0.3` for connections that were accepted but one party later unfollowed/muted
+
+This two-stage design separates the embedding objective (learn graph topology) from the ranking objective (prioritize valuable connections). The embedding stage sees all positive edges equally because it needs to learn the full graph structure. The ranking stage then re-weights using post-connection interaction data, pushing the final PYMK list toward connections that lead to active professional relationships — not just accepted requests that sit dormant. The interaction weights are computed from historical data: for each connection formed 90+ days ago, measure the subsequent interaction pattern and assign weights.
 
 Negative samples: 5 random FoF non-connected pairs per positive pair.
 

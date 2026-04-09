@@ -295,7 +295,40 @@ With 5M listings and daily embedding retraining, the ANN index must be rebuilt e
 
 **Scaling to larger catalogs:** If the listing count grows to 50M+, HNSW may no longer fit comfortably in memory on a single server. Options: (1) shard the index by geography (US, Europe, Asia-Pacific) since cross-region similarity is rare, (2) use IVF-PQ with trained codebooks for 10-50x compression, trading recall for memory savings. At 5M listings, neither is needed — but knowing the scaling path shows system design maturity.
 
+### 🏭 Why Pre-Filtering Is Optional at 5M — and When It Stops Being Optional
+
+At 5M active listings with 64-dim embeddings, the HNSW index is ~1.2GB and fits on a single machine with <10ms query latency. There is no need for a pre-filter before ANN search — the index is small enough to search directly. This is a key architectural simplification over systems like video recommendation (10B items) that require multi-stage retrieval.
+
+**When pre-filtering becomes necessary (50M+ listings):** As Airbnb grows, the index may not fit on a single machine. At that point, three pre-filtering strategies become relevant:
+
+1. **Geographic sharding:** Partition the index by region (US-West, US-East, Europe, Asia-Pacific). Since 95%+ of similar listing queries are within the same region, each shard stays small. Cross-region queries fan out to multiple shards but are rare.
+
+2. **Availability pre-filter:** Before ANN search, filter out listings unavailable for the user's dates. This is already done in re-ranking, but moving it upstream reduces the candidate pool by 30-60% depending on season, saving ANN compute.
+
+3. **Price-range bucketing:** Partition listings into price buckets ($0-100, $100-250, $250-500, $500+) and search only the relevant bucket plus one adjacent bucket. Users rarely consider listings at 3x their budget, so this filters without losing relevant candidates.
+
+The Staff-level insight: at 5M, the correct answer is "we don't need pre-filtering, and adding it would be over-engineering." But articulating *what changes at scale* and *which pre-filtering strategy matches which bottleneck* demonstrates scaling awareness without premature optimization.
+
 ### 💡 Relevance vs Diversity (MMR)
+
+### 💡 The Content-Signal Tradeoff: Why Airbnb Chose Session-Only Embeddings
+
+Listing2Vec deliberately excludes content features (price, amenities, photos, description) during embedding training. The model sees only listing IDs and their session co-occurrence. This is a design choice with significant interview implications — not a limitation to apologize for.
+
+**Why session-only signals work:** Behavioral co-occurrence captures latent quality dimensions that content features miss. Two listings at different prices with different amenity sets can be functionally equivalent alternatives if users consistently compare them. The embedding learns "perceived substitutability" directly from behavior, without the bias of hand-engineered feature similarity. This is the same insight behind Word2Vec — you learn word meaning from context, not from a dictionary.
+
+**When you'd add content features (and why Airbnb eventually did):**
+
+1. **Cold start:** New listings have no session history. The content-attribute bridge embedding (described in the Cold Start section) maps content features into the behavioral embedding space, giving new listings a reasonable starting embedding. Without content features, cold-start listings rely on geographic fallback only.
+
+2. **New markets:** When Airbnb enters a new country, session data is sparse. Content features (price relative to local median, amenity overlap with popular local listings) provide signal where behavioral data hasn't accumulated yet.
+
+3. **Sparse interaction listings:** Listings with <10 sessions in the training window produce noisy embeddings. Content features regularize — they anchor the embedding near content-similar listings when behavioral signal is weak.
+
+**The hybrid approach (production reality):** Airbnb's published work shows a progression: (1) pure session-based Listing2Vec for established listings, (2) content-attribute bridge for cold-start listings, (3) a combined model that uses content features as regularization during embedding training. The combined model adds `L_content = -Σ sim(v_i, v_j) × content_sim(i, j)` as a regularization term, pulling embeddings of content-similar listings closer together when behavioral data is sparse.
+
+This tradeoff — when to rely on behavior alone vs. when to inject content — is a Staff-level discussion point. The answer is not "always use more features." It is "behavioral signals are the primary teacher; content features are training wheels for cold-start and sparse-data regimes."
+
 
 Pure embedding similarity tends to produce monotonous recommendations — 10 listings that are nearly identical in style, price, and location. This doesn't serve users well because they want to compare alternatives, not see the same property repeated.
 

@@ -234,10 +234,11 @@ The recall gap (95% vs 99%) is acceptable because the re-ranking layer can compe
 #### Serving Pipeline
 
 1. **Preprocessing** (<5ms): Resize, normalize, handle region crop
-2. **Embedding** (<15ms): Run query through the model
-3. **ANN search** (<10ms): Search the IVF-PQ index
-4. **Re-ranking** (<10ms): Safety filter, dedup, diversity, freshness
-5. **Total: <40ms** (well within 100ms budget)
+2. **Metadata pre-filter** (<3ms): Before ANN search, reduce the candidate pool using lightweight metadata filters. At 200B images, even a 30% reduction saves significant ANN compute. Three filters run in parallel: (a) **content safety score** — exclude images flagged by the offline safety classifier (NSFW score > threshold), eliminating ~5% of the corpus from search, (b) **board category filter** — if the query image is classified as "home decor," exclude images from unrelated categories (automotive, sports) using a pre-computed category index, reducing candidates by ~40-60%, (c) **freshness/availability filter** — exclude deleted, private, or expired images. These filters operate on pre-computed metadata stored in an inverted index (sub-ms lookup per filter). The combined effect: the ANN search runs over 40-80B candidates instead of 200B, reducing shard fan-out and improving both latency and result quality (fewer irrelevant candidates means fewer wasted ANN slots).
+3. **Embedding** (<15ms): Run query through the model
+4. **ANN search** (<10ms): Search the IVF-PQ index
+5. **Re-ranking** (<10ms): Safety filter, dedup, diversity, freshness
+6. **Total: <45ms** (well within 100ms budget)
 
 ### Evaluation
 

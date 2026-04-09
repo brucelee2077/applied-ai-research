@@ -60,13 +60,18 @@ This is a **pointwise Learning to Rank (LTR)** problem using **binary classifica
 
 **Training data unit:** A (user, event) pair observed at impression time.
 **Label:** 1 if the user registered for the event, 0 if the user saw the event but did not register.
-**Loss function:** Focal loss to handle severe class imbalance (~1-2% conversion rate):
+**Loss function:** Event-value weighted focal loss. The business objective weights paid events by price (GMV contribution), so the loss must reflect this — otherwise the model optimizes for raw conversion count (dominated by free events) rather than revenue-aligned registrations:
 
 ```
-FL(p_t) = -α × (1 - p_t)^γ × log(p_t)
+Weighted_FL(p_t) = -α × (1 - p_t)^γ × w(event) × log(p_t)
 ```
 
-α = 0.25, γ = 2.0. When γ = 0, this reduces to standard cross-entropy.
+where:
+- `w(event) = event.price` if paid event, `w(event) = 1.0` if free event
+- `α = 0.25`, `γ = 2.0` — focal loss parameters for class imbalance (~1-2% conversion rate)
+- When `γ = 0` and `w = 1`, this reduces to standard cross-entropy
+
+The event-value weight `w(event)` means the model receives a stronger gradient signal when it misranks a $200 concert than when it misranks a free meetup. This directly connects the training loss to the business objective (maximize weighted registrations / GMV). Without this weight, the model treats all registrations equally, and the 80% of events that are free dominate the gradient — the model learns to recommend easy-to-convert free meetups at the expense of higher-value paid events.
 
 **Why pointwise over pairwise/listwise:** Pointwise maps cleanly to binary classification infrastructure, scales to millions of (user, event) pairs, and directly produces calibrated probabilities (needed for the two-tier serve/demote decision). Pairwise (LambdaMART) gives better ranking quality but requires constructing preference pairs and is harder to calibrate. Start pointwise, upgrade to listwise if top-of-list quality is insufficient.
 
@@ -211,6 +216,16 @@ Fine-tune daily on the last 7 days of data with a replay buffer (10% from older 
 | Model inference | Forward pass on ~500 candidates (batched on GPU) | 20ms |
 | Re-ranking | Diversity enforcement, organizer fairness boost, freshness | 10ms |
 | **Total** | | **~70ms** |
+
+**Event filtering infrastructure:** The filtering stage reduces ~100K active events to ~500 candidates in <10ms using two lightweight indexes:
+
+1. **R-tree spatial index** for distance queries — given the user's GPS coordinates, retrieve all events within 50 miles in O(log n) time. R-trees handle geographic bounding-box queries efficiently and are standard in PostGIS / Redis GeoSets. At ~100K events, a single R-tree fits in <10MB of memory.
+
+2. **In-memory category index** — an inverted index mapping each event category to its event IDs, pre-filtered by the user's category preferences stored in a bitmap. Category filtering is a hash lookup + intersection, sub-1ms.
+
+3. **Expiration filter** — a sorted set of events by start time, allowing O(1) removal of expired events via a sliding timestamp pointer.
+
+This is simpler than video recommendation's ANN-based retrieval because the candidate pool is 100K events (not 10B videos). At this scale, exhaustive filtering with lightweight indexes outperforms ANN search — no embedding computation, no approximate recall loss, and the infrastructure is trivially maintainable. If the platform scales to 10M+ active events, the filtering stage would need geographic sharding (partition events by metro area) or a two-stage approach with category-level ANN retrieval, but at 100K the simple approach is both faster and more accurate.
 
 **Feature freshness:**
 - Static features (user demographics, event description, price): computed at event creation and user profile update

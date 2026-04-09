@@ -168,7 +168,20 @@ where:
 - `L_reg` = smooth L1 loss for bounding box regression (x, y, w, h)
 - `λ` = weight balancing classification and regression (typically 1.0)
 
-**Asymmetric weighting for recall:** Increase the weight of false negatives in the classification loss to penalize missed detections more heavily than false positives.
+**Asymmetric weighting for recall:** Weight the classification loss by object class and detection size to directly connect training optimization to the business objective (weighted recall prioritizing high-risk detections):
+
+```
+L_weighted = w(class, size) × L_cls + λ × L_reg
+```
+
+where:
+- `w(face, close-up) = 10.0` — a clearly identifiable face is the highest-priority detection
+- `w(face, distant) = 5.0` — still a privacy risk, but lower severity
+- `w(plate, readable) = 8.0` — a readable plate is nearly as critical as a close-up face
+- `w(plate, distant) = 3.0` — an unreadable plate is lower risk
+- `w(background) = 1.0` — false positives are cosmetic
+
+These weights encode the business asymmetry: a missed close-up face (identifiable → privacy violation → potential GDPR fine) costs orders of magnitude more than a false blur on a tree trunk. The weights are tuned using the user complaint rate as the feedback signal — if complaints spike for a particular class/size bucket, increase its weight and retrain. This closes the loop between the business metric (complaint rate < 0.001%) and the training loss.
 
 ## Inference and Evaluation
 
@@ -231,13 +244,23 @@ Additionally, use test-time augmentation: run detection on the original image AN
 
 ### 💡 Recall vs Precision: The Asymmetric Error Cost
 
-A false negative (missed face) is a privacy violation. A false positive (blurring a fire hydrant) is a cosmetic issue. How do you operationalize this asymmetry?
+A false negative (missed face) is a privacy violation. A false positive (blurring a fire hydrant) is a cosmetic issue. How do you operationalize this asymmetry at each stage of the pipeline?
 
-**In training:** Use asymmetric class weights in the loss function. Weight false negatives 5-10x more than false positives. This shifts the model's decision boundary to favor recall.
+#### The Problem: Quantifying Asymmetric Cost
 
-**In post-processing:** Set the confidence threshold low (0.2-0.3). This catches borderline detections at the cost of more false positives. For a privacy-critical system, this is the right tradeoff.
+The cost ratio is roughly 1000:1. A missed face can trigger a GDPR complaint (investigation + potential fine + PR damage). A false blur on a mailbox costs nothing beyond a slightly degraded image. But this ratio is not fixed — it varies by object class (face > plate), object size (close-up > distant), and geography (EU with GDPR enforcement > regions with weaker privacy law). A single recall threshold treats all misses equally, which misses this structure.
 
-**In monitoring:** Track recall and precision separately. Alert on recall drops immediately. Tolerate precision drops as long as the false blur rate stays below a cosmetic threshold.
+#### Detection: Where the Pipeline Leaks
+
+The most common recall failures cluster in three patterns: (1) **small faces at distance** — below 20px, the model's confidence drops below threshold and NMS may suppress weak detections, (2) **unusual orientations** — faces in reflections, viewed from above, or partially occluded by sunglasses/masks, (3) **domain shift** — new geographies with different demographics or plate formats that weren't in the training set. Monitoring recall stratified by size bucket and geography reveals which pattern is dominant.
+
+#### Mitigation: Three Complementary Levers
+
+**In training:** Use the weighted loss `L_weighted = w(class, size) × L_cls` (described in the Loss Function section). This shifts the decision boundary per-class and per-size, not uniformly. The weights are tuned against the user complaint rate — if small-face complaints spike, increase `w(face, distant)` and retrain.
+
+**In post-processing:** Set the confidence threshold low (0.2-0.3). This catches borderline detections at the cost of more false positives. Additionally, run a second-pass detector at 2x resolution on image regions where the first pass had medium confidence (0.2-0.5) — this catches small faces the first pass was uncertain about without doubling compute on the entire image.
+
+**In monitoring:** Track recall and precision separately, sliced by object class, size bucket, and geographic region. Alert on recall drops immediately (any size bucket falling below 98% triggers investigation). Tolerate precision drops as long as the false blur rate stays below a cosmetic threshold (~15% false positive rate).
 
 ### 📊 International License Plate Variability
 
@@ -271,7 +294,9 @@ This eliminates distortion entirely and produces standard rectangular images the
 
 ### ⚠️ The Human Review Pipeline
 
-Even with 99.5% recall, at billions of images, the 0.5% miss rate means millions of unblurred faces. The human review pipeline is essential:
+**A note on user/behavioral signals:** Street View blurring is unusual among ML systems because there is no real-time user interacting with the model's output. Unlike a recommendation system where user clicks and dwell time provide continuous behavioral feedback, this is an offline batch pipeline — images are processed and published, and the only user signal is the sparse complaint channel. This is an important interview observation: it means the system cannot rely on behavioral signals for model improvement and must invest more heavily in active learning and synthetic data to close coverage gaps. The absence of a rich user signal layer is a design consequence of the batch architecture, not a gap to fill.
+
+Even though user signals are sparse, the complaint channel is critical: with 99.5% recall, at billions of images, the 0.5% miss rate means millions of unblurred faces. The human review pipeline is essential:
 
 1. **Automated triage:** Prioritize images from high-traffic areas and recently published images
 2. **User reports:** When a user reports an unblurred face, the image is queued for human review

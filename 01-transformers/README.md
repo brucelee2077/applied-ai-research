@@ -1,5 +1,7 @@
 # Transformers
 
+![Status](https://img.shields.io/badge/status-complete-brightgreen)
+
 ## The Mystery Worth Solving
 
 Here's something that genuinely puzzled researchers when it first happened:
@@ -63,6 +65,13 @@ You just understood the core mechanism of every major AI system released in the 
 
 ## Study Plan
 
+For each topic, we recommend the following study order to get the most out of the material:
+
+1.  **Theory (`.md`):** Start with the main `.md` file (e.g., `attention-mechanisms.md`) to understand the core concepts.
+2.  **Concept Notebook (`.ipynb`):** Work through the corresponding concept notebook (e.g., `01_attention_mechanisms.ipynb`) to see a practical, from-scratch implementation.
+3.  **Interview (`-interview.md`):** Once you're comfortable with the basics, read the interview-focused markdown file to deepen your understanding and prepare for common questions.
+4.  **Experiments (`_experiments.ipynb`):** Finally, explore the experiments notebook to see how the concepts behave in different scenarios and to run benchmarks.
+
 Follow this path from top to bottom. Each section builds on the previous one.
 
 ```
@@ -124,21 +133,6 @@ START HERE
 │     🧒 Making your robot bigger and smarter (like evolving a Pokemon!) │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
-### Recommended Reading Order
-
-For each topic, read the `.md` file first (theory), then work through the `.ipynb` notebook (code):
-
-| Step | Theory (Read) | Code (Hands-on) | What You'll Learn |
-|------|---------------|------------------|-------------------|
-| 1 | [Architecture Overview](./architecture/README.md) | — | The complete transformer, all components, three model types |
-| 2 | [Attention Mechanisms](./architecture/attention-mechanisms.md) | [Concept](./architecture/01_attention_mechanisms.ipynb) | Q, K, V, dot product, softmax, self vs cross attention |
-| 3 | [Multi-Head Attention](./architecture/multi-head-attention.md) | [Concept](./architecture/02_multi_head_attention.ipynb) | Parallel heads, concatenation, head specialization |
-| 4 | [Positional Encoding](./architecture/positional-encoding.md) | [Concept](./architecture/03_positional_encoding.ipynb) | Why order matters, sinusoidal vs learned encodings |
-| 5 | [Transformer Block](./architecture/transformer-block.md) | [Concept](./architecture/04_transformer_block.ipynb) | Layer norm, residual connections, FFN, full block |
-| 6 | [Training a Small Transformer](./experiments/training-a-small-transformer.md) | [Notebook](./experiments/01_training_a_small_transformer.ipynb) | Train a char-level decoder-only model, generate text |
-| 7 | [Encoder vs Decoder](./experiments/encoder-vs-decoder.md) | [Notebook](./experiments/02_encoder_vs_decoder.ipynb) | Same task, two architectures, attention pattern comparison |
-| 8 | [Model Scaling](./experiments/README.md#model-scaling-awareness) | — | Scaling laws, compute-optimal training, emergent abilities |
 
 ---
 
