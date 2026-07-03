@@ -8,6 +8,18 @@
 > - 💡 DPO vs PPO-based RLHF: when each wins
 > - 🏭 Production: evaluation pipelines, safety testing, iterative alignment
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | L_SFT | Supervised fine-tuning loss (cross-entropy on demonstrations) |
+> | L_DPO | DPO loss (from RLHF section) |
+> | KL(π_θ \|\| π_ref) | Drift from reference model |
+> | β | KL penalty coefficient |
+>
+> **RL concepts used here:** RLHF pipeline, DPO, PPO, reward modeling, KL constraint.
+> See [math-refresher.md](../math-refresher.md) for notation lookup.
+
 ---
 
 ## Brief restatement

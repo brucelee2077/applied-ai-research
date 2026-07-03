@@ -1,0 +1,397 @@
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Math, Precisely</h1>
+      <p class="module-subtitle">You have the recipe. Now read it like an engineer — every shape, every symbol, and the one division that keeps the whole thing trainable.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 1 — HOOK + VOLUME-DESK METAPHOR -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A volume mixing desk</h2>
+        <p>Picture the desk a sound engineer sits behind at a concert. A row of sliding faders. Each fader controls how loud one source plays — the vocals, the drums, the bass. Push a fader up, that source gets louder in the final mix. Pull it down, it fades into the background.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🎚️</div>
+            <div>
+              <strong>Each fader = one attention weight</strong>
+              <p>It sets how loudly one source plays in the final blend.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🔊</div>
+            <div>
+              <strong>Each source = one Value vector</strong>
+              <p>The actual sound — the payload — that gets mixed in.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🎛️</div>
+            <div>
+              <strong>The master trim = the √d<sub>k</sub> division</strong>
+              <p>It stops one fader from slamming to maximum and drowning everyone else out.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔎</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where the desk breaks down</strong>
+            <p>On a real desk a human sets the faders by hand. In attention, the faders are <em>computed from the data on every forward pass</em> — the model decides, fresh each time, how loud each source should be.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 2 — SYMBOL + SHAPE TABLE, BUILT UP -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One formula, built up piece by piece</h2>
+        <p>Here is the whole operation. We will not read it all at once — we will assemble it left to right, naming every part and its <span class="term" data-definition="The shape of a tensor is the size of each of its dimensions — for a matrix it is rows × columns. Knowing the shape tells you exactly how big a piece of data is and what it can multiply with.">shape</span> as we go.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧮</div>
+          <div class="callout-content">
+            <strong class="callout-title">The full formula</strong>
+            <p style="font-family: var(--font-mono); font-size: var(--text-lg); line-height: 2;">Attention(Q, K, V) = softmax( Q&nbsp;K<sup>T</sup>&nbsp;/&nbsp;√d<sub>k</sub> ) V</p>
+          </div>
+        </div>
+
+        <p><strong>Step 1 — the three inputs.</strong> Every token in the sequence produces three vectors. Stack them over all <em>n</em> tokens and you get three matrices: <span class="term" data-definition="A matrix is a grid of numbers with rows and columns. Here, each row is one token's vector, so an n × d matrix holds n tokens, each described by d numbers.">matrices</span> <code>Q</code>, <code>K</code>, and <code>V</code>.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">Q — n × d_k</code>
+            <span class="badge-desc"><span class="term" data-definition="A query vector is what one token is looking for in the others — like a search request sent to every other word.">Queries</span>: what each of the n tokens is looking for. <strong>d<sub>k</sub></strong> is the <span class="term" data-definition="d_k is the dimension (length) of each query and key vector — how many numbers describe one token's search request and one token's advertisement.">key/query dimension</span>.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">K — n × d_k</code>
+            <span class="badge-desc"><span class="term" data-definition="A key vector is what one token advertises about itself, so other tokens can decide whether to listen to it.">Keys</span>: what each token advertises. Same width d<sub>k</sub> as Q, so they can be compared.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">V — n × d_v</code>
+            <span class="badge-desc"><span class="term" data-definition="A value vector is the payload a token carries — the information that actually gets passed along when another token decides to listen to it.">Values</span>: the payload each token carries. Its width <strong>d<sub>v</sub></strong> can differ from d<sub>k</sub>.</span>
+          </div>
+        </div>
+
+        <p><strong>Step 2 — the scores.</strong> Multiply Q by K <span class="term" data-definition="The transpose of a matrix flips it over its diagonal: rows become columns and columns become rows. Writing K with a small T (Kᵀ) means we use its flipped version so the shapes line up for multiplication.">transposed</span> (written <code>K<sup>T</sup></code>). This takes the <span class="term" data-definition="A dot product multiplies two vectors element by element and adds the results into a single number — a score of how aligned the two vectors are. Bigger means more aligned.">dot product</span> of every query against every key, giving a score for every (query, key) pair.</p>
+
+        <div class="badge-list">
+          <div class="badge-item">
+            <code class="badge-code">Q K^T — n × n</code>
+            <span class="badge-desc">The raw similarity scores. One number for each of the n × n token pairs. <strong>This square is the expensive object</strong> — the whole next module is about its cost.</span>
+          </div>
+        </div>
+
+        <p><strong>Step 3 — the weights.</strong> Divide by √d<sub>k</sub>, then apply <span class="term" data-definition="Softmax turns a list of numbers into positive weights that add up to 1, so they read as proportions. The largest number gets the largest weight, but every number still gets some share.">softmax</span>. The softmax runs <strong>row-wise</strong>: each row is one query, and that row becomes a set of weights over all the keys that sum to exactly 1.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">d_k — scalar</code>
+            <span class="badge-desc">A single number (for example 64). We divide the scores by its square root before the softmax.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">softmax — row-wise</code>
+            <span class="badge-desc">Applied per row, over the keys. Each query gets its own distribution that sums to 1. These are the faders on the desk.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">output — n × d_v</code>
+            <span class="badge-desc">Multiply the weights by V. Each token's new, context-mixed representation. Same width d<sub>v</sub> as the Values.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Read it as a chain of shapes</strong>
+            <p>(n × d<sub>k</sub>) · (d<sub>k</sub> × n) → (n × n) → softmax → (n × n) · (n × d<sub>v</sub>) → (n × d<sub>v</sub>). Two matrix multiplies with a row-wise softmax in the middle. That is the entire operation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 3 — CODE-TO-ENGLISH CENTERPIECE (VERBATIM) -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The formula as real code</h2>
+        <p>This is the exact function from the lab, reproduced line for line. The shapes in the comments are the same ones you just named. Read the left, then the plain English on the right.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · python</span>
+            <pre><code><span class="code-line"><span class="code-keyword">import</span> numpy <span class="code-keyword">as</span> np</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">def</span> <span class="code-function">softmax</span>(x, axis=-<span class="code-number">1</span>):</span>
+<span class="code-line">    x = x - x.<span class="code-function">max</span>(axis=axis, keepdims=<span class="code-keyword">True</span>)   <span class="code-comment"># numerical stability</span></span>
+<span class="code-line">    e = np.<span class="code-function">exp</span>(x)</span>
+<span class="code-line">    <span class="code-keyword">return</span> e / e.<span class="code-function">sum</span>(axis=axis, keepdims=<span class="code-keyword">True</span>)</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">def</span> <span class="code-function">scaled_dot_product_attention</span>(Q, K, V, mask=<span class="code-keyword">None</span>):</span>
+<span class="code-line">    <span class="code-comment"># Q: (n, d_k)  K: (n, d_k)  V: (n, d_v)</span></span>
+<span class="code-line">    d_k = Q.shape[-<span class="code-number">1</span>]</span>
+<span class="code-line">    scores = Q @ K.T / np.<span class="code-function">sqrt</span>(d_k)           <span class="code-comment"># (n, n)  &lt;-- the O(n^2) object</span></span>
+<span class="code-line">    <span class="code-keyword">if</span> mask <span class="code-keyword">is</span> <span class="code-keyword">not</span> <span class="code-keyword">None</span>:                      <span class="code-comment"># causal mask: forbid looking ahead</span></span>
+<span class="code-line">        scores = np.<span class="code-function">where</span>(mask, scores, -np.inf)</span>
+<span class="code-line">    weights = <span class="code-function">softmax</span>(scores, axis=-<span class="code-number">1</span>)        <span class="code-comment"># row-wise: each query sums to 1</span></span>
+<span class="code-line">    <span class="code-keyword">return</span> weights @ V, weights               <span class="code-comment"># (n, d_v), (n, n)</span></span>
+</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Bring in NumPy, the library for fast math on grids of numbers.</p>
+              <p class="tl">Define softmax — the step that turns scores into faders that sum to 1.</p>
+              <p class="tl">Before taking exponentials, subtract the biggest value in each row. This is <span class="term" data-definition="Numerical stability means arranging a calculation so it does not blow up into infinity or shrink into zero on a real computer. Subtracting the max keeps the exponentials small enough to compute safely.">numerical stability</span> — it stops the exponentials from overflowing, and it does not change the answer.</p>
+              <p class="tl">Raise e to the power of each (now shifted) score.</p>
+              <p class="tl">Divide each value by the row's total, so the row sums to exactly 1. Those are your weights.</p>
+              <p class="tl">Now the main function: it takes Q, K, V and an optional mask.</p>
+              <p class="tl">A reminder of the shapes: Q and K are n × d<sub>k</sub>, V is n × d<sub>v</sub>.</p>
+              <p class="tl">Read d<sub>k</sub> straight off Q — it is the width of each query vector.</p>
+              <p class="tl"><strong>The heart of it:</strong> multiply Q by K transposed and divide by √d<sub>k</sub>. The result is the n × n score grid — the object that costs O(n²).</p>
+              <p class="tl">If a <span class="term" data-definition="A causal mask blocks each token from seeing tokens that come after it, so a model writing text cannot peek at the future words it has not generated yet.">causal mask</span> is given, blank out every future position by setting its score to negative infinity, so it cannot be looked at.</p>
+              <p class="tl">Those blanked scores become exactly 0 after softmax — the model cannot look ahead.</p>
+              <p class="tl">Run softmax along the last axis. That means row-wise: each query becomes its own set of weights over the keys, summing to 1.</p>
+              <p class="tl">Multiply the weights by V to blend the payloads, and hand back both the blend (n × d<sub>v</sub>) and the weights (n × n).</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The single most common silent bug</strong>
+            <p><code>axis=-1</code> is load-bearing. Softmax over the whole matrix, or over the columns (the queries), still produces numbers that sum to 1 — so nothing crashes — but the attention is now meaningless. The model trains, the loss looks plausible, and the behaviour is quietly wrong.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 4 — WHY √d_k, WITH BEFORE/AFTER COLLAPSE -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why divide by √d<sub>k</sub>?</h2>
+        <p>This is the master trim on the desk. Without it, one fader slams to the top and silences every other source. With it, the faders stay in a healthy range so the model can still blend several sources together.</p>
+
+        <p><strong>Why it happens:</strong> a dot product adds up d<sub>k</sub> products. As d<sub>k</sub> grows, the scores grow with it — their spread grows like √d<sub>k</sub>. Feed very large, very spread-out numbers into softmax and it spikes onto a single token: one weight near 1, the rest near 0. A spike like that also flattens the <span class="term" data-definition="A gradient is the signal that tells the model which direction to adjust its weights to improve. When the gradient is near zero, the model gets almost no signal and stops learning that part.">gradient</span> to almost nothing, so the model stops learning. Dividing by √d<sub>k</sub> cancels that growth and keeps the scores gentle.</p>
+
+        <p>Watch the same three scores <code>[10, 5, 2]</code> with the trim off, then on. (These are the verified numbers from the lab, with d<sub>k</sub> = 64.)</p>
+
+        <div class="layer-demo animate-in">
+          <div class="layer-tabs">
+            <button class="layer-tab active" onclick="showLayer('scale-off', this)">Scaling OFF</button>
+            <button class="layer-tab" onclick="showLayer('scale-on', this)">Scaling ON (÷ √64)</button>
+          </div>
+          <div class="layer-viewport">
+
+            <div class="layer" id="scale-off" style="display:block">
+              <div class="badge-list">
+                <div class="badge-item">
+                  <code class="badge-code">🍕  99.0%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:99%; background:var(--color-error); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🍝   0.9%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:2%; background:var(--color-accent-muted); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🥗   0.0%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:1%; background:var(--color-accent-muted); border-radius:var(--radius-sm);"></span></span>
+                </div>
+              </div>
+              <p style="color: var(--color-error); font-weight: 600;">Collapsed. The biggest score crushes everything — softmax is a one-hot spike. The model can only listen to one source, and the gradient has gone flat.</p>
+            </div>
+
+            <div class="layer" id="scale-on" style="display:none">
+              <div class="badge-list">
+                <div class="badge-item">
+                  <code class="badge-code">🍕  52.5%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:53%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🍝  28.1%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:28%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🥗  19.3%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:19%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+              </div>
+              <p style="color: var(--color-success); font-weight: 600;">Healthy. The scores stay gentle. The model still leans toward the top source but keeps real weight on the others — it can blend.</p>
+            </div>
+
+          </div>
+          <p class="layer-description">Same raw scores, one division between them. Toggle the tabs to see the difference the master trim makes.</p>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">The takeaway in one line</strong>
+            <p>Large dot products make softmax razor-sharp and gradients tiny. Dividing by √d<sub>k</sub> keeps the scores in a range where the model can still blend multiple sources and still learn.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 5 — FAILURE MODE + TRADE-OFF -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One failure mode, one trade-off</h2>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">⚠️</div>
+            <h4 class="pattern-title">Failure mode: the wrong axis</h4>
+            <p class="pattern-desc">Run softmax over the whole matrix, or over the columns instead of the rows, and it still sums to 1 — so nothing errors. But each query no longer gets its own distribution over the keys. Attention silently becomes nonsense. Pair this with skipping √d<sub>k</sub> at large d<sub>k</sub>: softmax becomes a one-hot spike, the gradient vanishes, and the layer stops learning.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-info)">
+            <div class="pattern-icon" style="background: var(--color-info)">⚖️</div>
+            <h4 class="pattern-title">Trade-off: the n × n square</h4>
+            <p class="pattern-desc">Computing Q&nbsp;K<sup>T</sup> as a full n × n matrix is exact and perfectly parallel — every token pair scored at once, ideal for GPUs. The price is <span class="term" data-definition="O(n²) means the work and memory grow with the square of the sequence length n. Double the tokens and you quadruple the cost. The little O is the standard way engineers describe how something scales.">O(n²)</span> memory and compute. Double the sequence length and the square quadruples. That single cost shapes everything about long context — and is exactly the subject of the next module.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why these two are worth remembering</strong>
+            <p>The wrong-axis bug is the one a senior engineer catches in code review because it never throws an error. The n × n trade-off is the one they raise in a design review, because it decides whether your model can read a whole book or just a paragraph.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 6 — QUIZ -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>Four questions. Each one asks you to reason about the math, not recite it. Wrong answers come with an explanation, so treat this as thinking practice.</p>
+
+        <div class="quiz-container" id="quiz-module4">
+
+          <div class="quiz-question-block"
+               data-correct="opt-rowwise"
+               data-explanation-right="Exactly. Softmax runs along the last axis — row-wise over the keys. Each query (each row) becomes its own probability distribution that sums to 1, independent of the other queries."
+               data-explanation-wrong="Not quite. If softmax ran over the whole matrix or over the columns, the numbers would still sum to 1, so nothing would crash — but each query would lose its own distribution over the keys, and the attention would be meaningless. It must be row-wise, over the keys.">
+            <h3 class="quiz-question">In <code>softmax(scores, axis=-1)</code>, what is the softmax actually computing a distribution over?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-whole" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The entire score matrix at once, as one big distribution</span>
+              </button>
+              <button class="quiz-option" data-value="opt-rowwise" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each row — a distribution over the keys, summing to 1 per query</span>
+              </button>
+              <button class="quiz-option" data-value="opt-cols" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each column — a distribution over the queries</span>
+              </button>
+              <button class="quiz-option" data-value="opt-values" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The value vectors V directly</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-payload"
+               data-explanation-right="Right. Routing is not payload. The Q·K match only sets how loud B's fader is. The information that flows into A is B's Value vector, scaled by that weight."
+               data-explanation-wrong="Think back to the desk. The Q·K score sets the fader (how much A listens to B), but the sound that actually plays is B's Value — its payload. A receives B's Value scaled by the attention weight, not B's key or its raw embedding.">
+            <h3 class="quiz-question">Token A attends strongly to token B. What does A actually receive in its output?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-key" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's Key vector</span>
+              </button>
+              <button class="quiz-option" data-value="opt-payload" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's Value (the payload), scaled by the Q·K weight</span>
+              </button>
+              <button class="quiz-option" data-value="opt-raw" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's raw embedding, copied across verbatim</span>
+              </button>
+              <button class="quiz-option" data-value="opt-nothing" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing — attention only produces scores, not an output</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-spike"
+               data-explanation-right="Yes. As d_k grows, dot products grow and spread out. Large, spread-out scores push softmax into a one-hot spike — one weight near 1, the rest near 0 — which also flattens the gradient. Dividing by √d_k cancels that growth so the model can still blend sources and still learn."
+               data-explanation-wrong="It is not about memory, squareness, or masking. The reason is statistical: a dot product over d_k terms grows with d_k, and big spread-out scores make softmax collapse onto one token and the gradient vanish. The √d_k division rescales the scores back into a healthy range.">
+            <h3 class="quiz-question">You bump d<sub>k</sub> from 16 to 256 and forget the √d<sub>k</sub> division. Why does training stall?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mem" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The bigger d<sub>k</sub> uses too much memory to fit on the GPU</span>
+              </button>
+              <button class="quiz-option" data-value="opt-spike" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Larger dot products push softmax into a one-hot spike, so the gradient goes tiny</span>
+              </button>
+              <button class="quiz-option" data-value="opt-square" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The score matrix is no longer square, so the multiply fails</span>
+              </button>
+              <button class="quiz-option" data-value="opt-mask" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The causal mask stops working without the division</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-axis"
+               data-explanation-right="Exactly the right instinct. Wrong-axis softmax never throws — the numbers still sum to 1 — so the loss can look plausible while the attention is quietly meaningless. Checking that softmax runs row-wise over the keys (axis=-1) is the first thing to verify."
+               data-explanation-wrong="A crash would point you to a shape bug, but here nothing crashes and the loss only looks slightly off. The classic silent culprit is softmax over the wrong axis: it still sums to 1, so no error fires, but each query loses its own distribution over the keys. Check the axis first.">
+            <h3 class="quiz-question">A teammate's attention layer runs without errors, but the model barely learns and the loss looks slightly off. Based on this module, where do you look first?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-axis" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Which axis the softmax runs over — a wrong axis fails silently</span>
+              </button>
+              <button class="quiz-option" data-value="opt-lr" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether the V matrix has the wrong number of columns</span>
+              </button>
+              <button class="quiz-option" data-value="opt-gpu" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether the GPU ran out of memory on the n × n matrix</span>
+              </button>
+              <button class="quiz-option" data-value="opt-import" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether NumPy was imported correctly</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">➡️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where we go next</strong>
+            <p>You now read attention the way an engineer does — every shape, every symbol, the one division that keeps it trainable. The n × n score matrix is powerful but expensive. Next, exactly how expensive it gets, and what FlashAttention does about it.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

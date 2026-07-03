@@ -8,6 +8,22 @@
 > - 💡 PPO vs SAC vs TD3 vs TRPO: decision matrix with 8 dimensions
 > - 🏭 Algorithm selection for production systems: RLHF, robotics, games
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | KL | KL divergence — policy distance measure |
+> | clip | PPO's clipping mechanism |
+> | H[π] | Entropy — used in SAC's objective |
+> | r(θ) | Probability ratio π_new/π_old |
+> | Â | Advantage estimate |
+>
+> **RL concepts used here** (all defined in this section's earlier files):
+> - **TRPO** — KL-constrained optimization
+> - **PPO** — clipped surrogate objective
+> - **SAC** — maximum entropy, off-policy, continuous actions
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

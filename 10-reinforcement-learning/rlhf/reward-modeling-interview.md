@@ -8,6 +8,20 @@
 > - 💡 Pointwise vs pairwise vs listwise reward modeling
 > - 🏭 Reward model ensembles and scaling laws
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | r_φ(x, y) | Reward model score for response y given prompt x |
+> | P(y_w > y_l) | Probability that the "winner" response is preferred over the "loser" |
+> | σ(x) | Sigmoid function — converts score difference to probability |
+> | L_RM | Reward model loss (binary cross-entropy) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **RLHF pipeline** — SFT → Reward Model → PPO ([what-is-rlhf-interview.md](./what-is-rlhf-interview.md))
+> - **Sigmoid σ(x) = 1/(1+exp(-x))** — explained in [math-refresher.md](../math-refresher.md)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

@@ -8,6 +8,26 @@
 > - 💡 Uniform vs prioritized replay vs hindsight experience replay
 > - 🏭 Buffer implementation: circular buffer, sum-tree, compression strategies
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | (s, a, r, s', done) | A stored transition — state, action, reward, next state, episode-over flag |
+> | P(i) | Sampling probability for transition i |
+> | p_i | Priority of transition i (based on TD error) |
+> | w_i | Importance sampling weight to correct for biased sampling |
+> | α (priority) | Controls how much prioritization is used (0 = uniform, 1 = full priority) |
+> | β | Controls importance sampling correction strength (annealed 0.4 → 1.0) |
+> | \|δ_i\| | Absolute TD error for transition i |
+> | N | Buffer capacity |
+> | B | Mini-batch size |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **DQN** — Deep Q-Network ([dqn-from-scratch-interview.md](./dqn-from-scratch-interview.md))
+> - **TD error δ** — measures how surprising a transition was
+> - **SGD** — stochastic gradient descent (requires approximately i.i.d. samples)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 Experience replay stores the agent's transitions (s, a, r, s', done) in a fixed-size buffer and samples random mini-batches for training instead of using transitions in sequential order. This breaks the temporal correlation between consecutive experiences and enables data reuse — each transition can be sampled and learned from multiple times. These two properties transform an unstable training process into one where SGD's i.i.d. assumption is approximately satisfied.

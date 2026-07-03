@@ -8,6 +8,17 @@
 > - 💡 SAC vs TD3 vs PPO: when each wins for robotics
 > - 🏭 Domain randomization and sim-to-real transfer in production
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | H[π] | Entropy bonus — encourages exploration in continuous spaces |
+> | α | SAC temperature — controls exploration vs exploitation |
+> | N(μ, σ²) | Gaussian distribution for continuous actions |
+>
+> **RL concepts used here:** SAC, TD3, PPO, continuous action spaces, Gaussian policies.
+> See [math-refresher.md](../math-refresher.md) for notation lookup.
+
 ---
 
 ## Brief restatement

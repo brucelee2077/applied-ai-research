@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 1 · Day 2 — JAX Randomness: Explicit Keys</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w01-d02-prng">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 1 Day 2</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-01-jax-immutability.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">JAX Immutability</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-vmap.html"><span class="lnav-dir">Next →</span><span class="lnav-t">vmap: Vectorization</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 1 · Week 1 · Day 2 (Tue)</span>
+    <h1>JAX Randomness<br>Explicit Keys</h1>
+    <p class="lead">In NumPy you just call <code>np.random.normal()</code> and numbers appear. In JAX you must carry around a "key" and pass it in by hand. Today: why JAX makes randomness explicit — and how to use it.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> create a random key, explain why reusing a key is a trap, split a key for fresh randomness, and use keys to initialize a tiny neural network.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">How does randomness work in JAX?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> basic Python/NumPy and <a href="day-01-jax-immutability.html">Day 1 (immutability)</a>. If you've used <code>np.random</code>, you already know the thing JAX changes. <b>No JAX randomness experience needed.</b></div></div>
+
+      <h4>First, what is a PRNG?</h4>
+      <p>Computers can't make truly random numbers. A <span class="term">PRNG</span> (pseudo-random number generator) is a deterministic algorithm that, starting from a <span class="term">seed</span> (a starting number), produces a long stream of numbers that <em>look</em> random. Same seed → same stream, every time.</p>
+
+      <h4>How NumPy does it: a hidden global generator</h4>
+      <p>In NumPy there's <strong>one hidden generator</strong> shared across your whole program. Each call to <code>np.random.normal()</code> quietly advances its internal state, so you get a new number every time. Convenient — but that state is <strong>hidden mutable state</strong>, the exact thing JAX avoids (remember Day 1: JAX wants <span class="term">pure functions</span>, no hidden side effects).</p>
+
+      <h4>How JAX does it: you hold the key</h4>
+      <p>JAX makes randomness <strong>explicit</strong>. You create a <span class="term">key</span> (a tiny array) from a seed, then pass it into every random call:</p>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>key = jax.random.PRNGKey(0)</code> &nbsp;→&nbsp; <code>jax.random.normal(key, (3,))</code><br><span style="font-size:.85rem;color:var(--text2)">The same <code>key</code> always returns the same numbers. There is no hidden state — the key <em>is</em> the state, and you carry it yourself. (Newer JAX also writes this as <code>jax.random.key(0)</code>.)</span></div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>Because the key fully determines the output, <strong>reusing the same key gives you the same numbers again</strong> — a subtle trap. To get fresh, independent randomness you must <strong>split</strong> the key into new keys. That's the whole skill for today.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional, for after): <a href="https://docs.jax.dev/en/latest/jep/263-prng.html" target="_blank" rel="noopener">JAX PRNG design note</a> · <a href="https://docs.jax.dev/en/latest/jax.random.html" target="_blank" rel="noopener">jax.random API</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A key is a ticket that decides your dice rolls</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a random draw as a sealed <strong>ticket</strong>. The ticket fully decides which "random" numbers you'll get when you cash it in.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🎲</span><h5>NumPy = dice on the table</h5><p>One shared pair of dice sits on the table. Everyone rolls them, and they keep moving. You don't manage them — but the state is shared and hidden.</p></div>
+        <div class="card"><span class="big">🎫</span><h5>JAX = you hold the ticket</h5><p>You hold a ticket (the key). Same ticket → same numbers, on any machine. Want a different draw? You don't re-cash the same ticket — you <strong>split</strong> it into new tickets.</p></div>
+      </div>
+      <p><strong>In one line:</strong> NumPy hides and auto-advances the randomness; JAX hands it to you as a key, and you split keys to move forward.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: tickets aren't "used up," and splitting is fully deterministic — splitting the same key always yields the same new keys. Nothing is actually random about the bookkeeping.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three cases and see for yourself</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated Python terminal. Click each button and watch what comes out. <strong>Click all three</strong> to finish this section. (Numbers are illustrative — the pattern is the point.)</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="np" type="button">① NumPy: hidden state</button>
+          <button class="play-btn" data-demo="reuse" type="button">② JAX: reuse the same key</button>
+          <button class="play-btn" data-demo="split" type="button">③ JAX: split the key</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The three calls you need, and why JAX bothers</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The whole API for today is three calls</h4>
+      <ul>
+        <li><code>key = jax.random.PRNGKey(seed)</code> — make a key from an integer seed.</li>
+        <li><code>jax.random.normal(key, shape)</code> — draw numbers. (Also <code>uniform</code>, <code>randint</code>, ...) Same key + same shape → same numbers.</li>
+        <li><code>key, subkey = jax.random.split(key)</code> — turn one key into two fresh, independent keys. Use one now, keep one for next time. <code>split(key, n)</code> gives <code>n</code> keys.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The #1 beginner bug:</b> calling <code>random.normal(key)</code> twice with the <em>same</em> <code>key</code>. You get the <em>same</em> numbers, so your "random" draws are secretly identical (correlated). Always split before drawing again.</div></div>
+
+      <h4>Why does JAX make you do this?</h4>
+      <p>Two payoffs:</p>
+      <ul>
+        <li><strong>Purity</strong> — no hidden global state means random functions are <span class="term">pure</span>, so the compiler can safely <code>jit</code>, <code>vmap</code>, and parallelize them (this is Day 1's lesson again).</li>
+        <li><strong>Reproducibility</strong> — the same key gives the same numbers on every run and every machine. For ML research, being able to reproduce an experiment exactly is priceless.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> explicit keys → no hidden state → pure &amp; reproducible → safe to compile, batch, and run on many devices deterministically.</div></div>
+      <button class="gotit" type="button">Got the three calls</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a tiny neural net's weights with split keys</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (straight from the curriculum): write a small <strong>MLP forward pass</strong> in raw <code>jax.numpy</code>, with weights initialized from <strong>split keys</strong>. An <span class="term">MLP</span> (multi-layer perceptron) is just a few matrix multiplies with a nonlinearity between them.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Start from one <code>key = random.PRNGKey(0)</code>, then <code>split</code> it into one key per layer.</li>
+        <li>Initialize <code>W1, W2</code> from those separate keys (so layers don't share the same random values).</li>
+        <li>A <code>forward(x)</code> that computes <code>tanh(x @ W1 + b1) @ W2 + b2</code> and prints the output shape.</li>
+        <li>Run it twice — confirm you get identical output (reproducible).</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/week01_jax/mlp_prng.py</code> and build the four bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 1 Day 2 artifact.
+
+Create experiments/week01_jax/mlp_prng.py that:
+1. Starts from key = jax.random.PRNGKey(0), then splits it into one subkey per layer.
+2. Initializes W1 (4x8), b1, W2 (8x2), b2 from those separate keys using jax.random.normal (biases can be zeros).
+3. Defines forward(x) = tanh(x @ W1 + b1) @ W2 + b2 using raw jax.numpy, no frameworks.
+4. Runs forward on a fixed random input and prints the output and its shape.
+5. Runs the whole script twice (or re-seeds) to show the output is identical = reproducible.
+Add a brief comment on each step explaining the key splitting, then run it to confirm it works.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-01/day-02-log.md</code>: what would break if you used one key for both layers instead of splitting?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 2 complete!</h3>
+    <p>You can create keys, avoid the reuse trap, split for fresh randomness, and seed a tiny network reproducibly.<br>Next: <code>start today</code> → Day 3 takes this MLP and runs it on a whole batch with <code>vmap</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-01-jax-immutability.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">JAX Immutability</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-vmap.html"><span class="lnav-dir">Next →</span><span class="lnav-t">vmap: Vectorization</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  np:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">import</span> numpy <span class="kw">as</span> np\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> np.random.normal()\n<span class="ok">0.4967</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> np.random.normal()    <span class="dim"># call again</span>\n<span class="ok">-0.1383</span>   <span class="hl"># different — a hidden counter advanced</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> np.random.normal()\n<span class="ok">0.6477</span>   <span class="dim"># where did the state change? you can\'t see it</span>',
+    take:'<b>①  NumPy hides the state.</b> Each call changes a global generator behind your back. Handy, but it\'s hidden mutable state — impure, and hard to reproduce or parallelize safely.'},
+  reuse:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">from</span> jax <span class="kw">import</span> random\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> key = random.PRNGKey(<span class="num">0</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> random.normal(key, (<span class="num">3</span>,))\n<span class="ok">[ 1.82 -0.48  0.34]</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> random.normal(key, (<span class="num">3</span>,))   <span class="dim"># same key!</span>\n<span class="ok">[ 1.82 -0.48  0.34]</span>   <span class="bad"># IDENTICAL — the trap</span>',
+    take:'<b>②  Same key → same numbers.</b> A key is pure: it fully determines the output. Reusing it gives identical draws, so your "random" values are secretly correlated. This is the #1 beginner bug.'},
+  split:{html:'<span class="prompt">&gt;&gt;&gt;</span> key = random.PRNGKey(<span class="num">0</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> key, sub = random.split(key)   <span class="dim"># two fresh keys</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> random.normal(key, (<span class="num">3</span>,))\n<span class="ok">[ 0.91  1.40 -1.08]</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> random.normal(sub, (<span class="num">3</span>,))\n<span class="ok">[-1.21  0.58 -0.95]</span>   <span class="hl"># different & independent</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># re-run from PRNGKey(0) → exact same two arrays every time</span>',
+    take:'<b>③  Split for fresh randomness.</b> <code>split</code> turns one key into independent new keys. You get different draws — and it\'s still perfectly reproducible across runs and machines.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"NumPy has one hidden global generator that every call advances\"><rect x=\"10\" y=\"20\" width=\"500\" height=\"70\" rx=\"10\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><circle cx=\"70\" cy=\"55\" r=\"22\" fill=\"#FFFFFF\" stroke=\"#C99A12\" stroke-width=\"2\"/><text x=\"70\" y=\"60\" text-anchor=\"middle\" font-size=\"11\" fill=\"#9A7208\" font-family=\"monospace\">state</text><text x=\"260\" y=\"48\" text-anchor=\"middle\" font-size=\"13\" fill=\"#2C2A28\" font-family=\"sans-serif\" font-weight=\"600\">one hidden generator, shared globally</text><text x=\"260\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\" font-family=\"monospace\">np.random.normal()</text><path d=\"M120 55 L 400 55\" stroke=\"#C99A12\" stroke-width=\"2\" marker-end=\"url(#a1)\"/><defs><marker id=\"a1\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#C99A12\"/></marker></defs><circle cx=\"450\" cy=\"55\" r=\"6\" fill=\"#C99A12\"/><text x=\"450\" y=\"90\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\" font-family=\"monospace\">advances quietly</text><text x=\"70\" y=\"115\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\" font-family=\"sans-serif\">hidden</text><text x=\"70\" y=\"130\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\" font-family=\"sans-serif\">mutable</text></svg>", "note": "<b>NumPy's randomness lives in one hidden global generator.</b> Every call to <code>np.random.normal()</code> secretly advances this shared state — convenient, but it is hidden mutable state, which breaks the \"pure function\" rule JAX depends on."}, {"viz": "<svg viewBox=\"0 0 520 130\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"JAX replaces hidden state with an explicit key array you hold\"><text x=\"30\" y=\"30\" font-size=\"12\" fill=\"#6B645E\" font-family=\"monospace\">seed = 0</text><rect x=\"110\" y=\"12\" width=\"36\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"128\" y=\"35\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\" font-family=\"monospace\">0</text><path d=\"M150 30 L 200 30\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a2)\"/><defs><marker id=\"a2\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2A7B9B\"/></marker></defs><text x=\"175\" y=\"20\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\" font-family=\"monospace\">PRNGKey</text><rect x=\"205\" y=\"5\" width=\"110\" height=\"50\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"260\" y=\"25\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1F6280\" font-family=\"sans-serif\" font-weight=\"700\">key</text><text x=\"260\" y=\"42\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\" font-family=\"monospace\">[0, 0]</text><path d=\"M320 30 L 370 30\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a2)\"/><rect x=\"375\" y=\"5\" width=\"120\" height=\"50\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\" stroke-width=\"1.5\"/><text x=\"435\" y=\"25\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">you carry it</text><text x=\"435\" y=\"40\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">explicitly</text><text x=\"260\" y=\"90\" text-anchor=\"middle\" font-size=\"12\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">the key IS the state — no hidden counter anywhere</text></svg>", "note": "<b>JAX turns the hidden counter into a visible object: the key.</b> <code>key = jax.random.PRNGKey(0)</code> is a small array built from your seed. It is not a pointer to some background state — the key <em>is</em> the entire state, and you pass it around by hand."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Same key drawn twice gives the identical output array\"><rect x=\"20\" y=\"20\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"65\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\" font-family=\"monospace\" font-weight=\"700\">key</text><path d=\"M110 40 L 165 40\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a3)\"/><defs><marker id=\"a3\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2A7B9B\"/></marker></defs><text x=\"137\" y=\"30\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\" font-family=\"monospace\">normal()</text><rect x=\"170\" y=\"12\" width=\"170\" height=\"25\" rx=\"5\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"255\" y=\"29\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">[1.82, -0.48, 0.34]</text><rect x=\"20\" y=\"85\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"65\" y=\"110\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\" font-family=\"monospace\" font-weight=\"700\">key</text><path d=\"M110 105 L 165 105\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a3)\"/><text x=\"137\" y=\"95\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\" font-family=\"monospace\">normal()</text><rect x=\"170\" y=\"90\" width=\"170\" height=\"25\" rx=\"5\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"255\" y=\"107\" text-anchor=\"middle\" font-size=\"10\" fill=\"#C93B3B\" font-family=\"monospace\">[1.82, -0.48, 0.34]</text><path d=\"M348 25 C 380 25, 380 100, 348 100\" stroke=\"#C93B3B\" stroke-width=\"1.5\" fill=\"none\" stroke-dasharray=\"4,3\"/><text x=\"400\" y=\"66\" font-size=\"11\" fill=\"#C93B3B\" font-family=\"sans-serif\" font-weight=\"700\">identical!</text></svg>", "note": "<b>A key is a pure function input: same key in, same numbers out.</b> Call <code>random.normal(key, shape)</code> twice on the unchanged <code>key</code> and both draws are bit-for-bit identical — this is the number-one beginner bug, because it looks like two \"random\" draws but is really one draw duplicated."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"split takes one key and deterministically produces two independent keys\"><rect x=\"20\" y=\"50\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"65\" y=\"75\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\" font-family=\"monospace\" font-weight=\"700\">key</text><path d=\"M110 70 L 190 30\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a4)\"/><path d=\"M110 70 L 190 110\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a4)\"/><defs><marker id=\"a4\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#7C6DAA\"/></marker></defs><text x=\"150\" y=\"38\" text-anchor=\"middle\" font-size=\"9\" fill=\"#5E5191\" font-family=\"monospace\">split()</text><rect x=\"195\" y=\"10\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"240\" y=\"35\" text-anchor=\"middle\" font-size=\"11\" fill=\"#5E5191\" font-family=\"monospace\" font-weight=\"700\">key'</text><rect x=\"195\" y=\"90\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"240\" y=\"115\" text-anchor=\"middle\" font-size=\"11\" fill=\"#5E5191\" font-family=\"monospace\" font-weight=\"700\">sub</text><text x=\"390\" y=\"25\" font-size=\"10\" fill=\"#6B645E\" font-family=\"sans-serif\">use now</text><text x=\"390\" y=\"105\" font-size=\"10\" fill=\"#6B645E\" font-family=\"sans-serif\">keep for later</text><text x=\"150\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">deterministic: same key → same key', sub every time</text></svg>", "note": "<b><code>jax.random.split(key)</code> deterministically manufactures two brand-new, statistically independent keys from one.</b> Nothing random happens in the split itself — the same input key always produces the same pair of output keys, on any machine."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Drawing from the two split keys gives two different independent arrays\"><rect x=\"20\" y=\"20\" width=\"80\" height=\"35\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"60\" y=\"43\" text-anchor=\"middle\" font-size=\"11\" fill=\"#5E5191\" font-family=\"monospace\">key'</text><path d=\"M100 37 L 150 37\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a5)\"/><defs><marker id=\"a5\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#7C6DAA\"/></marker></defs><rect x=\"155\" y=\"20\" width=\"180\" height=\"35\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"245\" y=\"43\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">[0.91, 1.40, -1.08]</text><rect x=\"20\" y=\"85\" width=\"80\" height=\"35\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"60\" y=\"108\" text-anchor=\"middle\" font-size=\"11\" fill=\"#5E5191\" font-family=\"monospace\">sub</text><path d=\"M100 102 L 150 102\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a5)\"/><rect x=\"155\" y=\"85\" width=\"180\" height=\"35\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"245\" y=\"108\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">[-1.21, 0.58, -0.95]</text><text x=\"440\" y=\"37\" font-size=\"10\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">different</text><text x=\"440\" y=\"102\" font-size=\"10\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">values</text><text x=\"180\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\" font-family=\"sans-serif\">yet fully reproducible — re-run from PRNGKey(0) and get these exact two arrays again</text></svg>", "note": "<b>Now the two independent keys draw two independent arrays.</b> You get fresh, uncorrelated randomness — and because the whole chain (seed &rarr; split &rarr; draw) is deterministic, running the script again from the same seed reproduces these exact numbers."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Splitting one key per layer keeps layer weights independent inside an MLP\"><rect x=\"20\" y=\"75\" width=\"70\" height=\"35\" rx=\"7\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"55\" y=\"97\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1F6280\" font-family=\"monospace\">key</text><path d=\"M90 92 L 140 50\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a6)\"/><path d=\"M90 92 L 140 135\" stroke=\"#7C6DAA\" stroke-width=\"2\" marker-end=\"url(#a6)\"/><defs><marker id=\"a6\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#7C6DAA\"/></marker></defs><rect x=\"145\" y=\"30\" width=\"75\" height=\"35\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"182\" y=\"52\" text-anchor=\"middle\" font-size=\"10\" fill=\"#5E5191\" font-family=\"monospace\">k1</text><rect x=\"145\" y=\"117\" width=\"75\" height=\"35\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"2\"/><text x=\"182\" y=\"139\" text-anchor=\"middle\" font-size=\"10\" fill=\"#5E5191\" font-family=\"monospace\">k2</text><path d=\"M220 47 L 275 47\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a7)\"/><path d=\"M220 134 L 275 134\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a7)\"/><defs><marker id=\"a7\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2A7B9B\"/></marker></defs><rect x=\"280\" y=\"25\" width=\"110\" height=\"45\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"335\" y=\"45\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\" font-family=\"monospace\" font-weight=\"700\">W1</text><text x=\"335\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\" font-family=\"monospace\">4x8</text><rect x=\"280\" y=\"112\" width=\"110\" height=\"45\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"335\" y=\"132\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\" font-family=\"monospace\" font-weight=\"700\">W2</text><text x=\"335\" y=\"147\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\" font-family=\"monospace\">8x2</text><path d=\"M280 60 L 300 105\" stroke=\"#C93B3B\" stroke-width=\"1.5\" stroke-dasharray=\"3,3\"/><line x1=\"290\" y1=\"78\" x2=\"310\" y2=\"92\" stroke=\"#C93B3B\" stroke-width=\"2\"/><line x1=\"310\" y1=\"78\" x2=\"290\" y2=\"92\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"460\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">no shared</text><text x=\"460\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2D8B55\" font-family=\"sans-serif\" font-weight=\"600\">randomness</text></svg>", "note": "<b>Split once per layer, and each weight matrix gets its own independent key.</b> <code>W1</code> (4&times;8) and <code>W2</code> (8&times;2) are drawn from <code>k1</code> and <code>k2</code>, so the two layers never accidentally share the same random values — the exact bug the split step prevents."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Explicit keys are what let JAX safely jit vmap and parallelize randomness across devices\"><rect x=\"15\" y=\"20\" width=\"110\" height=\"40\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"70\" y=\"37\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\" font-family=\"sans-serif\" font-weight=\"700\">explicit key</text><text x=\"70\" y=\"52\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\" font-family=\"monospace\">no hidden state</text><path d=\"M125 40 L 165 40\" stroke=\"#2A7B9B\" stroke-width=\"2\" marker-end=\"url(#a8)\"/><defs><marker id=\"a8\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2A7B9B\"/></marker></defs><rect x=\"170\" y=\"20\" width=\"90\" height=\"40\" rx=\"8\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"2\"/><text x=\"215\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1a5c38\" font-family=\"sans-serif\" font-weight=\"700\">pure fn</text><path d=\"M260 40 L 300 40\" stroke=\"#2D8B55\" stroke-width=\"2\" marker-end=\"url(#a9)\"/><defs><marker id=\"a9\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2D8B55\"/></marker></defs><rect x=\"305\" y=\"5\" width=\"200\" height=\"25\" rx=\"5\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"405\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">jit — safe to compile</text><rect x=\"305\" y=\"35\" width=\"200\" height=\"25\" rx=\"5\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"405\" y=\"52\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">vmap — safe to batch</text><rect x=\"305\" y=\"65\" width=\"200\" height=\"25\" rx=\"5\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"405\" y=\"82\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\" font-family=\"monospace\">pmap — safe across devices</text><text x=\"260\" y=\"115\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\" font-family=\"sans-serif\">same key on any machine &amp;rarr; identical experiment, exactly reproducible</text><text x=\"260\" y=\"140\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\" font-family=\"sans-serif\" font-weight=\"700\">this is why frontier labs standardize on explicit PRNG keys</text></svg>", "note": "<b>This is the payoff staff interviewers probe for: purity is not academic, it is what makes randomness safe to compile and parallelize.</b> Because a key carries the entire random state explicitly, JAX can <code>jit</code>-compile, <code>vmap</code>-batch, and shard random draws across many accelerators while still reproducing bit-identical results on any machine."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why does JAX make you pass an explicit random key instead of using a hidden generator like NumPy?',
+  opts:['To make the code shorter','To keep random functions pure (no hidden state) and reproducible — which lets the compiler jit/vmap/parallelize them','Because keys are faster than NumPy','So you can only draw numbers once'],
+  ans:1, fb:'Right. Explicit keys = no hidden mutable state = pure + reproducible. That\'s the same purity that powers jit and vmap.'},
+ {q:'2. You call <code>random.normal(key)</code> twice with the same <code>key</code>. What do you get?',
+  opts:['Two different random draws','The exact same numbers both times','An error — keys can only be used once','A warning, then random numbers'],
+  ans:1, fb:'Right. A key fully determines the output, so reusing it gives identical draws — the classic trap. Split before drawing again.'},
+ {q:'3. How do you get fresh, independent randomness in JAX?',
+  opts:['Call PRNGKey() again with the same seed','Use jax.random.split(key) to make new keys, then draw with those','Add 1 to the key yourself','Set a global seed once and forget it'],
+  ans:1, fb:'Right. split(key) returns new independent keys. Use one now, keep one for next time (split(key, n) for n keys).'},
+ {q:'4. You run the same key-based script on two different machines. The numbers are...',
+  opts:['Random, so different each time','The same — keys make randomness reproducible and deterministic','Only the same if you set a global seed','Undefined behavior'],
+  ans:1, fb:'Right. Same key → same numbers, every run and (conceptually) every machine. Reproducibility is a core reason JAX works this way.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

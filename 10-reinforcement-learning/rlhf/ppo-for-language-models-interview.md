@@ -8,6 +8,23 @@
 > - 💡 Per-token vs per-sequence rewards and credit assignment
 > - 🏭 Adaptive KL coefficient, generation batching, and distributed RLHF
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π_θ | Language model being trained |
+> | π_ref | Frozen reference model (SFT checkpoint) |
+> | r_φ(x, y) | Reward model score |
+> | KL(π_θ \|\| π_ref) | How far the model has drifted |
+> | β | KL penalty strength (adaptive) |
+> | r_t(θ) = π_θ/π_old | Probability ratio (for PPO clipping) |
+> | Â_t | Advantage estimate |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **PPO clipped objective** — min(r×A, clip(r)×A) ([ppo-from-scratch-interview.md](../advanced-algorithms/ppo-from-scratch-interview.md))
+> - **Reward model** — trained from human preferences ([reward-modeling-interview.md](./reward-modeling-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

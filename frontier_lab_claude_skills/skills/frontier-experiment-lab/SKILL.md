@@ -1,0 +1,82 @@
+---
+name: frontier-experiment-lab
+description: Turn a Frontier Lab learning concept into a small reproducible coding experiment with code, tests, run commands, results, and a writeup. Use for JAX, PyTorch, transformers, scaling laws, KV cache simulations, MoE routing, quantization, kernels, inference, or agent experiments.
+---
+
+# Frontier Experiment Lab
+
+Build tiny experiments that convert understanding into evidence.
+
+## Output files
+Create:
+
+```text
+experiments/<experiment-slug>/README.md
+experiments/<experiment-slug>/src/
+experiments/<experiment-slug>/tests/
+experiments/<experiment-slug>/results/
+experiments/<experiment-slug>/EXPERIMENT_LOG.md
+```
+
+## Experiment design template
+```markdown
+# Experiment: <name>
+
+## Question
+What are we trying to learn?
+
+## Hypothesis
+What do we expect to happen?
+
+## Minimal setup
+What is the smallest version that tests the idea?
+
+## Implementation
+Files and commands.
+
+## Results
+Numbers, plots, or qualitative output.
+
+## Interpretation
+What changed in my understanding?
+
+## Limitations
+Why this is not enough yet.
+
+## Next experiment
+One concrete follow-up.
+```
+
+## Rules
+- Keep the first version small.
+- Add tests before expanding.
+- Prefer deterministic synthetic data at first.
+- Avoid dependency hell.
+- Do not build a cathedral. Build a clean lab bench.
+
+## Good experiments
+- Implement scaled dot-product attention from scratch.
+- Fit a power-law curve to synthetic scaling data.
+- Simulate KV cache savings across decode steps.
+- Compare dense FFN vs MoE routing cost.
+- Quantize a vector and measure reconstruction error.
+- Benchmark batch size vs latency in a toy server.
+- Implement a small JAX training loop.
+- Try a Pallas kernel only after baseline Python/JAX version works.
+
+## Claude Code behavior
+When implementing:
+1. Restate the experiment question.
+2. Propose minimal file structure.
+3. Write tests.
+4. Implement the smallest working version.
+5. Run tests/commands if possible.
+6. Save results.
+7. Write the experiment log.
+
+## Review checklist
+- Is the question precise?
+- Is the baseline clear?
+- Did the result answer the question?
+- Is there a plot/table/result file?
+- Can future me rerun it in 10 minutes?

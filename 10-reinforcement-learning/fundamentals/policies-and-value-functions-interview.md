@@ -8,6 +8,22 @@
 > - 💡 Value-based vs policy-based vs actor-critic trade-offs
 > - 🏭 Function approximation for large state spaces
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Σ_a | Sum over all actions a |
+> | E_π[...] | Expected (average) value when following policy π |
+> | π(a\|s) | Probability of choosing action a in state s |
+> | G_t | Discounted return from time step t — defined in [rewards-and-returns-interview.md](./rewards-and-returns-interview.md) |
+> | P(s'\|s,a) | Probability of transitioning to state s' — defined in [markov-decision-processes-interview.md](./markov-decision-processes-interview.md) |
+> | max_π, argmax_a | "The policy/action that gives the maximum value" |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **G_t = r_t + γ·G_{t+1}** — discounted return (recursive form)
+> - **MDP = (S, A, P, R, γ)** — the formal RL framework
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 A policy π maps states to actions (or distributions over actions). A value function measures the expected return from a state (V) or state-action pair (Q) under a given policy. Together, they define what the agent does and how good its strategy is. Learning good value functions or policies is the core task of RL.
@@ -18,7 +34,9 @@ A policy π maps states to actions (or distributions over actions). A value func
 
 ### Policy Definition
 
-A policy π defines the agent's behavior:
+**Step 1 — Words.** A policy is the agent's strategy — the rule it uses to decide what to do. A deterministic policy always picks the same action in a given state. A stochastic policy has a distribution over actions — it might pick "left" 70% of the time and "right" 30% of the time in the same state.
+
+**Step 2 — Formula.**
 
 **Deterministic policy:**
 
@@ -36,9 +54,22 @@ Properties of a stochastic policy:
 - π(a|s) ≥ 0 for all a, s
 - Σ_a π(a|s) = 1 for all s
 
+**Step 3 — Worked example.** Robot at a crossroads with 3 choices:
+
+```
+π(left  | crossroads) = 0.1    (rarely goes left)
+π(right | crossroads) = 0.7    (usually goes right)
+π(straight | crossroads) = 0.2 (sometimes goes straight)
+
+Sum: 0.1 + 0.7 + 0.2 = 1.0 ✓
+All values ≥ 0 ✓
+```
+
 ### State-Value Function V^π(s)
 
-The value of state s under policy π is the expected return starting from s and following π:
+**Step 1 — Words.** V^π(s) answers: "How good is it to be in state s if I follow policy π from now on?" It is the average total reward the agent will collect starting from s. A high V means a good situation. A low V means a bad one. Different policies give different V values for the same state.
+
+**Step 2 — Formula.**
 
     V^π(s) = E_π [ G_t | s_t = s ]
            = E_π [ Σ_{k=0}^{∞} γ^k · r_{t+k} | s_t = s ]
@@ -48,14 +79,47 @@ Where:
 - G_t is the discounted return from time t
 - V^π(s) is a function mapping states to real numbers
 
+**Step 3 — Worked example.** A game with 3 states. Following policy π, you simulate 4 episodes from state A:
+
+```
+Episode 1: rewards [1, 2, 0] → G = 1 + 0.9×2 + 0.81×0 = 2.80
+Episode 2: rewards [1, 0, 5] → G = 1 + 0.9×0 + 0.81×5 = 5.05
+Episode 3: rewards [1, 2, 3] → G = 1 + 0.9×2 + 0.81×3 = 5.23
+Episode 4: rewards [1, 1, 1] → G = 1 + 0.9×1 + 0.81×1 = 2.71
+
+V^π(A) ≈ (2.80 + 5.05 + 5.23 + 2.71) / 4 = 3.95
+```
+
 ### Action-Value Function Q^π(s, a)
 
-The value of taking action a in state s, then following π:
+**Step 1 — Words.** Q^π(s, a) answers: "How good is it to take action a in state s, and then follow policy π after that?" Q tells you the value of a specific action, not just the state. This is what Q-learning learns.
+
+**Step 2 — Formula.**
 
     Q^π(s, a) = E_π [ G_t | s_t = s, a_t = a ]
               = E_π [ Σ_{k=0}^{∞} γ^k · r_{t+k} | s_t = s, a_t = a ]
 
+Where:
+- a_t = a means "starting by taking action a"
+- After that first action, the agent follows policy π as normal
+
+**Step 3 — Worked example.** In state A, you can go left or right (γ = 0.9):
+
+```
+Q^π(A, left):  go left, then follow π → average returns: [3.0, 2.5, 2.8, 3.2]
+  Q^π(A, left) ≈ (3.0 + 2.5 + 2.8 + 3.2) / 4 = 2.88
+
+Q^π(A, right): go right, then follow π → average returns: [5.0, 5.2, 4.8, 5.1]
+  Q^π(A, right) ≈ (5.0 + 5.2 + 4.8 + 5.1) / 4 = 5.03
+
+Going right is much better in this state.
+```
+
 ### Relationship Between V and Q
+
+**Step 1 — Words.** V and Q are connected. V(s) is the weighted average of Q(s, a) across all actions, where the weights are the policy probabilities. If the policy says "go left 30% of the time and right 70% of the time," then V is 30% of Q(left) plus 70% of Q(right).
+
+**Step 2 — Formula.**
 
 V can be derived from Q by averaging over the policy:
 
@@ -65,9 +129,23 @@ Q can be derived from V using the transition model:
 
     Q^π(s, a) = Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · V^π(s') ]
 
+**Step 3 — Worked example.** Continuing from above with π(left|A) = 0.3, π(right|A) = 0.7:
+
+```
+V^π(A) = π(left|A) × Q^π(A, left) + π(right|A) × Q^π(A, right)
+       = 0.3 × 2.88 + 0.7 × 5.03
+       = 0.86 + 3.52
+       = 4.38
+
+Check: V is between Q(left)=2.88 and Q(right)=5.03 ✓
+V is closer to Q(right) because the policy favors right (0.7) ✓
+```
+
 ### Advantage Function A^π(s, a)
 
-The advantage measures how much better action a is compared to the average action under π:
+**Step 1 — Words.** The advantage measures how much better action a is compared to what you would normally do. If A is positive, the action is better than average. If negative, it is worse. If zero, it is exactly average. Policy gradient methods use the advantage to decide which actions to reinforce.
+
+**Step 2 — Formula.**
 
     A^π(s, a) = Q^π(s, a) - V^π(s)
 
@@ -77,21 +155,42 @@ Properties:
 - Σ_a π(a|s) · A^π(s, a) = 0 for any policy (the average advantage is zero)
 - The advantage is central to policy gradient methods: it tells the agent which actions to reinforce
 
+**Step 3 — Worked example.**
+
+```
+V^π(A) = 4.38 (from above)
+
+A^π(A, left)  = Q(A, left)  - V(A) = 2.88 - 4.38 = -1.50  (worse than average)
+A^π(A, right) = Q(A, right) - V(A) = 5.03 - 4.38 = +0.65  (better than average)
+
+Weighted average: 0.3 × (-1.50) + 0.7 × (0.65) = -0.45 + 0.455 ≈ 0 ✓
+```
+
 ### Optimal Value Functions
 
-The optimal state-value function:
+**Step 1 — Words.** The optimal value V*(s) is the highest value any policy can achieve in state s. Q*(s, a) is the highest value from starting with action a. The optimal policy π* simply picks the action with the highest Q* in every state. Finding Q* is the goal of Q-learning.
+
+**Step 2 — Formula.**
 
     V*(s) = max_π V^π(s)
-
-The optimal action-value function:
-
     Q*(s, a) = max_π Q^π(s, a)
-
-The optimal policy can be derived from Q*:
-
     π*(s) = argmax_a Q*(s, a)
 
 This is why knowing Q* immediately gives you the best policy — just pick the action with the highest Q-value in each state.
+
+**Step 3 — Worked example.**
+
+```
+Suppose two policies exist:
+  Policy A: Q^A(start, left) = 3.0,  Q^A(start, right) = 5.0
+  Policy B: Q^B(start, left) = 4.5,  Q^B(start, right) = 4.0
+
+Q*(start, left)  = max(3.0, 4.5) = 4.5  (Policy B is better for left)
+Q*(start, right) = max(5.0, 4.0) = 5.0  (Policy A is better for right)
+
+π*(start) = argmax(Q*(left)=4.5, Q*(right)=5.0) = right
+V*(start) = max(4.5, 5.0) = 5.0
+```
 
 ---
 

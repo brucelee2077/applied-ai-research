@@ -8,6 +8,19 @@
 > - 💡 Bandits vs contextual bandits vs full RL: when each wins
 > - 🏭 Production: offline evaluation, logging policy, off-policy correction
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | K | Number of arms (items to recommend) |
+> | T | Number of rounds (user interactions) |
+> | UCB(a) | Upper Confidence Bound for arm a |
+> | Regret | Difference between optimal reward and actual reward |
+> | O(√(KT)) | Regret bound — scales with square root of arms × rounds |
+>
+> **RL concepts used here:** multi-armed bandits, exploration-exploitation, ε-greedy, Thompson Sampling.
+> See [math-refresher.md](../math-refresher.md) for notation lookup.
+
 ---
 
 ## Brief restatement

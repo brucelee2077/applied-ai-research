@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 19 · Day 4 — The "Less is More" Principle in ADRS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w19-d04-lessismore">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 19 Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-03-case-studies-automation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Case Studies in Automation</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-reward-hacking-threat.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Reward Hacking Threat</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 5 · Week 19 · Day 4 (Thu)</span>
+    <h1>The "Less is More"<br>Principle</h1>
+    <p class="lead">All week you built an AI loop that <em>invents</em> systems algorithms. Today's twist: to make it discover <em>more</em>, you give it <em>less</em> — a weaker starting point and only low-level building blocks. Handing the AI a near-perfect solution actually freezes its creativity.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why a strong baseline traps the search in a <code>local optimum</code>, why hiding logic behind a high-level API shrinks what the AI can discover, and the real trade-off — a higher discovery ceiling paid for in extra iterations.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Give the AI less, and it discovers more</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the earlier Week 19 days — you have seen the ADRS loop and the idea of a reliable verifier. <b>No prior knowledge of today's tuning trick needed.</b> We rebuild the loop from zero below.</div></div>
+
+      <h4>First, the loop this week is about</h4>
+      <p>Start from one idea. <span class="term">ADRS</span> stands for <strong>AI-Driven Research for Systems</strong>. It is a loop with three steps that repeat:</p>
+      <ol>
+        <li>An <strong>LLM</strong> (a large language model) writes a candidate algorithm — real code.</li>
+        <li>A <span class="term">verifier</span> — actual code or a simulator — <strong>runs</strong> that candidate on a fixed set of workloads and measures its speed or cost. That number is the score.</li>
+        <li>The LLM edits the best candidates so far and the loop repeats.</li>
+      </ol>
+      <p>Because the score comes from <em>running the code</em>, not from an opinion, you can trust it. That trustworthy score is what we call the <strong>reliable verifier</strong>.</p>
+
+      <h4>Two knobs the human controls</h4>
+      <p>Before the loop starts, you (the human) make two setup choices.</p>
+      <p><strong>The baseline.</strong> This is the starting algorithm you hand the loop as candidate number zero. It can be <em>weak</em> — a short, obviously-improvable version — or <em>strong</em> — a near-state-of-the-art human design.</p>
+      <p><strong>The high-level API.</strong> An <span class="term">API</span> (Application Programming Interface) is a ready-made library function that does a big chunk of work in one call — think <code>torch.topk</code>, or a scheduler's <code>.balance()</code>, or a query planner's <code>.optimize()</code>. It is convenient, but it hides the real algorithm inside the library. The LLM can only change the arguments you pass to it, not rewrite the logic underneath.</p>
+
+      <h4>The principle</h4>
+      <p>The <strong>"Less is More" principle</strong> is this: giving the AI <em>less</em> — a weaker baseline and only <em>low-level</em> building blocks (loops, arithmetic, raw data structures) instead of one-call APIs — produces <em>more</em> discovery.</p>
+      <div class="callout c-info"><span class="ic">💡</span><div>Why? A strong baseline is already sitting near a <span class="term">local optimum</span> — a solution so good that every small edit near it looks worse. So the search never leaves the hill it is on; it only makes <strong>micro-optimizations</strong> (tiny surface tweaks). A high-level API is a locked black box — the LLM cannot evolve code it cannot see. Strip both away and the search must rebuild the algorithm from parts, which opens a far larger space where genuinely new strategies live.</div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div>Evidence from the paper (a spot-instance scheduling problem called <em>Can't-Be-Late</em>): evolving from a <strong>simple greedy baseline</strong> beat evolving from the stronger <strong>Uniform Progress</strong> policy. The strong start "restricted exploration." Their advice: seed the loop with clean, minimal, high-quality baselines. Minimal, not maximal.</div></div>
+      <div class="callout c-info"><span class="ic">📚</span><div>Source material: <a href="https://arxiv.org/abs/2510.06189" target="_blank" rel="noopener">Barbarians at the Gate (Cheng et al., 2025), arXiv:2510.06189</a> · <a href="https://www.sigops.org/2026/barbarians-at-the-gate-ai-driven-system-design/" target="_blank" rel="noopener">SIGOPS summary: Barbarians at the Gate — AI-Driven System Design</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">The renovation contractor</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Imagine you hire a renovation contractor and ask for one thing: "surprise me with a <em>better</em> kitchen." What you hand them at the start changes everything.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🏰</span><h5>A: finished luxury kitchen</h5><p>This is the <strong>strong baseline</strong>. The contractor will not tear out $80k of cabinets. They swap a faucet, re-caulk a seam — tiny safe tweaks. A great new layout stays hidden, because demolishing something good is too risky.</p></div>
+        <div class="card"><span class="big">🧱</span><h5>B: bare room, basic tools</h5><p>This is the <strong>weak baseline</strong> with only <strong>low-level parts</strong> — pipes, studs, no pre-fab kitchen units (no high-level API). Now they <em>must</em> design from scratch — and that is exactly when they invent the island-with-hidden-pantry nobody asked for.</p></div>
+      </div>
+      <p><strong>In one line:</strong> less given at the start → more created in the end. A finished kitchen freezes the design; a bare room forces invention.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a human contractor gets tired and expensive with more work, so "less to start" saves them effort. The AI loop is the opposite — a weaker start means it runs <em>more</em> iterations and burns <em>more</em> compute to reach a good answer. "Less is more" is about the <strong>quality ceiling</strong> of the discovery, not about doing less total work. You trade dollars of compute for creative reach.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Run the loop three ways and watch what changes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. Each button runs the ADRS loop under a different setup and prints what the verifier scored. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="localopt" type="button">① strong vs. weak baseline</button>
+          <button class="play-btn" data-demo="api" type="button">② high-level API vs. low-level parts</button>
+          <button class="play-btn" data-demo="cost" type="button">③ the cost side of "less is more"</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">Why less scaffolding means more discovery</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The two mechanisms</h4>
+      <ul>
+        <li><strong>The local-optimum trap.</strong> A <span class="term">local optimum</span> is a peak on the quality landscape — good, but maybe not the tallest. A strong baseline starts on such a peak. Every small edit steps <em>down</em> the hill, so the verifier scores it worse and the loop rejects it. The search stays stuck and only makes <strong>micro-optimizations</strong> — tiny surface tweaks like swapping one API call.</li>
+        <li><strong>The black-box lock.</strong> A high-level API hides its algorithm inside a library. The LLM can only change the arguments you pass — it cannot rewrite logic it cannot see. Low-level parts (a loop, an <code>argmin</code>, an <code>assign</code>) are fully editable, so the LLM can rebuild the algorithm itself.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><b>The winning setup:</b> a <em>weak, low-level</em> start. It sits down in the valley with room to move, and every building block is rewritable — so the search can cross the valley and climb a taller peak the strong start could never reach.</div></div>
+
+      <h4>Why "less" wins on discovery</h4>
+      <ul>
+        <li><strong>Larger reachable space.</strong> Removing the API does not just change style — it multiplies how many distinct algorithms the search can even express. More reachable solutions means more room for a genuinely new strategy to appear.</li>
+        <li><strong>Escape from the near hill.</strong> A weak baseline is far from any peak, so many edits improve it. The search keeps moving instead of freezing after a few rejected tweaks.</li>
+        <li><strong>Evidence.</strong> In the Can't-Be-Late scheduling study, evolving from a simple greedy baseline reached a better final algorithm than evolving from the stronger Uniform Progress policy — the strong start "restricted exploration."</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> reliable verifier (earlier this week) → the loop can trust its scores → but a strong baseline / high-level API keeps it near a local optimum → so give it a weak baseline + low-level parts → larger search space → deeper discovery, paid for in more iterations.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch the idea assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time — a search landscape with two peaks, two starting flags, and the two setup knobs. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. By the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Reproduce "Less is More" on a toy problem</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task: build a small, reproducible experiment that <strong>demonstrates</strong> the "Less is More" principle. Run a simple local-search "evolution" loop over one toy systems objective in four setups and show that the weak / low-level setup out-discovers the strong / high-API setup.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>python experiment.py</code> runs end-to-end with no errors and prints a 4-row table: <code>config, start_score, final_score, iters, cost</code>.</li>
+        <li>The <code>weak + low-level</code> config reaches a strictly <strong>higher</strong> final_score than <code>strong + high-API</code> — the core claim reproduced.</li>
+        <li>The <code>strong + high-API</code> config visibly converges early (final_score within a small epsilon of its start_score) — the micro-optimization trap.</li>
+        <li>The <code>weak + low-level</code> config uses <strong>more</strong> iterations than <code>strong + high-API</code> — the cost trade-off.</li>
+        <li>A fixed random seed makes the table reproducible across two runs. Any LLM/bridge call is wrapped in <code>try/except</code> so the script still finishes if the bridge is down.</li>
+        <li><code>results.md</code> states the reproduced numbers in one sentence each and links back to arXiv:2510.06189.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>frontier-lab/week19/thursday-less-is-more/experiment.py</code> (plus <code>README.md</code> and <code>results.md</code>) with the four bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 19 Day 4 artifact demonstrating the "Less is More" principle from arXiv:2510.06189.
+
+Create frontier-lab/week19/thursday-less-is-more/experiment.py plus README.md and results.md that:
+1. Define a toy systems objective (a spot-instance scheduling OR MoE load-balance score) that a candidate solution can be graded on by RUNNING it — this is the reliable verifier.
+2. Run a minimal hill-climbing / local-search "evolution" loop over that objective in FOUR configs: {weak baseline, strong baseline} x {low-level ops allowed, high-level API only}. Log start_score, final_score, iteration count, and a stand-in cost.
+3. Use the local genAI bridge at http://localhost:11211 for the mutation step if an LLM proposer is used; otherwise a scripted random-edit proposer is fine. Wrap any bridge call in try/except and fall back so the script always completes.
+4. Fix a random seed so results are reproducible across two runs.
+5. Print a 4-row results table: config, start_score, final_score, iters, cost.
+
+Acceptance to satisfy:
+- weak + low-level has a strictly HIGHER final_score than strong + high-API (core claim).
+- strong + high-API converges early: final_score within a small epsilon of its start_score (micro-optimization trap).
+- weak + low-level uses MORE iterations than strong + high-API (cost trade-off).
+- results.md states each reproduced number in one sentence and links back to arXiv:2510.06189.
+Add a brief comment on each step, then run it to confirm the table prints and the claims hold.</pre>
+      </div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common mistake:</b> "Less is More" does NOT mean "always start weak and forbid all libraries." It is conditional. The paper wants a <em>clean, high-quality but minimal</em> baseline — "less" means fewer shortcuts, not lower quality or buggier. The payoff only holds when your verifier is reliable and your iteration budget is large enough to cross the valley. With too few iterations you get "stuck in the loop" and end up worse than the strong start. And if the high-level API already <em>is</em> the best known algorithm, stripping it away just wastes compute. Judgment: use a weak/low-level start when you suspect a better algorithm exists and can afford the search; keep the strong start when you only want safe polish.</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 4 complete!</h3>
+    <p>You now know the counterintuitive tuning lesson of ADRS: give the AI a weaker baseline and only low-level parts, and it discovers deeper algorithms — because a strong start freezes on a local optimum and an API is a locked black box. Less scaffolding buys a higher ceiling, paid for in iterations.<br>Next: <code>start today</code> → Day 5 is <code>The Reward Hacking Threat</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-03-case-studies-automation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Case Studies in Automation</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-reward-hacking-threat.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Reward Hacking Threat</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  localopt:{html:'<span class="prompt">prompt$</span> python demo_localopt.py <span class="str">--baseline strong</span>\n'+
+    '<span class="dim">[verifier]</span> scoring baseline (Uniform Progress)........ score = <span class="hl">0.71</span>  <span class="ok">ok</span>\n'+
+    '<span class="dim">[search]</span>   proposing 8 nearby edits.................... <span class="dim">dim</span>\n'+
+    '  edit 1: tweak progress_rate coeff  -&gt; 0.70  <span class="bad">bad (worse, reject)</span>\n'+
+    '  edit 2: clamp deadline margin      -&gt; 0.71  <span class="dim">dim (no change)</span>\n'+
+    '  edit 3: swap greedy tiebreak       -&gt; 0.69  <span class="bad">bad</span>\n'+
+    '  ... 5 more edits, all &lt;= 0.71\n'+
+    '<span class="dim">[result]</span>   converged at <span class="hl">0.71</span> after 40 iters — micro-optimizations only\n'+
+    '\n'+
+    '<span class="prompt">prompt$</span> python demo_localopt.py <span class="str">--baseline weak</span>\n'+
+    '<span class="dim">[verifier]</span> scoring baseline (naive greedy)............. score = <span class="bad">0.42</span>\n'+
+    '<span class="dim">[search]</span>   proposing 8 nearby edits.................... <span class="dim">dim</span>\n'+
+    '  iter  20: add spot-availability window   -&gt; 0.55  <span class="ok">ok</span>\n'+
+    '  iter  80: track alpha over recent window -&gt; 0.68  <span class="ok">ok</span>\n'+
+    '  iter 160: adaptive defer near deadline   -&gt; <span class="hl">0.79</span>  <span class="ok">ok  (new strategy!)</span>\n'+
+    '<span class="dim">[result]</span>   reached <span class="hl">0.79</span> after 400 iters — <span class="ok">beat the strong start\'s 0.71</span>',
+    take:'<b>①  The local-optimum trap.</b> The strong start freezes at 0.71 — every nearby edit is worse, so only micro-optimizations survive. The weak start roams and reaches 0.79, a strategy the strong start never explored.'},
+  api:{html:'<span class="prompt">prompt$</span> python demo_api.py <span class="str">--mode high_level</span>\n'+
+    'candidate: <span class="kw">return</span> scheduler.<span class="fn">balance</span>(experts, gpus)     <span class="dim"># black box</span>\n'+
+    '<span class="dim">[mutate]</span>  LLM can only change ARGS, not the algorithm  <span class="dim">dim</span>\n'+
+    '<span class="dim">[verifier]</span> latency = <span class="num">5.0</span> ms   <span class="ok">ok</span>    <span class="bad">(locked; 3 iters then stuck)</span>\n'+
+    '\n'+
+    '<span class="prompt">prompt$</span> python demo_api.py <span class="str">--mode low_level</span>\n'+
+    'candidate: <span class="kw">for</span> e <span class="kw">in</span> experts: <span class="fn">assign</span>(e, argmin(load))   <span class="dim"># raw parts</span>\n'+
+    '<span class="dim">[mutate]</span>  iter  30: batch moves to cut transfer count  <span class="ok">ok</span>\n'+
+    '<span class="dim">[mutate]</span>  iter  90: greedy + lookahead rebalance        <span class="ok">ok</span>\n'+
+    '<span class="dim">[verifier]</span> latency = <span class="num">1.0</span> ms   <span class="ok">ok</span>    <span class="hl">-&gt; 5.0x faster than the API path</span>',
+    take:'<b>②  API vs. low-level parts.</b> A high-level API is a black box — the LLM can only jiggle its arguments (locked at 5.0 ms). Low-level parts are fully rewritable, so the loop rebuilds the logic and hits 1.0 ms.'},
+  cost:{html:'<span class="prompt">prompt$</span> python demo_cost.py\n'+
+    'config            start_score  final_score  iters  approx_cost\n'+
+    'strong+highAPI       0.71         0.72         40      <span class="dim">$2</span>\n'+
+    'weak+lowlevel        0.42         <span class="hl">0.79</span>        400     <span class="hl">$18</span>\n'+
+    '<span class="dim">[note]</span> weak start wins on QUALITY (<span class="ok">+0.07 over strong</span>) but costs <span class="hl">~9x more</span>\n'+
+    '<span class="dim">[takeaway]</span> <span class="hl">\'less is more\' buys a higher ceiling, not a cheaper run</span>',
+    take:'<b>③  The cost side.</b> The weak / low-level setup wins on quality (+0.07) but takes ~9x the iterations and dollars. "Less is more" is about the discovery <em>ceiling</em>, not about doing less total work.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up. `viz` is inline HTML/SVG (use the .dgram/.node
+   diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
+   is the short explanation beside it. Engine below is fixed across all lessons. */
+var BUILD=[
+ {viz:'<svg viewBox="0 0 360 150" width="360" height="150" role="img" aria-label="A quality landscape with a small foothill on the left and a tall mountain on the right, a green weak-baseline flag in the valley and an amber strong-baseline flag on the foothill">'+
+    '<path d="M0 130 Q 55 70 100 92 Q 150 118 210 40 Q 270 -10 360 60 L360 150 L0 150 Z" fill="#EEEBE5" stroke="#C9C1B4" stroke-width="1.5"/>'+
+    '<line x1="10" y1="145" x2="10" y2="20" stroke="#9A938A" stroke-width="1"/>'+
+    '<text x="6" y="16" font-size="8" fill="#6B645E" font-family="monospace">quality</text>'+
+    '<text x="300" y="147" font-size="8" fill="#6B645E" font-family="monospace">algorithm-space →</text>'+
+    // green weak flag in the valley
+    '<line x1="55" y1="72" x2="55" y2="40" stroke="#2D8B55" stroke-width="2"/>'+
+    '<polygon points="55,40 82,47 55,54" fill="#2D8B55"/>'+
+    '<circle cx="55" cy="72" r="4" fill="#2D8B55"/>'+
+    '<text x="30" y="88" font-size="8" fill="#1a5c38" font-family="monospace">weak baseline</text>'+
+    // amber strong flag on the foothill
+    '<line x1="100" y1="92" x2="100" y2="62" stroke="#C99A12" stroke-width="2"/>'+
+    '<polygon points="100,62 127,69 100,76" fill="#C99A12"/>'+
+    '<circle cx="100" cy="92" r="4" fill="#C99A12"/>'+
+    '<text x="105" y="108" font-size="8" fill="#9A7208" font-family="monospace">strong baseline</text>'+
+    '</svg>',
+  note:'<b>The search landscape.</b> Quality goes up the Y axis; every possible algorithm is a point along the X axis. There is a small foothill on the left and a tall mountain on the right. Two flags mark where you plant candidate #0: a <span style="color:#2D8B55;font-weight:600">green weak baseline</span> in the valley, an <span style="color:#9A7208;font-weight:600">amber strong baseline</span> already up on the foothill. Where you plant the flag decides which peak the AI can even reach.'},
+
+ {viz:'<div class="dgram"><span class="node">LLM: propose edit</span><span class="arrow">▶</span><span class="node dim">Verifier: run + score</span><span class="arrow">▶</span><span class="node ok">Keep best</span><span class="arrow">↺</span></div>',
+  note:'<b>The ADRS loop, minimal.</b> Every lap is just <em>edit, run, measure, repeat</em>. The LLM proposes an edit, the verifier runs it on fixed workloads and scores it, the best candidate is kept, and the arrow curves back to the LLM. The verifier is the only source of truth.'},
+
+ {viz:'<svg viewBox="0 0 360 150" width="360" height="150" role="img" aria-label="From the amber flag on the small foothill, short search arrows bounce and settle, stamped with a red LOCAL OPTIMUM badge">'+
+    '<path d="M0 130 Q 55 70 100 92 Q 150 118 210 40 Q 270 -10 360 60 L360 150 L0 150 Z" fill="#EEEBE5" stroke="#C9C1B4" stroke-width="1.5"/>'+
+    '<circle cx="100" cy="92" r="4" fill="#C99A12"/>'+
+    // short blue hops that bounce down/equal
+    '<path d="M100 92 Q 108 84 112 96" fill="none" stroke="#2A7B9B" stroke-width="1.5"/>'+
+    '<path d="M100 92 Q 92 86 88 98" fill="none" stroke="#2A7B9B" stroke-width="1.5"/>'+
+    '<path d="M100 92 Q 110 80 118 94" fill="none" stroke="#2A7B9B" stroke-width="1.5"/>'+
+    '<path d="M100 92 Q 90 82 84 95" fill="none" stroke="#2A7B9B" stroke-width="1.5"/>'+
+    '<text x="52" y="118" font-size="8" fill="#5A544E" font-family="monospace">micro-optimizations</text>'+
+    '<rect x="62" y="30" width="96" height="16" rx="4" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1"/>'+
+    '<text x="70" y="41" font-size="8" fill="#C93B3B" font-family="monospace" font-weight="bold">LOCAL OPTIMUM</text>'+
+    '</svg>',
+  note:'<b>Strong start climbs, then freezes.</b> From the amber flag, every small edit lands lower or equal, so the search bounces back to the top of the small foothill and stops. It is stuck on a <span style="color:#C93B3B;font-weight:600">local optimum</span> — near a good solution, tiny tweaks all look worse, so only micro-optimizations survive.'},
+
+ {viz:'<svg viewBox="0 0 360 150" width="360" height="150" role="img" aria-label="From the green flag in the valley, a long search path wanders across the valley and climbs the tall mountain on the right past the foothill height">'+
+    '<path d="M0 130 Q 55 70 100 92 Q 150 118 210 40 Q 270 -10 360 60 L360 150 L0 150 Z" fill="#EEEBE5" stroke="#C9C1B4" stroke-width="1.5"/>'+
+    '<circle cx="55" cy="72" r="4" fill="#2D8B55"/>'+
+    // long wandering blue path up the tall mountain
+    '<path d="M55 72 Q 90 96 125 108 Q 160 116 185 70 Q 205 36 225 30" fill="none" stroke="#2A7B9B" stroke-width="2" stroke-dasharray="3 2"/>'+
+    '<polygon points="225,30 233,36 222,39" fill="#2A7B9B"/>'+
+    // milestone dots
+    '<circle cx="125" cy="108" r="3" fill="#2A7B9B"/>'+
+    '<text x="100" y="124" font-size="7" fill="#1F6280" font-family="monospace">+window</text>'+
+    '<circle cx="185" cy="70" r="3" fill="#2A7B9B"/>'+
+    '<text x="150" y="60" font-size="7" fill="#1F6280" font-family="monospace">adaptive defer</text>'+
+    '</svg>',
+  note:'<b>Weak start roams free.</b> From the green flag in the valley, the search has room to move — it wanders, dips, crosses the valley, and climbs the <em>tall</em> mountain, passing the foothill\'s height. Milestones on the path (<code>added window</code>, <code>adaptive defer</code>) are genuinely new strategies the strong start could never see.'},
+
+ {viz:'<div class="dgram">'+
+    '<span class="node v" style="opacity:.95">🔒 balance( … )<br><span style="font-size:.7rem;font-weight:400">args-only slider ⇄</span></span>'+
+    '<span class="arrow">vs</span>'+
+    '<span class="node ok" style="text-align:left">loop<br>argmin<br>assign<br>swap<br><span style="font-size:.7rem;font-weight:400">all editable ✎</span></span>'+
+    '</div>',
+  note:'<b>The API lock (second knob).</b> Card A is one <span style="color:#9A7208;font-weight:600">amber</span> <code>balance(...)</code> call wrapped in a padlock — a black box the LLM can only wiggle the arguments of. Card B is a <span style="color:#1a5c38;font-weight:600">green</span> stack of small blocks (<code>loop</code>, <code>argmin</code>, <code>assign</code>, <code>swap</code>) that are all fully rewritable.'},
+
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node v" style="min-width:40px">A</span> <span class="node dim" style="min-width:60px;justify-content:flex-start">▮ reachable: tiny</span></span>'+
+    '<span><span class="node ok" style="min-width:40px">B</span> <span class="node ok" style="min-width:230px;justify-content:flex-start">▮▮▮▮▮▮▮▮▮▮▮ reachable: huge</span></span>'+
+    '</div>',
+  note:'<b>Space size comparison.</b> Under each card, a bar shows how many distinct algorithms the search can even express. Card A (API) reaches a <em>tiny</em> set; Card B (low-level) reaches a <em>huge</em> one. Removing the API does not just change style — it multiplies the reachable search space.'},
+
+ {viz:'<div class="dgram col">'+
+    '<span class="node v" style="min-width:300px;justify-content:flex-start">⛰️ strong + high-API → 0.71 · 40 iters · $2</span>'+
+    '<span class="node ok" style="min-width:300px;justify-content:flex-start">🏔️ weak + low-level → <b>0.79</b> · 400 iters · $18</span>'+
+    '<span class="node hot dash" style="min-width:300px;justify-content:center">+0.07 quality &nbsp;·&nbsp; ~9× cost</span>'+
+    '</div>',
+  note:'<b>Results scoreboard.</b> Pulling the colors together: the <span style="color:#9A7208;font-weight:600">amber</span> strong+API row settles at 0.71 in 40 cheap iterations; the <span style="color:#1a5c38;font-weight:600">green</span> weak+low-level row reaches 0.79 but takes 400 iterations and ~9× the cost. Less given to the AI buys a higher ceiling — paid for in iterations, not in insight.'},
+
+ {viz:'<div class="dgram"><span class="node ok" style="font-size:.95rem;padding:.6rem 1rem;text-align:center">Less scaffolding → larger search space → deeper discovery</span></div>',
+  note:'<b>The principle, one line.</b> Everything collapses to this: <em>less scaffolding → larger search space → deeper discovery</em>. The footnote from the paper: on Can\'t-Be-Late scheduling, the simple <b>greedy baseline beat Uniform Progress</b>. The human\'s job shifts from writing the algorithm to choosing the starting point and the toolbox.'}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why does seeding an ADRS loop with a strong, near-SOTA baseline often produce only shallow "micro-optimizations"?',
+  opts:['The verifier refuses to score solutions that differ too much from the baseline','A strong baseline sits near a local optimum, so nearby edits score worse and the search never leaves that hill','Strong baselines use more tokens, so the loop runs out of budget before improving','LLMs cannot read code that is already high quality'],
+  ans:1, fb:'Near a good solution most small edits are worse, so the search gets trapped in a local optimum and only tweaks the surface.'},
+ {q:'2. In the paper\'s Can\'t-Be-Late scheduling case study, which starting point led to the better final algorithm?',
+  opts:['The stronger Uniform Progress policy','A random policy with no structure','The simple greedy baseline','Both tied exactly'],
+  ans:2, fb:'Evolution from the simple greedy baseline beat starting from the stronger Uniform Progress policy, which "restricted exploration."'},
+ {q:'3. Why does restricting the LLM to LOW-level building blocks instead of a high-level API help discovery?',
+  opts:['Low-level code always runs faster on the hardware','A high-level API is a black box the LLM can only tune, while low-level parts let it rewrite the actual algorithm, opening a far larger search space','High-level APIs are usually buggy and fail the verifier','It reduces the compute cost per iteration'],
+  ans:1, fb:'An API hides the algorithm inside the library; only low-level parts are fully editable, so the space of reachable algorithms is much larger.'},
+ {q:'4. What is the real trade-off captured by "Less is More" in ADRS?',
+  opts:['A weaker/low-level setup reaches a higher-quality ceiling but usually needs more iterations and compute to get there','A weaker setup is both cheaper and higher quality in every case','It means the human should give the AI no problem specification at all','It only applies when the verifier is unreliable'],
+  ans:0, fb:'Less scaffolding raises the discovery ceiling but is paid for in extra iterations and dollars of compute, not in less total work.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

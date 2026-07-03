@@ -8,6 +8,25 @@
 > - 💡 MC vs TD: the bias-variance tradeoff
 > - 🏭 Importance sampling for off-policy MC and its pitfalls
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Σ_{i=1}^{N} | Sum from i=1 to N |
+> | N(s) | Number of times state s was visited |
+> | G_t, G_i(s) | Discounted return from time t, or the i-th observed return from state s |
+> | α | Learning rate — how fast to update the estimate |
+> | argmax_a | "The action with the highest value" |
+> | \|A\| | Number of available actions |
+> | Π_{k=t}^{T} | Product from k=t to T (multiply all terms together) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **V^π(s)** — expected return from state s under policy π ([policies-and-value-functions-interview.md](../fundamentals/policies-and-value-functions-interview.md))
+> - **Q^π(s,a)** — expected return from (s, a) under policy π
+> - **G_t = r_t + γ·G_{t+1}** — discounted return
+> - **ε-greedy** — explore randomly with probability ε
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 Monte Carlo methods estimate value functions by averaging actual returns from complete episodes. They are model-free (no transition probabilities needed) and unbiased (they use real returns, not estimates). The trade-off is high variance and the requirement that episodes must terminate.
@@ -18,23 +37,27 @@ Monte Carlo methods estimate value functions by averaging actual returns from co
 
 ### MC Prediction: Estimating V^π
 
-The value of a state under policy π is the expected return starting from that state:
+**Step 1 — Words.** The simplest idea in RL: to find out how good a state is, just start from that state many times, play out full episodes, and average the total rewards you collected. Do this enough times and the average converges to the true value.
 
-    V^π(s) = E_π [ G_t | s_t = s ]
-
-Where the return is:
-
-    G_t = r_{t+1} + γ · r_{t+2} + γ² · r_{t+3} + ... = Σ_{k=0}^{T-t-1} γ^k · r_{t+k+1}
-
-Monte Carlo estimates V^π(s) by collecting actual returns from many episodes and averaging them:
+**Step 2 — Formula.**
 
     V̂(s) = (1/N(s)) · Σ_{i=1}^{N(s)} G_i(s)
 
 Where:
 - N(s) is the number of times state s was visited (first-visit: once per episode; every-visit: every occurrence)
 - G_i(s) is the return observed from the i-th visit to state s
+- The return is: G_t = Σ_{k=0}^{T-t-1} γ^k · r_{t+k+1}
 
 By the law of large numbers, V̂(s) → V^π(s) as N(s) → ∞.
+
+**Step 3 — Worked example.** State A visited in 3 episodes with returns: G = 8.0, G = 6.5, G = 9.2.
+
+```
+V̂(A) = (8.0 + 6.5 + 9.2) / 3 = 7.9
+
+After 3 episodes, our estimate is 7.9. With more episodes, this converges
+to the true V^π(A).
+```
 
 ### First-Visit vs Every-Visit
 
@@ -71,13 +94,26 @@ This guarantees π(a|s) ≥ ε/|A| > 0 for all actions, ensuring every pair is v
 
 ### Incremental Update Form
 
-Instead of storing all returns and computing the mean, use the incremental update:
+**Step 1 — Words.** Instead of storing every return and recomputing the average each time, you can update the estimate after each episode using a simple rule: move the old estimate a fraction α toward the new return. This is more memory-efficient and also lets you weight recent experience more heavily.
+
+**Step 2 — Formula.**
 
     V(s) ← V(s) + α · (G_t - V(s))
 
 Where:
 - α = 1/N(s) recovers the exact sample mean
 - α = constant gives a recency-weighted average (useful for non-stationary environments)
+- (G_t - V(s)) = "how far off was our estimate?"
+
+**Step 3 — Worked example.** V(A) = 7.0 (current estimate), new return G = 9.0, α = 0.1:
+
+```
+V(A) ← 7.0 + 0.1 × (9.0 - 7.0)
+     = 7.0 + 0.1 × 2.0
+     = 7.2
+
+The estimate moved 10% of the way from 7.0 toward 9.0.
+```
 
 ### Worked Example
 

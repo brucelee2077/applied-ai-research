@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantization: fp16 → int8 → 2-bit & Outlier Features</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);
+  padding-bottom:4rem;min-height:100vh}
+
+/* TOP BAR */
+.nav{position:sticky;top:0;z-index:100;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);height:54px}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-link{font-family:var(--mono);font-size:.78rem;color:var(--accent);text-decoration:none;white-space:nowrap}
+.nav-link:hover{color:var(--accent-d);text-decoration:underline}
+
+.wrap{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.12;margin-bottom:.7rem}
+.intro{color:var(--text2);font-size:1.02rem;max-width:640px;margin-bottom:1.6rem}
+.intro b{color:var(--text)}
+
+h2{font-family:var(--display);font-size:1.25rem;font-weight:700;margin:2.2rem 0 .4rem}
+.sub{color:var(--text2);font-size:.95rem;max-width:640px;margin-bottom:1rem}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.3rem 1.4rem;margin-bottom:1.4rem}
+
+/* CONTROLS */
+.controls{display:flex;flex-direction:column;gap:1rem;margin-bottom:1.1rem}
+.ctrl{display:flex;flex-direction:column;gap:.35rem}
+.ctrl-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);padding:.1rem .5rem;border-radius:var(--r-sm);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;
+  border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);
+  border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+
+.btn-row{display:flex;flex-wrap:wrap;gap:.5rem}
+.btn{font-family:var(--body);font-size:.85rem;font-weight:600;color:var(--text2);
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r-md);
+  padding:.5rem .9rem;cursor:pointer;transition:all .12s}
+.btn:hover{border-color:var(--accent);color:var(--accent-d)}
+.btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* FIGURE */
+.figbox{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.5rem}
+svg{display:block;width:100%;height:auto}
+.d3-fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;font-family:var(--mono)}
+
+/* READOUTS */
+.readouts{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1rem}
+.readout{flex:1;min-width:150px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:.7rem .9rem}
+.readout .lbl{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.readout .num{font-family:var(--mono);font-size:1.25rem;font-weight:600;margin-top:.15rem}
+.readout.good .num{color:var(--ok)}
+.readout.bad .num{color:var(--bad)}
+
+/* TAKEAWAY */
+.notice{background:var(--accent-l);border:1px solid #BFDDE8;border-left:4px solid var(--accent);
+  border-radius:var(--r-md);padding:1.1rem 1.3rem;margin:1.6rem 0 0}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.55rem;display:flex;align-items:center;gap:.4rem}
+.notice ul{margin:0;padding-left:1.1rem}
+.notice li{font-size:.92rem;color:var(--text2);margin-bottom:.4rem}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--text)}
+
+.formula{font-family:var(--mono);font-size:.82rem;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:.4rem .7rem;display:inline-block;color:var(--accent-d);margin-top:.3rem}
+
+.hint{font-size:.82rem;color:var(--muted);margin-top:.5rem}
+
+footer{max-width:860px;margin:2.5rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border);
+  font-size:.74rem;color:var(--muted);text-align:center}
+
+@media(max-width:600px){
+  h1{font-size:1.55rem}
+  .readout{min-width:calc(50% - .4rem)}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Quantization</span>
+    <a class="nav-link" href="../index.html">← All lessons</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <span class="eyebrow">Frontier Lab · ML Systems</span>
+  <h1>Quantization: fp16 → int8 → 2-bit &amp; Outlier Features</h1>
+  <p class="intro">
+    <b>Quantization</b> means storing model numbers with fewer bits (16 → 8 → 4 → 2) to shrink memory
+    and speed up inference. Fewer bits = less memory, but a <b>few huge "outlier" values</b> can wreck a
+    naive scheme. Play with the two figures below to see the memory win — and why isolating or rotating
+    outliers is what makes extreme low-bit quantization actually work.
+  </p>
+
+  <!-- ============ PART 1: MEMORY ============ -->
+  <h2>Part 1 — Memory footprint by precision</h2>
+  <p class="sub">
+    Bytes to store all weights = <span class="formula">bytes = n_params × bits ÷ 8</span>.
+    Drag the parameter count and watch each precision's memory (in GB) — and how many times smaller it is
+    than fp16.
+  </p>
+
+  <div class="card">
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Model size (parameters)</span>
+          <span class="ctrl-val" id="paramsVal">7.0 B</span>
+        </div>
+        <input type="range" id="paramsSlider" min="1" max="70" step="0.5" value="7">
+        <div class="hint">1 B (small) → 70 B (large open model). Weights only; activations/KV-cache extra.</div>
+      </div>
+    </div>
+    <div class="figbox">
+      <svg id="memSvg" role="img" aria-label="Bar chart of model memory in gigabytes at four precisions: fp16, int8, int4, and 2-bit."></svg>
+    </div>
+  </div>
+
+  <!-- ============ PART 2: OUTLIERS ============ -->
+  <h2>Part 2 — Outlier features &amp; why naive quantization breaks</h2>
+  <p class="sub">
+    Here is one row of activation values. Most are small; a <b>few are huge outliers</b>. To quantize to
+    int8 we pick a single <b>scale</b> (step size) for the row. A big outlier forces a big step, so all the
+    tiny values round to the same bucket — often 0. Compare three strategies and watch the
+    <b>mean absolute error</b>.
+  </p>
+
+  <div class="card">
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Outlier magnitude</span>
+          <span class="ctrl-val" id="outMagVal">40×</span>
+        </div>
+        <input type="range" id="outMagSlider" min="1" max="80" step="1" value="40">
+        <div class="hint">How much larger the outlier columns are than the typical value.</div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Number of outlier columns</span>
+          <span class="ctrl-val" id="outCntVal">2</span>
+        </div>
+        <input type="range" id="outCntSlider" min="0" max="6" step="1" value="2">
+        <div class="hint">Real LLMs: a tiny handful of feature dimensions carry the outliers.</div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Quantization strategy</span>
+          <span class="ctrl-val" id="stratVal">Naive int8</span>
+        </div>
+        <div class="btn-row" id="stratBtns">
+          <button class="btn active" data-strat="naive">Naive int8 (1 scale)</button>
+          <button class="btn" data-strat="mixed">Mixed-precision (LLM.int8)</button>
+          <button class="btn" data-strat="quip">Rotate + 2-bit (QuIP)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="figbox">
+      <svg id="outSvg" role="img" aria-label="Bar chart comparing original activation values to their quantized reconstructions, showing quantization error under the selected strategy."></svg>
+    </div>
+
+    <div class="readouts">
+      <div class="readout" id="roBits">
+        <div class="lbl">Effective bits / value</div>
+        <div class="num" id="bitsNum">8.0</div>
+      </div>
+      <div class="readout" id="roScale">
+        <div class="lbl" id="scaleLbl">Quant step (scale)</div>
+        <div class="num" id="scaleNum">0.00</div>
+      </div>
+      <div class="readout bad" id="roErr">
+        <div class="lbl" id="errLbl">Mean abs error</div>
+        <div class="num" id="errNum">0.00</div>
+      </div>
+    </div>
+    <div class="hint" id="stratNote">Naive: one scale spans the whole row, dominated by the outlier.</div>
+  </div>
+
+  <!-- ============ TAKEAWAY ============ -->
+  <div class="notice">
+    <h3>🎯 What to notice</h3>
+    <ul>
+      <li><b>Lower bits = linearly less memory.</b> int8 halves fp16; int4 is 4× smaller; 2-bit is 8×.
+      Inference is usually <b>memory-bandwidth-bound</b>, so smaller weights also mean faster token generation.</li>
+      <li><b>A few outlier features cause catastrophic error.</b> One giant value forces a coarse scale, so
+      all the small values collapse toward 0. Crank the outlier magnitude with "Naive int8" and watch the error explode.</li>
+      <li><b>Isolate or rotate the outliers.</b> <b>LLM.int8()</b> keeps outlier columns in fp16 and int8s the
+      rest — error stays tiny. <b>QuIP</b> multiplies by a random orthogonal (Hadamard) matrix to <b>spread</b>
+      the outlier energy so no single value dominates (incoherence max/RMS drops toward 1), which is what
+      enables coherent 2-bit quantization. The rotation win grows with dimension — real QuIP rotates whole
+      weight matrices with per-block scales and lattice codebooks, so a 16-wide toy only hints at it.</li>
+    </ul>
+  </div>
+</div>
+
+<footer>Frontier Lab · interactive visualization · D3 v7 · offline</footer>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DUR = REDUCE ? 0 : 420;
+
+  // ---- graceful degradation --------------------------------------------------
+  if (typeof window.d3 === "undefined") {
+    console.warn("d3 is not loaded (expected ./d3.v7.min.js). Showing fallback message.");
+    ["memSvg","outSvg"].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) {
+        var p = document.createElement("div");
+        p.className = "d3-fallback";
+        p.textContent = "Interactive figure unavailable — D3 (./d3.v7.min.js) did not load.";
+        el.parentNode.replaceChild(p, el);
+      }
+    });
+    return;
+  }
+
+  var d3 = window.d3;
+  var fmt2 = d3.format(".2f");
+  var fmt1 = d3.format(".1f");
+
+  // ===========================================================================
+  // PART 1 — MEMORY
+  // ===========================================================================
+  var PRECISIONS = [
+    {name:"fp16", bits:16, color:"#6B645E"},
+    {name:"int8", bits:8,  color:"#2A7B9B"},
+    {name:"int4", bits:4,  color:"#2D8B55"},
+    {name:"2-bit",bits:2,  color:"#C99A12"}
+  ];
+
+  var memSvg = d3.select("#memSvg");
+  var mW = 780, mH = 300, mM = {top:24, right:24, bottom:64, left:64};
+  memSvg.attr("viewBox", "0 0 " + mW + " " + mH);
+  var mIW = mW - mM.left - mM.right;
+  var mIH = mH - mM.top - mM.bottom;
+  var mG = memSvg.append("g").attr("transform","translate("+mM.left+","+mM.top+")");
+
+  var mX = d3.scaleBand().domain(PRECISIONS.map(function(p){return p.name;})).range([0, mIW]).padding(0.28);
+  var mY = d3.scaleLinear().range([mIH, 0]);
+
+  // static axis groups
+  var mXAxisG = mG.append("g").attr("transform","translate(0,"+mIH+")");
+  mXAxisG.call(d3.axisBottom(mX).tickSize(0)).call(function(g){ g.select(".domain").attr("stroke","#E5DFD6"); });
+  mXAxisG.selectAll("text").attr("font-family","var(--mono)").attr("font-size","13px").attr("dy","1.4em").attr("fill","#2C2A28").attr("font-weight",600);
+  var mYAxisG = mG.append("g");
+
+  // y axis label
+  mG.append("text").attr("transform","rotate(-90)").attr("x", -mIH/2).attr("y", -46)
+    .attr("text-anchor","middle").attr("font-size","12px").attr("fill","#6B645E").attr("font-family","var(--mono)")
+    .text("Memory (GB)");
+
+  // x axis label
+  mG.append("text").attr("x", mIW/2).attr("y", mIH + 52).attr("text-anchor","middle")
+    .attr("font-size","12px").attr("fill","#6B645E").attr("font-family","var(--mono)")
+    .text("Numeric precision (bits per weight)");
+
+  function memGB(nParamsB, bits){
+    // n_params (in billions) * bits / 8  -> bytes ; /1e9 -> GB
+    // (nParamsB * 1e9 * bits / 8) / 1e9 = nParamsB * bits / 8
+    return nParamsB * bits / 8;
+  }
+
+  function drawMem(nParamsB){
+    var data = PRECISIONS.map(function(p){
+      return {name:p.name, bits:p.bits, color:p.color, gb: memGB(nParamsB, p.bits)};
+    });
+    var fp16gb = data[0].gb;
+    var maxGB = fp16gb;
+    mY.domain([0, maxGB * 1.12 || 1]);
+
+    mYAxisG.transition().duration(DUR).call(d3.axisLeft(mY).ticks(5).tickFormat(function(d){return d+"";}));
+    mYAxisG.call(function(g){ g.select(".domain").attr("stroke","#E5DFD6"); g.selectAll("line").attr("stroke","#EEEBE5"); });
+    mYAxisG.selectAll("text").attr("font-family","var(--mono)").attr("font-size","11px").attr("fill","#6B645E");
+
+    // bars
+    var bars = mG.selectAll(".mbar").data(data, function(d){return d.name;});
+    bars.enter().append("rect")
+        .attr("class","mbar")
+        .attr("x", function(d){return mX(d.name);})
+        .attr("width", mX.bandwidth())
+        .attr("y", mIH).attr("height", 0)
+        .attr("rx",6).attr("fill", function(d){return d.color;})
+      .merge(bars)
+        .attr("fill", function(d){return d.color;})
+        .transition().duration(DUR)
+        .attr("x", function(d){return mX(d.name);})
+        .attr("width", mX.bandwidth())
+        .attr("y", function(d){return mY(d.gb);})
+        .attr("height", function(d){return mIH - mY(d.gb);});
+    bars.exit().remove();
+
+    // value labels (GB)
+    var vlab = mG.selectAll(".mval").data(data, function(d){return d.name;});
+    vlab.enter().append("text")
+        .attr("class","mval")
+        .attr("text-anchor","middle")
+        .attr("font-family","var(--mono)").attr("font-size","12px").attr("font-weight",600).attr("fill","#2C2A28")
+      .merge(vlab)
+        .transition().duration(DUR)
+        .attr("x", function(d){return mX(d.name)+mX.bandwidth()/2;})
+        .attr("y", function(d){return mY(d.gb) - 22;})
+        .tween("text", function(d){
+          var self = d3.select(this);
+          var i = d3.interpolateNumber(parseFloat(self.text())||0, d.gb);
+          return function(t){ self.text(fmt1(i(t)) + " GB"); };
+        });
+    vlab.exit().remove();
+
+    // reduction factor labels
+    var rlab = mG.selectAll(".mred").data(data, function(d){return d.name;});
+    rlab.enter().append("text")
+        .attr("class","mred")
+        .attr("text-anchor","middle")
+        .attr("font-family","var(--mono)").attr("font-size","11px").attr("fill","#5A544E")
+      .merge(rlab)
+        .attr("x", function(d){return mX(d.name)+mX.bandwidth()/2;})
+        .attr("y", function(d){return mY(d.gb) - 6;})
+        .text(function(d){
+          var factor = fp16gb / d.gb; // = 16/bits
+          return d.name === "fp16" ? "baseline" : (fmt1(factor) + "× smaller");
+        })
+        .attr("fill", function(d){ return d.name === "fp16" ? "#6B645E" : "#2D8B55"; });
+    rlab.exit().remove();
+  }
+
+  var paramsSlider = document.getElementById("paramsSlider");
+  var paramsVal = document.getElementById("paramsVal");
+  function onParams(){
+    var n = parseFloat(paramsSlider.value);
+    paramsVal.textContent = fmt1(n) + " B";
+    drawMem(n);
+  }
+  paramsSlider.addEventListener("input", onParams);
+  onParams();
+
+  // ===========================================================================
+  // PART 2 — OUTLIERS
+  // ===========================================================================
+  var N_COLS = 16;
+  // Fixed "typical" small values (deterministic so the figure is stable while dragging).
+  // Values in roughly [-1, 1].
+  var BASE = [0.42,-0.31,0.58,-0.12,0.26,-0.47,0.19,-0.63,0.35,-0.22,0.51,-0.08,0.44,-0.39,0.29,-0.55];
+  // Which columns become outliers, in priority order.
+  var OUTLIER_COLS = [3, 11, 7, 14, 1, 9];
+
+  var strategy = "naive";
+
+  var outSvg = d3.select("#outSvg");
+  var oW = 780, oH = 320, oM = {top:26, right:20, bottom:60, left:56};
+  outSvg.attr("viewBox","0 0 " + oW + " " + oH);
+  var oIW = oW - oM.left - oM.right;
+  var oIH = oH - oM.top - oM.bottom;
+  var oG = outSvg.append("g").attr("transform","translate("+oM.left+","+oM.top+")");
+
+  var oX = d3.scaleBand().domain(d3.range(N_COLS)).range([0, oIW]).padding(0.35);
+  var oY = d3.scaleLinear().range([oIH, 0]);
+
+  var oXAxisG = oG.append("g").attr("transform","translate(0,"+ (oIH) +")");
+  var oYAxisG = oG.append("g");
+  var oZero = oG.append("line").attr("x1",0).attr("x2",oIW).attr("stroke","#C9C1B7").attr("stroke-width",1);
+
+  // labels
+  oG.append("text").attr("transform","rotate(-90)").attr("x",-oIH/2).attr("y",-40)
+    .attr("text-anchor","middle").attr("font-size","12px").attr("fill","#6B645E").attr("font-family","var(--mono)")
+    .text("Activation value");
+  oG.append("text").attr("x", oIW/2).attr("y", oIH + 48).attr("text-anchor","middle")
+    .attr("font-size","12px").attr("fill","#6B645E").attr("font-family","var(--mono)")
+    .text("Feature column index");
+
+  // legend
+  var leg = oG.append("g").attr("transform","translate(0,-8)");
+  leg.append("rect").attr("x",0).attr("y",-6).attr("width",12).attr("height",12).attr("rx",2).attr("fill","#2A7B9B").attr("opacity",0.35);
+  var legOrig = leg.append("text").attr("x",18).attr("y",4).attr("font-size","11px").attr("fill","#5A544E").attr("font-family","var(--mono)").text("original");
+  leg.append("rect").attr("x",92).attr("y",-6).attr("width",12).attr("height",12).attr("rx",2).attr("fill","#2A7B9B");
+  var legRecon = leg.append("text").attr("x",110).attr("y",4).attr("font-size","11px").attr("fill","#5A544E").attr("font-family","var(--mono)").text("reconstructed");
+  var legOutRect = leg.append("rect").attr("x",232).attr("y",-6).attr("width",12).attr("height",12).attr("rx",2).attr("fill","#BE3E26");
+  var legOut = leg.append("text").attr("x",250).attr("y",4).attr("font-size","11px").attr("fill","#5A544E").attr("font-family","var(--mono)").text("outlier column");
+
+  // Symmetric int8 range: [-127, 127]. int2: 2-bit signed -> levels {-1,0,1} usable => qmax=1.
+  var Q_INT8 = 127;
+
+  function roundClamp(x, qmax){
+    var q = Math.round(x);
+    if (q > qmax) q = qmax;
+    if (q < -qmax) q = -qmax;
+    return q;
+  }
+
+  // Build the current row given outlier magnitude and count.
+  function buildRow(mag, count){
+    var vals = BASE.slice();
+    var outSet = {};
+    for (var i=0;i<count;i++){
+      var c = OUTLIER_COLS[i];
+      outSet[c] = true;
+      // keep original sign, scale magnitude up
+      var s = vals[c] >= 0 ? 1 : -1;
+      vals[c] = s * mag;
+    }
+    return {vals:vals, isOut:outSet};
+  }
+
+  // Quantize the whole row with one scale = maxAbs / qmax (per-tensor absmax, symmetric).
+  function quantizeNaive(vals, qmax){
+    var maxAbs = 0;
+    for (var i=0;i<vals.length;i++){ var a=Math.abs(vals[i]); if(a>maxAbs) maxAbs=a; }
+    var scale = maxAbs / qmax || 1e-9;
+    var recon = vals.map(function(v){ return roundClamp(v/scale, qmax) * scale; });
+    return {recon:recon, scale:scale};
+  }
+
+  // Mixed precision: outlier columns kept exact (fp16 ~ lossless here); rest quantized to int8
+  // with a scale computed from the non-outlier values only.
+  function quantizeMixed(vals, isOut, qmax){
+    var maxAbs = 0;
+    for (var i=0;i<vals.length;i++){ if(!isOut[i]){ var a=Math.abs(vals[i]); if(a>maxAbs) maxAbs=a; } }
+    var scale = maxAbs / qmax || 1e-9;
+    var recon = vals.map(function(v,i){
+      if (isOut[i]) return v;                       // kept in high precision -> exact
+      return roundClamp(v/scale, qmax) * scale;
+    });
+    return {recon:recon, scale:scale};
+  }
+
+  // Deterministic normalized Hadamard (Walsh) transform for length-16 vectors.
+  // H is orthonormal (H^T H = I), so it is a genuine energy-preserving rotation.
+  // Applying it MIXES every input into every output, spreading a lone outlier's
+  // energy across all 16 entries -> the rotated vector is "incoherent" (no dominant value).
+  function hadamard16(x){
+    var y = x.slice();
+    var n = 16, h = 1;
+    while (h < n){
+      for (var i=0;i<n;i+=h*2){
+        for (var j=i;j<i+h;j++){
+          var a = y[j], b = y[j+h];
+          y[j]   = a + b;
+          y[j+h] = a - b;
+        }
+      }
+      h *= 2;
+    }
+    var norm = 1/Math.sqrt(n);        // makes the transform orthonormal (unitary)
+    for (var k=0;k<n;k++) y[k] *= norm;
+    return y;
+  }
+
+  // QuIP-style: rotate by an orthogonal (Hadamard) matrix so outlier energy is SPREAD across
+  // all entries, quantize the now-incoherent vector at low bits (2-bit), then rotate back.
+  // Because no single rotated value dominates, the ratio max/RMS ("incoherence") drops toward 1,
+  // which is the property that lets extreme low-bit grids work at scale.
+  // In this 16-element toy we DISPLAY the rotated vector so you can SEE the outlier spread out;
+  // the quantization + error we report are measured in that rotated domain (where it happens).
+  function quantizeQuip(vals, bits){
+    var rot = hadamard16(vals);                 // energy-preserving rotation (spreads outliers)
+    var maxAbs = 0, energy = 0;
+    for (var i=0;i<rot.length;i++){ var a=Math.abs(rot[i]); if(a>maxAbs) maxAbs=a; energy += rot[i]*rot[i]; }
+    var levels = (1 << bits) - 1;               // 2-bit -> 3 usable levels each side of the grid
+    var qmax = levels >> 1;                     // symmetric: 2-bit -> qmax = 1
+    if (qmax < 1) qmax = 1;
+    var scale = maxAbs / qmax || 1e-9;          // grid conditioned on the SPREAD (incoherent) vector
+    var rotQ = rot.map(function(v){ return roundClamp(v/scale, qmax) * scale; });
+    var rms = Math.sqrt(energy / rot.length) || 1e-9;
+    // recon in the ORIGINAL domain (rotate back) is available too, but we show the rotated domain.
+    return {recon:rotQ, scale:scale, display:rot, incoherence:maxAbs/rms};
+  }
+
+  function meanAbsErr(orig, recon){
+    var s = 0;
+    for (var i=0;i<orig.length;i++) s += Math.abs(orig[i]-recon[i]);
+    return s / orig.length;
+  }
+
+  // Incoherence = maxAbs / RMS. High for a spiky vector (one big outlier), ~1 when energy is
+  // spread evenly. A rotation that lowers this ratio is what makes low-bit grids fit every value.
+  function incoherence(vals){
+    var maxAbs = 0, energy = 0;
+    for (var i=0;i<vals.length;i++){ var a=Math.abs(vals[i]); if(a>maxAbs) maxAbs=a; energy += vals[i]*vals[i]; }
+    var rms = Math.sqrt(energy / vals.length) || 1e-9;
+    return maxAbs / rms;
+  }
+
+  var outMagSlider = document.getElementById("outMagSlider");
+  var outCntSlider = document.getElementById("outCntSlider");
+  var outMagVal = document.getElementById("outMagVal");
+  var outCntVal = document.getElementById("outCntVal");
+  var stratVal  = document.getElementById("stratVal");
+  var stratNote = document.getElementById("stratNote");
+  var bitsNum = document.getElementById("bitsNum");
+  var scaleNum = document.getElementById("scaleNum");
+  var scaleLbl = document.getElementById("scaleLbl");
+  var errNum = document.getElementById("errNum");
+  var errLbl = document.getElementById("errLbl");
+  var roErr = document.getElementById("roErr");
+
+  var STRAT_LABEL = { naive:"Naive int8", mixed:"Mixed-precision (LLM.int8)", quip:"Rotate + 2-bit (QuIP)" };
+  var STRAT_NOTE = {
+    naive:"Naive: one int8 scale spans the whole row; the outlier forces a coarse step, so small values round toward 0.",
+    mixed:"LLM.int8(): outlier columns stay in fp16 (exact); the rest use an int8 scale computed without the outlier — error stays tiny.",
+    quip:"QuIP: this view shows the row AFTER a Hadamard rotation — the outlier's energy is now spread across all columns, so no single value dominates. Watch the incoherence (max/RMS) drop toward 1. That flatness is what lets a 2-bit grid fit every entry. (The benefit grows with dimension; a 16-wide toy only hints at it.)"
+  };
+  var STRAT_BITS = { naive:8, mixed: null, quip:2 }; // mixed computed dynamically
+
+  function drawOut(){
+    var mag = parseFloat(outMagSlider.value);
+    var count = parseInt(outCntSlider.value, 10);
+    outMagVal.textContent = mag + "×";
+    outCntVal.textContent = count;
+    stratVal.textContent = STRAT_LABEL[strategy];
+    stratNote.textContent = STRAT_NOTE[strategy];
+
+    var row = buildRow(mag, count);
+    var q, dispOrig, dispRecon, dispOut;
+    if (strategy === "naive"){
+      q = quantizeNaive(row.vals, Q_INT8);
+      dispOrig = row.vals; dispRecon = q.recon;
+      dispOut = function(i){ return !!row.isOut[i]; };
+    } else if (strategy === "mixed"){
+      q = quantizeMixed(row.vals, row.isOut, Q_INT8);
+      dispOrig = row.vals; dispRecon = q.recon;
+      dispOut = function(i){ return !!row.isOut[i]; };
+    } else {
+      // QuIP: show the ROTATED (spread) vector and its 2-bit reconstruction, both in rotated domain.
+      q = quantizeQuip(row.vals, 2);
+      dispOrig = q.display;   // rotated: outlier energy spread across ALL entries
+      dispRecon = q.recon;    // 2-bit quantized rotated vector
+      dispOut = function(){ return false; }; // no single "outlier column" after rotation — that's the point
+    }
+
+    // Error is measured in the domain shown (rotated domain for QuIP, original domain otherwise).
+    var mae = meanAbsErr(dispOrig, dispRecon);
+
+    // y domain symmetric around 0, covering shown originals + recon
+    var maxAbs = 0.5;
+    for (var i=0;i<N_COLS;i++){
+      maxAbs = Math.max(maxAbs, Math.abs(dispOrig[i]), Math.abs(dispRecon[i]));
+    }
+    oY.domain([-maxAbs*1.1, maxAbs*1.1]);
+
+    // axes
+    oYAxisG.transition().duration(DUR).call(d3.axisLeft(oY).ticks(6).tickFormat(function(d){return fmt1(d);}));
+    oYAxisG.call(function(g){ g.select(".domain").attr("stroke","#E5DFD6"); g.selectAll("line").attr("stroke","#F0EDE6"); });
+    oYAxisG.selectAll("text").attr("font-family","var(--mono)").attr("font-size","10px").attr("fill","#6B645E");
+
+    oXAxisG.call(d3.axisBottom(oX).tickValues(d3.range(0,N_COLS,3)).tickSize(0));
+    oXAxisG.select(".domain").remove();
+    oXAxisG.selectAll("text").attr("font-family","var(--mono)").attr("font-size","10px").attr("fill","#6B645E").attr("dy","1.6em");
+    oXAxisG.attr("transform","translate(0,"+oY(0)+")");
+    oZero.attr("transform","translate(0,"+oY(0)+")");
+
+    var data = d3.range(N_COLS).map(function(i){
+      return {i:i, orig:dispOrig[i], recon:dispRecon[i], isOut:dispOut(i)};
+    });
+
+    var bw = oX.bandwidth();
+
+    // ORIGINAL bars (light / outlier-tinted), drawn behind
+    var ob = oG.selectAll(".obar").data(data, function(d){return d.i;});
+    ob.enter().append("rect")
+        .attr("class","obar")
+        .attr("x", function(d){return oX(d.i);})
+        .attr("width", bw)
+        .attr("rx",2)
+      .merge(ob)
+        .attr("fill", function(d){ return d.isOut ? "#BE3E26" : "#2A7B9B"; })
+        .attr("opacity", 0.28)
+        .transition().duration(DUR)
+        .attr("x", function(d){return oX(d.i);})
+        .attr("width", bw)
+        .attr("y", function(d){ return d.orig >= 0 ? oY(d.orig) : oY(0); })
+        .attr("height", function(d){ return Math.abs(oY(d.orig) - oY(0)); });
+    ob.exit().remove();
+
+    // RECONSTRUCTED bars (solid, narrower, in front)
+    var rb = oG.selectAll(".rbar").data(data, function(d){return d.i;});
+    rb.enter().append("rect")
+        .attr("class","rbar")
+        .attr("x", function(d){return oX(d.i)+bw*0.25;})
+        .attr("width", bw*0.5)
+        .attr("rx",2)
+      .merge(rb)
+        .attr("fill", function(d){ return d.isOut ? "#8A2C18" : "#1F6280"; })
+        .attr("opacity", 0.95)
+        .transition().duration(DUR)
+        .attr("x", function(d){return oX(d.i)+bw*0.25;})
+        .attr("width", bw*0.5)
+        .attr("y", function(d){ return d.recon >= 0 ? oY(d.recon) : oY(0); })
+        .attr("height", function(d){ return Math.abs(oY(d.recon) - oY(0)); });
+    rb.exit().remove();
+
+    // ---- readouts -----------------------------------------------------------
+    var bits = STRAT_BITS[strategy];
+    if (strategy === "mixed"){
+      // effective bits: outliers at 16, rest at 8, averaged over columns
+      bits = (count*16 + (N_COLS-count)*8) / N_COLS;
+    }
+    bitsNum.textContent = fmt1(bits);
+
+    // Third readout switches meaning for QuIP: incoherence (max/RMS) instead of scale-only.
+    if (strategy === "quip"){
+      // incoherence of ORIGINAL row vs ROTATED row — the smaller the rotated ratio, the better
+      var origInc = incoherence(row.vals);
+      scaleLbl.textContent = "Incoherence max/RMS";
+      scaleNum.textContent = fmt1(origInc) + " → " + fmt1(q.incoherence);
+    } else {
+      scaleLbl.textContent = "Quant step (scale)";
+      scaleNum.textContent = fmt2(q.scale);
+    }
+
+    // Error readout. For naive/mixed this is the mean-abs reconstruction error in the
+    // original domain (smaller = better). For QuIP we do NOT show a rotated-domain MAE:
+    // that number is measured on large-magnitude rotated values, so it is not comparable
+    // to the original-domain MAE of naive/mixed and would falsely read as "worse". Instead
+    // we report the peak magnitude the rotation removes (biggest abs value before -> after),
+    // which is the quantity that actually lets a low-bit grid fit every entry.
+    var good;
+    if (strategy === "quip"){
+      var maxBefore = 0, maxAfter = 0;
+      for (var mi=0; mi<row.vals.length; mi++){ var av=Math.abs(row.vals[mi]); if(av>maxBefore) maxBefore=av; }
+      for (var mj=0; mj<q.display.length; mj++){ var aw=Math.abs(q.display[mj]); if(aw>maxAfter) maxAfter=aw; }
+      errLbl.textContent = "Peak value (before → after)";
+      errNum.textContent = fmt1(maxBefore) + " → " + fmt1(maxAfter);
+      // "good" when rotation meaningfully spread the energy (incoherence dropped)
+      good = q.incoherence < incoherence(row.vals) * 0.75;
+    } else {
+      errLbl.textContent = "Mean abs error";
+      errNum.textContent = fmt2(mae);
+      good = mae < 0.06;
+    }
+    if (good){
+      roErr.classList.remove("bad"); roErr.classList.add("good");
+    } else {
+      roErr.classList.remove("good"); roErr.classList.add("bad");
+    }
+
+    // legend adapts: QuIP shows the rotated domain, so labels change and there is no outlier column
+    if (strategy === "quip"){
+      legOrig.text("rotated");
+      legRecon.text("2-bit quantized");
+      legOut.attr("opacity", 0);
+      legOutRect.attr("opacity", 0);
+    } else {
+      legOrig.text("original");
+      legRecon.text("reconstructed");
+      legOut.attr("opacity", 1);
+      legOutRect.attr("opacity", 1);
+    }
+  }
+
+  outMagSlider.addEventListener("input", drawOut);
+  outCntSlider.addEventListener("input", drawOut);
+
+  var stratBtns = document.getElementById("stratBtns");
+  stratBtns.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-strat]");
+    if (!b) return;
+    strategy = b.getAttribute("data-strat");
+    Array.prototype.forEach.call(stratBtns.querySelectorAll("button"), function(x){
+      x.classList.toggle("active", x === b);
+    });
+    drawOut();
+  });
+
+  drawOut();
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,13 @@
 > - 💡 DQN vs PPO vs A2C: when each wins and why
 > - 🏭 From Atari to AlphaGo: scaling RL to superhuman performance
 
+> **Math you will need for this file**
+>
+> This file references algorithms from earlier sections. No new notation is introduced.
+>
+> **RL concepts used here:** DQN, PPO, A2C, MCTS, reward shaping, experience replay.
+> See [math-refresher.md](../math-refresher.md) for notation lookup.
+
 ---
 
 ## Brief restatement

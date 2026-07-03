@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frontier Mock Interview</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- top bar: brand + live XP / level / tokens -->
+  <header id="topbar">
+    <div class="brand" id="brand-home" title="Back to start">
+      Frontier<span class="dot">.</span>Interview
+      <span class="sub">Mock Interview System</span>
+    </div>
+    <div id="xp-chip">
+      <span class="token-chip" id="token-chip" title="Tokens earned"></span>
+      <div class="level-badge" id="level-badge" title="Your level">
+        <span class="lvl-num" id="lvl-num">1</span>
+        <span id="lvl-name">ML Intern</span>
+      </div>
+      <div class="xp-meter">
+        <div class="bar"><div class="fill" id="xp-fill"></div></div>
+        <div class="label" id="xp-label">0 XP</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- offline-mode banner (shown when the genAI bridge is unavailable) -->
+  <div id="offline-banner" class="hidden">
+    <b>Offline reveal mode.</b> The live AI interviewer (genAI bridge) isn't
+    available, so you answer, then self-grade against the model answers. Start the
+    bridge at <code>http://localhost:11211</code> to enable live AI interviews.
+  </div>
+
+  <main>
+    <!-- ============ SCREEN 1: track picker ============ -->
+    <section id="screen-picker" tabindex="-1" class="screen">
+      <div class="eyebrow">Choose your arena</div>
+      <h1 class="screen-title">What do you want to practice?</h1>
+      <p class="screen-sub">Each track draws on the repo's calibrated interview
+        material. Pick a track, then a topic, then drill a single question or run
+        a full timed mock.</p>
+      <div class="track-grid" id="track-grid"></div>
+    </section>
+
+    <!-- ============ SCREEN 1b: topic picker ============ -->
+    <section id="screen-topics" tabindex="-1" class="screen hidden">
+      <div class="crumbs" id="topic-crumbs"></div>
+      <h1 class="screen-title" id="topic-title">Topics</h1>
+      <p class="screen-sub" id="topic-sub"></p>
+      <div class="topic-list" id="topic-list"></div>
+    </section>
+
+    <!-- ============ SCREEN 2: session config ============ -->
+    <section id="screen-config" tabindex="-1" class="screen hidden">
+      <div class="crumbs" id="config-crumbs"></div>
+      <h1 class="screen-title" id="config-title">Set up your session</h1>
+      <div class="config-card">
+        <div class="field-label">Session type</div>
+        <div class="mode-grid">
+          <div class="mode-opt sel" data-mode="drill">
+            <div class="mtitle">⚡ Quick drill</div>
+            <div class="mdesc">One question + adaptive probes, then instant
+              feedback. ~5–10 min.</div>
+          </div>
+          <div class="mode-opt" data-mode="full_mock">
+            <div class="mtitle">🎯 Full mock</div>
+            <div class="mdesc">Walk a whole case study end to end, like a real
+              45-min interview. Scorecard + XP at the end.</div>
+          </div>
+        </div>
+        <div id="drill-question-field">
+          <div class="field-label">Question (drill)</div>
+          <select id="drill-question-select" aria-label="Drill question"></select>
+        </div>
+        <div class="btn-row">
+          <button class="btn big" id="start-btn">Start interview →</button>
+          <button class="btn ghost" id="config-back">Back</button>
+        </div>
+        <div class="error hidden" id="config-error"></div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 3: chat ============ -->
+    <section id="screen-chat" tabindex="-1" class="screen hidden">
+      <div class="chat-head">
+        <span class="topic" id="chat-topic"></span>
+        <span class="qprog" id="chat-prog"></span>
+        <span class="qprog" id="chat-mode"></span>
+        <span class="timer" id="chat-timer">00:00</span>
+      </div>
+      <div id="transcript" role="log" aria-live="polite" aria-relevant="additions" aria-label="Interview transcript"></div>
+
+      <!-- answer composer -->
+      <div class="answer-box" id="answer-box">
+        <textarea id="answer-text" placeholder="Type your answer here. Think out loud — structure your reasoning the way you would on a whiteboard."></textarea>
+        <div class="hint" id="answer-hint">Press <b>Ctrl/Cmd + Enter</b> to submit.</div>
+        <div class="btn-row">
+          <button class="btn" id="submit-answer">Submit answer</button>
+          <button class="btn ghost" id="quit-session">Quit</button>
+        </div>
+      </div>
+
+      <!-- reveal / self-grade (offline) -->
+      <div class="reveal-wrap hidden" id="reveal-wrap"></div>
+    </section>
+
+    <!-- ============ SCREEN 4: scorecard ============ -->
+    <section id="screen-scorecard" tabindex="-1" class="screen hidden">
+      <div id="verdict-host"></div>
+      <div class="sc-grid">
+        <div class="sc-card" id="sc-breakdown">
+          <h3>Per-question breakdown</h3>
+          <svg id="bar-svg" viewBox="0 0 420 240" role="img" aria-label="Per-question scores"></svg>
+        </div>
+        <div class="sc-card" id="sc-reward">
+          <h3>Rewards</h3>
+          <div class="reward" id="reward-host"></div>
+        </div>
+      </div>
+      <div class="sc-card hidden" id="sc-radar-card" style="margin-top:18px">
+        <h3>Criteria coverage</h3>
+        <svg id="radar-svg" viewBox="0 0 420 360" role="img" aria-label="Criteria coverage radar"></svg>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="sc-review">Review transcript</button>
+        <button class="btn ghost" id="sc-new">New interview</button>
+        <button class="btn ghost" id="sc-history">History</button>
+      </div>
+      <div id="review-host" class="review" style="margin-top:20px"></div>
+    </section>
+
+    <!-- ============ SCREEN 5: history ============ -->
+    <section id="screen-history" tabindex="-1" class="screen hidden">
+      <div class="crumbs"><button id="history-back">← Start</button></div>
+      <h1 class="screen-title">Your interview history</h1>
+      <div id="history-list" class="topic-list"></div>
+    </section>
+  </main>
+
+  <!-- vendored locally (CDNs are blocked); viz reads window.__INTERVIEW_D3 -->
+  <script src="d3.v7.min.js"></script>
+  <script src="viz.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

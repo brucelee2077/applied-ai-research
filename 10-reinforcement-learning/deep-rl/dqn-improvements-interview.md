@@ -8,6 +8,23 @@
 > - 💡 Double vs Dueling vs Prioritized: when each improvement gives the biggest gain
 > - 🏭 Combining improvements: interaction effects and production recommendations
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Q(s, a; θ) | Online Q-network |
+> | Q(s, a; θ⁻) | Target Q-network |
+> | V(s; θ) | State-value stream (Dueling DQN) |
+> | A(s, a; θ) | Advantage stream (Dueling DQN) |
+> | argmax_a Q(s', a; θ) | Action selected by online network (Double DQN) |
+> | E[max Q̂] ≥ max E[Q̂] | Jensen's inequality — why max overestimates |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **DQN** — base algorithm being improved ([dqn-from-scratch-interview.md](./dqn-from-scratch-interview.md))
+> - **Advantage A(s,a) = Q(s,a) - V(s)** — how much better action a is than average
+> - **Experience replay and target networks** — DQN components
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 The original DQN had systematic flaws. It overestimated Q-values because the max operator selects the action with the luckiest noise. It wasted capacity learning state values in situations where the action choice did not matter. Its exploration was random and state-independent. Between 2015 and 2017, researchers identified these flaws and designed targeted fixes. Double DQN decouples action selection from evaluation, reducing overestimation. Dueling DQN separates Q into state value V(s) and advantage A(s,a), improving efficiency. Rainbow (2017) combined six improvements into one algorithm, achieving roughly 2.5x the performance of the original DQN on Atari.

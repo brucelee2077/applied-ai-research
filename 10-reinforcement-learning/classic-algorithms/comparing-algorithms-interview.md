@@ -8,6 +8,25 @@
 > - 💡 Decision framework: which algorithm for which problem
 > - 🏭 How classic algorithms map to modern deep RL methods
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | G_t | Actual discounted return (computed after episode ends) |
+> | δ_t | TD error — r + γV(s') - V(s) |
+> | max_{a'} | Maximum over all actions in the next state |
+> | Q(s', a') | Q-value of the action actually taken next (SARSA) |
+> | α | Learning rate |
+> | γ | Discount factor |
+> | λ | TD(λ) parameter for bias-variance trade-off |
+> | O(...) | "On the order of" — how computation scales |
+>
+> **RL concepts used here** (all defined in earlier files in this section):
+> - **MC, TD(0), Q-learning, SARSA** — the four classic algorithms compared here
+> - **On-policy vs off-policy** — whether the agent learns about its own policy or the optimal one
+> - **Bias-variance trade-off** — MC is unbiased/high variance; TD is biased/low variance
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 The four classic RL algorithms — Monte Carlo, TD learning, Q-learning, and SARSA — differ along three axes: when they update (episode end vs every step), what they bootstrap from (real returns vs estimates), and which policy they learn about (current vs optimal). Understanding these trade-offs and knowing when each algorithm is appropriate is a key staff-level competency.
@@ -18,7 +37,9 @@ The four classic RL algorithms — Monte Carlo, TD learning, Q-learning, and SAR
 
 ### The Four Update Rules Side by Side
 
-All four algorithms update a value estimate toward a target. The difference is the target.
+**Step 1 — Words.** All four classic algorithms update a value estimate toward a target. The only difference is what that target is. MC uses the real return (waits for the episode to end). TD(0) uses one step of real reward plus a bootstrap. Q-learning uses the best possible next action. SARSA uses the actual next action.
+
+**Step 2 — Formula.** All four algorithms update a value estimate toward a target. The difference is the target.
 
 **Monte Carlo (first-visit):**
 

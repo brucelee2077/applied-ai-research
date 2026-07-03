@@ -8,6 +8,25 @@
 > - 💡 DQN vs tabular Q-learning: what changes and what stays the same
 > - 🏭 Hyperparameter selection, training diagnostics, and production deployment
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Q(s, a; θ) | Q-value from the online (learning) network |
+> | Q(s', a'; θ⁻) | Q-value from the target (frozen) network |
+> | θ, θ⁻ | Online network weights, target network weights |
+> | L(θ) | Loss function — mean squared TD error |
+> | ∇_θ | Gradient with respect to network weights |
+> | N | Replay buffer capacity |
+> | B | Mini-batch size |
+> | ε(t) | Epsilon at time t (decays over training) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Function approximation** — neural net instead of Q-table ([function-approximation-interview.md](./function-approximation-interview.md))
+> - **Q-learning** — off-policy TD control using max ([q-learning-interview.md](../classic-algorithms/q-learning-interview.md))
+> - **Semi-gradient update** — gradient through prediction only, not the target
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 DQN (Deep Q-Network) is Q-learning with three additions that make it stable with a neural network. The neural network replaces the Q-table, enabling generalization to unseen states. Experience replay stores transitions in a buffer and samples random mini-batches, breaking the correlation between consecutive training samples. A target network provides a frozen copy of the Q-network for computing TD targets, preventing the positive feedback loop where updating the network changes the target it is chasing. Together, these three innovations turned an unstable combination into the first algorithm to learn control policies from raw pixels at human-competitive level.

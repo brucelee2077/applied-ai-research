@@ -1,5 +1,5 @@
 """
-coach/core.py — XP engine, streak logic, SM-2 spaced repetition, badge system,
+coach/core.py — XP engine, SM-2 spaced repetition, badge system,
 boss unlock, module skill tree, session management.
 
 All state is persisted to coach/state.json.
@@ -26,7 +26,6 @@ XP_QUIZ_PASS = 50
 XP_QUIZ_RETRY = 20
 XP_MOCK_INTERVIEW = 200
 XP_PERFECT_QUIZ = 100
-XP_STREAK_BONUS = 25
 XP_FIRST_SESSION = 50
 
 # ── Levels (cumulative XP threshold) ──────────────────────────────────────────
@@ -43,25 +42,12 @@ LEVELS = [
     (10, 13000, "AI Legend"),
 ]
 
-# ── Streak multipliers ─────────────────────────────────────────────────────────
-def compute_streak_multiplier(streak_days: int) -> float:
-    if streak_days >= 30:
-        return 3.0
-    if streak_days >= 14:
-        return 2.0
-    if streak_days >= 7:
-        return 1.5
-    if streak_days >= 3:
-        return 1.25
-    return 1.0
-
 # ── Token economy ──────────────────────────────────────────────────────────────
 TOKENS_PER_SESSION = 5
 TOKENS_QUIZ_PASS = 2
 TOKENS_BOSS_COMPLETE = 20
 TOKENS_PERFECT_SCORE = 10
 
-COST_STREAK_SHIELD = 15
 COST_HINT_REVEAL = 5
 COST_SKIP_PREREQ = 50
 
@@ -72,6 +58,61 @@ BOSS_TIME_LIMIT_MINUTES = 45
 # ── SM-2 defaults ─────────────────────────────────────────────────────────────
 SR_INITIAL_EASE = 2.5
 SR_MIN_EASE = 1.3
+
+# ── Build-a-Transformer day system ───────────────────────────────────────────
+XP_DAY_COMPLETE = 15
+XP_MILESTONE_COMPLETE = 75
+TOKENS_DAY_COMPLETE = 2
+TOKENS_MILESTONE = 10
+
+# Maps each day to its metadata. component_id links to model_status in state.json.
+# phase: 1=Attention, 2=Multi-Head, 3=Position, 4=Full Model, 5=Interview
+# milestone days have is_milestone=True.
+BUILD_DAYS: dict[int, dict] = {
+    # Phase 1: Attention
+    1:  {"title": "Words to Numbers",          "component_id": "embedding",          "phase": 1, "is_milestone": False},
+    2:  {"title": "Asking Questions",          "component_id": "qkv_projection",     "phase": 1, "is_milestone": False},
+    3:  {"title": "Who Matches Who",           "component_id": "dot_product",        "phase": 1, "is_milestone": False},
+    4:  {"title": "Keeping Scores Fair",       "component_id": "scaling",            "phase": 1, "is_milestone": False},
+    5:  {"title": "Picking Winners",           "component_id": "softmax",            "phase": 1, "is_milestone": False},
+    6:  {"title": "Mixing the Answer",         "component_id": "attention_output",   "phase": 1, "is_milestone": False},
+    7:  {"title": "Your First Attention",      "component_id": None,                 "phase": 1, "is_milestone": True},
+    # Phase 2: Multi-Head
+    8:  {"title": "Why One Isn't Enough",      "component_id": None,                 "phase": 2, "is_milestone": False},
+    9:  {"title": "Splitting Into Teams",      "component_id": "multi_head_split",   "phase": 2, "is_milestone": False},
+    10: {"title": "Parallel Attention",        "component_id": None,                 "phase": 2, "is_milestone": False},
+    11: {"title": "The Team Report",           "component_id": "head_concat_project","phase": 2, "is_milestone": False},
+    12: {"title": "Multi-Head Attention",      "component_id": None,                 "phase": 2, "is_milestone": True},
+    # Phase 3: Position
+    13: {"title": "The Shuffle Problem",       "component_id": None,                 "phase": 3, "is_milestone": False},
+    14: {"title": "Wave Patterns",             "component_id": "positional_encoding","phase": 3, "is_milestone": False},
+    15: {"title": "Adding Position",           "component_id": None,                 "phase": 3, "is_milestone": False},
+    16: {"title": "Modern Alternatives",       "component_id": None,                 "phase": 3, "is_milestone": False},
+    17: {"title": "Position-Aware Model",      "component_id": None,                 "phase": 3, "is_milestone": True},
+    # Phase 4: Full Model
+    18: {"title": "Skip Connections",          "component_id": "residual_connection","phase": 4, "is_milestone": False},
+    19: {"title": "Keeping Numbers Calm",      "component_id": "layer_norm",         "phase": 4, "is_milestone": False},
+    20: {"title": "The Thinking Layer",        "component_id": "ffn",                "phase": 4, "is_milestone": False},
+    21: {"title": "Building the Block",        "component_id": "transformer_block",  "phase": 4, "is_milestone": False},
+    22: {"title": "No Peeking",               "component_id": "causal_mask",         "phase": 4, "is_milestone": False},
+    23: {"title": "Learning to Write",         "component_id": "training_loop",      "phase": 4, "is_milestone": False},
+    24: {"title": "Your Transformer Writes!",  "component_id": "text_generation",    "phase": 4, "is_milestone": True},
+    # Phase 5: Interview Ready
+    25: {"title": "Explain Attention",         "component_id": None,                 "phase": 5, "is_milestone": False},
+    26: {"title": "The Cost of Attention",     "component_id": None,                 "phase": 5, "is_milestone": False},
+    27: {"title": "Encoder vs Decoder",        "component_id": None,                 "phase": 5, "is_milestone": False},
+    28: {"title": "Break It to Prove It",      "component_id": None,                 "phase": 5, "is_milestone": False},
+}
+
+TOTAL_BUILD_DAYS = len(BUILD_DAYS)
+
+PHASE_NAMES = {
+    1: "Attention",
+    2: "Multi-Head",
+    3: "Position",
+    4: "Full Model",
+    5: "Interview Ready",
+}
 
 # ── Skill tree prerequisite map ────────────────────────────────────────────────
 PREREQ_MAP: dict[str, list[str]] = {
@@ -106,6 +147,19 @@ ALL_MODULES = [
     "rag",
     # Fine-tuning
     "fine-tuning",
+    # Reinforcement Learning
+    "rl-fundamentals",
+    # Mock Interview System — fundamentals topics + the two net-new tracks.
+    # Added so interview XP flows through record_boss_result like every other
+    # module. These have no skill-tree prereqs (see ALWAYS_UNLOCKED).
+    "neural-networks",
+    "prompt-engineering",
+    "multimodal",
+    "evaluation",
+    "deployment",
+    "ai-agents",
+    "frontier-research",
+    "behavioral",
 ]
 
 # Study notebooks per module (not the boss notebook)
@@ -202,13 +256,23 @@ MODULE_STUDY_NOTEBOOKS: dict[str, list[str]] = {
         "05_instruction_tuning.ipynb",
         "05_instruction_tuning_experiments.ipynb",
     ],
+    # Reinforcement Learning
+    "rl-fundamentals": [
+        "01_what_is_reinforcement_learning.ipynb",
+        "02_markov_decision_processes.ipynb",
+        "03_rewards_and_returns.ipynb",
+        "04_policies_and_value_functions.ipynb",
+        "05_bellman_equations.ipynb",
+    ],
 }
 
 # ── Default state factory ──────────────────────────────────────────────────────
 def _default_state() -> dict:
     modules = {}
     # Foundations modules are always unlocked; ML Design skill tree starts at module 01
-    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning"}
+    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning", "rl-fundamentals",
+                       "neural-networks", "prompt-engineering", "multimodal", "evaluation", "deployment",
+                       "ai-agents", "frontier-research", "behavioral"}
     for mid in ALL_MODULES:
         modules[mid] = {
             "unlocked": mid in ALWAYS_UNLOCKED,
@@ -278,7 +342,9 @@ def load_state() -> dict:
     with open(STATE_PATH, "r") as f:
         state = json.load(f)
     # Backfill modules added after this state file was created
-    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning"}
+    ALWAYS_UNLOCKED = {"01-ml-design-prep", "rnn", "transformers", "rag", "fine-tuning", "rl-fundamentals",
+                       "neural-networks", "prompt-engineering", "multimodal", "evaluation", "deployment",
+                       "ai-agents", "frontier-research", "behavioral"}
     changed = False
     for mid in ALL_MODULES:
         if mid not in state.get("modules", {}):
@@ -330,21 +396,17 @@ def get_level_name(xp: int) -> str:
 # ── XP engine ──────────────────────────────────────────────────────────────────
 def award_xp(state: dict, base_xp: int, reason: str) -> dict:
     """
-    Award XP with streak multiplier applied. Updates state in place.
+    Award XP. Updates state in place.
     Returns summary dict. Caller must save_state().
     """
-    streak = state["streak"]["current"]
-    multiplier = compute_streak_multiplier(streak)
-    xp_awarded = math.floor(base_xp * multiplier)
+    xp_awarded = base_xp
 
     prev_xp = state["player"]["xp"]
     state["player"]["xp"] += xp_awarded
 
-    # Token award: ~1 token per 10 XP
     tokens_awarded = max(1, xp_awarded // 10)
     state["player"]["tokens"] += tokens_awarded
 
-    # Level up check
     prev_level = state["player"]["level"]
     new_level_num, _, _, _ = compute_level(state["player"]["xp"])
     level_up = new_level_num > prev_level
@@ -356,7 +418,7 @@ def award_xp(state: dict, base_xp: int, reason: str) -> dict:
     return {
         "xp_awarded": xp_awarded,
         "base_xp": base_xp,
-        "multiplier": multiplier,
+        "multiplier": 1.0,
         "tokens_awarded": tokens_awarded,
         "level_up": level_up,
         "new_level": new_level_num,
@@ -364,112 +426,6 @@ def award_xp(state: dict, base_xp: int, reason: str) -> dict:
         "prev_xp": prev_xp,
         "reason": reason,
     }
-
-# ── Streak engine ──────────────────────────────────────────────────────────────
-def check_and_update_streak(state: dict) -> dict:
-    """
-    Compare today to last_study_date, update streak accordingly.
-    Returns result dict. Updates state in place. Caller saves.
-    """
-    today = datetime.date.today()
-    today_str = today.isoformat()
-    last_str = state["streak"].get("last_study_date")
-
-    result = {
-        "streak_maintained": False,
-        "shield_used": False,
-        "streak_broken": False,
-        "fire_activated": False,
-        "current_streak": state["streak"]["current"],
-        "already_studied_today": False,
-    }
-
-    if last_str == today_str:
-        # Already studied today
-        result["already_studied_today"] = True
-        result["streak_maintained"] = True
-        result["current_streak"] = state["streak"]["current"]
-        return result
-
-    if last_str is None:
-        # First ever session
-        state["streak"]["current"] = 1
-        state["streak"]["last_study_date"] = today_str
-        result["streak_maintained"] = True
-        result["current_streak"] = 1
-        return result
-
-    last_date = datetime.date.fromisoformat(last_str)
-    gap = (today - last_date).days
-
-    if gap == 1:
-        # Perfect — consecutive day
-        state["streak"]["current"] += 1
-        state["streak"]["last_study_date"] = today_str
-        result["streak_maintained"] = True
-    elif gap == 2 and state["streak"]["shields_remaining"] > 0:
-        # One day gap — use shield
-        state["streak"]["current"] += 1
-        state["streak"]["shields_remaining"] -= 1
-        state["streak"]["last_study_date"] = today_str
-        result["streak_maintained"] = True
-        result["shield_used"] = True
-    else:
-        # Streak broken
-        state["streak"]["current"] = 1
-        state["streak"]["last_study_date"] = today_str
-        result["streak_broken"] = gap > 1
-        result["streak_maintained"] = False
-
-    # Update longest
-    if state["streak"]["current"] > state["streak"]["longest"]:
-        state["streak"]["longest"] = state["streak"]["current"]
-
-    # Fire status
-    fire_was = state["streak"].get("fire_active", False)
-    fire_now = state["streak"]["current"] >= 3
-    state["streak"]["fire_active"] = fire_now
-    if fire_now and not fire_was:
-        result["fire_activated"] = True
-
-    result["current_streak"] = state["streak"]["current"]
-    return result
-
-def get_streak_warning(state: dict) -> str | None:
-    """Return loss-aversion warning if streak is at risk, else None."""
-    last_str = state["streak"].get("last_study_date")
-    if not last_str:
-        return None
-    streak = state["streak"]["current"]
-    if streak == 0:
-        return None
-
-    today = datetime.date.today()
-    last_date = datetime.date.fromisoformat(last_str)
-    gap = (today - last_date).days
-
-    if gap == 0:
-        return None  # Already studied today
-
-    now_hour = datetime.datetime.now().hour
-    hours_left = max(0, 24 - now_hour)
-
-    if gap == 1:
-        if hours_left <= 6:
-            return (
-                f"DANGER: Your {streak}-day streak dies in {hours_left}h. "
-                f"Open ANY notebook NOW to save it."
-            )
-        elif hours_left <= 12:
-            return (
-                f"WARNING: {streak}-day streak at risk — {hours_left}h left today."
-            )
-    elif gap == 2 and state["streak"]["shields_remaining"] > 0:
-        return (
-            f"SHIELD ALERT: You missed yesterday. A streak shield will auto-protect "
-            f"your {streak}-day streak — but only if you study TODAY."
-        )
-    return None
 
 # ── Token economy ──────────────────────────────────────────────────────────────
 def spend_tokens(state: dict, amount: int, reason: str) -> None:
@@ -484,19 +440,19 @@ def spend_tokens(state: dict, amount: int, reason: str) -> None:
 # ── Badge engine ───────────────────────────────────────────────────────────────
 BADGES: dict[str, dict] = {
     "first_blood":    {"name": "First Blood",      "desc": "Complete your first notebook",      "rarity": "common"},
-    "on_fire":        {"name": "On Fire",           "desc": "Maintain a 3-day streak",           "rarity": "uncommon"},
-    "week_warrior":   {"name": "Week Warrior",      "desc": "7-day streak",                      "rarity": "rare"},
     "module_master":  {"name": "Module Master",     "desc": "Pass a boss battle",                "rarity": "rare"},
     "speed_runner":   {"name": "Speed Runner",      "desc": "Beat boss in under 30 min",         "rarity": "rare"},
-    "comeback_kid":   {"name": "Comeback Kid",      "desc": "Resume after a 3+ day break",       "rarity": "uncommon"},
     "night_owl":      {"name": "Night Owl",         "desc": "Study after 11pm",                  "rarity": "uncommon"},
     "early_bird":     {"name": "Early Bird",        "desc": "Study before 7am",                  "rarity": "uncommon"},
     "half_way":       {"name": "Half Way There",    "desc": "Master 5+ modules",                 "rarity": "epic"},
     "perfectionist":  {"name": "Perfectionist",     "desc": "Score 100% on 3+ quizzes",          "rarity": "epic"},
-    "legend_streak":  {"name": "30-Day Legend",     "desc": "30-day streak",                     "rarity": "legendary"},
     "perfect_run":    {"name": "Perfect Run",       "desc": "All bosses at 100%",                "rarity": "legendary"},
     "legend_tier":    {"name": "Legend Tier",       "desc": "Reach level 10 (AI Legend)",        "rarity": "legendary"},
     "interview_ready":{"name": "Interview Ready",   "desc": "Master all 11 modules",             "rarity": "legendary"},
+    # Build-a-Transformer badges
+    "first_component": {"name": "First Component",  "desc": "Build your first transformer piece", "rarity": "common"},
+    "full_transformer":{"name": "Full Transformer",  "desc": "Build all transformer components",   "rarity": "epic"},
+    "build_master":    {"name": "Build Master",      "desc": "Complete all build milestones",       "rarity": "legendary"},
 }
 
 RARITY_EMOJI = {"common": "⚪", "uncommon": "🟢", "rare": "🔵", "epic": "🟣", "legendary": "🟡"}
@@ -526,19 +482,6 @@ def check_and_award_badges(state: dict, event: dict) -> list[str]:
     )
     if total_completed >= 1:
         _grant("first_blood")
-
-    # Streak badges
-    streak = state["streak"]["current"]
-    if streak >= 3:
-        _grant("on_fire")
-    if streak >= 7:
-        _grant("week_warrior")
-    if streak >= 30:
-        _grant("legend_streak")
-
-    # Comeback: streak broken (gap) then resumed
-    if etype == "streak_broken":
-        _grant("comeback_kid")
 
     # Boss badges
     if etype == "boss_complete":
@@ -577,6 +520,18 @@ def check_and_award_badges(state: dict, event: dict) -> list[str]:
             _grant("night_owl")
         if 5 <= hour < 7:
             _grant("early_bird")
+
+    # Build-a-Transformer badges
+    model_status = state.get("model_status", {}).get("components", {})
+    built_count = sum(1 for c in model_status.values() if c.get("built"))
+    if built_count >= 1:
+        _grant("first_component")
+    total_components = sum(1 for d in BUILD_DAYS.values() if d["component_id"])
+    if built_count >= total_components:
+        _grant("full_transformer")
+    milestones_done = state.get("quests", {}).get("milestones_completed", [])
+    if len(milestones_done) >= 5:
+        _grant("build_master")
 
     return new_badges
 
@@ -768,6 +723,128 @@ def get_cohort_percentile(state: dict) -> int:
     percentile = int(50 * (1 + math.erf(z)))
     return max(1, min(99, percentile))
 
+# ── Build-a-Transformer engine ────────────────────────────────────────────────
+def is_day_available(state: dict, day_number: int) -> bool:
+    """Check if a build day is available (previous day completed or day 1)."""
+    if day_number == 1:
+        return True
+    completed = set(state.get("quests", {}).get("completed_days", []))
+    return (day_number - 1) in completed
+
+
+def get_build_progress(state: dict) -> dict:
+    """Return current build progress: days done, phase, components, pct."""
+    completed_days = set(state.get("quests", {}).get("completed_days", []))
+    milestones = state.get("quests", {}).get("milestones_completed", [])
+    model = state.get("model_status", {}).get("components", {})
+    built = [cid for cid, info in model.items() if info.get("built")]
+
+    # Current day = lowest incomplete day
+    current_day = 1
+    for d in range(1, TOTAL_BUILD_DAYS + 1):
+        if d not in completed_days:
+            current_day = d
+            break
+    else:
+        current_day = TOTAL_BUILD_DAYS  # all done
+
+    phase = BUILD_DAYS.get(current_day, {}).get("phase", 1)
+    pct = len(completed_days) / TOTAL_BUILD_DAYS * 100
+
+    return {
+        "current_day": current_day,
+        "days_completed": len(completed_days),
+        "total_days": TOTAL_BUILD_DAYS,
+        "completed_days": sorted(completed_days),
+        "phase": phase,
+        "phase_name": PHASE_NAMES.get(phase, "Unknown"),
+        "components_built": built,
+        "milestones_completed": milestones,
+        "pct_complete": round(pct, 1),
+    }
+
+
+def complete_build_day(state: dict, day_number: int) -> dict:
+    """
+    Mark a build day as complete. Awards XP/tokens, marks component,
+    checks milestone, checks badges. Returns summary.
+    """
+    if day_number not in BUILD_DAYS:
+        return {"error": f"Day {day_number} does not exist."}
+
+    if not is_day_available(state, day_number):
+        prev = day_number - 1
+        return {"error": f"Day {prev} must be completed first."}
+
+    # Init quests tracking if absent
+    quests = state.setdefault("quests", {})
+    completed_days = quests.setdefault("completed_days", [])
+
+    if day_number in completed_days:
+        return {"already_done": True, "day": day_number, "title": BUILD_DAYS[day_number]["title"]}
+
+    day_info = BUILD_DAYS[day_number]
+    completed_days.append(day_number)
+    quests["current_day"] = day_number + 1
+    quests["total_quests_completed"] = len(completed_days)
+
+    # Mark component as built
+    comp_id = day_info["component_id"]
+    if comp_id:
+        model = state.setdefault("model_status", {}).setdefault("components", {})
+        if comp_id in model:
+            model[comp_id]["built"] = True
+            model[comp_id]["day_built"] = day_number
+
+    # Determine XP
+    is_milestone = day_info["is_milestone"]
+    base_xp = XP_MILESTONE_COMPLETE if is_milestone else XP_DAY_COMPLETE
+    xp_result = award_xp(state, base_xp, f"build_day_{day_number}")
+
+    # Token bonus
+    token_bonus = TOKENS_MILESTONE if is_milestone else TOKENS_DAY_COMPLETE
+    state["player"]["tokens"] += token_bonus
+
+    # Record milestone
+    if is_milestone:
+        milestones = quests.setdefault("milestones_completed", [])
+        milestones.append(day_info["phase"])
+
+    # Check badges
+    new_badges = check_and_award_badges(state, {"type": "build_day_complete", "day": day_number})
+
+    # Log session
+    state["session_log"].append({
+        "module": "transformers",
+        "notebook": f"build_day_{day_number:02d}",
+        "minutes": 0,
+        "xp": xp_result["xp_awarded"],
+        "date": datetime.date.today().isoformat(),
+    })
+    state["session_log"] = state["session_log"][-30:]
+
+    # Next day info
+    next_day = day_number + 1
+    next_info = BUILD_DAYS.get(next_day)
+
+    save_state(state)
+
+    return {
+        "day": day_number,
+        "title": day_info["title"],
+        "phase": day_info["phase"],
+        "phase_name": PHASE_NAMES[day_info["phase"]],
+        "is_milestone": is_milestone,
+        "component_built": comp_id,
+        "xp_result": xp_result,
+        "token_bonus": token_bonus,
+        "new_badges": new_badges,
+        "next_day": next_day if next_info else None,
+        "next_title": next_info["title"] if next_info else "You're done!",
+        "progress": get_build_progress(state),
+    }
+
+
 # ── Session management ─────────────────────────────────────────────────────────
 def start_session(module_id: str, notebook_name: str) -> dict:
     """
@@ -781,22 +858,8 @@ def start_session(module_id: str, notebook_name: str) -> dict:
         state["player"]["first_session_bonus_given"] = True
         xp_result = award_xp(state, XP_FIRST_SESSION, "welcome_bonus")
 
-    streak_result = check_and_update_streak(state)
-
-    # Streak bonus XP
-    if not streak_result["already_studied_today"] and state["streak"]["current"] > 1:
-        sr = award_xp(state, XP_STREAK_BONUS, "streak_bonus")
-        if xp_result:
-            xp_result["xp_awarded"] += sr["xp_awarded"]
-        else:
-            xp_result = sr
-
     state["player"]["total_sessions"] += 1
     state["meta"]["session_start"] = datetime.datetime.now().isoformat()
-
-    # Check streak break badge
-    if streak_result.get("streak_broken"):
-        check_and_award_badges(state, {"type": "streak_broken"})
 
     check_and_award_badges(state, {"type": "session_start"})
 
@@ -814,8 +877,7 @@ def start_session(module_id: str, notebook_name: str) -> dict:
         "state": state,
         "module_id": module_id,
         "notebook_name": notebook_name,
-        "streak_result": streak_result,
-        "warning": get_streak_warning(state),
+        "warning": None,
         "due_reviews": due_reviews,
         "boss_hours_remaining": boss_hours,
         "boss_expired": boss_expired,

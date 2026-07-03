@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Parallelism: DP · FSDP · TP · PP on a Device Mesh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --text:#2C2A28; --text2:#5A544E;
+    --muted:#6B645E; --border:#E5DFD6; --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+    --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:0 20px 72px;}
+  /* top bar */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:22px 0 10px; flex-wrap:wrap;
+  }
+  .topbar h1{
+    font-family:'Bricolage Grotesque', system-ui, sans-serif;
+    font-weight:700; font-size:24px; line-height:1.2; margin:0; letter-spacing:-0.01em;
+  }
+  .back{
+    color:var(--accent-d); text-decoration:none; font-weight:600; font-size:14px;
+    white-space:nowrap; padding:6px 10px; border-radius:8px;
+  }
+  .back:hover{background:var(--accent-l);}
+  /* intro */
+  .intro{
+    color:var(--text2); font-size:16px; margin:6px 0 22px;
+  }
+  /* cards */
+  .card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:18px 18px 20px; margin:0 0 20px;
+    box-shadow:0 1px 3px rgba(44,42,40,0.04), 0 8px 24px rgba(44,42,40,0.03);
+  }
+  .card h2{
+    font-family:'Bricolage Grotesque', system-ui, sans-serif;
+    font-weight:600; font-size:16px; margin:0 0 14px; letter-spacing:-0.01em;
+  }
+  .label{font-size:13px; color:var(--muted); font-weight:600;}
+  /* strategy toggle */
+  .toggle{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;}
+  .toggle button{
+    font-family:'DM Sans', sans-serif; font-weight:600; font-size:14px;
+    color:var(--text2); background:var(--surface2); border:1px solid var(--border);
+    padding:9px 14px; border-radius:10px; cursor:pointer; transition:all .15s ease;
+  }
+  .toggle button:hover{border-color:var(--accent);}
+  .toggle button.active{
+    background:var(--accent); border-color:var(--accent); color:#fff;
+    box-shadow:0 2px 8px rgba(42,123,155,0.25);
+  }
+  .toggle button .sub{display:block; font-weight:400; font-size:11px; opacity:.85; margin-top:1px;}
+  /* sliders */
+  .ctrl-row{display:flex; align-items:center; gap:14px; margin:16px 0 4px; flex-wrap:wrap;}
+  .ctrl-row .label{min-width:150px;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; height:6px; border-radius:6px;
+    background:var(--border); outline:none; flex:1; min-width:160px; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:18px; height:18px; border-radius:50%;
+    background:var(--accent); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.2); cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:var(--accent);
+    border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.2); cursor:pointer;
+  }
+  .val{
+    font-family:'JetBrains Mono', monospace; font-size:14px; font-weight:500;
+    color:var(--accent-d); min-width:42px; text-align:right;
+  }
+  .hint{font-size:12.5px; color:var(--muted); margin:2px 0 0;}
+  /* big-model note */
+  .bigmodel{
+    display:flex; align-items:center; gap:10px; margin-top:16px;
+    padding:10px 14px; border-radius:10px; font-size:14px; font-weight:500;
+    border:1px solid var(--border); background:var(--surface2); color:var(--muted);
+    transition:all .2s ease;
+  }
+  .bigmodel.lit{
+    background:#FBEEE9; border-color:var(--bad); color:var(--bad);
+  }
+  .bigmodel.fits{
+    background:#EAF6EF; border-color:var(--ok); color:var(--ok);
+  }
+  .bigmodel .dot{width:10px; height:10px; border-radius:50%; background:currentColor; flex:none;}
+  /* figure */
+  .figwrap{margin-top:2px;}
+  svg{width:100%; height:auto; display:block;}
+  .fallback{
+    padding:24px; text-align:center; color:var(--bad); background:var(--surface2);
+    border:1px dashed var(--border); border-radius:10px; font-size:14px;
+  }
+  /* comm + tradeoff panel */
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px;}
+  @media (max-width:560px){ .info-grid{grid-template-columns:1fr;} }
+  .info-box{
+    background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 14px;
+  }
+  .info-box .k{
+    font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+    margin-bottom:4px;
+  }
+  .info-box .v{font-size:14.5px; color:var(--text);}
+  .chip{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:12.5px; font-weight:500;
+    background:var(--accent-l); color:var(--accent-d); padding:2px 8px; border-radius:6px; margin:2px 4px 2px 0;
+  }
+  /* takeaway */
+  .takeaway{
+    background:var(--accent-l); border:1px solid #BFE0EB; border-radius:14px; padding:18px 20px;
+  }
+  .takeaway h2{
+    font-family:'Bricolage Grotesque', system-ui, sans-serif;
+    font-weight:700; font-size:16px; margin:0 0 10px; color:var(--accent-d);
+  }
+  .takeaway ul{margin:0; padding-left:20px;}
+  .takeaway li{margin:7px 0; font-size:14.5px; color:var(--text);}
+  .takeaway b{color:var(--accent-d);}
+  /* legend */
+  .legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; font-size:12.5px; color:var(--text2);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .legend i{width:14px; height:14px; border-radius:4px; display:inline-block; border:1px solid rgba(0,0,0,.08);}
+  .caption{font-size:13px; color:var(--muted); margin:12px 0 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>Parallelism: DP · FSDP · TP · PP on a Device Mesh</h1>
+    <a class="back" href="../index.html">← All lessons</a>
+  </div>
+
+  <p class="intro">
+    <b>What am I looking at?</b> A grid of GPUs (the tiles below). <b>Parallelism</b> means splitting one
+    training job across many GPUs. Each strategy splits a different thing — the <em>data</em>, the
+    <em>weights</em>, a single <em>layer</em>, or the <em>stack of layers</em> — and each pays for it with
+    a different kind of network chatter. Pick a strategy to shade the tiles and see what each GPU holds.
+  </p>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h2>Pick a strategy and a device count</h2>
+
+    <div class="label" style="margin-bottom:8px;">Strategy</div>
+    <div class="toggle" id="toggle">
+      <button data-s="DP" class="active">Data Parallel<span class="sub">DP</span></button>
+      <button data-s="FSDP">Fully Sharded<span class="sub">FSDP / ZeRO-3</span></button>
+      <button data-s="TP">Tensor Parallel<span class="sub">TP</span></button>
+      <button data-s="PP">Pipeline Parallel<span class="sub">PP</span></button>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="label">Devices (GPUs)</span>
+      <input type="range" id="nDev" min="2" max="16" step="1" value="8" />
+      <span class="val" id="nDevVal">8</span>
+    </div>
+
+    <div class="ctrl-row" id="mbRow">
+      <span class="label">Microbatches (PP)</span>
+      <input type="range" id="microB" min="1" max="32" step="1" value="8" />
+      <span class="val" id="microBVal">8</span>
+    </div>
+    <p class="hint" id="mbHint">Only used by Pipeline Parallel — controls how full the pipeline stays.</p>
+
+    <div class="ctrl-row">
+      <span class="label">Model size vs 1 GPU</span>
+      <input type="range" id="modelSize" min="1" max="16" step="1" value="6" />
+      <span class="val" id="modelSizeVal">6×</span>
+    </div>
+    <p class="hint">How many GPUs' worth of memory the full model + optimizer state needs.</p>
+
+    <div class="bigmodel" id="bigNote">
+      <span class="dot"></span>
+      <span id="bigNoteText">…</span>
+    </div>
+  </div>
+
+  <!-- FIGURE -->
+  <div class="card">
+    <h2 id="figTitle">What each device holds</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="fig" viewBox="0 0 800 420" role="img"
+           aria-label="A grid of GPU devices shaded to show what each device stores under the selected parallelism strategy."></svg>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="caption" id="caption"></p>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="k">Communication primitive</div>
+        <div class="v" id="commText"></div>
+      </div>
+      <div class="info-box">
+        <div class="k">Memory ↔ Communication tradeoff</div>
+        <div class="v" id="tradeText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAKEAWAY -->
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li><b>DP replicates</b> — dead simple, but every GPU carries a full copy of the model, so it wastes memory and can't fit a model larger than one device.</li>
+      <li><b>FSDP shards</b> weights, gradients, and optimizer state so a huge model fits, at the cost of extra AllGather / ReduceScatter traffic every layer.</li>
+      <li><b>TP splits inside a layer</b> — low latency and great for one big matmul, but it AllReduces activations constantly, so it demands a fast interconnect (NVLink) and stays inside one node.</li>
+      <li><b>PP splits across layers</b> — cheap point-to-point comms, but the startup/drain <b>bubble</b> wastes time unless microbatches ≫ stages. Real training <b>composes several of these at once</b> (3D / 4D parallelism).</li>
+    </ul>
+  </div>
+
+</div>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById('fig');
+
+  // ---------- graceful degradation ----------
+  if (typeof window.d3 === 'undefined') {
+    console.warn('[parallelism] d3 is not loaded (window.d3 undefined) — showing fallback message.');
+    var fw = document.getElementById('figwrap');
+    if (fw) {
+      fw.innerHTML = '<div class="fallback">This interactive figure needs D3 (v7), which did not load from ' +
+        '<code>./d3.v7.min.js</code>. The rest of the page still works — reload once the script is present.</div>';
+    }
+    return;
+  }
+
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DUR = REDUCED ? 0 : 450;
+
+  // ---------- state ----------
+  var state = {
+    strategy: 'DP',
+    nDev: 8,
+    microB: 8,
+    modelSize: 6   // in units of "one GPU worth of memory"
+  };
+
+  // ---------- palette ----------
+  var C = {
+    accent:'#2A7B9B', accentD:'#1F6280', accentL:'#E4F2F7',
+    ok:'#2D8B55', bad:'#BE3E26', warn:'#C99A12',
+    border:'#E5DFD6', surface2:'#FDF9F3', text:'#2C2A28', muted:'#6B645E'
+  };
+
+  // shard colors for FSDP / TP (one hue per device slice)
+  function shardColor(i, n){
+    // interpolate around the accent hue for visual distinction
+    var t = n <= 1 ? 0 : i / (n - 1);
+    return d3.interpolateRgb('#7FBBD0', '#1F6280')(t);
+  }
+
+  var svg = d3.select('#fig');
+
+  // ---------- per-strategy metadata ----------
+  var META = {
+    DP: {
+      title: 'Data Parallel — every device holds a FULL model replica',
+      caption: 'Each GPU trains on a different slice of the batch, then gradients are averaged so all replicas stay identical.',
+      comm: ['AllReduce (gradients, once per step)'],
+      trade: 'Cheapest comm and simplest code, but memory is O(full model) on every GPU — it cannot fit a model bigger than one device.',
+      legend: [{c:C.accent, t:'Full model replica'}, {c:C.warn, t:'Different data shard'}]
+    },
+    FSDP: {
+      title: 'Fully Sharded (ZeRO-3) — each device holds ONE shard of params, grads & optimizer state',
+      caption: 'Weights are AllGathered just-in-time for the layer being computed, used, then freed; gradients are ReduceScattered back to shards.',
+      comm: ['AllGather (weights, per layer)', 'ReduceScatter (gradients)'],
+      trade: 'Memory per GPU drops to ~1/N of the model, so huge models fit — but you pay extra AllGather + ReduceScatter traffic every layer.',
+      legend: [{c:'#4E9CBB', t:'This device\'s param shard'}, {c:C.accentL, t:'Temporarily gathered (freed after use)'}]
+    },
+    TP: {
+      title: 'Tensor Parallel — ONE layer\'s weight matrix is split across all devices',
+      caption: 'Each GPU owns a column/row slice of the same weight matrix. Partial activations are AllReduced within the layer to reconstruct the full output.',
+      comm: ['AllReduce (activations, twice per layer)'],
+      trade: 'Low latency for a single giant layer and no idle GPUs, but it AllReduces activations constantly — needs a fast interconnect and stays inside one node.',
+      legend: [{c:'#4E9CBB', t:'Column-slice of the same weight matrix'}]
+    },
+    PP: {
+      title: 'Pipeline Parallel — different LAYERS live on different devices (stages)',
+      caption: 'Microbatches flow through the stages like an assembly line. The shaded "bubble" cells are idle GPU-time while the pipeline fills and drains.',
+      comm: ['Point-to-point (send activations to next stage)'],
+      trade: 'Comms are cheap (only stage boundaries), but the fill/drain bubble wastes time. Bubble fraction = (stages−1)/(microbatches+stages−1).',
+      legend: [{c:C.accent, t:'Working (a microbatch is here)'}, {c:C.border, t:'Bubble — idle GPU-time'}]
+    }
+  };
+
+  // ---------- layout helpers ----------
+  var W = 800, H = 420;
+  var MARGIN = {top: 44, right: 24, bottom: 24, left: 24};
+
+  function gridDims(n){
+    // choose a near-square grid; prefer up to 4 columns wide
+    var cols = Math.min(n, 4);
+    if (n > 8) cols = Math.min(n, Math.ceil(Math.sqrt(n)) + 1);
+    cols = Math.max(1, Math.min(cols, 8));
+    var rows = Math.ceil(n / cols);
+    return {cols: cols, rows: rows};
+  }
+
+  // ---------- renderers ----------
+  function clear(){ svg.selectAll('*').remove(); }
+
+  function deviceGridData(n){
+    var arr = [];
+    for (var i=0;i<n;i++) arr.push({i:i});
+    return arr;
+  }
+
+  // shared tile drawer for DP / FSDP / TP
+  function renderGrid(cfg){
+    clear();
+    var n = state.nDev;
+    var dims = gridDims(n);
+    var innerW = W - MARGIN.left - MARGIN.right;
+    var innerH = H - MARGIN.top - MARGIN.bottom;
+    var gap = 10;
+    var cellW = (innerW - gap*(dims.cols-1)) / dims.cols;
+    var cellH = (innerH - gap*(dims.rows-1)) / dims.rows;
+    cellH = Math.min(cellH, 92);
+
+    var g = svg.append('g');
+
+    var tiles = g.selectAll('g.dev').data(deviceGridData(n), function(d){return d.i;});
+    var enter = tiles.enter().append('g').attr('class','dev');
+
+    enter.attr('transform', function(d){
+      var r = Math.floor(d.i / dims.cols), c = d.i % dims.cols;
+      var x = MARGIN.left + c*(cellW+gap);
+      var y = MARGIN.top + r*(cellH+gap);
+      return 'translate('+x+','+y+')';
+    });
+
+    // base tile
+    enter.append('rect')
+      .attr('class','tile')
+      .attr('rx',10).attr('ry',10)
+      .attr('width', cellW).attr('height', cellH)
+      .attr('fill','#fff').attr('stroke',C.border).attr('stroke-width',1.5);
+
+    // fill overlay (what the device holds)
+    enter.append('rect')
+      .attr('class','fill')
+      .attr('rx',8).attr('ry',8)
+      .attr('x',6).attr('y',6)
+      .attr('width', Math.max(0,cellW-12)).attr('height', Math.max(0,cellH-34))
+      .attr('opacity',0);
+
+    // device label
+    enter.append('text')
+      .attr('class','glabel')
+      .attr('x', cellW/2).attr('y', cellH-9)
+      .attr('text-anchor','middle')
+      .attr('font-family',"'JetBrains Mono', monospace")
+      .attr('font-size',11).attr('fill',C.muted)
+      .text(function(d){return 'GPU '+d.i;});
+
+    // content text inside the fill
+    enter.append('text')
+      .attr('class','content')
+      .attr('x', cellW/2).attr('y', (cellH-28)/2 + 6 + 4)
+      .attr('text-anchor','middle')
+      .attr('font-family',"'DM Sans', sans-serif")
+      .attr('font-size',11).attr('font-weight',600);
+
+    // apply strategy-specific fills
+    var sel = enter;
+    sel.select('.fill')
+      .transition().duration(DUR)
+      .attr('fill', function(d){ return cfg.fill(d.i, n); })
+      .attr('opacity', function(d){ return cfg.opacity ? cfg.opacity(d.i,n) : 1; });
+
+    sel.select('.content')
+      .attr('fill', function(d){ return cfg.contentColor ? cfg.contentColor(d.i,n) : '#fff'; })
+      .text(function(d){ return cfg.content(d.i, n); });
+  }
+
+  function renderDP(){
+    renderGrid({
+      fill: function(){ return C.accent; },
+      content: function(i){ return 'full model'; },
+      contentColor: function(){ return '#fff'; }
+    });
+  }
+
+  function renderFSDP(){
+    renderGrid({
+      fill: function(i,n){ return shardColor(i,n); },
+      content: function(i,n){ return 'shard ' + (i+1) + '/' + n; },
+      contentColor: function(){ return '#fff'; }
+    });
+    // draw a thin "gathered layer" band above the grid to show just-in-time AllGather
+    var band = svg.append('g').attr('opacity', REDUCED ? 1 : 0);
+    band.append('rect')
+      .attr('x', MARGIN.left).attr('y', 14)
+      .attr('width', W - MARGIN.left - MARGIN.right).attr('height', 20)
+      .attr('rx',6).attr('fill', C.accentL).attr('stroke','#BFE0EB');
+    band.append('text')
+      .attr('x', W/2).attr('y', 28).attr('text-anchor','middle')
+      .attr('font-size',11).attr('font-weight',600).attr('fill', C.accentD)
+      .text('↑ AllGather full layer just-in-time, compute, then free (temporary)');
+    if (!REDUCED) band.transition().duration(DUR).attr('opacity',1);
+  }
+
+  function renderTP(){
+    renderGrid({
+      fill: function(i,n){ return shardColor(i,n); },
+      content: function(i,n){ return 'W[:, ' + i + ']'; },
+      contentColor: function(){ return '#fff'; }
+    });
+    // header note: same layer, split matrix
+    svg.append('text')
+      .attr('x', W/2).attr('y', 28).attr('text-anchor','middle')
+      .attr('font-size',11).attr('font-weight',600).attr('fill', C.accentD)
+      .attr('opacity', REDUCED ? 1 : 0)
+      .text('One layer W split by columns → each GPU computes a partial output → AllReduce to combine')
+      .transition().duration(DUR).attr('opacity',1);
+  }
+
+  // Pipeline Parallel: draw a stage × time-slot diagram with the bubble
+  function renderPP(){
+    clear();
+    var n = state.nDev;              // n stages
+    var stages = n;
+    var m = state.microB;            // microbatches
+    // Total time slots for one forward pass of a simple (GPipe-style) schedule:
+    //   fill + steady + drain = m + stages - 1
+    var totalSlots = m + stages - 1;
+
+    var innerW = W - MARGIN.left - MARGIN.right;
+    var topPad = 40;
+    var innerH = H - topPad - MARGIN.bottom - 18;
+    var labelW = 52;
+    var gapX = 2, gapY = 6;
+
+    var cols = totalSlots;
+    var cellW = (innerW - labelW - gapX*(cols-1)) / cols;
+    var cellH = (innerH - gapY*(stages-1)) / stages;
+    cellH = Math.min(cellH, 40);
+
+    var g = svg.append('g');
+
+    // title strip: bubble fraction
+    var bubbleFrac = (stages - 1) / (m + stages - 1);
+    var bubblePct = (bubbleFrac * 100);
+
+    svg.append('text')
+      .attr('x', MARGIN.left).attr('y', 26)
+      .attr('font-family',"'DM Sans', sans-serif")
+      .attr('font-size',13).attr('font-weight',600).attr('fill', C.text)
+      .html(null)
+      .text('Bubble fraction = (stages−1)/(microbatches+stages−1) = ('
+        + (stages-1) + ')/(' + m + '+' + (stages-1) + ') = '
+        + bubblePct.toFixed(1) + '%  idle GPU-time');
+
+    // build cells: for stage s (0-indexed), it works on microbatch k during slot (s + k)
+    var cells = [];
+    for (var s=0; s<stages; s++){
+      for (var slot=0; slot<totalSlots; slot++){
+        // which microbatch (if any) is at stage s during this slot?
+        var k = slot - s;               // microbatch index processed here
+        var working = (k >= 0 && k < m);
+        cells.push({s:s, slot:slot, working:working, k:k});
+      }
+    }
+
+    // y-axis title: rows are pipeline stages, one per GPU
+    svg.append('text')
+      .attr('transform', 'translate(' + (MARGIN.left - 4) + ',' + (topPad + innerH/2) + ') rotate(-90)')
+      .attr('text-anchor','middle')
+      .attr('font-family',"'DM Sans', sans-serif")
+      .attr('font-size',11).attr('font-weight',600).attr('fill', C.muted)
+      .text('pipeline stage (1 GPU, ≈ layers/' + stages + ' of the model)');
+
+    // stage row labels
+    g.selectAll('text.stagelabel').data(d3.range(stages)).enter().append('text')
+      .attr('class','stagelabel')
+      .attr('x', MARGIN.left + labelW - 8)
+      .attr('y', function(d){ return topPad + d*(cellH+gapY) + cellH/2 + 4; })
+      .attr('text-anchor','end')
+      .attr('font-family',"'JetBrains Mono', monospace")
+      .attr('font-size',11).attr('fill', C.muted)
+      .text(function(d){ return 'GPU '+d; });
+
+    // cells
+    var cellSel = g.selectAll('rect.slot').data(cells).enter().append('rect')
+      .attr('class','slot')
+      .attr('x', function(d){ return MARGIN.left + labelW + d.slot*(cellW+gapX); })
+      .attr('y', function(d){ return topPad + d.s*(cellH+gapY); })
+      .attr('width', Math.max(1, cellW))
+      .attr('height', Math.max(1, cellH))
+      .attr('rx', 3)
+      .attr('stroke', '#fff').attr('stroke-width', 0.5)
+      .attr('fill', function(d){ return d.working ? C.accent : C.border; })
+      .attr('opacity', REDUCED ? 1 : 0);
+
+    if (!REDUCED){
+      cellSel.transition()
+        .delay(function(d){ return Math.min(600, d.slot*18); })
+        .duration(200)
+        .attr('opacity', function(d){ return d.working ? 0.95 : 0.55; });
+    } else {
+      cellSel.attr('opacity', function(d){ return d.working ? 0.95 : 0.55; });
+    }
+
+    // microbatch number inside working cells if there's room
+    if (cellW >= 16 && cellH >= 16){
+      g.selectAll('text.mb').data(cells.filter(function(d){return d.working;})).enter().append('text')
+        .attr('class','mb')
+        .attr('x', function(d){ return MARGIN.left + labelW + d.slot*(cellW+gapX) + cellW/2; })
+        .attr('y', function(d){ return topPad + d.s*(cellH+gapY) + cellH/2 + 4; })
+        .attr('text-anchor','middle')
+        .attr('font-family',"'JetBrains Mono', monospace")
+        .attr('font-size', Math.min(11, cellH*0.5)).attr('fill','#fff')
+        .text(function(d){ return d.k+1; });
+    }
+
+    // x-axis label
+    svg.append('text')
+      .attr('x', MARGIN.left + labelW + (innerW-labelW)/2)
+      .attr('y', H - 6)
+      .attr('text-anchor','middle')
+      .attr('font-size',11).attr('fill', C.muted)
+      .text('time slots →  (blue = computing a microbatch, grey = bubble / idle)');
+  }
+
+  // ---------- update everything ----------
+  function updateInfoPanels(){
+    var meta = META[state.strategy];
+    document.getElementById('figTitle').textContent = meta.title;
+    document.getElementById('caption').textContent = meta.caption;
+
+    // comm chips
+    var commHtml = meta.comm.map(function(c){ return '<span class="chip">'+c+'</span>'; }).join(' ');
+    document.getElementById('commText').innerHTML = commHtml;
+
+    // tradeoff
+    document.getElementById('tradeText').textContent = meta.trade;
+
+    // legend
+    var legHtml = meta.legend.map(function(l){
+      return '<span><i style="background:'+l.c+'"></i>'+l.t+'</span>';
+    }).join('');
+    document.getElementById('legend').innerHTML = legHtml;
+  }
+
+  function updateBigModelNote(){
+    var note = document.getElementById('bigNote');
+    var txt = document.getElementById('bigNoteText');
+    var m = state.modelSize;      // GPUs' worth of memory the full model needs
+    var n = state.nDev;
+    note.classList.remove('lit','fits');
+
+    // Per-strategy memory model:
+    // DP & TP-of-activations still keep FULL params per data-replica for DP;
+    //   - DP: each GPU needs full model -> needs m <= 1
+    //   - FSDP: shards params across all N -> needs m <= n
+    //   - TP: splits the layer weights across N -> params fit if m <= n (per the split), low activation redundancy
+    //   - PP: splits layers across N stages -> params fit if m <= n
+    var s = state.strategy;
+    var fits, msg;
+    if (s === 'DP'){
+      fits = (m <= 1);
+      if (fits){
+        msg = 'Model needs ' + m + '× one GPU. DP replicates the whole model on each GPU, so it fits (it takes ≤ 1 GPU).';
+      } else {
+        msg = 'Model needs ' + m + '× one GPU, but DP puts a FULL copy on every GPU. It does NOT fit — you must shard (try FSDP / TP / PP).';
+      }
+    } else {
+      // sharded strategies split the model across N devices
+      fits = (m <= n);
+      if (fits){
+        msg = 'Model needs ' + m + '× one GPU. ' + s + ' shards it across ' + n +
+              ' GPUs (≈ ' + (m/n).toFixed(2) + '× per GPU), so it fits.';
+      } else {
+        msg = 'Model needs ' + m + '× one GPU, but ' + n + ' GPUs of ' + s +
+              ' only hold ' + n + '×. Still does NOT fit — add more devices or compose strategies.';
+      }
+    }
+
+    note.classList.add(fits ? 'fits' : 'lit');
+    txt.textContent = (fits ? 'Fits: ' : 'Too big: ') + msg;
+  }
+
+  function render(){
+    // enable/disable microbatch control visibility cue
+    var mbActive = (state.strategy === 'PP');
+    document.getElementById('microB').disabled = !mbActive;
+    document.getElementById('mbRow').style.opacity = mbActive ? '1' : '0.45';
+    document.getElementById('mbHint').style.opacity = mbActive ? '1' : '0.6';
+
+    switch(state.strategy){
+      case 'DP':   renderDP();   break;
+      case 'FSDP': renderFSDP(); break;
+      case 'TP':   renderTP();   break;
+      case 'PP':   renderPP();   break;
+    }
+    updateInfoPanels();
+    updateBigModelNote();
+  }
+
+  // ---------- wire up controls ----------
+  var toggle = document.getElementById('toggle');
+  toggle.addEventListener('click', function(e){
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    state.strategy = btn.getAttribute('data-s');
+    Array.prototype.forEach.call(toggle.querySelectorAll('button'), function(b){
+      b.classList.toggle('active', b === btn);
+    });
+    render();
+  });
+
+  var nDev = document.getElementById('nDev');
+  var nDevVal = document.getElementById('nDevVal');
+  nDev.addEventListener('input', function(){
+    state.nDev = +nDev.value;
+    nDevVal.textContent = state.nDev;
+    render();
+  });
+
+  var microB = document.getElementById('microB');
+  var microBVal = document.getElementById('microBVal');
+  microB.addEventListener('input', function(){
+    state.microB = +microB.value;
+    microBVal.textContent = state.microB;
+    if (state.strategy === 'PP') render();
+  });
+
+  var modelSize = document.getElementById('modelSize');
+  var modelSizeVal = document.getElementById('modelSizeVal');
+  modelSize.addEventListener('input', function(){
+    state.modelSize = +modelSize.value;
+    modelSizeVal.textContent = state.modelSize + '×';
+    render();
+  });
+
+  // initial readouts
+  nDevVal.textContent = state.nDev;
+  microBVal.textContent = state.microB;
+  modelSizeVal.textContent = state.modelSize + '×';
+
+  // first paint
+  render();
+
+})();
+</script>
+</body>
+</html>

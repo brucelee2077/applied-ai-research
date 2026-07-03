@@ -8,6 +8,24 @@
 > - 💡 TD vs MC vs DP: the full spectrum of backup methods
 > - 🏭 N-step returns and GAE for practical variance control
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | α | Learning rate — how much to adjust the estimate per update |
+> | δ_t | TD error — "surprise signal" (actual minus expected) |
+> | γ | Discount factor |
+> | λ | Lambda — controls bias-variance trade-off in TD(λ) and GAE |
+> | e_t(s) | Eligibility trace — how recently and frequently state s was visited |
+> | 𝟙(s_t = s) | Indicator function: equals 1 if agent is in state s at time t, else 0 |
+> | V̂(s) | Current estimate of V^π(s) (may not be accurate yet) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **V^π(s)** — true expected return from state s
+> - **G_t = r_t + γ·G_{t+1}** — discounted return (recursive)
+> - **Bellman equation** — V^π(s) = E[r + γ·V^π(s')] ([bellman-equations-interview.md](../fundamentals/bellman-equations-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 Temporal difference learning updates value estimates after every step instead of waiting for the episode to end. It combines MC's model-free learning with DP's bootstrapping: the update target uses the current estimate V̂(s') instead of the full return G_t. This reduces variance at the cost of introducing bias from the estimate.
@@ -18,21 +36,34 @@ Temporal difference learning updates value estimates after every step instead of
 
 ### The TD(0) Update
 
-TD(0) updates V(s) after observing one transition (s, r, s'):
+**Step 1 — Words.** TD(0) updates the value estimate after every single step, without waiting for the episode to end. It uses the reward it just received plus its current guess of the next state's value as a "target." The difference between this target and the current estimate is the TD error — a surprise signal. If the agent got more than expected, the TD error is positive. If less, it is negative.
+
+**Step 2 — Formula.** TD(0) updates V(s) after observing one transition (s, r, s'):
 
     V(s) ← V(s) + α · δ_t
 
 Where the **TD error** is:
 
     δ_t = r_{t+1} + γ · V(s_{t+1}) - V(s_t)
-
-In words: the TD error is the difference between what you got (r + γV(s')) and what you expected (V(s)). If the TD error is positive, the outcome was better than expected. If negative, it was worse.
+          ─────────────────────────   ──────
+          what we got                 what we expected
+          (reward + future estimate)  (current estimate)
 
 Where:
 - α ∈ (0, 1] is the learning rate (step size)
 - γ is the discount factor
 - V(s_{t+1}) is the current estimate of the next state's value (the "bootstrap")
 - The target r_{t+1} + γ · V(s_{t+1}) is called the **TD target**
+
+**Step 3 — Worked example.** V(A) = 5.0, agent moves to B with reward = 2, V(B) = 4.0, γ = 0.9, α = 0.1:
+
+```
+TD target = r + γ × V(B) = 2 + 0.9 × 4.0 = 5.6
+TD error δ = 5.6 - 5.0 = 0.6   (slightly better than expected!)
+V(A) ← 5.0 + 0.1 × 0.6 = 5.06
+
+The estimate of A increased slightly because the outcome was better than expected.
+```
 
 ### Why TD Works: Connection to the Bellman Equation
 
@@ -44,7 +75,9 @@ TD(0) uses a single sample of r_{t+1} + γ · V̂(s_{t+1}) as an estimate of thi
 
 ### N-Step Returns
 
-Between TD(0) (one-step) and MC (full episode) lies a spectrum:
+**Step 1 — Words.** TD(0) looks just one step ahead. Monte Carlo looks all the way to the end. N-step returns sit in between: look n steps ahead using real rewards, then bootstrap from the value estimate at step n. Small n means low variance but more bias (trusting the estimate). Large n means less bias but more variance (more random rewards in the sum).
+
+**Step 2 — Formula.** Between TD(0) (one-step) and MC (full episode) lies a spectrum:
 
     G_t^{(n)} = r_{t+1} + γr_{t+2} + ... + γ^{n-1}r_{t+n} + γ^n V(s_{t+n})
 
@@ -52,9 +85,20 @@ Between TD(0) (one-step) and MC (full episode) lies a spectrum:
 - n = T-t: MC target, G_t (the full return)
 - Intermediate n: blend of real rewards and bootstrap
 
+**Step 3 — Worked example.** Rewards = [2, 1, 3, 0, ...], V(s_{t+3}) = 5.0, γ = 0.9:
+
+```
+1-step (n=1): G^(1) = 2 + 0.9 × V(s_{t+1})           — most bootstrap
+2-step (n=2): G^(2) = 2 + 0.9×1 + 0.81 × V(s_{t+2})
+3-step (n=3): G^(3) = 2 + 0.9×1 + 0.81×3 + 0.729 × 5.0
+            = 2 + 0.9 + 2.43 + 3.645 = 8.975           — less bootstrap
+```
+
 ### TD(λ): Unifying MC and TD
 
-TD(λ) averages over all n-step returns using exponential weighting:
+**Step 1 — Words.** Instead of picking one value of n, TD(λ) averages over all possible n-step returns using exponentially decaying weights. The parameter λ controls the decay: λ=0 puts all weight on the 1-step return (TD(0)), λ=1 puts all weight on the full return (MC), and values in between interpolate.
+
+**Step 2 — Formula.**
 
     G_t^λ = (1-λ) Σ_{n=1}^{T-t-1} λ^{n-1} G_t^{(n)} + λ^{T-t-1} G_t
 
@@ -62,13 +106,67 @@ Where:
 - λ = 0: reduces to TD(0)
 - λ = 1: reduces to MC
 - λ ∈ (0,1): interpolates between bias (TD) and variance (MC)
+- The (1-λ) factor normalizes the weights so they sum to 1
 
-The **eligibility trace** implementation avoids computing all n-step returns:
+**Step 3 — Worked example.** With λ = 0.5 and n-step returns G^(1) = 4.0, G^(2) = 5.0, G^(3) = 6.0 (MC):
+
+```
+Weights: (1-λ)λ⁰ = 0.5, (1-λ)λ¹ = 0.25, λ² = 0.25 (last term gets remaining weight)
+
+G^λ = 0.5 × 4.0 + 0.25 × 5.0 + 0.25 × 6.0
+    = 2.0 + 1.25 + 1.5
+    = 4.75
+
+The λ-return blends all n-step estimates, weighting shorter lookups more heavily.
+```
+
+### Eligibility Traces: Efficient Implementation of TD(λ)
+
+**Step 1 — Words.** Computing all n-step returns and averaging them is expensive. Eligibility traces achieve the same result efficiently. The idea: maintain a "trace" for each state that records how recently and frequently it was visited. When the TD error arrives, spread the update to all states in proportion to their trace. States visited recently get big updates. States visited long ago get small updates (their trace has decayed).
+
+The connection between TD(λ) and eligibility traces:
+- TD(λ) averages forward-looking n-step returns (expensive: need future rewards)
+- Eligibility traces look backward at past states (cheap: update all states in one pass)
+- The two views give mathematically equivalent results
+
+**Step 2 — Formula.**
 
     e_t(s) = γλ · e_{t-1}(s) + 𝟙(s_t = s)
     V(s) ← V(s) + α · δ_t · e_t(s)    for all s
 
-This propagates the TD error backward to recently visited states, with the trace decaying by γλ per step.
+Where:
+- e_t(s) = the eligibility trace for state s at time t
+- γλ = the decay rate (trace shrinks each step)
+- 𝟙(s_t = s) = 1 if the agent is in state s right now, 0 otherwise
+- δ_t = the TD error at time t
+- The update applies to ALL states, weighted by their trace
+
+**Step 3 — Worked example.** 3 states (A, B, C), γ = 0.9, λ = 0.8, so γλ = 0.72. Agent visits A → B → A:
+
+```
+Time 0 (visit A):
+  e_0(A) = 0.72 × 0 + 1 = 1.0    (just visited)
+  e_0(B) = 0.72 × 0 + 0 = 0.0
+  e_0(C) = 0.72 × 0 + 0 = 0.0
+
+  If δ_0 = 0.5: V(A) += 0.1 × 0.5 × 1.0 = 0.05 (full update)
+
+Time 1 (visit B):
+  e_1(A) = 0.72 × 1.0 + 0 = 0.72  (decayed — A was visited 1 step ago)
+  e_1(B) = 0.72 × 0.0 + 1 = 1.0   (just visited)
+  e_1(C) = 0.72 × 0.0 + 0 = 0.0
+
+  If δ_1 = -0.3: V(A) += 0.1 × (-0.3) × 0.72 = -0.022 (partial update to A!)
+                  V(B) += 0.1 × (-0.3) × 1.0  = -0.030 (full update to B)
+
+Time 2 (visit A again):
+  e_2(A) = 0.72 × 0.72 + 1 = 1.518  (decayed trace + new visit = boosted!)
+  e_2(B) = 0.72 × 1.0 + 0  = 0.72
+  e_2(C) = 0.72 × 0.0 + 0  = 0.0
+
+A's trace is > 1.0 because it was visited twice recently. Frequently visited states
+get stronger updates — this is how credit gets assigned to important states.
+```
 
 ### Worked Example
 

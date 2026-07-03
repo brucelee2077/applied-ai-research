@@ -1,0 +1,2178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attention, Visualized</title>
+
+  <!-- Google Fonts: Bricolage Grotesque · DM Sans · JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Accent palette: teal (nods to the source lab's calm technical feel) -->
+  <style>
+    :root {
+      --color-accent:       #2A7B9B;
+      --color-accent-hover: #1F6280;
+      --color-accent-light: #E4F2F7;
+      --color-accent-muted: #5A9DB8;
+    }
+  </style>
+
+  <!-- D3 (vendored locally — offline-safe), course engine, then course D3 viz. defer preserves order. -->
+  <script src="d3.v7.min.js" defer></script>
+  <script src="main.js" defer></script>
+  <script src="course-d3.js" defer></script>
+</head>
+<body>
+
+  <nav class="nav" id="nav">
+    <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    <div class="nav-inner">
+      <span class="nav-title">Attention, Visualized</span>
+      <div class="nav-dots" id="nav-dots" role="tablist">
+        <button class="nav-dot" data-target="module-1" data-tooltip="Who is &quot;it&quot;?" role="tab" aria-label="Module 1: Who is it?"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="The Library: Q, K, V" role="tab" aria-label="Module 2: Query, Key, Value"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="The Recipe" role="tab" aria-label="Module 3: The Recipe"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="The Math, Precisely" role="tab" aria-label="Module 4: The Math"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="The Cost of Attention" role="tab" aria-label="Module 5: The Cost"></button>
+        <button class="nav-dot" data-target="module-6" data-tooltip="Inference & the KV Cache" role="tab" aria-label="Module 6: Inference and the KV Cache"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- modules/*.html content is assembled here by build.sh -->
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">Who is "it"?</h1>
+      <p class="module-subtitle">How a sentence quietly tells you what a word points back to — and how a language model learns the same trick.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ════════════ SCREEN 1 — THE HOOK ════════════ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A tiny mystery, solved in a heartbeat</h2>
+
+        <p>Read this sentence, slowly:</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔍</div>
+          <div class="callout-content">
+            <strong class="callout-title">The sentence</strong>
+            <p style="font-size: var(--text-xl); font-family: var(--font-display);">"The cat sat on the mat, because <em>it</em> was tired."</p>
+          </div>
+        </div>
+
+        <p>Now answer one question: <strong>who is "it"?</strong></p>
+
+        <p>You knew instantly. It is the <strong>cat</strong> — not the mat. But notice what just happened: nobody told you. The word "it" does not say "cat" on its face. You figured it out by quietly glancing back at the earlier words and picking the one that fit.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">✨</div>
+          <div class="callout-content">
+            <strong class="callout-title">The surprise</strong>
+            <p>A <span class="term" data-definition="A language model is a computer program that reads and writes text by predicting which word comes next, one piece at a time. The popular chat assistants you have used are language models.">language model</span> — the kind of program behind the chat assistants you have used — does the exact same thing. The trick it uses has a name: <strong>attention</strong>. This whole module is about that one idea.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SCREEN 2 — THE METAPHOR ════════════ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A detective re-reading the earlier pages</h2>
+
+        <p>Picture a detective in the middle of a mystery novel. They reach a confusing line and stop. To make sense of it, they flip back through the earlier pages, looking for clues that matter <em>for this exact line</em>.</p>
+
+        <p>Some clues they stare at hard. Others they barely glance at. That choice — <strong>how much to focus on each earlier clue</strong> — is the heart of the whole thing.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🕵️</div>
+            <div>
+              <strong>The detective = the word being read right now</strong>
+              <p>When the model reaches "it", that word is the detective trying to make sense of itself.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📖</div>
+            <div>
+              <strong>Flipping back through pages = checking the other words</strong>
+              <p>The word looks back at "cat", "mat", "sat", and every other word in the sentence.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🔦</div>
+            <div>
+              <strong>How hard they stare at a clue = the attention weight</strong>
+              <p>A big stare on "cat", a faint glance at "mat". That amount of focus is called the <span class="term" data-definition="An attention weight is a number that says how much one word should focus on another word right now. A big weight means strong focus; a tiny weight means barely any. The weights for one word always add up to a whole.">attention weight</span>.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where the detective story breaks down</strong>
+            <p>A real detective reads one clue at a time, in order. Attention looks at <strong>every word at once</strong>, and it re-decides who matters all over again at each step of its thinking — not just once.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SCREEN 3 — THE PLAIN IDEA ════════════ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Every word asks one question</h2>
+
+        <p>Here is the plain idea, stripped down. For each <span class="term" data-definition="A token is one small piece of text the model reads — usually a word or part of a word. The model breaks every sentence into tokens before doing anything else.">token</span> (each little piece of text, usually a word), the model asks a single question:</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💭</div>
+          <div class="callout-content">
+            <strong class="callout-title">The one question</strong>
+            <p style="font-size: var(--text-lg); font-family: var(--font-display);">"Right now, who should I listen to?"</p>
+          </div>
+        </div>
+
+        <p>The model answers by giving every other word a focus score, then blending those words together using the scores. Words with a big score get heard loudly. Words with a tiny score barely whisper. This deciding-and-blending is what we call <span class="term" data-definition="Attention is the step where a model, for each word, decides how much to focus on every other word, then blends them together using those amounts. It is the core operation behind modern language models.">attention</span>.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-success)">
+            <div class="pattern-icon" style="background: var(--color-success)">🎯</div>
+            <h4 class="pattern-title">It IS: relevance</h4>
+            <p class="pattern-desc">Attention measures <span class="term" data-definition="Relevance means how much one word matters to another word right now. 'cat' is highly relevant to 'it' in our sentence; 'mat' is much less relevant.">relevance</span> — how much each word matters to the word being read right now.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-success)">
+            <div class="pattern-icon" style="background: var(--color-success)">🔀</div>
+            <h4 class="pattern-title">It IS: routing</h4>
+            <p class="pattern-desc">It decides where information flows — which words feed into which. Engineers call this <span class="term" data-definition="Routing means choosing which information goes where. In attention, it means deciding which words should send their meaning to which other words.">routing</span>: a learned map of who listens to whom.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">🚫</div>
+            <h4 class="pattern-title">It is NOT: understanding</h4>
+            <p class="pattern-desc">The model is not "getting" the story like a person does. It is only scoring relevance and blending. No grammar lesson, no rulebook.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">🚫</div>
+            <h4 class="pattern-title">It is NOT: memory</h4>
+            <p class="pattern-desc">Nothing is saved for later. The focus scores are worked out fresh, from scratch, every single time.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SCREEN 4 — THE HERO VISUAL ════════════ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">See it for yourself</h2>
+
+        <p>Below is the same sentence, drawn as a grid. Each <strong>row</strong> is one word doing the looking. The brighter a square, the more that word is focusing on the word in that column.</p>
+
+        <div id="attn-heatmap"></div>
+        <p id="attn-heatmap-caption" style="color: var(--color-text-muted); font-size: var(--text-sm); text-align: center; margin-top: var(--space-3);">Click a row label, or hover a cell, to see who that word listens to.</p>
+
+        <p><strong>Try this:</strong> click the row for the word <strong>"it"</strong>. Watch the square under <strong>"cat"</strong> light up the brightest of all. That bright square <em>is</em> attention resolving "it" to "cat" — with no grammar rules, no dictionary, just learned focus.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Aha — attention is a spotlight</strong>
+            <p>Think of each word holding a spotlight that it sweeps over all the other words. Bright where it cares, dim where it does not. Attention is simply that <strong>per-word spotlight</strong> — a fresh one for every word, every time.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════ SCREEN 5 — VICTORY LAP + QUIZ ════════════ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">You just unlocked the core idea</h2>
+
+        <p>You now hold the single most important picture in modern AI: for every word, the model decides who to listen to right now, then blends them. Everything in the rest of this course is built on top of this one move.</p>
+
+        <p>One quick check before you go. There are no right-or-wrong grades here — just a chance to see if the idea has clicked. If a question trips you up, that is completely normal: read the explanation and you will lock it in.</p>
+
+        <div class="quiz-container" id="quiz-module1">
+
+          <div class="quiz-question-block"
+               data-correct="opt-blend"
+               data-explanation-right="Exactly. Attention scores how much each earlier word matters, then blends those words using the scores. No dictionary, no stored answer — just deciding and mixing, fresh each time."
+               data-explanation-wrong="Not quite. The model is not looking up a fixed answer or remembering one from before. It is deciding, in the moment, which earlier words matter most for 'it', then blending them together.">
+            <h3 class="quiz-question">When the model reads "it", what is attention actually doing?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-dict" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Looking up "it" in a built-in dictionary to find its meaning</span>
+              </button>
+              <button class="quiz-option" data-value="opt-memory" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Remembering the answer it saved the last time it saw this sentence</span>
+              </button>
+              <button class="quiz-option" data-value="opt-blend" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Deciding which earlier words matter for "it", then blending them together</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-cat"
+               data-explanation-right="Right. In the heatmap, the row for 'it' shines brightest on 'cat'. The model gives 'cat' the biggest focus score, so that is who 'it' points back to."
+               data-explanation-wrong="Look again at the heatmap. When you click the row for 'it', the brightest square sits under 'cat' — that is the word getting the most focus. The cat is the one who was tired.">
+            <h3 class="quiz-question">In our sentence, which word will get the brightest spotlight from "it"?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mat" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>"mat" — it is the closest noun before "it"</span>
+              </button>
+              <button class="quiz-option" data-value="opt-cat" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>"cat" — the one the sentence is really about</span>
+              </button>
+              <button class="quiz-option" data-value="opt-tired" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>"tired" — it comes right after "it"</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-each"
+               data-explanation-right="Yes. Every word runs its own attention — it asks 'who should I listen to right now?' and gets its own set of focus scores. 'it' looks for cat; 'sat' looks back at who sat; each word has its own spotlight."
+               data-explanation-wrong="Attention is not just for tricky words like 'it'. Every single word runs the same step and gets its own spotlight over the others. 'it' is simply the clearest example to see.">
+            <h3 class="quiz-question">A friend says: "So attention only happens for confusing words like 'it', right?" What is the better way to put it?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-onlyit" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Correct — attention only kicks in for words that are unclear</span>
+              </button>
+              <button class="quiz-option" data-value="opt-each" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Not quite — every word gets its own spotlight, "it" is just the easiest to notice</span>
+              </button>
+              <button class="quiz-option" data-value="opt-first" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Correct — attention only runs once, on the first word of the sentence</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-relevance"
+               data-explanation-right="Spot on. The detective stares hard at the clues that matter and barely glances at the rest. That amount of staring is the focus score — what attention gives to each word."
+               data-explanation-wrong="Think about the detective. The thing that maps onto attention is not the novel itself or the final verdict — it is the choice of how hard to stare at each earlier clue. That staring is the focus score.">
+            <h3 class="quiz-question">In the detective story, what plays the role of the attention weight (the focus score)?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-pages" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The total number of pages in the novel</span>
+              </button>
+              <button class="quiz-option" data-value="opt-relevance" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>How hard the detective stares at each earlier clue</span>
+              </button>
+              <button class="quiz-option" data-value="opt-verdict" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The final verdict the detective announces at the end</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try Again</button>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">➡️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Coming up next</strong>
+            <p>You have seen <em>what</em> attention does. Next, you will meet the three roles every word secretly plays to make this work — <strong>Query</strong>, <strong>Key</strong>, and <strong>Value</strong> — through a trip to the library.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-2" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">The Library: Query, Key, Value</h1>
+      <p class="module-subtitle">Every word plays three roles at once. Meet them.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============================================================
+           SCREEN 1 — HOOK + THE LIBRARY
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">You walk into a library, wanting dinosaurs</h2>
+        <p>You do not know exactly which book you want. You only know what you are <strong>looking for</strong>: something about dinosaurs.</p>
+        <p>So how do you find it without reading every single book? You look at the <strong>labels on the shelves</strong>. You walk toward the ones that match. And the better a shelf matches, the more books you grab from it.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📚</div>
+          <div class="callout-content">
+            <strong class="callout-title">This is exactly how a word finds meaning</strong>
+            <p>In the last module, the word "it" needed to find "cat". It did not search the whole sentence blindly. It played a clever little library game. Let us learn the three pieces of that game.</p>
+          </div>
+        </div>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🔎</div>
+            <div>
+              <strong>Your request — "I want dinosaurs"</strong>
+              <p>What you are looking for right now.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🏷️</div>
+            <div>
+              <strong>The shelf labels — "Science", "History"</strong>
+              <p>What each shelf advertises about itself.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">📖</div>
+            <div>
+              <strong>The actual books on the shelf</strong>
+              <p>The real information you carry home.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           SCREEN 2 — Q / K / V AS THREE CARDS
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Three roles every word plays</h2>
+        <p>Here is the surprising part. In the library, three different people do these jobs. But inside an AI model, <strong>every word does all three jobs at once</strong>, for itself.</p>
+        <p>A word turns itself into three things. Engineers call them
+          <span class="term" data-definition="Query (often written Q) is what a word is looking for right now — like the request you carry into a library. It does not contain an answer; it is a search.">query</span>,
+          <span class="term" data-definition="Key (often written K) is what each word advertises about itself — like the label on a library shelf. Other words read it to decide whether this word is worth listening to.">key</span>, and
+          <span class="term" data-definition="Value (often written V) is the actual information a word carries — like the real books on a shelf. This is what gets passed along when one word listens to another.">value</span>.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔎</div>
+            <h4 class="pattern-title">Query (Q)</h4>
+            <p class="pattern-desc"><strong>What I am looking for.</strong> Like walking up to the desk and saying "I want dinosaurs." It is a question, not an answer.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🏷️</div>
+            <h4 class="pattern-title">Key (K)</h4>
+            <p class="pattern-desc"><strong>What I advertise about myself.</strong> Like the label on a shelf: "Science." Other words read my label to decide if I am worth listening to.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📖</div>
+            <h4 class="pattern-title">Value (V)</h4>
+            <p class="pattern-desc"><strong>The real information I carry.</strong> Like the actual books on the shelf. This is what I hand over when someone listens to me.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The label is not the book</strong>
+            <p>A shelf's <em>label</em> ("Science") is short and just for matching. The <em>books</em> are the real thing you take home. Keep these two apart in your mind — it is the most important idea in this whole module, and we will return to it.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           SCREEN 3 — HERO: GROUP CHAT (tokens introduce themselves)
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch the words introduce themselves</h2>
+        <p>Take the sentence: <em>"The cat sat on the mat because it was tired."</em> The word <strong>"it"</strong> wants to know what it stands for. Let us listen in as the words post their query, their key, and their value — and find their match.</p>
+
+        <div class="chat-window" id="chat-module2">
+          <div class="chat-messages">
+
+            <div class="chat-message" data-msg="0" data-sender="it" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">it</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">"it" — posting my Query 🔎</span>
+                <p>Hi everyone! I am a little pronoun, and honestly I have no idea who I stand for. I am looking for a thing earlier in the sentence — an animal or object that I can point back to.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="1" data-sender="cat" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">cat</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">"cat" — posting my Key 🏷️</span>
+                <p>That sounds like me! My label says: I am an animal, I am a subject, and I showed up early in the sentence. Read my label and see if I match what you need.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="2" data-sender="mat" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">mat</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">"mat" — posting my Key 🏷️</span>
+                <p>I am also here! But my label says I am a flat object on the floor, not really a "doer". I probably match you a little, "it", but not a lot.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="3" data-sender="it" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">it</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">"it" — comparing labels</span>
+                <p>Let me compare. "cat" — animal, subject, early. That is a <strong>strong match</strong> for what I want! "mat" — flat object. That is a <strong>weak match</strong>. So I will listen mostly to "cat".</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="4" data-sender="cat" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">cat</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">"cat" — handing over my Value 📖</span>
+                <p>Great, here is my real information (my Value): "furry animal, the one who sat, the one feeling tired." Take a big helping of it, since we matched so well.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="5" data-sender="it" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">it</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">"it" — walking away with a blend</span>
+                <p>Done! I now carry mostly "cat" information, with a tiny bit of "mat". I did not become "cat" — I just borrowed a big scoop of what "cat" carries. Now I know who I am. 🎉</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-typing" id="chat-module2-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module2-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+
+        <p>Notice what happened. "it" compared its <strong>query</strong> to everyone's <strong>key</strong>. The best match decided who to listen to. Then it took a <strong>big helping of that word's value</strong> — not a copy of the label.</p>
+      </section>
+
+      <!-- ============================================================
+           SCREEN 4 — THE WEIGHTED BLEND
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Good match, big scoop. Weak match, tiny scoop.</h2>
+        <p>You almost never walk out with one single book. You walk out with a <strong>blend</strong>. The shelf that matched best gives you a big stack. A poorly matching shelf still gives you a little something.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Compare your request to every label</strong>
+              <p>"it" checks its query against the key of "cat", "mat", and every other word. Each gets a match score.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Turn matches into scoop sizes</strong>
+              <p>A strong match becomes a big scoop. A weak match becomes a small scoop. All the scoops together fill exactly one bag — no more, no less.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Take that much of each word's value</strong>
+              <p>From "cat" you take a lot of its real information. From "mat" you take a little. You mix them into one blend.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🥤</div>
+          <div class="callout-content">
+            <strong class="callout-title">It is a smoothie, not a single fruit</strong>
+            <p>"it" does not pick one word and copy it. It pours in mostly "cat", a splash of "mat", a drop of others — and drinks the blend. That blended drink is the new meaning of "it".</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           SCREEN 5 — ROUTING vs PAYLOAD (the aha) + breakdown
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The big idea: who you listen to vs. what you receive</h2>
+        <p>This is the moment that makes attention click. There are two completely separate jobs happening, and people mix them up all the time.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🧭</div>
+            <h4 class="pattern-title">Routing — Query vs Key</h4>
+            <p class="pattern-desc">Comparing your request (Q) to the labels (K) only decides <strong>who you listen to</strong>. It is the matchmaking step. It moves zero real information by itself.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📦</div>
+            <h4 class="pattern-title">Payload — the Value</h4>
+            <p class="pattern-desc">The <span class="term" data-definition="The payload is the actual information that gets passed along — the Value (V). The match decides how much of it you take; the payload is the thing you actually receive.">payload</span> (V) is <strong>what you actually receive</strong>. The match decides the scoop size; the value is what fills the scoop.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why this matters so much</strong>
+            <p>A word can match on one thing (its label) and hand over something completely different (its books). So "it" can find "cat" by matching labels — but what it carries home is "cat" the real information, not the word "cat" itself. Routing chooses; payload delivers.</p>
+          </div>
+        </div>
+
+        <h2 class="screen-heading" style="margin-top: var(--space-12)">Where the library picture breaks down</h2>
+        <p>Every analogy has an edge. Here is this one's edge, in one sentence:</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">In a real library, different people write the labels and stock the books</strong>
+            <p>But in
+              <span class="term" data-definition="Self-attention is when every word builds its own query, key, and value from itself, and the words compare against each other inside the same sentence. There is no outside librarian — each word labels itself and decides what it carries.">self-attention</span>,
+              every word creates its <strong>own</strong> query, key, and value at the same time — three learned versions of itself. A word writes its own label <em>and</em> stocks its own shelf.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧩</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where do these three come from?</strong>
+            <p>Each word starts as an
+              <span class="term" data-definition="An embedding is a word turned into a list of numbers. The numbers capture what the word means, so a computer can compare words by doing math on the lists.">embedding</span>
+              — the word turned into a list of numbers. The model learned three ways to reshape that list: one makes the query, one makes the key, one makes the value. Same word, three useful versions.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           QUIZ (at the end)
+           ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>No grades, no pressure. These are here to make the idea stick. If one trips you up, the explanation will teach you the why.</p>
+
+        <div class="quiz-container" id="quiz-module2">
+
+          <div class="quiz-question-block"
+               data-correct="opt-value"
+               data-explanation-right="Word A receives B's Value — B's real information — and only a scoop of it, sized by how well their query and key matched. It is a blend, never an exact copy."
+               data-explanation-wrong="Remember the library: the match (query vs key) only decides the scoop size. What A actually carries home is B's Value — B's real books — scaled by that match. Not B's label, and not a word-for-word copy.">
+            <h3 class="quiz-question">The word "A" pays a lot of attention to the word "B". What does A actually <em>receive</em>?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-key" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's label (its Key) — the short advertisement</span>
+              </button>
+              <button class="quiz-option" data-value="opt-value" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>A big scoop of B's Value — B's real information, sized by the match</span>
+              </button>
+              <button class="quiz-option" data-value="opt-copy" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>An exact, word-for-word copy of B</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-self"
+               data-explanation-right="In self-attention, a word starts as one list of numbers (its embedding) and is reshaped three ways — into its own query, key, and value. Same word, three versions of itself."
+               data-explanation-wrong="They are not three separate words or three separate inputs. Each word makes all three from itself — its query, its key, and its value are three learned versions of the same word.">
+            <h3 class="quiz-question">In self-attention, where do a word's Query, Key, and Value come from?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-three" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>From three different words in the sentence</span>
+              </button>
+              <button class="quiz-option" data-value="opt-self" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>All three are made from the same word — three versions of itself</span>
+              </button>
+              <button class="quiz-option" data-value="opt-librarian" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>An outside librarian writes the labels and stocks the books</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-route"
+               data-explanation-right="Right. Comparing your Query to the Keys is pure matchmaking — it only sets the scoop sizes (who you listen to). It moves no real information on its own."
+               data-explanation-wrong="The query-vs-key comparison is the routing step: it only decides who you listen to and how much. The real information you receive is the Value (the payload). Matching and delivering are two different jobs.">
+            <h3 class="quiz-question">What job does comparing your Query to everyone's Key actually do?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-route" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It decides <em>who you listen to</em> and how much — the matchmaking</span>
+              </button>
+              <button class="quiz-option" data-value="opt-deliver" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It hands over the real information directly</span>
+              </button>
+              <button class="quiz-option" data-value="opt-nothing" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing useful — the model ignores it</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-blend"
+               data-explanation-right="Exactly. A strong match gives a big scoop, a weak match gives a small scoop, and you mix them all into one blend. You rarely walk away with just one word."
+               data-explanation-wrong="Attention almost never grabs a single word. It takes a big scoop from the best match, a small scoop from weaker ones, and blends them — like a smoothie made of mostly one fruit plus a splash of others.">
+            <h3 class="quiz-question">When "it" finishes attending, what is it carrying?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-one" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Only the single best-matching word, nothing else</span>
+              </button>
+              <button class="quiz-option" data-value="opt-blend" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>A blend — mostly the best match, plus small scoops of the others</span>
+              </button>
+              <button class="quiz-option" data-value="opt-equal" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>An equal amount of every word in the sentence</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">You just unlocked the three roles</strong>
+            <p>Query asks, Key advertises, Value delivers. The match between query and key sets the scoop sizes; the value fills the scoops. You now have the cast of characters — next, the simple recipe that turns Query, Key, and Value into an answer.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">The Recipe</h1>
+      <p class="module-subtitle">Four steps turn "who matches whom" into a real answer — in plain words, then the formula as one labeled reference.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============ SCREEN 1 — HOOK ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A recipe is just steps</h2>
+
+        <p>You already know the idea from the last module: each word makes a
+          <span class="term" data-definition="A Query is what a word is looking for — its question. In the library picture from Module 2, it is the topic you walked in wanting, like &quot;I want dinosaurs.&quot;">Query</span>
+          (what it wants), a
+          <span class="term" data-definition="A Key is what a word advertises about itself — its label. In the library picture, it is the sign on each shelf, like &quot;Science&quot; or &quot;History.&quot;">Key</span>
+          (what it advertises), and a
+          <span class="term" data-definition="A Value is the actual information a word carries — its payload. In the library picture, it is the real book you take off the shelf.">Value</span>
+          (what it carries).</p>
+
+        <p>But making those three things is not the answer yet. We still have to <strong>use</strong> them. That is what this module is about: the four simple steps that turn all those matches into a fresh meaning for each word.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">The whole module in one breath</strong>
+            <p>SCORE every word against every word. SHRINK the scores a little. Turn them into percentages with <span class="term" data-definition="Softmax is a step that takes a list of any numbers — big, small, negative — and turns them into percentages that always add up to 100%. The biggest number gets the biggest percentage.">softmax</span>. BLEND the payloads by those percentages. Four steps. That is the recipe.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 2 — METAPHOR + FOUR STEPS ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Mixing paint to a target shade</h2>
+
+        <p>Imagine you want a very specific shade of orange. You have jars of red, yellow, and a little blue. You do not pour them in randomly. You decide <strong>how much of each color</strong> to add based on how well that color helps you reach the shade you want.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🎯</div>
+            <h4 class="pattern-title">Your target shade</h4>
+            <p class="pattern-desc">The exact orange you are aiming for. This is the word's Query — what it is looking for.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🏷️</div>
+            <h4 class="pattern-title">Each jar's label</h4>
+            <p class="pattern-desc">"Warm red", "bright yellow". You judge how well each label fits your target. That judging is the score.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🥫</div>
+            <h4 class="pattern-title">The paint inside</h4>
+            <p class="pattern-desc">The real color you pour out. This is the Value — the payload that actually mixes into the cup.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🥤</div>
+            <h4 class="pattern-title">A full cup</h4>
+            <p class="pattern-desc">The amounts you pour must add up to one full cup — no more, no less. That "must add to a full cup" rule is softmax.</p>
+          </div>
+        </div>
+
+        <p>A jar with a great-matching label gets poured a lot. A jar with a weak label still gets a small splash. You walk away with a <span class="term" data-definition="A weighted blend mixes several things together where each one contributes a different amount. In paint, you pour more of the colors that match and less of the ones that do not — the final color is a blend of all of them.">weighted blend</span> — a mix, not a single color. That blend is the new meaning of the word.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where the paint picture breaks down</strong>
+            <p>Paint mixing goes one way — you make one cup. But here, every word mixes its own blend at the same time, all in parallel.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 3 — THE FOUR STEPS ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The four steps</h2>
+
+        <p>Here is the recipe, one card per step. Read them top to bottom — each step feeds the next.</p>
+
+        <div class="step-cards">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>SCORE — how well does each Query match each Key?</strong>
+              <p>For every word, compare its Query against every other word's Key. A good match gets a high
+                <span class="term" data-definition="A score is a single number that says how well one word's Query matches another word's Key. A bigger score means a better match — this word should listen more to that one.">score</span>;
+                a poor match gets a low one. Behind the scenes this match is a
+                <span class="term" data-definition="A dot product is a simple way to compare two lists of numbers: multiply the matching numbers together and add up all the results. If two lists point the same way, the dot product is big — a strong match.">dot product</span>:
+                multiply the matching numbers and add them up.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>SHRINK — make the scores a little smaller</strong>
+              <p>Divide every score by the same fixed number to
+                <span class="term" data-definition="To scale (or shrink) the scores means to divide them all by the same number, making them smaller but keeping their order. The biggest is still biggest — just gentler.">scale</span>
+                them down. This keeps the next step gentle so it does not over-react to one big score. The full reason for this comes in Module 4.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>SOFTMAX — turn the scores into percentages</strong>
+              <p>Run the scores through softmax. Messy scores become clean percentages that add up to 100%. A bigger score gets a bigger slice of the cup.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>BLEND — mix the Values by those percentages</strong>
+              <p>Pour each word's Value into the cup using its percentage. Add them up. Out comes a brand-new set of numbers — the word's fresh, context-aware meaning.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Routing versus payload</strong>
+            <p>Steps 1–3 decide <em>how much</em> to pour (the routing). Step 4 decides <em>what</em> gets poured (the payload). The matching and the mixing are two separate jobs — that split is the heart of attention.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 4 — SOFTMAX IN PLAIN WORDS ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Softmax, in plain words</h2>
+
+        <p>Softmax is the step that worries people the most, so let us make it boring. It takes <strong>any</strong> list of numbers and does two things, every time, with no exceptions:</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">💯</div>
+            <div>
+              <strong>The percentages always add up to 100%</strong>
+              <p>No matter what numbers you feed in, the slices fill exactly one full cup.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📈</div>
+            <div>
+              <strong>A bigger score always gets a bigger slice</strong>
+              <p>Softmax never flips the order. The strongest match keeps the largest share.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>Here is the real example you will keep seeing in this course. The word <strong>"sat"</strong> scores the two words "cat" and "sat". After shrinking, softmax turns those scores into these slices:</p>
+
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="flow-step-num" style="background: var(--color-actor-4)">🐱</div>
+            <p><strong>"cat"</strong><br>gets <strong>33%</strong> of the cup</p>
+          </div>
+          <div class="flow-arrow">+</div>
+          <div class="flow-step">
+            <div class="flow-step-num" style="background: var(--color-actor-2)">💺</div>
+            <p><strong>"sat"</strong><br>gets <strong>67%</strong> of the cup</p>
+          </div>
+          <div class="flow-arrow">=</div>
+          <div class="flow-step">
+            <div class="flow-step-num">🥤</div>
+            <p>100% —<br>one full cup</p>
+          </div>
+        </div>
+
+        <p>So "sat" listens about <strong>two-thirds to itself</strong> and <strong>one-third to "cat"</strong> — and those two slices, 33% and 67%, add up to a full cup. That is softmax doing its only job.</p>
+      </section>
+
+      <!-- ============ SCREEN 5 — HERO FLOW ANIMATION ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch the recipe run: "cat sat"</h2>
+
+        <p>Step through the real example. Each word starts as a few plain numbers and comes out the other end with a fresh, blended meaning. Click <strong>Next Step</strong> to follow the cup being mixed.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"START — each word is just a few plain numbers. Here are two words: cat and sat."},
+          {"highlight":"actor-2","label":"MAKE Q, K, V — each word builds a Query (what it wants), a Key (what it advertises), and a Value (what it carries).","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"STEP 1 SCORE — match every Query against every Key. How well does the word sat match cat, and match itself?","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-3","label":"STEP 2 SHRINK — divide the scores by a fixed number so they stay gentle for the next step."},
+          {"highlight":"actor-4","label":"STEP 3 SOFTMAX — turn the scores into percentages that add to 100%. Here that is about 33% for cat and 67% for sat.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-5","label":"STEP 4 BLEND — pour each Value by its percentage and add them up.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"actor-5","label":"OUT — a brand-new set of numbers, about 0.33 and 1.00. That is the fresh, context-aware meaning of sat."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🔢</div>
+              <span>Plain numbers</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">🏷️</div>
+              <span>Make Q, K, V</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">⚖️</div>
+              <span>Score &amp; shrink</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">💯</div>
+              <span>Softmax %</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">🥤</div>
+              <span>Blend → output</span>
+            </div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+
+          <div class="flow-step-label" id="flow-label">Click "Next Step" to begin</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">What just happened</strong>
+            <p>Two plain words went in. The four steps mixed them. A new set of numbers — about 0.33 and 1.00 — came out for "sat". Nothing magical: just score, shrink, softmax, blend.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 6 — FORMULA AS LABELED REFERENCE ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The same recipe, written as one formula</h2>
+
+        <p>Everything you just learned has a one-line name in math. You do not need to read it like an equation — read it like a label that points at the four steps you already know.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧮</div>
+          <div class="callout-content">
+            <strong class="callout-title">The attention formula</strong>
+            <p style="font-family: var(--font-mono); font-size: var(--text-lg); text-align: center; margin: var(--space-4) 0; line-height: 1.8;">
+              Attention(Q, K, V) = softmax( Q&nbsp;K&#7488; / &radic;d&#8342; ) &middot; V
+            </p>
+            <p>Read left to right, it <em>is</em> the recipe. Here is what each piece is doing.</p>
+          </div>
+        </div>
+
+        <div class="badge-list">
+          <div class="badge-item">
+            <code class="badge-code">Q K&#7488;</code>
+            <span class="badge-desc"><strong>Step 1 — SCORE.</strong> All the match scores: every Query compared against every Key at once.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">&divide; &radic;d&#8342;</code>
+            <span class="badge-desc"><strong>Step 2 — SHRINK.</strong> The gentle shrink: divide the scores by a fixed number so the next step stays calm.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">softmax( &hellip; )</code>
+            <span class="badge-desc"><strong>Step 3 — SOFTMAX.</strong> Turn the scores into percentages that add up to 100%.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">&middot; V</code>
+            <span class="badge-desc"><strong>Step 4 — BLEND.</strong> Pour and mix the Values (the payloads) by those percentages.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">This is a label, not a test</strong>
+            <p>That single line is just the four step-cards squeezed together. Module 4 opens it up fully — every symbol, every shape, with real numbers — for readers who want the precise math.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 7 — QUIZ ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <p>Three short questions. There is no score and no penalty — if one trips you up, the explanation will teach you the missing piece.</p>
+
+        <div class="quiz-container" id="quiz-module3">
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Exactly right. Softmax always does two things: the slices add up to a full cup (100%), and the bigger score keeps the bigger slice. Both are guaranteed no matter what numbers go in."
+               data-explanation-wrong="Not quite. Softmax does not make the two equal, and it never flips the order. Its two promises are: the percentages add up to 100%, AND the bigger score gets the bigger slice. Both happen together.">
+            <h3 class="quiz-question">Softmax is given two scores, and one is clearly bigger than the other. What is guaranteed about the two percentages it gives back?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They come out roughly equal, to keep things fair.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They add up to 100%, and the bigger score gets the bigger slice.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The smaller score gets the bigger slice, to balance things out.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="Yes. Shrinking keeps the scores gentle so softmax does not over-react and dump almost the whole cup onto one word. The full mathematical reason is coming in Module 4."
+               data-explanation-wrong="Think about what comes right after shrinking: softmax. If the scores are too big, softmax over-reacts and pours almost the whole cup onto a single word, ignoring the rest. The shrink keeps softmax gentle so a word can still listen to several others.">
+            <h3 class="quiz-question">Why do we shrink the scores (Step 2) before running softmax (Step 3)?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To save memory, since smaller numbers take less space.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To make the scores add up to 100% before softmax runs.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>So softmax stays gentle and does not pour almost the whole cup onto one word.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Exactly. The scores and percentages (Steps 1–3) only decide HOW MUCH to pour. The thing that actually gets poured into the cup is the Value — the payload. Matching and mixing are two separate jobs."
+               data-explanation-wrong="Careful — this is the most common mix-up. The scores and percentages decide how much to pour, but they are not what gets poured. What flows into the cup is each word's Value (its payload). The matching and the mixing are deliberately kept as two separate jobs.">
+            <h3 class="quiz-question">In Step 4 (BLEND), the percentages tell you how much to pour. But what is the thing actually being poured into the cup?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each word's Value — the payload it carries.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each word's match score, poured in directly.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The percentages themselves, added together.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try Again</button>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">That is the whole recipe</strong>
+            <p>Score, shrink, softmax, blend — and one formula that names all four. From here the course splits: readers who want the precise math, the exact shapes, and real code continue to <strong>Module 4</strong>. This is where the interview-depth half begins.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Math, Precisely</h1>
+      <p class="module-subtitle">You have the recipe. Now read it like an engineer — every shape, every symbol, and the one division that keeps the whole thing trainable.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 1 — HOOK + VOLUME-DESK METAPHOR -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A volume mixing desk</h2>
+        <p>Picture the desk a sound engineer sits behind at a concert. A row of sliding faders. Each fader controls how loud one source plays — the vocals, the drums, the bass. Push a fader up, that source gets louder in the final mix. Pull it down, it fades into the background.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🎚️</div>
+            <div>
+              <strong>Each fader = one attention weight</strong>
+              <p>It sets how loudly one source plays in the final blend.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🔊</div>
+            <div>
+              <strong>Each source = one Value vector</strong>
+              <p>The actual sound — the payload — that gets mixed in.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🎛️</div>
+            <div>
+              <strong>The master trim = the √d<sub>k</sub> division</strong>
+              <p>It stops one fader from slamming to maximum and drowning everyone else out.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔎</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where the desk breaks down</strong>
+            <p>On a real desk a human sets the faders by hand. In attention, the faders are <em>computed from the data on every forward pass</em> — the model decides, fresh each time, how loud each source should be.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 2 — SYMBOL + SHAPE TABLE, BUILT UP -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One formula, built up piece by piece</h2>
+        <p>Here is the whole operation. We will not read it all at once — we will assemble it left to right, naming every part and its <span class="term" data-definition="The shape of a tensor is the size of each of its dimensions — for a matrix it is rows × columns. Knowing the shape tells you exactly how big a piece of data is and what it can multiply with.">shape</span> as we go.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧮</div>
+          <div class="callout-content">
+            <strong class="callout-title">The full formula</strong>
+            <p style="font-family: var(--font-mono); font-size: var(--text-lg); line-height: 2;">Attention(Q, K, V) = softmax( Q&nbsp;K<sup>T</sup>&nbsp;/&nbsp;√d<sub>k</sub> ) V</p>
+          </div>
+        </div>
+
+        <p><strong>Step 1 — the three inputs.</strong> Every token in the sequence produces three vectors. Stack them over all <em>n</em> tokens and you get three matrices: <span class="term" data-definition="A matrix is a grid of numbers with rows and columns. Here, each row is one token's vector, so an n × d matrix holds n tokens, each described by d numbers.">matrices</span> <code>Q</code>, <code>K</code>, and <code>V</code>.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">Q — n × d_k</code>
+            <span class="badge-desc"><span class="term" data-definition="A query vector is what one token is looking for in the others — like a search request sent to every other word.">Queries</span>: what each of the n tokens is looking for. <strong>d<sub>k</sub></strong> is the <span class="term" data-definition="d_k is the dimension (length) of each query and key vector — how many numbers describe one token's search request and one token's advertisement.">key/query dimension</span>.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">K — n × d_k</code>
+            <span class="badge-desc"><span class="term" data-definition="A key vector is what one token advertises about itself, so other tokens can decide whether to listen to it.">Keys</span>: what each token advertises. Same width d<sub>k</sub> as Q, so they can be compared.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">V — n × d_v</code>
+            <span class="badge-desc"><span class="term" data-definition="A value vector is the payload a token carries — the information that actually gets passed along when another token decides to listen to it.">Values</span>: the payload each token carries. Its width <strong>d<sub>v</sub></strong> can differ from d<sub>k</sub>.</span>
+          </div>
+        </div>
+
+        <p><strong>Step 2 — the scores.</strong> Multiply Q by K <span class="term" data-definition="The transpose of a matrix flips it over its diagonal: rows become columns and columns become rows. Writing K with a small T (Kᵀ) means we use its flipped version so the shapes line up for multiplication.">transposed</span> (written <code>K<sup>T</sup></code>). This takes the <span class="term" data-definition="A dot product multiplies two vectors element by element and adds the results into a single number — a score of how aligned the two vectors are. Bigger means more aligned.">dot product</span> of every query against every key, giving a score for every (query, key) pair.</p>
+
+        <div class="badge-list">
+          <div class="badge-item">
+            <code class="badge-code">Q K^T — n × n</code>
+            <span class="badge-desc">The raw similarity scores. One number for each of the n × n token pairs. <strong>This square is the expensive object</strong> — the whole next module is about its cost.</span>
+          </div>
+        </div>
+
+        <p><strong>Step 3 — the weights.</strong> Divide by √d<sub>k</sub>, then apply <span class="term" data-definition="Softmax turns a list of numbers into positive weights that add up to 1, so they read as proportions. The largest number gets the largest weight, but every number still gets some share.">softmax</span>. The softmax runs <strong>row-wise</strong>: each row is one query, and that row becomes a set of weights over all the keys that sum to exactly 1.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">d_k — scalar</code>
+            <span class="badge-desc">A single number (for example 64). We divide the scores by its square root before the softmax.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">softmax — row-wise</code>
+            <span class="badge-desc">Applied per row, over the keys. Each query gets its own distribution that sums to 1. These are the faders on the desk.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">output — n × d_v</code>
+            <span class="badge-desc">Multiply the weights by V. Each token's new, context-mixed representation. Same width d<sub>v</sub> as the Values.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Read it as a chain of shapes</strong>
+            <p>(n × d<sub>k</sub>) · (d<sub>k</sub> × n) → (n × n) → softmax → (n × n) · (n × d<sub>v</sub>) → (n × d<sub>v</sub>). Two matrix multiplies with a row-wise softmax in the middle. That is the entire operation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 3 — CODE-TO-ENGLISH CENTERPIECE (VERBATIM) -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The formula as real code</h2>
+        <p>This is the exact function from the lab, reproduced line for line. The shapes in the comments are the same ones you just named. Read the left, then the plain English on the right.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · python</span>
+            <pre><code><span class="code-line"><span class="code-keyword">import</span> numpy <span class="code-keyword">as</span> np</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">def</span> <span class="code-function">softmax</span>(x, axis=-<span class="code-number">1</span>):</span>
+<span class="code-line">    x = x - x.<span class="code-function">max</span>(axis=axis, keepdims=<span class="code-keyword">True</span>)   <span class="code-comment"># numerical stability</span></span>
+<span class="code-line">    e = np.<span class="code-function">exp</span>(x)</span>
+<span class="code-line">    <span class="code-keyword">return</span> e / e.<span class="code-function">sum</span>(axis=axis, keepdims=<span class="code-keyword">True</span>)</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">def</span> <span class="code-function">scaled_dot_product_attention</span>(Q, K, V, mask=<span class="code-keyword">None</span>):</span>
+<span class="code-line">    <span class="code-comment"># Q: (n, d_k)  K: (n, d_k)  V: (n, d_v)</span></span>
+<span class="code-line">    d_k = Q.shape[-<span class="code-number">1</span>]</span>
+<span class="code-line">    scores = Q @ K.T / np.<span class="code-function">sqrt</span>(d_k)           <span class="code-comment"># (n, n)  &lt;-- the O(n^2) object</span></span>
+<span class="code-line">    <span class="code-keyword">if</span> mask <span class="code-keyword">is</span> <span class="code-keyword">not</span> <span class="code-keyword">None</span>:                      <span class="code-comment"># causal mask: forbid looking ahead</span></span>
+<span class="code-line">        scores = np.<span class="code-function">where</span>(mask, scores, -np.inf)</span>
+<span class="code-line">    weights = <span class="code-function">softmax</span>(scores, axis=-<span class="code-number">1</span>)        <span class="code-comment"># row-wise: each query sums to 1</span></span>
+<span class="code-line">    <span class="code-keyword">return</span> weights @ V, weights               <span class="code-comment"># (n, d_v), (n, n)</span></span>
+</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Bring in NumPy, the library for fast math on grids of numbers.</p>
+              <p class="tl">Define softmax — the step that turns scores into faders that sum to 1.</p>
+              <p class="tl">Before taking exponentials, subtract the biggest value in each row. This is <span class="term" data-definition="Numerical stability means arranging a calculation so it does not blow up into infinity or shrink into zero on a real computer. Subtracting the max keeps the exponentials small enough to compute safely.">numerical stability</span> — it stops the exponentials from overflowing, and it does not change the answer.</p>
+              <p class="tl">Raise e to the power of each (now shifted) score.</p>
+              <p class="tl">Divide each value by the row's total, so the row sums to exactly 1. Those are your weights.</p>
+              <p class="tl">Now the main function: it takes Q, K, V and an optional mask.</p>
+              <p class="tl">A reminder of the shapes: Q and K are n × d<sub>k</sub>, V is n × d<sub>v</sub>.</p>
+              <p class="tl">Read d<sub>k</sub> straight off Q — it is the width of each query vector.</p>
+              <p class="tl"><strong>The heart of it:</strong> multiply Q by K transposed and divide by √d<sub>k</sub>. The result is the n × n score grid — the object that costs O(n²).</p>
+              <p class="tl">If a <span class="term" data-definition="A causal mask blocks each token from seeing tokens that come after it, so a model writing text cannot peek at the future words it has not generated yet.">causal mask</span> is given, blank out every future position by setting its score to negative infinity, so it cannot be looked at.</p>
+              <p class="tl">Those blanked scores become exactly 0 after softmax — the model cannot look ahead.</p>
+              <p class="tl">Run softmax along the last axis. That means row-wise: each query becomes its own set of weights over the keys, summing to 1.</p>
+              <p class="tl">Multiply the weights by V to blend the payloads, and hand back both the blend (n × d<sub>v</sub>) and the weights (n × n).</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The single most common silent bug</strong>
+            <p><code>axis=-1</code> is load-bearing. Softmax over the whole matrix, or over the columns (the queries), still produces numbers that sum to 1 — so nothing crashes — but the attention is now meaningless. The model trains, the loss looks plausible, and the behaviour is quietly wrong.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 4 — WHY √d_k, WITH BEFORE/AFTER COLLAPSE -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why divide by √d<sub>k</sub>?</h2>
+        <p>This is the master trim on the desk. Without it, one fader slams to the top and silences every other source. With it, the faders stay in a healthy range so the model can still blend several sources together.</p>
+
+        <p><strong>Why it happens:</strong> a dot product adds up d<sub>k</sub> products. As d<sub>k</sub> grows, the scores grow with it — their spread grows like √d<sub>k</sub>. Feed very large, very spread-out numbers into softmax and it spikes onto a single token: one weight near 1, the rest near 0. A spike like that also flattens the <span class="term" data-definition="A gradient is the signal that tells the model which direction to adjust its weights to improve. When the gradient is near zero, the model gets almost no signal and stops learning that part.">gradient</span> to almost nothing, so the model stops learning. Dividing by √d<sub>k</sub> cancels that growth and keeps the scores gentle.</p>
+
+        <p>Watch the same three scores <code>[10, 5, 2]</code> with the trim off, then on. (These are the verified numbers from the lab, with d<sub>k</sub> = 64.)</p>
+
+        <div class="layer-demo animate-in">
+          <div class="layer-tabs">
+            <button class="layer-tab active" onclick="showLayer('scale-off', this)">Scaling OFF</button>
+            <button class="layer-tab" onclick="showLayer('scale-on', this)">Scaling ON (÷ √64)</button>
+          </div>
+          <div class="layer-viewport">
+
+            <div class="layer" id="scale-off" style="display:block">
+              <div class="badge-list">
+                <div class="badge-item">
+                  <code class="badge-code">🍕  99.0%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:99%; background:var(--color-error); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🍝   0.9%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:2%; background:var(--color-accent-muted); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🥗   0.0%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:1%; background:var(--color-accent-muted); border-radius:var(--radius-sm);"></span></span>
+                </div>
+              </div>
+              <p style="color: var(--color-error); font-weight: 600;">Collapsed. The biggest score crushes everything — softmax is a one-hot spike. The model can only listen to one source, and the gradient has gone flat.</p>
+            </div>
+
+            <div class="layer" id="scale-on" style="display:none">
+              <div class="badge-list">
+                <div class="badge-item">
+                  <code class="badge-code">🍕  52.5%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:53%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🍝  28.1%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:28%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+                <div class="badge-item">
+                  <code class="badge-code">🥗  19.3%</code>
+                  <span class="badge-desc" style="display:block; width:100%;"><span style="display:inline-block; height:14px; width:19%; background:var(--color-success); border-radius:var(--radius-sm);"></span></span>
+                </div>
+              </div>
+              <p style="color: var(--color-success); font-weight: 600;">Healthy. The scores stay gentle. The model still leans toward the top source but keeps real weight on the others — it can blend.</p>
+            </div>
+
+          </div>
+          <p class="layer-description">Same raw scores, one division between them. Toggle the tabs to see the difference the master trim makes.</p>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">The takeaway in one line</strong>
+            <p>Large dot products make softmax razor-sharp and gradients tiny. Dividing by √d<sub>k</sub> keeps the scores in a range where the model can still blend multiple sources and still learn.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 5 — FAILURE MODE + TRADE-OFF -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One failure mode, one trade-off</h2>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">⚠️</div>
+            <h4 class="pattern-title">Failure mode: the wrong axis</h4>
+            <p class="pattern-desc">Run softmax over the whole matrix, or over the columns instead of the rows, and it still sums to 1 — so nothing errors. But each query no longer gets its own distribution over the keys. Attention silently becomes nonsense. Pair this with skipping √d<sub>k</sub> at large d<sub>k</sub>: softmax becomes a one-hot spike, the gradient vanishes, and the layer stops learning.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-info)">
+            <div class="pattern-icon" style="background: var(--color-info)">⚖️</div>
+            <h4 class="pattern-title">Trade-off: the n × n square</h4>
+            <p class="pattern-desc">Computing Q&nbsp;K<sup>T</sup> as a full n × n matrix is exact and perfectly parallel — every token pair scored at once, ideal for GPUs. The price is <span class="term" data-definition="O(n²) means the work and memory grow with the square of the sequence length n. Double the tokens and you quadruple the cost. The little O is the standard way engineers describe how something scales.">O(n²)</span> memory and compute. Double the sequence length and the square quadruples. That single cost shapes everything about long context — and is exactly the subject of the next module.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why these two are worth remembering</strong>
+            <p>The wrong-axis bug is the one a senior engineer catches in code review because it never throws an error. The n × n trade-off is the one they raise in a design review, because it decides whether your model can read a whole book or just a paragraph.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 6 — QUIZ -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>Four questions. Each one asks you to reason about the math, not recite it. Wrong answers come with an explanation, so treat this as thinking practice.</p>
+
+        <div class="quiz-container" id="quiz-module4">
+
+          <div class="quiz-question-block"
+               data-correct="opt-rowwise"
+               data-explanation-right="Exactly. Softmax runs along the last axis — row-wise over the keys. Each query (each row) becomes its own probability distribution that sums to 1, independent of the other queries."
+               data-explanation-wrong="Not quite. If softmax ran over the whole matrix or over the columns, the numbers would still sum to 1, so nothing would crash — but each query would lose its own distribution over the keys, and the attention would be meaningless. It must be row-wise, over the keys.">
+            <h3 class="quiz-question">In <code>softmax(scores, axis=-1)</code>, what is the softmax actually computing a distribution over?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-whole" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The entire score matrix at once, as one big distribution</span>
+              </button>
+              <button class="quiz-option" data-value="opt-rowwise" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each row — a distribution over the keys, summing to 1 per query</span>
+              </button>
+              <button class="quiz-option" data-value="opt-cols" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each column — a distribution over the queries</span>
+              </button>
+              <button class="quiz-option" data-value="opt-values" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The value vectors V directly</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-payload"
+               data-explanation-right="Right. Routing is not payload. The Q·K match only sets how loud B's fader is. The information that flows into A is B's Value vector, scaled by that weight."
+               data-explanation-wrong="Think back to the desk. The Q·K score sets the fader (how much A listens to B), but the sound that actually plays is B's Value — its payload. A receives B's Value scaled by the attention weight, not B's key or its raw embedding.">
+            <h3 class="quiz-question">Token A attends strongly to token B. What does A actually receive in its output?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-key" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's Key vector</span>
+              </button>
+              <button class="quiz-option" data-value="opt-payload" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's Value (the payload), scaled by the Q·K weight</span>
+              </button>
+              <button class="quiz-option" data-value="opt-raw" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>B's raw embedding, copied across verbatim</span>
+              </button>
+              <button class="quiz-option" data-value="opt-nothing" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing — attention only produces scores, not an output</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-spike"
+               data-explanation-right="Yes. As d_k grows, dot products grow and spread out. Large, spread-out scores push softmax into a one-hot spike — one weight near 1, the rest near 0 — which also flattens the gradient. Dividing by √d_k cancels that growth so the model can still blend sources and still learn."
+               data-explanation-wrong="It is not about memory, squareness, or masking. The reason is statistical: a dot product over d_k terms grows with d_k, and big spread-out scores make softmax collapse onto one token and the gradient vanish. The √d_k division rescales the scores back into a healthy range.">
+            <h3 class="quiz-question">You bump d<sub>k</sub> from 16 to 256 and forget the √d<sub>k</sub> division. Why does training stall?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mem" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The bigger d<sub>k</sub> uses too much memory to fit on the GPU</span>
+              </button>
+              <button class="quiz-option" data-value="opt-spike" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Larger dot products push softmax into a one-hot spike, so the gradient goes tiny</span>
+              </button>
+              <button class="quiz-option" data-value="opt-square" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The score matrix is no longer square, so the multiply fails</span>
+              </button>
+              <button class="quiz-option" data-value="opt-mask" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The causal mask stops working without the division</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-axis"
+               data-explanation-right="Exactly the right instinct. Wrong-axis softmax never throws — the numbers still sum to 1 — so the loss can look plausible while the attention is quietly meaningless. Checking that softmax runs row-wise over the keys (axis=-1) is the first thing to verify."
+               data-explanation-wrong="A crash would point you to a shape bug, but here nothing crashes and the loss only looks slightly off. The classic silent culprit is softmax over the wrong axis: it still sums to 1, so no error fires, but each query loses its own distribution over the keys. Check the axis first.">
+            <h3 class="quiz-question">A teammate's attention layer runs without errors, but the model barely learns and the loss looks slightly off. Based on this module, where do you look first?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-axis" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Which axis the softmax runs over — a wrong axis fails silently</span>
+              </button>
+              <button class="quiz-option" data-value="opt-lr" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether the V matrix has the wrong number of columns</span>
+              </button>
+              <button class="quiz-option" data-value="opt-gpu" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether the GPU ran out of memory on the n × n matrix</span>
+              </button>
+              <button class="quiz-option" data-value="opt-import" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Whether NumPy was imported correctly</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">➡️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where we go next</strong>
+            <p>You now read attention the way an engineer does — every shape, every symbol, the one division that keeps it trainable. The n × n score matrix is powerful but expensive. Next, exactly how expensive it gets, and what FlashAttention does about it.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">The Cost of Attention</h1>
+      <p class="module-subtitle">Attention reads every word against every other word. Double the text and you quadruple the work. Here is where long context gets expensive — and the trick that saves it.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 1 — HOOK + HANDSHAKE METAPHOR -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why does long context get so expensive?</h2>
+
+        <p>You already know the core operation: every token compares itself against every other token. That sounds harmless for ten words. It is brutal for a hundred thousand.</p>
+
+        <p>Picture a party where every guest must shake hands with every other guest. With 5 guests that is about 10 handshakes. With 50 guests it is around 1,225. Add a few more people and the handshakes explode — far faster than the guest list grows.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🤝</div>
+            <h4 class="pattern-title">Guests = tokens</h4>
+            <p class="pattern-desc">Each token is a guest at the party. The sequence length we call <strong>n</strong> is the guest count.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">💥</div>
+            <h4 class="pattern-title">Handshakes = pairs</h4>
+            <p class="pattern-desc">Every pair of tokens must be compared. The pairs grow with the <strong>square</strong> of the guest count.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔁</div>
+            <h4 class="pattern-title">Where it breaks</h4>
+            <p class="pattern-desc">Real handshakes happen once. Attention redoes <em>all</em> the pairings at <strong>every layer</strong> of the network.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The shape of the cost</strong>
+            <p>Comparing every token to every other token is an
+              <span class="term" data-definition="Big-O notation describes how the cost of an operation grows as the input grows. O(n) means cost grows in step with n. O(n squared) means cost grows with n times itself — so doubling n makes it four times bigger.">O(n²)</span>
+              operation: the work grows with the square of the sequence length. This single fact drives almost every long-context engineering decision in modern language models.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 2 — O(n) vs O(n^2): TWO OBJECTS, TWO GROWTH RATES -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Two objects, two very different growth rates</h2>
+
+        <p>Inside an attention layer there are two memory objects that matter. One grows gently. One grows viciously. Telling them apart is the whole game.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📏</div>
+            <div>
+              <strong>The token tensor — shape n × d — grows like O(n)</strong>
+              <p>Each of the <strong>n</strong> tokens is a vector of length <strong>d</strong> (the model dimension). Add one token, add one row. Memory grows in a straight line.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-accent)">🟥</div>
+            <div>
+              <strong>The score matrix — shape n × n — grows like O(n²)</strong>
+              <p>The
+                <span class="term" data-definition="To materialize a tensor means to actually allocate it in memory and fill in every number — as opposed to computing values on the fly and throwing them away. The n by n score matrix is materialized when every pairwise score is written to memory at once.">materialized</span>
+                table of every-token-against-every-token. Add one token and you add a whole new row <em>and</em> a whole new column. Memory grows like the square.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>Put real numbers on it. We will use
+          <span class="term" data-definition="fp16 means 16-bit floating point — a way to store a number using 2 bytes instead of the usual 4. Models use it to halve memory and run faster on GPUs, at the cost of a little numerical precision.">fp16</span>,
+          where every number takes 2 bytes. This is the standard precision for the activations inside a running model.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">n × d × 2 bytes</code>
+            <span class="badge-desc"><strong>Token tensor (fp16).</strong> n rows, each of width d, two bytes per number. Linear in n — this is the gentle one.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">n × n × 2 bytes</code>
+            <span class="badge-desc"><strong>Score matrix (fp16).</strong> n rows by n columns, two bytes per number. Quadratic in n — this is the one that explodes.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📊</div>
+          <div class="callout-content">
+            <strong class="callout-title">The ratio that tells the story</strong>
+            <p>Divide the two: the score matrix is exactly <strong>n ÷ d</strong> times bigger than the token tensor. While n is smaller than d, the token tensor dominates. The moment n grows past d, the n × n matrix takes over — and from there it never looks back.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 3 — HERO D3 COST CHART -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch the cost curves cross</h2>
+
+        <p>This is the picture to keep in your head. Three memory-growth curves on
+          <span class="term" data-definition="A log-log chart plots both axes on a logarithmic scale, where each step multiplies rather than adds. Curves that explode (like n squared) become straight lines, so you can compare growth rates at a glance instead of one curve flattening the others into the floor.">log-log axes</span>:
+          the token tensor (n × d), the score matrix (n × n), and FlashAttention.</p>
+
+        <div id="attn-cost-controls">
+          <label>Sequence length n: <output id="attn-n-out">512</output><input id="attn-n" type="range" min="128" max="131072" step="128" value="512"></label>
+          <label>Model dim d: <output id="attn-d-out">1024</output><input id="attn-d" type="range" min="128" max="8192" step="128" value="1024"></label>
+          <label><input id="attn-flash" type="checkbox"> Enable FlashAttention (do not materialize n x n)</label>
+        </div>
+        <div id="attn-cost-chart"></div>
+        <p id="attn-cost-caption" style="color: var(--color-text-muted); font-size: var(--text-sm); font-style: italic; margin-top: var(--space-2);"></p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Drag n and watch the wall appear</strong>
+            <p>Slide <strong>n</strong> to the right. At first the token-tensor line sits on top. Then the n × n curve crosses above it and shoots past everything else — that crossing point is the <strong>long-context wall</strong>. Now tick the FlashAttention box: the n × n curve vanishes and a flat O(n) curve takes its place.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 4 — THE 100x-PER-10x RULE + MEMORY WALL -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The 100×-per-10× rule</h2>
+
+        <p>Here is the one number an interviewer wants to hear you reach for instantly. It falls straight out of the square.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Make the context 10× longer</strong>
+              <p>Go from an 8,000-token prompt to an 80,000-token prompt. That is a 10× increase in n.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Attention memory grows ~100×</strong>
+              <p>The n × n score matrix scales with n², and 10² is 100. So the attention memory balloons by roughly one hundred times.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Prefill compute grows ~100× too</strong>
+              <p>The
+                <span class="term" data-definition="Prefill is the first pass an LLM makes over your whole prompt before it writes anything. It computes attention across all the prompt tokens at once. Because every token attends to every token, prefill cost scales with n squared.">prefill</span>
+                pass does ~O(n²·d)
+                <span class="term" data-definition="FLOPs means floating point operations — the count of individual multiply-and-add steps a computation needs. It is the standard way to measure raw compute cost, separate from how much memory the work uses.">FLOPs</span>,
+                so the work to read a 10× longer prompt also rises by about 100×.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Long context is fundamentally a memory problem</strong>
+            <p>The token tensor stays small. The n × n matrix is what you run out of room for first. So when someone asks "why can't this model just take a million tokens?", the honest first answer is not "not enough compute" — it is "not enough memory to hold all the pairwise scores."</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 5 — FLASHATTENTION + CODE-TO-ENGLISH -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">FlashAttention: same answer, far less memory</h2>
+
+        <p>FlashAttention is the trick that softens the wall. It is
+          <span class="term" data-definition="IO-aware means the algorithm is designed around the cost of moving data between memory levels, not just the cost of arithmetic. It deliberately keeps work inside fast on-chip memory to avoid slow trips to and from the big, slow memory.">IO-aware</span>:
+          it organizes the work to avoid the expensive memory traffic, instead of changing the math.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🧮</div>
+            <h4 class="pattern-title">Compute: unchanged</h4>
+            <p class="pattern-desc">Still O(n²) FLOPs. The same number of multiply-adds. The exact same output, number for number.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📉</div>
+            <h4 class="pattern-title">Memory: O(n)</h4>
+            <p class="pattern-desc">It never builds the full n × n matrix. It walks through it in tiles, keeping only running totals — so attention memory drops to linear.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">⚡</div>
+            <h4 class="pattern-title">Why it is faster too</h4>
+            <p class="pattern-desc">It keeps each tile inside fast on-chip memory and avoids round trips to slow
+              <span class="term" data-definition="HBM (High Bandwidth Memory) is the large pool of memory that sits beside a GPU. It is big but comparatively slow to read from. Writing and re-reading a giant n by n matrix to HBM is exactly the traffic FlashAttention avoids.">HBM</span>.</p>
+          </div>
+        </div>
+
+        <p>In production you rarely write the attention math by hand. You call one fused function, and the library uses a
+          <span class="term" data-definition="FlashAttention is an IO-aware attention algorithm. It computes attention in tiles and never stores the full n by n score matrix, cutting attention memory from O(n squared) down to O(n) while producing the exact same result.">FlashAttention</span>-backed kernel under the hood when it is available.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-line"><span class="code-keyword">import</span> torch.nn.functional <span class="code-keyword">as</span> F</span>
+<span class="code-line"><span class="code-comment"># Fused, FlashAttention-backed when available. Does NOT materialize the n×n matrix.</span></span>
+<span class="code-line">out = F.<span class="code-function">scaled_dot_product_attention</span>(q, k, v, is_causal=<span class="code-keyword">True</span>)</span>
+</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Pull in PyTorch's bundle of ready-made neural-network operations and call it <code>F</code>.</p>
+              <p class="tl">A note for the reader: this one call is fused (the whole attention is done in a single optimized step) and uses FlashAttention when the hardware supports it — so it never writes out the full n × n score table.</p>
+              <p class="tl">Run attention on the queries, keys, and values in one go. <code>is_causal=True</code> means each token may only look back at earlier tokens, never ahead. The result <code>out</code> is the new, context-mixed representation — identical to the slow way, just computed without ever holding the giant matrix in memory.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>That last line is the FlashAttention curve from the chart. Same output as the slow path, but the memory it uses is the flat O(n) line, not the exploding O(n²) one.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Failure mode &amp; the trade-off worth naming</strong>
+            <p>The first wall you hit at scale is an
+              <span class="term" data-definition="OOM stands for Out Of Memory — the moment a program asks for more memory than the GPU has, and the run crashes. At long context the n by n score matrix and the growing KV cache are the usual culprits.">OOM</span>
+              crash from the n × n matrix (and a growing
+              <span class="term" data-definition="The KV cache stores the Key and Value vectors of every token already processed, so the model does not recompute them for each new token during generation. It grows with sequence length and is the central topic of the next module.">KV cache</span>,
+              which the next module covers). FlashAttention saves memory IO but does <strong>not</strong> reduce FLOPs — your compute bill is unchanged. If you need to cut compute, that means sparse or sliding-window attention, which lower the work by <em>approximating</em> the result instead of computing every pair exactly.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 6 — QUIZ -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>These are interview-shaped. Pick the answer you would defend in a design review, not just the one that sounds right.</p>
+
+        <div class="quiz-container" id="quiz-module5">
+
+          <div class="quiz-question-block"
+               data-correct="opt-100x"
+               data-explanation-right="Exactly. Attention memory tracks the n × n matrix, which scales with n². A 10× longer context means 10² = 100× more attention memory — and roughly 100× more prefill FLOPs as well."
+               data-explanation-wrong="Think about the shape of the object that dominates. Attention memory follows the n × n score matrix, and that grows with n SQUARED. So a 10× change in n is a 10² = 100× change, not 10×.">
+            <h3 class="quiz-question">You extend a model's context from 8,000 tokens to 80,000 tokens — a 10× increase. Roughly how much does the attention memory change?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-10x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 10× — it grows in step with the context length.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-100x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 100× — the n × n score matrix grows with n².</span>
+              </button>
+              <button class="quiz-option" data-value="opt-2x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 2× — only the newest tokens add cost.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-mem"
+               data-explanation-right="Right. FlashAttention is a memory-IO trick: it never materializes the n × n matrix, so attention memory drops to O(n). The FLOPs stay O(n²) and the output is bit-for-bit the same — it is not an approximation."
+               data-explanation-wrong="FlashAttention does not touch the math. It produces the exact same output and the exact same O(n²) compute. What it changes is how memory is used — by tiling the work and never building the full n × n matrix, so attention memory becomes O(n).">
+            <h3 class="quiz-question">A teammate says "we switched to FlashAttention, so attention is now O(n) compute." What is wrong with that statement?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mem" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Compute is still O(n²). FlashAttention only cuts memory to O(n) by not materializing the matrix.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-approx" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing is wrong — FlashAttention returns an approximate output to save compute.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-kv" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing is wrong — it works by removing the need for a KV cache.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-scores"
+               data-explanation-right="Correct. The token tensor (n × d) is linear in n and stays small. The n × n score matrix is what you run out of room for first — long context is fundamentally a memory problem, and the n × n object is where it bites."
+               data-explanation-wrong="The token tensor is n × d — linear in n — so it grows gently and is rarely the first thing to run out. The object that explodes is the n × n score matrix, which grows with the square of n. That is the first thing to OOM at long context.">
+            <h3 class="quiz-question">Your long-context job crashes with an out-of-memory error during the prefill pass. Which object is the most likely culprit?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-token" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The token tensor (n × d) — it scales with the model dimension.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-scores" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The n × n score matrix — it grows with the square of the context length.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-weights" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The model weights — they grow with the context length.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-sparse"
+               data-explanation-right="Exactly. FlashAttention saves memory IO but keeps the same O(n²) FLOPs. To actually cut the compute you move to sparse or sliding-window attention, which skip most pairs — but that approximates the full attention rather than computing every pair exactly."
+               data-explanation-wrong="FlashAttention is the wrong lever here: it leaves FLOPs at O(n²) and only saves memory. To reduce the compute itself you need sparse or sliding-window attention, which trade exactness for fewer pairs to score.">
+            <h3 class="quiz-question">Prefill is compute-bound and you must cut the FLOPs, not just the memory. Which approach actually does that — and what is the cost?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-flash" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Enable FlashAttention — it lowers the FLOPs for free.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-fp16" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Switch to fp16 — halving the bytes halves the FLOPs.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-sparse" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Use sparse or sliding-window attention — it skips most pairs, but the result is an approximation.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Next: a different bottleneck</strong>
+            <p>Training does all positions at once, so it is bound by the n × n compute you just measured. Inference reveals a completely different bottleneck — generating one token at a time, where the cost is loading the <strong>KV cache</strong> from memory every step. That is the next module.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">Inference &amp; the KV Cache</h1>
+      <p class="module-subtitle">Why generating an answer is bottlenecked by re-reading, not by math — and how production systems fight back.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============ SCREEN 1 — HOOK + SCRIBE METAPHOR ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The model re-reads everything, every single word</h2>
+        <p>When a model writes you an answer, it does it one
+          <span class="term" data-definition="A token is one chunk of text the model handles at a time — often a word or part of a word. 'Attention' might be one token; 'reinforcement' might be split into several.">token</span>
+          at a time. Before it writes each new token, it re-reads everything it has said so far. That re-reading, not the math, is the bottleneck.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">✍️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Metaphor: a scribe taking dictation</strong>
+            <p>Imagine a scribe writing down a long story word by word. Before adding each new word, the scribe re-reads the <em>entire transcript so far</em> to stay consistent. The pile of pages already written is the <strong>KV cache</strong>. Re-reading the whole pile before every new word is the cost we will study. The analogy breaks down in one place: a real scribe could just remember the recent context, but the model literally reloads the whole cache from memory at every step.</p>
+          </div>
+        </div>
+
+        <p>This module is the finale. You already know <em>what</em> attention computes. Now you will learn why the same operation behaves like two completely different machines: a fast parallel one while <span class="term" data-definition="Training is the phase where the model learns. It is shown full example sequences and updates its internal weights. All tokens are present at once, so the work is one big parallel computation.">training</span>, and a memory-starved sequential one while <span class="term" data-definition="Inference (also called decoding) is the phase where a trained model is used to produce output for a user. For text generation it runs autoregressively — one new token at a time.">inference</span> generates text.</p>
+      </section>
+
+      <!-- ============ SCREEN 2 — TRAINING vs DECODE (SIDE BY SIDE) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One operation, two very different machines</h2>
+        <p>The attention formula does not change between training and generation. What changes is the <em>shape</em> of the inputs — and that single difference flips the bottleneck from compute to memory.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚡</div>
+            <h4 class="pattern-title">Training — parallel</h4>
+            <p class="pattern-desc">All <strong>N</strong> tokens are known up front. Q, K, and V are full <strong>N × d</strong> matrices. The whole <strong>N × N</strong> attention grid is one big parallel
+              <span class="term" data-definition="Matmul is short for matrix multiplication — the core arithmetic of deep learning. GPUs are built to do enormous matmuls extremely fast.">matmul</span>.
+              The GPU is doing heavy arithmetic, so this phase is <strong>compute-bound</strong>: speed is limited by how many math operations per second the chip can do.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🔁</div>
+            <h4 class="pattern-title">Decode — autoregressive</h4>
+            <p class="pattern-desc">Only one new token is born per step. Its Query is a single <strong>1 × d</strong> row. The past Keys and Values are kept in a
+              <span class="term" data-definition="The KV cache stores the Key and Value vectors already computed for every past token, so they never have to be recomputed. It grows by one row each time a new token is generated.">KV cache</span>
+              and just <em>appended to</em>, never recomputed. Per-token math is tiny, but every step you must re-read the whole cache from memory, so this phase is <strong>memory-bandwidth-bound</strong>.</p>
+          </div>
+        </div>
+
+        <p>The phrase to lock in: <strong>autoregressive</strong> generation.</p>
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: the bottleneck moved, not the math</strong>
+            <p>An <span class="term" data-definition="Autoregressive means each new output depends on all the outputs before it. The model feeds its own previous tokens back in to produce the next one — like predicting word 5 from words 1 through 4.">autoregressive</span> decode step does almost no arithmetic — a 1 × d query against the cache. The expensive part is <span class="term" data-definition="HBM (High Bandwidth Memory) is the fast memory sitting next to the GPU chip where weights and the KV cache live. It is fast, but reading from it still takes time — and that read time is the bottleneck during decoding.">HBM</span> bandwidth: loading the whole growing cache from memory into the chip on every single step. A system can be <span class="term" data-definition="Memory-bandwidth bound means the speed limit is how fast data can be moved from memory into the compute units — not how fast the math runs. The chip sits idle waiting for data.">memory-bandwidth bound</span> while the math units sit mostly idle.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 3 — HERO FLOW ANIMATION OF DECODE ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Trace one decode step, end to end</h2>
+        <p>Follow what happens when the model generates one token. Watch the cache grow by exactly one row each step — and notice that the past Keys and Values are <strong>re-read</strong>, never rebuilt.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Start: the prompt is already processed. The KV cache holds one Key row and one Value row for each prompt token."},
+          {"highlight":"flow-actor-2","label":"A new token is born. Its Query is a single 1 x d row — just this one position asking who to listen to.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-3","label":"Score the new Query against the WHOLE cached K. The past keys are loaded from HBM and re-read — never recomputed.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Softmax turns those scores into weights, then blend the cached Values (V) into this token output."},
+          {"highlight":"flow-actor-4","label":"Append this token K and V to the cache. The cache grows by exactly one row.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-2","label":"Repeat for the next token. Each step re-reads a slightly larger cache from HBM — that growing re-read is the bandwidth cost."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">📚</div>
+              <span>KV Cache</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">Q</div>
+              <span>New Query (1 × d)</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">⚖️</div>
+              <span>Score + Blend</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">➕</div>
+              <span>Append to Cache</span>
+            </div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+
+          <div class="flow-step-label" id="flow-label">Click "Next Step" to watch one token get generated</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📈</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why this is the wall</strong>
+            <p>The cache size grows with sequence length × layers × heads × head-dimension. At step 1000 you re-read roughly 1000 rows; at step 8000 you re-read 8000. The arithmetic per step barely moved, but the bytes moved from HBM keep climbing. That is why long answers feel slower toward the end.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 4 — THE CAUSAL MASK (CODE-TO-ENGLISH) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The one line that makes generation left-to-right</h2>
+        <p>Why can the model only ever go forward, one token at a time? Because of a
+          <span class="term" data-definition="A causal mask blocks each token from seeing tokens that come after it. 'Causal' means a cause must come before its effect — so a token can only attend to the past, never the future.">causal mask</span>.
+          Here is the exact line from the reference implementation. Read the plain-English column on the right.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-line"><span class="code-function">scores</span> = np.<span class="code-function">where</span>(mask, scores, -np.inf)</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Wherever the mask says "you are allowed to look here," keep the real score.</p>
+              <p class="tl">Wherever it says "this is a future token," replace the score with negative infinity.</p>
+              <p class="tl">After softmax, negative infinity becomes a weight of zero — so a token can never listen to words that come after it. That is what forces generation to run left to right.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔗</div>
+          <div class="callout-content">
+            <strong class="callout-title">Mask + cache are the same idea, seen twice</strong>
+            <p>During training, the causal mask hides the future inside one big parallel matmul, so every position is trained as if it only saw the past. During decoding, that "only the past exists" rule is automatic — the future tokens have not been generated yet. The KV cache is simply how we avoid recomputing that growing past from scratch on every step.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 5 — COMMON CONFUSIONS ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Five confusions that sink interviews</h2>
+        <p>These are the misreads that separate "I memorized a diagram" from "I understand the mechanism." Get each one straight.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Attention means the model understands."</strong>
+              <p>No. It computes relevance and <em>routes</em> information. Any understanding lives in the learned weights across the whole stack, not in one softmax.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"If token A attends to B, A copies B's embedding."</strong>
+              <p>No. A receives B's <strong>Value</strong> — the payload — scaled by the Query·Key weight. Routing decides <em>how much</em>; the Value is <em>what</em> actually flows. Routing is not the same as payload.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Softmax is taken over the whole matrix."</strong>
+              <p>No. It is row-wise, over the keys. Each query gets its own probability distribution that sums to 1. Get the axis wrong and attention silently turns to nonsense.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Q, K, and V are three different inputs."</strong>
+              <p>No. In <span class="term" data-definition="Self-attention is attention where the queries, keys, and values all come from the same sequence — the sentence attends to itself. This is the kind used inside a single block of a language model.">self-attention</span> they are three learned projections of the <em>same</em> input. A token labels itself and decides what it carries.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"FlashAttention is a faster, approximate or sub-quadratic algorithm."</strong>
+              <p>No. <span class="term" data-definition="FlashAttention is an IO-aware way of computing exact attention. It keeps the same math and same O(n squared) compute, but never writes the full n-by-n score matrix to memory, cutting memory traffic dramatically.">FlashAttention</span> gives the exact same output and the same O(n²) compute. It only changes <em>memory IO</em> by never materializing the full n × n score matrix.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 6 — THE FIXES (PATTERN CARDS) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The fixes you should be able to name</h2>
+        <p>Once you can say "decode is memory-bandwidth bound because we re-read the KV cache from HBM," every production fix becomes obvious — each one attacks the cache or the bandwidth directly.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🗜️</div>
+            <h4 class="pattern-title">MQA / GQA</h4>
+            <p class="pattern-desc"><span class="term" data-definition="MQA (Multi-Query Attention) and GQA (Grouped-Query Attention) let many attention heads share the same Keys and Values instead of each having its own. Fewer K/V copies means a much smaller KV cache to load each step.">MQA / GQA</span> share K and V across heads, so the cache shrinks. Less to load from HBM each step means a faster decode for the same model.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🧩</div>
+            <h4 class="pattern-title">PagedAttention / vLLM</h4>
+            <p class="pattern-desc"><span class="term" data-definition="PagedAttention, used by the vLLM serving system, stores the KV cache in small fixed-size blocks like operating-system memory pages. This stops the cache from fragmenting and wasting memory, so a GPU can serve many more users at once.">PagedAttention</span> stores the cache in small fixed-size blocks, like memory pages. No fragmentation means one GPU can fit far more concurrent requests.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🔢</div>
+            <h4 class="pattern-title">Quantized cache</h4>
+            <p class="pattern-desc">Store the cached Keys and Values in fewer bits (for example 8-bit instead of 16-bit). Fewer bytes per row means less to read from HBM each step — directly attacking the bandwidth bottleneck.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🚌</div>
+            <h4 class="pattern-title">Continuous batching</h4>
+            <p class="pattern-desc"><span class="term" data-definition="Continuous batching keeps the GPU busy by adding new requests and dropping finished ones on the fly, instead of waiting for a whole fixed batch to finish. It packs more useful work into each memory read.">Continuous batching</span> keeps the GPU full by swapping requests in and out as they finish, so each expensive cache read serves more users.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Design trade-off to verbalize</strong>
+            <p>MQA/GQA and a quantized cache both shrink the cache, but they can cost a little quality — sharing K/V across heads or using fewer bits throws away some precision. The staff-level answer names the lever <em>and</em> the price: "GQA cuts the cache and speeds decode, but I would A/B the eval scores before shipping, because sharing K/V can dent quality on long-context tasks." Naming the cost is the signal.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 7 — VICTORY LAP ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Victory lap — you can now hold your own in a design review</h2>
+        <p>This was the last module, and you leveled all the way up. Walk into the room able to do every one of these without notes.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Explain what attention computes — and what it does not</strong>
+              <p>A learned, per-token, per-layer soft lookup over the sequence. Routing, not understanding.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Derive softmax(Q Kᵀ / √d<sub>k</sub>) V with shapes</strong>
+              <p>Score, scale, softmax row-wise, blend the Values — every symbol and shape labeled, and why we divide by √d<sub>k</sub>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Reason about the O(n²) cost and the long-context memory wall</strong>
+              <p>10× longer context means 100× attention memory. You know why FlashAttention helps and why it changes memory IO, not the math.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Explain the KV cache and the decode bottleneck in a review</strong>
+              <p>Training is compute-bound; decode is memory-bandwidth-bound. You can name MQA/GQA, PagedAttention, quantized cache, and continuous batching — and the trade-off each carries.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🚀</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where this goes next</strong>
+            <p>Everything you built here is the prerequisite for two more topics that plug into this same course later: <strong>Multi-Head Attention</strong> (why one head is not enough) and <strong>Positional Encoding</strong> (how to give order to an operation that is otherwise blind to it). You now have the foundation they both stand on.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 8 — QUIZ ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check yourself — interview-shaped</h2>
+        <p>These test reasoning, not recall. Take a beat before each one.</p>
+
+        <div class="quiz-container" id="quiz-module6">
+
+          <div class="quiz-question-block"
+               data-correct="opt-bw"
+               data-explanation-right="Per-token compute during decode is tiny — a single 1 x d query against the cache. The expensive part is loading the whole growing KV cache from HBM on every step, so memory bandwidth sets the speed limit."
+               data-explanation-wrong="Compute is the bottleneck during training, not decode. During autoregressive decode the math per token is tiny; the cost is re-reading the entire KV cache from HBM each step — that is memory bandwidth.">
+            <h3 class="quiz-question">A teammate says "let's buy a GPU with more math throughput to speed up text generation." Why might that barely help?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-compute" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It would help a lot — decode is limited by how fast the chip does math</span>
+              </button>
+              <button class="quiz-option" data-value="opt-bw" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Decode is memory-bandwidth bound — it re-reads the KV cache from HBM each step, so more math throughput sits mostly idle</span>
+              </button>
+              <button class="quiz-option" data-value="opt-disk" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Generation is limited by disk read speed</span>
+              </button>
+              <button class="quiz-option" data-value="opt-net" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It is limited by network latency to the user</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-reread"
+               data-explanation-right="The cache holds the Key and Value vectors of every past token. We re-read them instead of recomputing because they never change once produced — recomputing the whole past at every step would turn cheap decoding into an O(n squared) blowup per token."
+               data-explanation-wrong="The cache does not store the final answer or the attention weights — it stores past Keys and Values. We keep them because they are fixed once computed; recomputing the entire past on every new token would be hugely wasteful, so we re-read instead.">
+            <h3 class="quiz-question">What does the KV cache store, and why re-read it instead of recomputing it each step?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-answer" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the final generated answer so we don't repeat words</span>
+              </button>
+              <button class="quiz-option" data-value="opt-reread" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the Keys and Values of past tokens; they never change, so re-reading is far cheaper than recomputing the whole past each step</span>
+              </button>
+              <button class="quiz-option" data-value="opt-weights" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the softmax attention weights, which we reuse directly</span>
+              </button>
+              <button class="quiz-option" data-value="opt-queries" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the Query rows so the model can re-ask old questions</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-shape"
+               data-explanation-right="During training all N tokens are present, so Q, K, V are full N x d matrices and the N x N attention is one big parallel matmul — heavy math, compute-bound. During decode only a 1 x d query is new each step while the cache is re-read from HBM — tiny math, bandwidth-bound."
+               data-explanation-wrong="The formula is identical in both phases. What flips the bottleneck is the input shape: training has all N tokens at once (big parallel matmul, compute-bound), while decode produces one row at a time and re-reads the cache (tiny math, memory-bandwidth-bound).">
+            <h3 class="quiz-question">In one sentence: why is training compute-bound while autoregressive decode is memory-bandwidth-bound?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-formula" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training and decoding use two different attention formulas</span>
+              </button>
+              <button class="quiz-option" data-value="opt-shape" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training processes all N tokens as one big parallel matmul (heavy math), while decode adds one 1 × d row at a time and must re-read the whole cache from HBM (tiny math, lots of memory traffic)</span>
+              </button>
+              <button class="quiz-option" data-value="opt-precision" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training uses higher numerical precision than decoding</span>
+              </button>
+              <button class="quiz-option" data-value="opt-mask" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because only decoding uses the causal mask</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-cache"
+               data-explanation-right="GQA makes heads share Keys and Values, which shrinks the KV cache. A smaller cache means fewer bytes to load from HBM each decode step — directly relieving the memory-bandwidth bottleneck. The catch to mention: sharing K/V can cost a little quality, so you'd verify eval scores."
+               data-explanation-wrong="GQA does not change the math output or add compute — and it is not about disk. Its job is to make heads share K and V so the KV cache is smaller, which cuts the HBM traffic that bottlenecks decoding.">
+            <h3 class="quiz-question">You're serving a chat model and decode is too slow. Why would switching to GQA help, and what would you watch?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-faster-math" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It makes the attention math itself run with fewer operations</span>
+              </button>
+              <button class="quiz-option" data-value="opt-cache" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Heads share K/V, so the KV cache shrinks and there's less to load from HBM each step — watch eval scores, since sharing can dent quality</span>
+              </button>
+              <button class="quiz-option" data-value="opt-disk2" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It moves the cache to disk so it never fills GPU memory</span>
+              </button>
+              <button class="quiz-option" data-value="opt-exact" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It removes the causal mask so tokens can attend in both directions</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+  </main>
+
+</body>
+</html>

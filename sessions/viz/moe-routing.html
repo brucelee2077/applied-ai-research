@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mixture-of-Experts: Token Routing & Load Balancing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --text:#2C2A28; --text2:#5A544E;
+    --muted:#6B645E; --border:#E5DFD6; --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+    --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px 64px; }
+
+  .topbar {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding: 22px 0 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .topbar h1 {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-weight: 700; font-size: 26px; line-height: 1.15; margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .backlink {
+    font-size: 14px; color: var(--accent); text-decoration: none;
+    white-space: nowrap; font-weight: 500;
+  }
+  .backlink:hover { color: var(--accent-d); text-decoration: underline; }
+
+  .intro {
+    font-size: 16px; color: var(--text2); margin: 0 0 22px;
+  }
+  .intro b { color: var(--text); font-weight: 600; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: 0 1px 2px rgba(44,42,40,0.04), 0 6px 20px rgba(44,42,40,0.04);
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-size: 15px; font-weight: 600; margin: 0 0 16px;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+  }
+
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+  .control label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 14px; font-weight: 500; margin-bottom: 6px;
+  }
+  .control .val {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; color: var(--accent-d); font-weight: 500;
+    background: var(--accent-l); padding: 1px 8px; border-radius: 6px;
+  }
+  .control .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  input[type=range] {
+    width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer;
+    height: 22px;
+  }
+  .btnrow { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--accent-d); background: var(--accent-l);
+    border: 1px solid #C9E4EE; border-radius: 8px;
+    padding: 8px 16px; cursor: pointer; transition: background 0.15s, border 0.15s;
+  }
+  button:hover { background: #D6ECF3; border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+
+  .readouts {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 620px) { .readouts { grid-template-columns: 1fr; } }
+  .stat {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .stat .k { font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 3px; }
+  .stat .v {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 22px; font-weight: 500; color: var(--text);
+  }
+  .stat .sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .stat.warnstat .v { color: var(--bad); }
+
+  figure { margin: 0; }
+  svg { width: 100%; height: auto; display: block; }
+  .fallback {
+    padding: 40px 20px; text-align: center; color: var(--muted);
+    font-size: 15px; background: var(--surface2);
+    border: 1px dashed var(--border); border-radius: 12px;
+  }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--text2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+
+  .takeaway {
+    background: var(--accent-l);
+    border: 1px solid #C9E4EE;
+    border-left: 4px solid var(--accent);
+    border-radius: 12px;
+    padding: 18px 22px;
+  }
+  .takeaway h2 {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    font-size: 15px; font-weight: 700; margin: 0 0 10px; color: var(--accent-d);
+    text-transform: none; letter-spacing: 0;
+  }
+  .takeaway ul { margin: 0; padding-left: 20px; }
+  .takeaway li { margin-bottom: 8px; font-size: 14.5px; color: var(--text); }
+  .takeaway li:last-child { margin-bottom: 0; }
+  .takeaway code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; background: rgba(42,123,155,0.10); padding: 1px 5px; border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>Mixture-of-Experts: Token Routing &amp; Load Balancing</h1>
+    <a class="backlink" href="../index.html">&larr; All lessons</a>
+  </div>
+
+  <p class="intro">
+    A <b>Mixture-of-Experts (MoE)</b> layer holds many small feed-forward networks called
+    <b>experts</b>. A tiny <b>gating network</b> reads each token and sends it to only the
+    <b>top-k</b> experts instead of all of them &mdash; so the model has huge total parameters
+    but runs cheap per token. Below: watch 16 tokens get routed, and see what happens when
+    routing gets lopsided.
+  </p>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <div class="control">
+        <label for="sE">Number of experts <span class="val" id="vE">8</span></label>
+        <input type="range" id="sE" min="4" max="16" step="1" value="8" />
+        <div class="hint">Total experts E in the layer.</div>
+      </div>
+      <div class="control">
+        <label for="sK">Top-k (experts per token) <span class="val" id="vK">1</span></label>
+        <input type="range" id="sK" min="1" max="2" step="1" value="1" />
+        <div class="hint">How many experts each token is sent to.</div>
+      </div>
+      <div class="control">
+        <label for="sC">Capacity factor <span class="val" id="vC">1.25</span></label>
+        <input type="range" id="sC" min="0.5" max="2.0" step="0.05" value="1.25" />
+        <div class="hint">Buffer size multiplier per expert.</div>
+      </div>
+      <div class="control">
+        <label for="sS">Routing skew <span class="val" id="vS">0.30</span></label>
+        <input type="range" id="sS" min="0" max="1" step="0.02" value="0.30" />
+        <div class="hint">0 = uniform routing &middot; 1 = a few experts hog everything.</div>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button id="reroll">Re-roll tokens</button>
+      <button id="reset">Reset controls</button>
+    </div>
+  </div>
+
+  <!-- READOUTS -->
+  <div class="readouts">
+    <div class="stat" id="stActive">
+      <div class="k">Active params / token</div>
+      <div class="v" id="rActive">12.5%</div>
+      <div class="sub" id="rActiveSub">top_k / E = 1 / 8</div>
+    </div>
+    <div class="stat" id="stDropped">
+      <div class="k">Tokens dropped</div>
+      <div class="v" id="rDropped">0</div>
+      <div class="sub" id="rDroppedSub">over capacity &rarr; discarded</div>
+    </div>
+    <div class="stat" id="stImb">
+      <div class="k">Load imbalance</div>
+      <div class="v" id="rImb">1.00&times;</div>
+      <div class="sub">max load / mean load (1.0 = perfect)</div>
+    </div>
+  </div>
+
+  <!-- FIGURE -->
+  <div class="card">
+    <h2>Router &amp; expert bins</h2>
+    <figure>
+      <svg id="viz" viewBox="0 0 820 460" role="img"
+           aria-label="Diagram of 16 tokens on the left routed through a gating network to expert bins on the right. Experts are colored by load; tokens sent to a full expert are dropped and shown in red.">
+        <foreignObject x="0" y="0" width="820" height="460" id="fallbackHost" style="display:none;">
+          <div xmlns="http://www.w3.org/1999/xhtml" class="fallback">
+            The interactive figure needs D3, which could not be loaded.
+            The concept still holds: tokens are routed to top-k of E experts, and any
+            token sent to an expert that is already full gets dropped.
+          </div>
+        </foreignObject>
+      </svg>
+    </figure>
+    <div class="legend">
+      <span><span class="swatch" style="background:#DCE9EE;"></span> low load</span>
+      <span><span class="swatch" style="background:var(--accent);"></span> high load</span>
+      <span><span class="swatch" style="background:var(--warn);"></span> at / over capacity</span>
+      <span><span class="swatch" style="background:var(--bad);"></span> dropped token / edge</span>
+    </div>
+  </div>
+
+  <!-- TAKEAWAY -->
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li><b>Sparse compute, dense knowledge.</b> Each token only touches
+        <code>top_k / E</code> of the experts, so compute stays flat while total parameters
+        can grow enormous. That is the whole selling point of MoE.</li>
+      <li><b>Skew causes drops.</b> Slide routing skew up: a few experts overflow their
+        capacity <code>ceil(cf &middot; top_k &middot; n / E)</code> and the extra tokens turn
+        <span style="color:var(--bad);font-weight:600;">red &mdash; dropped</span>. Dropped tokens
+        get no expert output, which hurts quality.</li>
+      <li><b>Why the aux loss &amp; capacity factor exist.</b> An auxiliary load-balancing loss
+        pushes the imbalance ratio toward <code>1.0</code> (uniform), and a larger capacity factor
+        adds buffer so fewer tokens drop &mdash; at the cost of more memory and padding.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var svg = document.getElementById("viz");
+  var fallbackHost = document.getElementById("fallbackHost");
+
+  if (typeof window.d3 === "undefined") {
+    console.warn("[moe-routing] d3 is undefined — showing fallback message, no figure rendered.");
+    if (fallbackHost) fallbackHost.style.display = "";
+    return;
+  }
+
+  var prefersReduced = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = prefersReduced ? 0 : 500;
+
+  var N_TOKENS = 16;
+
+  // ----- geometry -----
+  var W = 820, H = 460;
+  var tokenX = 90;            // x of token dots (left)
+  var gateX = 340;            // x of gating network box (center)
+  var gateW = 118, gateH = 150;
+  var expertX = 600;          // left edge of expert bins (right)
+  var expertW = 150;          // bin width
+  var topPad = 40, botPad = 40;
+
+  var d3svg = d3.select("#viz");
+
+  // Persistent layers (created once, updated on redraw)
+  var gEdges   = d3svg.append("g").attr("class", "edges");
+  var gExperts = d3svg.append("g").attr("class", "experts");
+  var gGate    = d3svg.append("g").attr("class", "gate");
+  var gTokens  = d3svg.append("g").attr("class", "tokens");
+  var gLabels  = d3svg.append("g").attr("class", "labels");
+
+  // Color scale: load 0 -> pale, higher -> accent
+  var loadColor = d3.scaleLinear()
+    .domain([0, 1])
+    .range(["#DCE9EE", "#2A7B9B"])
+    .clamp(true);
+
+  // ----- controls -----
+  var els = {
+    E: document.getElementById("sE"),
+    K: document.getElementById("sK"),
+    C: document.getElementById("sC"),
+    S: document.getElementById("sS"),
+    vE: document.getElementById("vE"),
+    vK: document.getElementById("vK"),
+    vC: document.getElementById("vC"),
+    vS: document.getElementById("vS")
+  };
+
+  // A fixed random seed per "roll" so sliders don't reshuffle the base preferences.
+  // rand[i] in [0,1) is a stable per-token uniform draw used to pick experts.
+  var tokenSeeds = [];
+  function reroll() {
+    tokenSeeds = [];
+    for (var i = 0; i < N_TOKENS; i++) {
+      // two independent draws per top-k slot (support up to k=2)
+      tokenSeeds.push([Math.random(), Math.random()]);
+    }
+  }
+  reroll();
+
+  // Build a routing distribution over E experts given skew s in [0,1].
+  // s=0 -> uniform weights; s=1 -> heavily concentrated on the first few experts.
+  // We use an exponential decay whose sharpness grows with s.
+  function routingWeights(E, s) {
+    var w = new Array(E);
+    var lambda = s * 3.0; // decay rate; 0 -> flat, up to ~3 -> steep
+    var sum = 0;
+    for (var e = 0; e < E; e++) {
+      var val = Math.exp(-lambda * (e / Math.max(1, E - 1)));
+      w[e] = val;
+      sum += val;
+    }
+    for (var e2 = 0; e2 < E; e2++) w[e2] /= sum; // normalize to a probability distribution
+    return w;
+  }
+
+  // Map a uniform draw u in [0,1) to an expert index via inverse-CDF over weights w.
+  function pickExpert(u, w) {
+    var acc = 0;
+    for (var e = 0; e < w.length; e++) {
+      acc += w[e];
+      if (u < acc) return e;
+    }
+    return w.length - 1;
+  }
+
+  // ----- core routing computation -----
+  function computeRouting(E, K, cf, s) {
+    var weights = routingWeights(E, s);
+
+    // capacity per expert = ceil(cf * K * N / E)
+    var capacity = Math.ceil(cf * K * N_TOKENS / E);
+    if (capacity < 1) capacity = 1;
+
+    // First pass: each token proposes K distinct experts (ranked by gate).
+    // We assign in token order; an expert accepts until it is full, else the
+    // token's slot is DROPPED. This mirrors the standard capacity-drop scheme.
+    var expertLoad = new Array(E).fill(0);        // accepted tokens per expert
+    var expertRequested = new Array(E).fill(0);   // requested (incl. would-be-dropped)
+    var assignments = []; // per token: array of {expert, slot, dropped}
+
+    for (var t = 0; t < N_TOKENS; t++) {
+      var chosen = [];
+      var seedPair = tokenSeeds[t];
+      for (var slot = 0; slot < K; slot++) {
+        // draw an expert; if duplicate of an already-chosen one this token, nudge to next
+        var u = seedPair[slot % seedPair.length];
+        // decorrelate the second slot a little so top-2 usually differs from top-1
+        if (slot === 1) u = (u + 0.5) % 1;
+        var e = pickExpert(u, weights);
+        // ensure distinct experts within a token's top-k
+        var guard = 0;
+        while (chosen.indexOf(e) !== -1 && guard < E) {
+          e = (e + 1) % E;
+          guard++;
+        }
+        chosen.push(e);
+      }
+
+      var tokAssign = [];
+      for (var c = 0; c < chosen.length; c++) {
+        var ex = chosen[c];
+        expertRequested[ex] += 1;
+        var dropped;
+        if (expertLoad[ex] < capacity) {
+          expertLoad[ex] += 1;
+          dropped = false;
+        } else {
+          dropped = true;
+        }
+        tokAssign.push({ expert: ex, slot: c, dropped: dropped });
+      }
+      assignments.push(tokAssign);
+    }
+
+    // Stats
+    // A token is "fully dropped" only if ALL of its slots dropped (no expert output at all).
+    var droppedTokens = 0;
+    for (var ti = 0; ti < assignments.length; ti++) {
+      var all = assignments[ti].length > 0;
+      for (var a = 0; a < assignments[ti].length; a++) {
+        if (!assignments[ti][a].dropped) all = false;
+      }
+      if (all) droppedTokens += 1;
+    }
+
+    // Imbalance uses REQUESTED load (what the gate wanted), so it reflects routing skew
+    // even beyond capacity. mean requested load per expert = K * N / E.
+    var meanReq = (K * N_TOKENS) / E;
+    var maxReq = 0;
+    for (var m = 0; m < E; m++) if (expertRequested[m] > maxReq) maxReq = expertRequested[m];
+    var imbalance = meanReq > 0 ? (maxReq / meanReq) : 1;
+
+    return {
+      E: E, K: K, cf: cf, s: s,
+      capacity: capacity,
+      weights: weights,
+      expertLoad: expertLoad,
+      expertRequested: expertRequested,
+      assignments: assignments,
+      droppedTokens: droppedTokens,
+      imbalance: imbalance,
+      meanReq: meanReq
+    };
+  }
+
+  // ----- rendering -----
+  function tokenPos(i) {
+    var span = H - topPad - botPad;
+    var y = topPad + (span * (i + 0.5) / N_TOKENS);
+    return { x: tokenX, y: y };
+  }
+
+  function expertLayout(E) {
+    var span = H - topPad - botPad;
+    var gap = 8;
+    var binH = (span - gap * (E - 1)) / E;
+    if (binH < 6) binH = 6;
+    var arr = [];
+    for (var e = 0; e < E; e++) {
+      var y = topPad + e * (binH + gap);
+      arr.push({ x: expertX, y: y, h: binH, cy: y + binH / 2 });
+    }
+    return arr;
+  }
+
+  function render(state) {
+    var E = state.E;
+    var bins = expertLayout(E);
+
+    // ---------- Gating network box (static-ish) ----------
+    var gateY = (H - gateH) / 2;
+    var gateSel = gGate.selectAll("g.gatebox").data([0]);
+    var gateEnter = gateSel.enter().append("g").attr("class", "gatebox");
+    gateEnter.append("rect")
+      .attr("x", gateX).attr("y", gateY)
+      .attr("width", gateW).attr("height", gateH)
+      .attr("rx", 12)
+      .attr("fill", "#FDF9F3")
+      .attr("stroke", "#2A7B9B")
+      .attr("stroke-width", 1.5);
+    gateEnter.append("text")
+      .attr("x", gateX + gateW / 2).attr("y", gateY + gateH / 2 - 8)
+      .attr("text-anchor", "middle")
+      .attr("font-family", "'Bricolage Grotesque', sans-serif")
+      .attr("font-size", 15).attr("font-weight", 700).attr("fill", "#1F6280")
+      .text("Gating");
+    gateEnter.append("text")
+      .attr("x", gateX + gateW / 2).attr("y", gateY + gateH / 2 + 12)
+      .attr("text-anchor", "middle")
+      .attr("font-family", "'Bricolage Grotesque', sans-serif")
+      .attr("font-size", 15).attr("font-weight", 700).attr("fill", "#1F6280")
+      .text("network");
+    gateEnter.append("text")
+      .attr("x", gateX + gateW / 2).attr("y", gateY + gateH + 20)
+      .attr("text-anchor", "middle")
+      .attr("font-family", "'JetBrains Mono', monospace")
+      .attr("font-size", 12).attr("fill", "#6B645E")
+      .attr("class", "gate-topk");
+    gGate.select(".gate-topk").text("softmax → top-" + state.K);
+
+    // ---------- Column labels ----------
+    var labelData = [
+      { x: tokenX, y: 22, t: "Tokens (batch = " + N_TOKENS + ")" },
+      { x: expertX + expertW / 2, y: 22, t: "Experts (E = " + E + ")" }
+    ];
+    var lab = gLabels.selectAll("text.collabel").data(labelData);
+    lab.enter().append("text")
+      .attr("class", "collabel")
+      .attr("text-anchor", "middle")
+      .attr("font-family", "'Bricolage Grotesque', sans-serif")
+      .attr("font-size", 13).attr("font-weight", 600).attr("fill", "#5A544E")
+      .merge(lab)
+      .attr("x", function (d) { return d.x; })
+      .attr("y", function (d) { return d.y; })
+      .text(function (d) { return d.t; });
+
+    // ---------- Expert bins ----------
+    var maxLoad = Math.max(1, d3.max(state.expertRequested));
+    var expData = bins.map(function (b, e) {
+      var load = state.expertLoad[e];
+      var req = state.expertRequested[e];
+      var full = req >= state.capacity;
+      return { e: e, x: b.x, y: b.y, h: b.h, cy: b.cy, load: load, req: req, full: full };
+    });
+
+    var eSel = gExperts.selectAll("g.expert").data(expData, function (d) { return d.e; });
+    eSel.exit().remove();
+    var eEnter = eSel.enter().append("g").attr("class", "expert");
+    eEnter.append("rect").attr("class", "ebin").attr("rx", 8);
+    eEnter.append("rect").attr("class", "efill").attr("rx", 6);
+    eEnter.append("text").attr("class", "elabel");
+    eEnter.append("text").attr("class", "ecount");
+
+    var eAll = eEnter.merge(eSel);
+
+    eAll.select("rect.ebin")
+      .attr("x", function (d) { return d.x; })
+      .attr("width", expertW)
+      .attr("stroke-width", 1.5)
+      .transition().duration(DUR)
+      .attr("y", function (d) { return d.y; })
+      .attr("height", function (d) { return d.h; })
+      .attr("fill", function (d) {
+        // fill color by requested load (relative)
+        return loadColor(d.req / maxLoad);
+      })
+      .attr("stroke", function (d) { return d.full ? "#C99A12" : "#C9E4EE"; });
+
+    // "capacity used" inner fill bar (proportion of capacity filled)
+    eAll.select("rect.efill")
+      .attr("x", function (d) { return d.x + 4; })
+      .transition().duration(DUR)
+      .attr("y", function (d) { return d.y + 4; })
+      .attr("width", function (d) {
+        var frac = Math.min(1, d.load / state.capacity);
+        return Math.max(0, (expertW - 8) * frac);
+      })
+      .attr("height", function (d) { return Math.max(0, d.h - 8); })
+      .attr("fill", function (d) { return d.full ? "rgba(201,154,18,0.30)" : "rgba(42,123,155,0.22)"; });
+
+    eAll.select("text.elabel")
+      .attr("x", function (d) { return d.x + 8; })
+      .attr("text-anchor", "start")
+      .attr("font-family", "'JetBrains Mono', monospace")
+      .attr("font-size", function (d) { return d.h < 16 ? 9 : 11; })
+      .attr("fill", "#2C2A28")
+      .transition().duration(DUR)
+      .attr("y", function (d) { return d.cy + (d.h < 16 ? 3 : 4); })
+      .tween("text", null)
+      .on("start", function (d) { d3.select(this).text("E" + d.e); });
+
+    eAll.select("text.ecount")
+      .attr("x", function (d) { return d.x + expertW - 8; })
+      .attr("text-anchor", "end")
+      .attr("font-family", "'JetBrains Mono', monospace")
+      .attr("font-size", function (d) { return d.h < 16 ? 9 : 11; })
+      .attr("font-weight", 500)
+      .transition().duration(DUR)
+      .attr("y", function (d) { return d.cy + (d.h < 16 ? 3 : 4); })
+      .attr("fill", function (d) { return d.full ? "#9A7509" : "#5A544E"; })
+      .on("start", function (d) {
+        d3.select(this).text(d.load + "/" + state.capacity);
+      });
+
+    // capacity line note under experts
+    var capNote = gLabels.selectAll("text.capnote").data([0]);
+    capNote.enter().append("text").attr("class", "capnote")
+      .attr("text-anchor", "middle")
+      .attr("font-family", "'JetBrains Mono', monospace")
+      .attr("font-size", 11).attr("fill", "#6B645E")
+      .merge(capNote)
+      .attr("x", expertX + expertW / 2)
+      .attr("y", H - 12)
+      .text("capacity = ceil(" + state.cf.toFixed(2) + " × " + state.K +
+            " × " + N_TOKENS + " / " + E + ") = " + state.capacity + " per expert");
+
+    // ---------- Tokens ----------
+    var tokData = [];
+    for (var t = 0; t < N_TOKENS; t++) {
+      var p = tokenPos(t);
+      var a = state.assignments[t];
+      var allDropped = a.length > 0;
+      for (var ai = 0; ai < a.length; ai++) if (!a[ai].dropped) allDropped = false;
+      tokData.push({ i: t, x: p.x, y: p.y, dropped: allDropped });
+    }
+
+    var tSel = gTokens.selectAll("circle.token").data(tokData, function (d) { return d.i; });
+    tSel.enter().append("circle")
+      .attr("class", "token")
+      .attr("r", 8)
+      .attr("cx", function (d) { return d.x; })
+      .attr("cy", function (d) { return d.y; })
+      .attr("stroke", "#FFFFFF").attr("stroke-width", 1.5)
+      .merge(tSel)
+      .transition().duration(DUR)
+      .attr("cx", function (d) { return d.x; })
+      .attr("cy", function (d) { return d.y; })
+      .attr("fill", function (d) { return d.dropped ? "#BE3E26" : "#1F6280"; });
+
+    // ---------- Edges (token -> gate -> expert) ----------
+    // Build flat edge list.
+    var edges = [];
+    for (var te = 0; te < N_TOKENS; te++) {
+      var tp = tokenPos(te);
+      var assigns = state.assignments[te];
+      for (var s2 = 0; s2 < assigns.length; s2++) {
+        var as = assigns[s2];
+        var bin = bins[as.expert];
+        edges.push({
+          key: te + "-" + s2,
+          x1: tp.x + 8, y1: tp.y,
+          bx: bin.x, by: bin.cy,
+          dropped: as.dropped
+        });
+      }
+    }
+
+    var gateCX = gateX + gateW / 2;
+    function edgePath(d) {
+      // token -> center of gate box -> expert bin left edge, as two smooth curves
+      var midY = gateY + gateH / 2;
+      // curve 1: token to gate
+      var c1x = (d.x1 + gateX) / 2;
+      // curve 2: gate to expert
+      var c2x = (gateX + gateW + d.bx) / 2;
+      return "M" + d.x1 + "," + d.y1 +
+             " C" + c1x + "," + d.y1 + " " + c1x + "," + midY + " " + gateX + "," + midY +
+             " M" + (gateX + gateW) + "," + midY +
+             " C" + c2x + "," + midY + " " + c2x + "," + d.by + " " + d.bx + "," + d.by;
+    }
+
+    var edgeSel = gEdges.selectAll("path.edge").data(edges, function (d) { return d.key; });
+    edgeSel.exit().remove();
+    edgeSel.enter().append("path")
+      .attr("class", "edge")
+      .attr("fill", "none")
+      .attr("stroke-linecap", "round")
+      .merge(edgeSel)
+      .attr("d", edgePath)
+      .attr("stroke", function (d) { return d.dropped ? "#BE3E26" : "#8FBFD1"; })
+      .attr("stroke-width", function (d) { return d.dropped ? 1.6 : 1.2; })
+      .attr("stroke-opacity", function (d) { return d.dropped ? 0.85 : 0.45; })
+      .attr("stroke-dasharray", function (d) { return d.dropped ? "4 3" : null; });
+
+    // ---------- Readouts ----------
+    updateReadouts(state);
+  }
+
+  function updateReadouts(state) {
+    var activeFrac = state.K / state.E;
+    document.getElementById("rActive").textContent = (activeFrac * 100).toFixed(1) + "%";
+    document.getElementById("rActiveSub").textContent =
+      "top_k / E = " + state.K + " / " + state.E;
+
+    var dEl = document.getElementById("rDropped");
+    dEl.textContent = String(state.droppedTokens);
+    var dStat = document.getElementById("stDropped");
+    if (state.droppedTokens > 0) dStat.classList.add("warnstat");
+    else dStat.classList.remove("warnstat");
+    document.getElementById("rDroppedSub").textContent =
+      state.droppedTokens > 0
+        ? "of " + N_TOKENS + " tokens got no expert"
+        : "over capacity → discarded";
+
+    var imbEl = document.getElementById("rImb");
+    imbEl.textContent = state.imbalance.toFixed(2) + "×";
+    var imbStat = document.getElementById("stImb");
+    if (state.imbalance > 1.6) imbStat.classList.add("warnstat");
+    else imbStat.classList.remove("warnstat");
+  }
+
+  // ----- read controls & redraw -----
+  function readControls() {
+    var E = parseInt(els.E.value, 10);
+    var K = parseInt(els.K.value, 10);
+    var cf = parseFloat(els.C.value);
+    var s = parseFloat(els.S.value);
+
+    els.vE.textContent = String(E);
+    els.vK.textContent = String(K);
+    els.vC.textContent = cf.toFixed(2);
+    els.vS.textContent = s.toFixed(2);
+
+    return { E: E, K: K, cf: cf, s: s };
+  }
+
+  function update() {
+    var c = readControls();
+    var state = computeRouting(c.E, c.K, c.cf, c.s);
+    render(state);
+  }
+
+  ["sE", "sK", "sC", "sS"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", update);
+  });
+
+  document.getElementById("reroll").addEventListener("click", function () {
+    reroll();
+    update();
+  });
+
+  document.getElementById("reset").addEventListener("click", function () {
+    els.E.value = 8; els.K.value = 1; els.C.value = 1.25; els.S.value = 0.30;
+    reroll();
+    update();
+  });
+
+  // initial paint
+  update();
+})();
+</script>
+</body>
+</html>

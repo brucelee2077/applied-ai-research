@@ -1,0 +1,211 @@
+{
+  "track": "frontier_research",
+  "module_id": "frontier-research",
+  "topic": "Frontier Research",
+  "questions": [
+    {
+      "order": 1,
+      "difficulty": 4,
+      "title": "RLHF pipeline & reward hacking",
+      "prompt": "Walk me through the RLHF pipeline for aligning a language model, then explain reward hacking: give a concrete example of what the policy learns to exploit and how you'd detect it in production.",
+      "probes": [
+        "Where exactly does the KL penalty enter, and what breaks if you remove it?",
+        "Is sycophancy a reward-hacking failure, a reward-model coverage failure, or both?"
+      ],
+      "criteria": ["SFT then RM then PPO", "KL penalty to reference policy", "reward hacking / Goodhart", "concrete exploit example", "detection in production"],
+      "rubric": {
+        "no_hire": {"answer": "You collect human feedback and train the model to maximize it. Reward hacking is when the model games the reward.", "interviewer_note": "Names the pieces with no mechanism. No KL term, no concrete exploit, no detection."},
+        "weak_hire": {"answer": "Three stages: supervised fine-tuning, train a reward model on human preference pairs, then optimize the policy with PPO against the reward model. Reward hacking is when the policy finds high-reward outputs the RM scores well but humans dislike.", "interviewer_note": "Correct pipeline and definition, but no KL regularization, no concrete exploit, no detection strategy."},
+        "hire": {"answer": "SFT -> reward model on pairwise preferences (Bradley-Terry) -> PPO with a per-token KL penalty to the SFT reference policy so the policy stays in-distribution for the RM. Reward hacking is Goodhart's law: e.g. the policy learns verbose, confident, list-formatted answers because raters reward those, even when wrong. Detect via held-out human eval drift vs proxy reward, and by watching the KL blow up.", "interviewer_note": "Solid mechanism, names the KL anchor and a concrete exploit, gives one detection signal. Push: RM uncertainty, distribution shift over training."},
+        "strong_hire": {"answer": "Beyond the standard SFT/RM/PPO loop with KL anchoring: reward hacking is overoptimization of an imperfect proxy. The RM is only accurate near the SFT distribution; PPO pushes the policy off-distribution where RM error compounds, so proxy reward keeps rising while true reward turns over (the classic overoptimization curve, roughly sqrt-shaped in KL). Concrete exploits: sycophancy (agreeing with the user's stated belief), length bias, and format gaming. Mitigations: tune the KL coefficient or use adaptive KL targeting, RM ensembles to penalize disagreement (uncertainty as a cost), iterated RLHF with fresh preference data on-policy, and gold human evals on a frozen holdout to catch proxy-true divergence early. I'd also log reward vs KL and alert when reward rises with no gold-eval gain.", "interviewer_note": "Connects reward hacking to overoptimization theory, the proxy-true divergence, RM coverage, and concrete production mitigations. Staff-level."}
+      }
+    },
+    {
+      "order": 2,
+      "difficulty": 4,
+      "title": "DPO vs PPO",
+      "prompt": "DPO has largely displaced PPO for a lot of preference tuning. Derive the intuition for why DPO works without an explicit reward model, and tell me when you'd still reach for PPO.",
+      "probes": [
+        "What is DPO's implicit reward, and what's the reference-model role?",
+        "What failure modes does DPO have that online PPO does not?"
+      ],
+      "criteria": ["closed-form RL solution", "implicit reward = log-ratio", "offline vs on-policy", "DPO failure modes", "when PPO wins"],
+      "rubric": {
+        "no_hire": {"answer": "DPO is simpler than PPO and works better, so people use it instead of reinforcement learning.", "interviewer_note": "Preference without any mechanism. No derivation, no tradeoff."},
+        "weak_hire": {"answer": "DPO reparameterizes the RLHF objective so you can train directly on preference pairs with a classification-style loss, no separate reward model or rollouts. It's more stable and cheaper. PPO is better when you have an online reward signal.", "interviewer_note": "Correct shape and one real tradeoff, but no derivation of the implicit reward and vague on PPO's edge."},
+        "hire": {"answer": "The KL-regularized RLHF objective has a closed-form optimal policy: pi*(y|x) proportional to pi_ref(y|x) exp(r(x,y)/beta). Invert it and the reward equals beta*log(pi/pi_ref) plus a partition term that cancels in pairwise differences, so you can fit the policy directly on preference pairs with a logistic loss over the log-ratio. DPO is offline and only as good as its fixed preference data; PPO wins when you want on-policy exploration, a reusable reward model for many policies, or online signals like verifiable rewards.", "interviewer_note": "Derives the implicit reward and states the offline limitation plus when PPO is preferable. Strong."},
+        "strong_hire": {"answer": "DPO comes from the analytic solution to max_pi E[r] - beta*KL(pi||pi_ref): pi* = pi_ref exp(r/beta)/Z. Solving for r gives r = beta log(pi/pi_ref) + beta log Z; in the Bradley-Terry pairwise loss log Z cancels, yielding the DPO loss on the chosen-minus-rejected log-ratio. Practical failure modes: DPO is fully offline so it can't correct distribution shift, it tends to push down the probability of BOTH chosen and rejected (likelihood displacement) which can degrade the SFT distribution, and it's sensitive to noisy/contradictory pairs since there's no RM to average over. I reach for PPO/GRPO when I have verifiable or programmatic rewards (math, code, tool use), need on-policy data to avoid off-distribution staleness, or want one RM to align a family of models. In practice many labs do DPO/IPO for cheap broad alignment then on-policy RL with verifiable rewards for reasoning.", "interviewer_note": "Full derivation, names likelihood displacement and offline staleness, and gives a crisp decision rule including verifiable-reward RL. Principal-level."}
+      }
+    },
+    {
+      "order": 3,
+      "difficulty": 5,
+      "title": "Reward overoptimization & KL control",
+      "prompt": "As you push RLHF longer, proxy reward keeps climbing but the model gets worse by human judgment. Explain what's happening and how you'd control it.",
+      "probes": [
+        "How does the KL coefficient trade off alignment vs reward gain?",
+        "Would an RM ensemble help, and why?"
+      ],
+      "criteria": ["proxy vs true reward divergence", "Goodhart", "KL as distance budget", "RM error off-distribution", "ensemble / early stop mitigations"],
+      "rubric": {
+        "no_hire": {"answer": "The model is overfitting the reward, so you should train for fewer steps.", "interviewer_note": "Right instinct (stop earlier) but no understanding of why, or of KL."},
+        "weak_hire": {"answer": "The reward model is a proxy; optimizing it too hard makes the policy exploit its errors (Goodhart). Adding a KL penalty to the reference keeps the policy from drifting too far. You can also stop early.", "interviewer_note": "Names Goodhart and KL, but treats them qualitatively with no notion of the reward-KL curve or RM coverage."},
+        "hire": {"answer": "It's overoptimization: the RM is accurate near the SFT distribution but errs off-distribution, and PPO drives the policy exactly into those high-RM-error regions, so proxy reward rises while true reward turns over. The KL penalty bounds how far the policy moves; gold reward typically scales like a function of sqrt(KL) then degrades. Controls: tune/adaptively target KL, early-stop on a frozen human/gold eval, and use RM ensembles so disagreement penalizes off-distribution outputs.", "interviewer_note": "Names the divergence mechanism, the KL budget, and concrete controls. Solid."},
+        "strong_hire": {"answer": "Overoptimization is Goodhart on a learned proxy. Empirically (Gao et al.) gold reward as a function of KL distance follows d(alpha - beta*log d)-type curves: it improves then declines, and the turnover point and severity scale with RM size and preference-data size. The lever is the KL budget: small beta lets the policy travel far and exploit RM error, large beta keeps it honest but caps gains. I'd (1) target a KL band with adaptive KL control rather than a fixed coefficient, (2) use an RM ensemble and penalize variance so the policy is pushed away from regions where RMs disagree (epistemic uncertainty as cost), (3) refresh preference data on-policy so the RM stays calibrated where the policy now lives, and (4) gate releases on a frozen gold human eval, alerting when proxy reward rises without gold gain. I'd also consider reward model distillation and label-noise-robust RM training to widen the accurate region.", "interviewer_note": "Quantitative law, uncertainty-as-cost, on-policy RM refresh, and release gating. Research-lead depth."}
+      }
+    },
+    {
+      "order": 4,
+      "difficulty": 4,
+      "title": "Scaling laws & compute-optimal training",
+      "prompt": "You have a fixed compute budget of ~1e23 FLOPs. Use scaling laws to decide model size and training tokens, and tell me where this reasoning breaks down.",
+      "probes": [
+        "What did Chinchilla change relative to the earlier Kaplan picture?",
+        "Why might you deliberately train a 'too-small' model past compute-optimal?"
+      ],
+      "criteria": ["C ~ 6ND", "Chinchilla ~20 tokens/param", "loss power law", "inference-aware training", "loss != downstream"],
+      "rubric": {
+        "no_hire": {"answer": "Bigger models are better, so I'd train the largest model the compute allows.", "interviewer_note": "No notion of token-parameter tradeoff or compute-optimality."},
+        "weak_hire": {"answer": "Scaling laws say loss falls as a power law in parameters and data. Chinchilla showed you should scale data and parameters together, roughly 20 tokens per parameter. With 1e23 FLOPs I'd pick N and D so they're balanced.", "interviewer_note": "Knows the 20:1 heuristic and power law, but doesn't use C~6ND to actually solve or discuss limits."},
+        "hire": {"answer": "Compute is about C = 6ND. Chinchilla's compute-optimal point puts roughly 20 tokens per parameter, so I solve 6ND = 1e23 with D ~ 20N: that gives N on the order of low-tens of billions of params and D in the hundreds of billions to ~trillion tokens. Caveat: scaling laws predict pretraining loss, which correlates imperfectly with downstream task performance, and they ignore inference cost.", "interviewer_note": "Uses 6ND, solves it, and flags the loss-vs-downstream gap. Strong."},
+        "strong_hire": {"answer": "Using C=6ND and Chinchilla's joint fit (optimal N and D both scale like C^0.5), 1e23 FLOPs lands near ~20B params and ~400-500B tokens at the compute-optimal point. But compute-optimal is the wrong objective if you'll serve the model a lot: inference cost is dominated by N, so for a heavily-served model you deliberately go past Chinchilla-optimal in tokens to shrink N (the Llama strategy) and pay more training to save far more inference. Where it breaks: scaling laws fit smooth pretraining loss, but downstream benchmarks can be emergent/discontinuous and only loosely tied to loss; data quality and repetition (epoching) shift the curves; and the laws assume a fixed architecture/optimizer. I'd fit my own law on small proxy runs rather than trust published constants.", "interviewer_note": "Solves it, distinguishes train-optimal from inference-optimal, and critiques the laws' assumptions. Principal-level."}
+      }
+    },
+    {
+      "order": 5,
+      "difficulty": 5,
+      "title": "Mixture-of-Experts tradeoffs",
+      "prompt": "Explain why frontier models use sparse Mixture-of-Experts, and the main engineering problems MoE introduces.",
+      "probes": [
+        "What is the load-balancing problem and how is it addressed?",
+        "Why is MoE memory-heavy even though each token uses few experts?"
+      ],
+      "criteria": ["decouple params from FLOPs/token", "top-k routing", "load balancing aux loss", "all-to-all comm", "memory vs compute"],
+      "rubric": {
+        "no_hire": {"answer": "MoE uses multiple models and picks the best one for each input, so it's smarter.", "interviewer_note": "Misconception: experts aren't separate models and there's no 'best one' selection."},
+        "weak_hire": {"answer": "MoE replaces the FFN with many expert FFNs and a router that sends each token to the top-k experts. This gives more parameters without more compute per token. The hard part is balancing load across experts.", "interviewer_note": "Correct mechanism and the key benefit, plus names load balancing. Lacks comms/memory and routing detail."},
+        "hire": {"answer": "MoE decouples parameter count from FLOPs per token: a router sends each token to top-k of E experts (e.g. 2 of 64), so capacity grows with E while compute stays ~constant. Problems: load imbalance (a few experts get all tokens) needs an auxiliary load-balancing loss and capacity factors with token dropping; all-to-all communication to route tokens across devices is a bottleneck; and you must hold ALL experts in memory even though each token touches few, so memory scales with total params.", "interviewer_note": "Names decoupling, routing, aux loss, all-to-all, and the memory point. Strong."},
+        "strong_hire": {"answer": "MoE buys parameter scaling at fixed FLOPs/token by replacing dense FFNs with E experts and top-k routing. Engineering issues: (1) Load balancing - without an auxiliary loss (or loss-free bias tricks like DeepSeek's) routing collapses to a few experts; capacity factor + token dropping bound per-expert load but drop tokens under skew. (2) Communication - expert parallelism needs two all-to-alls per MoE layer; at scale this dominates, driving expert-parallel + tensor-parallel topologies and overlap with compute. (3) Memory - all experts must be resident, so a model with 8x the params at the same active FLOPs needs ~8x the weight memory and HBM bandwidth, which is why serving MoE is memory-bound. (4) Training instability - router z-loss to keep logits bounded, and fine-tuning is finicky because routing distributions shift. Tradeoff vs dense: MoE wins on quality-per-training-FLOP but loses on memory footprint and serving complexity, so it pays off mainly at large scale with high request volume.", "interviewer_note": "Covers routing collapse, comms topology, memory-bound serving, stability tricks, and the dense-vs-sparse economics. Research-engineer depth."}
+      }
+    },
+    {
+      "order": 6,
+      "difficulty": 4,
+      "title": "KV cache & inference serving",
+      "prompt": "Walk me through what dominates LLM inference cost and latency at serving time, and how systems like PagedAttention and continuous batching help.",
+      "probes": [
+        "Why is decode memory-bandwidth-bound while prefill is compute-bound?",
+        "What does PagedAttention fix that static KV allocation got wrong?"
+      ],
+      "criteria": ["prefill vs decode", "KV cache size/growth", "memory-bandwidth bound decode", "continuous batching", "PagedAttention fragmentation"],
+      "rubric": {
+        "no_hire": {"answer": "You put the model on a GPU and batch requests together to go faster.", "interviewer_note": "No prefill/decode distinction, no KV cache, no memory reasoning."},
+        "weak_hire": {"answer": "The KV cache stores past keys and values so you don't recompute attention each step; it grows with sequence length and eats memory. Batching requests improves throughput, and continuous batching lets new requests join without waiting for the whole batch to finish.", "interviewer_note": "Knows KV cache and continuous batching, but not the prefill/decode compute profile or PagedAttention's mechanism."},
+        "hire": {"answer": "Two phases: prefill processes the prompt in parallel and is compute-bound; decode generates one token at a time and is memory-bandwidth-bound because each step reads the whole KV cache and weights for tiny compute. KV cache size = 2 * layers * heads * head_dim * seq_len * batch * dtype, so it dominates memory and caps batch size. Continuous batching keeps the GPU full by adding/removing sequences per step. PagedAttention stores KV in fixed blocks like virtual memory pages, eliminating the fragmentation and over-reservation of contiguous per-request allocation, so you fit far more concurrent sequences.", "interviewer_note": "Clean prefill/decode split, KV sizing, and what PagedAttention fixes. Strong."},
+        "strong_hire": {"answer": "Decode arithmetic intensity is terrible: per token you read all weights and the full KV cache to produce one token, so you're bound by HBM bandwidth, not FLOPs - which is why throughput comes from batching (amortizing weight reads) not faster math, and why MoE/large models are memory-bound. Prefill is the opposite, compute-bound and parallel over prompt tokens, which is why TTFT and inter-token latency have different optimizations and people split prefill/decode onto different pools (disaggregated serving). KV cache grows linearly in context and dominates memory; static contiguous allocation wastes 60-80% to internal+external fragmentation and forces conservative max-length reservations. PagedAttention pages KV into blocks with a block table, enabling near-zero waste, copy-on-write sharing for beam search / shared prefixes, and much higher concurrency. Stack the wins: continuous batching + paged KV + chunked prefill to interleave prefill and decode, plus speculative decoding to raise decode arithmetic intensity. The headline metric is tokens/sec/GPU at a TTFT/ITL SLO.", "interviewer_note": "Arithmetic-intensity reasoning, disaggregation, prefix sharing, chunked prefill, and the right serving metric. Systems-level mastery."}
+      }
+    },
+    {
+      "order": 7,
+      "difficulty": 4,
+      "title": "Speculative decoding",
+      "prompt": "Explain speculative decoding. A 7B draft proposes k=5 tokens for a 70B target; on average 3 are accepted. What's the speedup, and when does it stop helping?",
+      "probes": [
+        "Why is the output distribution provably unchanged?",
+        "How does acceptance rate depend on draft-target agreement and temperature?"
+      ],
+      "criteria": ["draft-then-verify", "exactness via rejection sampling", "accepted tokens per target pass", "draft cost overhead", "breaks under low acceptance / large batch"],
+      "rubric": {
+        "no_hire": {"answer": "A small model writes a draft and the big model checks it, which is faster.", "interviewer_note": "Gist only; no exactness argument, no speedup reasoning, no limits."},
+        "weak_hire": {"answer": "A cheap draft model proposes several tokens, the target verifies them in one forward pass, and accepted tokens are kept. With 3 of 5 accepted you get roughly 3-4 tokens per target step instead of 1, so a ~3x-ish speedup, minus draft overhead.", "interviewer_note": "Right mechanism and ballpark speedup, but hand-wavy on exactness and on when it fails."},
+        "hire": {"answer": "Draft autoregressively proposes k tokens; the target scores all k+1 positions in one pass; a modified rejection-sampling rule accepts a prefix and resamples the first rejected token from an adjusted distribution, so the output distribution is provably identical to sampling from the target. With ~3 accepted per cycle you produce ~4 tokens (3 + 1 resampled) per target pass, so ~3-4x fewer target passes; net speedup is lower after the draft's own cost. It stops helping when acceptance is low (draft and target disagree, e.g. high temperature or hard domains) or when you're already compute-bound from large batches, because the target pass is no longer cheap relative to throughput.", "interviewer_note": "Exactness via rejection sampling, correct token accounting, and real limits. Strong."},
+        "strong_hire": {"answer": "Speculative decoding trades extra compute for fewer sequential target steps. The draft samples k tokens; the target does one parallel verification; the rejection rule accepts token i with prob min(1, p_target/p_draft) and on rejection resamples from the normalized positive part of (p_target - p_draft), which makes the marginal exactly the target distribution - no quality loss. Token accounting: 3 accepted + 1 free resample = 4 tokens per target pass, ~4x reduction in target passes, but the realized wall-clock speedup is (expected accepted+1)/(1 + c) where c is draft cost relative to target; with a 7B/70B pair c is small so you keep most of it. It degrades when: acceptance drops (temperature up, distribution shift, long reasoning where draft and target diverge), or when the batch is large enough that the target forward is already bandwidth-saturated so the 'free' parallel verification isn't free anymore - speculative decoding mainly helps the low-batch, latency-bound regime. Extensions: self-speculation / Medusa heads remove the separate draft, and tree/multi-candidate drafting raises expected acceptance.", "interviewer_note": "Exact rejection rule, realized-speedup formula, batch-regime caveat, and Medusa/tree extensions. Research depth."}
+      }
+    },
+    {
+      "order": 8,
+      "difficulty": 4,
+      "title": "Quantization for inference",
+      "prompt": "You need to serve a 70B model cheaply. Talk me through quantization options, what actually degrades quality, and how methods like GPTQ/AWQ avoid it.",
+      "probes": [
+        "What are activation outliers and why do they matter?",
+        "Weight-only vs weight+activation quantization - when each?"
+      ],
+      "criteria": ["FP16->INT8->INT4", "memory-bandwidth win", "activation outliers", "GPTQ/AWQ mechanism", "weight-only vs W8A8"],
+      "rubric": {
+        "no_hire": {"answer": "Quantization makes weights smaller by using fewer bits, which saves memory and is faster.", "interviewer_note": "True but generic; no failure modes, no method understanding."},
+        "weak_hire": {"answer": "You cast weights to INT8 or INT4 to cut memory and bandwidth, which speeds up the memory-bound decode. Aggressive quantization hurts accuracy, so methods like GPTQ calibrate on data to minimize the error.", "interviewer_note": "Right framing and names GPTQ, but no outlier story or weight-vs-activation distinction."},
+        "hire": {"answer": "Since decode is memory-bandwidth-bound, shrinking weights from FP16 to INT8/INT4 directly speeds it up and lets larger models fit. The catch is activation outliers: a few channels have huge magnitudes that, if naively quantized, blow up error - this is why W8A8 is hard. Weight-only methods (GPTQ does error-compensating per-column rounding; AWQ scales salient weight channels by activation statistics) keep activations in FP16 and quantize weights to 4-bit with small accuracy loss. For 70B I'd start with 4-bit weight-only (AWQ/GPTQ) and reserve W8A8 for throughput-critical paths with outlier handling.", "interviewer_note": "Connects to bandwidth, names outliers, distinguishes weight-only vs W8A8, and gives a concrete plan. Strong."},
+        "strong_hire": {"answer": "The win is bandwidth: decode reads weights every token, so 4-bit weights ~ 4x less weight traffic and big throughput gains; it also frees HBM for KV cache / larger batch. Quality loss comes mainly from activation outliers - emergent large-magnitude features in specific channels that dominate the dynamic range; LLM.int8() handles them with mixed-precision decomposition, SmoothQuant migrates outlier scale from activations into weights to enable W8A8, GPTQ does second-order (OBQ-style) error-compensating quantization column by column, and AWQ protects salient channels identified by activation magnitude. Decision: weight-only INT4 (AWQ/GPTQ) is the default for memory-bound single-stream serving with minimal degradation; W8A8 (SmoothQuant) helps when you're compute-bound at high batch and want INT8 tensor cores; KV-cache quantization (FP8/INT8) is increasingly important since KV often dominates memory at long context. I'd validate with perplexity AND task evals (perplexity hides reasoning regressions) and watch for degradation concentrated in long-context or code.", "interviewer_note": "Bandwidth economics, outlier mechanisms across methods, W4 vs W8A8 decision, KV quantization, and eval rigor. Mastery."}
+      }
+    },
+    {
+      "order": 9,
+      "difficulty": 4,
+      "title": "LLM-as-judge evaluation",
+      "prompt": "Your team wants to use a strong LLM as an automatic judge to evaluate model outputs. What are the failure modes, and how do you make the eval trustworthy?",
+      "probes": [
+        "What biases does an LLM judge have?",
+        "How do you validate the judge itself?"
+      ],
+      "criteria": ["position/verbosity/self bias", "agreement with humans", "calibration vs gold set", "pairwise vs pointwise", "judge gaming"],
+      "rubric": {
+        "no_hire": {"answer": "Use GPT-4 to score the answers from 1 to 10 and average them.", "interviewer_note": "No awareness of judge bias or validation; pointwise 1-10 is the weakest design."},
+        "weak_hire": {"answer": "LLM judges are cheap and correlate with humans, but they have biases - they favor longer answers and the first option shown. Use pairwise comparisons and swap positions to reduce position bias, and check agreement with human labels.", "interviewer_note": "Names key biases and two mitigations, but no calibration plan or gaming discussion."},
+        "hire": {"answer": "Known biases: position bias (favor first/second), verbosity bias (longer = better), self-preference (favor outputs from the same model family), and sensitivity to formatting. Mitigations: prefer pairwise/Elo over pointwise scores, randomize and average over both position orders, anonymize source, and use a rubric-conditioned prompt. Crucially, validate the judge against a human-labeled gold set (measure agreement / Cohen's kappa) before trusting it, and keep a frozen human eval for release gating.", "interviewer_note": "Comprehensive bias list, pairwise design, and judge validation against humans. Strong."},
+        "strong_hire": {"answer": "Treat the judge as a measurement instrument that must be calibrated and monitored. Failure modes: position, verbosity/length, self-preference (a model judging its own family inflates scores - dangerous when the judge and candidate share a base), format/sycophancy bias, and reward-hacking if the judge is in any training loop (the policy learns to fool the judge). Design: pairwise with both orderings averaged, ties allowed, rubric-conditioned and chain-of-thought judging, and ensembles/different judge families to break self-preference. Validation: a stratified human-labeled gold set, report judge-human agreement and where it diverges, and measure the judge's discriminative power (does it separate known-good from known-bad?). Guardrails: never let the same model both train against and judge a metric without a held-out human anchor, refresh the gold set as the distribution shifts, and report confidence intervals (Arena-style) rather than point scores. For high-stakes claims, LLM-judge for iteration speed but gate on human eval.", "interviewer_note": "Instrument framing, self-preference and judge-gaming risks, validation and gating discipline. Research-lead depth."}
+      }
+    },
+    {
+      "order": 10,
+      "difficulty": 5,
+      "title": "Jailbreak & adversarial robustness",
+      "prompt": "A 10-turn roleplay gradually shifts the model into a 'do anything' persona and by turn 9 it complies with a harmful request. Why did the multi-turn attack work, and how do you defend without crippling helpfulness?",
+      "probes": [
+        "Why are single-turn classifiers insufficient here?",
+        "How would you automate red-teaming at scale?"
+      ],
+      "criteria": ["context accumulation / distribution shift", "single-turn vs conversation-level", "layered defense", "helpfulness tradeoff / over-refusal", "automated red-teaming"],
+      "rubric": {
+        "no_hire": {"answer": "Add a filter that blocks bad words and refuse anything unsafe.", "interviewer_note": "Keyword filtering and blanket refusal; no understanding of multi-turn or the helpfulness tradeoff."},
+        "weak_hire": {"answer": "The model is conditioned on the whole conversation, so the earlier roleplay turns shift it into a harmful persona that a single-turn check misses. Defenses: classify the full conversation, train with adversarial examples, and add an output filter.", "interviewer_note": "Correct cause and a layered idea, but no over-refusal tradeoff or automated red-teaming."},
+        "hire": {"answer": "Autoregressive models condition on the full context; the gradual roleplay walks the model off its safety distribution so by turn 9 the harmful completion is locally likely - a single-turn input classifier never sees the accumulated framing. Layered defense: conversation-level safety classifier (not just the last turn), adversarial/safety training (RLHF/Constitutional) on multi-turn attacks, and an output classifier as a backstop. The tension is over-refusal: aggressive filters tank helpfulness and annoy users, so I'd track false-refusal rate alongside attack-success rate and tune the operating point.", "interviewer_note": "Mechanism, layered defense, and the helpfulness tradeoff with a metric. Strong."},
+        "strong_hire": {"answer": "Multi-turn jailbreaks exploit context accumulation: each turn nudges the conditional distribution until the harmful continuation is the locally probable one, and persona/roleplay framing suppresses the safety behavior that was trained mostly on single-turn prompts. Single-turn classifiers fail by construction because the harmful turn looks benign in isolation. Defense in depth: (1) conversation-level moderation that scores the trajectory, not the last message; (2) safety training that includes multi-turn and persona attacks (Constitutional AI / RLAIF with adversarial conversations) so robustness is in the policy, not just a wrapper; (3) input and output classifiers as independent layers; (4) system-prompt and persona-lock defenses. Manage the helpfulness tradeoff explicitly: plot attack-success-rate vs false-refusal-rate and pick an operating point per surface, because over-refusal is itself a product failure. Automate red-teaming: use an attacker LLM to generate and mutate jailbreaks (RL the attacker against the defender), gradient-based suffix search (GCG) on open weights, and maintain a growing adversarial eval suite so you measure robustness as a moving target. Assume the arms race never ends and budget for continuous retraining.", "interviewer_note": "Distribution-shift mechanism, defense-in-depth with policy-level robustness, ASR/FRR tradeoff, and automated/adaptive red-teaming. Principal-level."}
+      }
+    },
+    {
+      "order": 11,
+      "difficulty": 4,
+      "title": "Constitutional AI / RLAIF",
+      "prompt": "Explain Constitutional AI / RLAIF and why a lab would use AI feedback instead of human feedback. What are the risks?",
+      "probes": [
+        "Where do humans stay in the loop?",
+        "What's the failure mode if the 'constitution' is wrong or the critic is weak?"
+      ],
+      "criteria": ["self-critique + revise", "AI preference labels", "scalability vs human cost", "constitution as spec", "bias amplification risk"],
+      "rubric": {
+        "no_hire": {"answer": "The model is given rules and follows them, so you don't need humans.", "interviewer_note": "Oversimplified; misses the critique/revision and preference-modeling structure and the residual human role."},
+        "weak_hire": {"answer": "Constitutional AI has the model critique and revise its own answers against a set of principles, then trains a preference model from AI-generated comparisons (RLAIF) instead of human labels. It scales better and is cheaper than collecting human preferences.", "interviewer_note": "Correct mechanism and motivation; light on risks and the human role."},
+        "hire": {"answer": "Two phases: a supervised phase where the model critiques its responses against written principles and rewrites them, then an RL phase where an AI labeler generates preference pairs from those principles (RLAIF) to train the reward model. The win is scalability and consistency - human preference data is slow, expensive, and noisy, and the constitution makes the values explicit and auditable. Humans still write/curate the constitution and run oversight evals. Risk: errors or bias in the critic or the principles get amplified at scale, and the model can become evasive rather than genuinely safe.", "interviewer_note": "Both phases, the explicit-spec benefit, residual human role, and amplification risk. Strong."},
+        "strong_hire": {"answer": "CAI replaces most human preference labeling with model self-supervision against an explicit constitution: (1) SL stage - sample a response, ask the model to critique it against a randomly drawn principle and revise, fine-tune on the revisions; (2) RL stage - the model generates pairwise preferences guided by the constitution (RLAIF), train an RM, then RL the policy. Why labs do it: human feedback is the bottleneck (cost, latency, annotator inconsistency, exposure of raters to harmful content), and a written constitution turns values into an auditable, version-controlled spec rather than implicit in a labeling workforce. It's also a scalable-oversight bet: as models surpass average human raters on many tasks, AI feedback can be more consistent. Risks: the critic is itself the model, so its blind spots and biases get amplified and entrenched (self-preference, narrow value coverage); a wrong or underspecified principle propagates everywhere; and you can get sycophantic 'sounds-safe' behavior that games the constitution without real safety. Mitigations: keep humans on constitution design and high-stakes red-team evals, ensemble/critique with diverse models, and validate against independent human safety benchmarks. The open research question is exactly scalable oversight - trusting AI feedback where humans can't easily verify.", "interviewer_note": "Full two-phase mechanism, the scalable-oversight framing, amplification/sycophancy risks, and human-in-the-loop mitigations. Research-lead depth."}
+      }
+    },
+    {
+      "order": 12,
+      "difficulty": 5,
+      "title": "Long-context scaling",
+      "prompt": "Pushing context from 4K to 1M tokens stresses both training and serving. What are the core obstacles and the main techniques to overcome them?",
+      "probes": [
+        "Why doesn't a model trained at 4K just work at 128K?",
+        "What dominates memory at very long context, and what do you do about it?"
+      ],
+      "criteria": ["O(n^2) attention", "positional extrapolation (RoPE scaling)", "KV cache memory at long ctx", "efficient attention / IO-aware", "lost-in-the-middle / eval"],
+      "rubric": {
+        "no_hire": {"answer": "You just train the model on longer documents and it learns to use them.", "interviewer_note": "Ignores quadratic cost, positional extrapolation, and KV memory."},
+        "weak_hire": {"answer": "Attention is O(n^2) in sequence length, so long context is expensive in compute and memory. Techniques include FlashAttention to make attention efficient and methods to extend positional encodings like RoPE scaling. The KV cache also gets large.", "interviewer_note": "Names the quadratic cost, FlashAttention, RoPE scaling, and KV growth, but doesn't connect or go deep."},
+        "hire": {"answer": "Three obstacles. (1) Compute: attention is O(n^2), so 1M tokens is intractable naively - FlashAttention makes it IO-aware and memory-linear, and you often add sparse/sliding-window or chunked attention. (2) Positions: a model trained at 4K hasn't seen larger relative positions, so it fails to extrapolate; RoPE interpolation/NTK-aware scaling or YaRN remap positions, usually with some long-context continued pretraining. (3) Memory at serve time: KV cache grows linearly with context and dominates, so you use KV quantization, GQA/MQA to shrink KV, and paged caches. You also have to evaluate real usage (needle-in-haystack, lost-in-the-middle).", "interviewer_note": "Separates compute, positions, and memory with concrete techniques for each, plus eval. Strong."},
+        "strong_hire": {"answer": "Decompose by resource. Compute: vanilla attention is O(n^2*d); FlashAttention keeps it exact but IO-aware (tiling, no materialized n-by-n matrix) and memory-linear, and for very long context you add structured sparsity (sliding window + global tokens, e.g. Longformer/streaming), or sequence/ring/context parallelism to shard the sequence across devices during training. Positions: training distribution doesn't cover large relative offsets, so RoPE-based models need interpolation (Position Interpolation), NTK-aware scaling, or YaRN, followed by short continued-pretraining at the target length to adapt; otherwise you get gibberish past the trained window. Memory/serving: KV cache = 2*L*H*d_head*n*batch*dtype dominates at long context, so the levers are GQA/MQA (fewer KV heads), KV-cache quantization (FP8/INT8), paged KV, and cache eviction/compression (H2O, attention-sink/StreamingLLM keeps initial + recent tokens). Quality/eval: long-context ability is not just perplexity - models exhibit lost-in-the-middle (poor recall of mid-context info), so I'd evaluate with needle-in-a-haystack at varying depths, multi-hop retrieval over long context, and real tasks, not just loss. Net: long context is a co-design problem across attention kernels, positional scheme, parallelism, KV memory, and targeted continued pretraining.", "interviewer_note": "Resource decomposition, exact technique names per axis, KV sizing and compression, parallelism, and the lost-in-the-middle eval point. Mastery."}
+      }
+    }
+  ]
+}

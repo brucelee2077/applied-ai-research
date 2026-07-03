@@ -8,6 +8,19 @@
 > - 💡 From-scratch vs library: when each is appropriate
 > - 🏭 Reproducibility, checkpointing, and deployment considerations
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | n_envs | Number of parallel environments |
+> | n_steps | Rollout length per environment |
+> | batch_size | n_envs × n_steps = total transitions per update |
+> | n_epochs | Number of passes over the batch |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **PPO** — clipped objective, GAE, entropy bonus ([ppo-from-scratch-interview.md](./ppo-from-scratch-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

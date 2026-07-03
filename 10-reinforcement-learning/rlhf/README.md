@@ -8,6 +8,7 @@ This section covers how RL is used to align language models with human preferenc
 - Reward modeling from preferences
 - PPO for language models
 - Alternatives like DPO
+- GRPO — critic-free policy optimization (used in DeepSeek-R1)
 - Using the TRL library
 
 ## Notebooks
@@ -20,6 +21,7 @@ This section covers how RL is used to align language models with human preferenc
 | 4 | [DPO and Alternatives](04_dpo_and_alternatives.ipynb) | Direct Preference Optimization |
 | 5 | [TRL Library Tutorial](05_trl_library_tutorial.ipynb) | Using Hugging Face TRL |
 | 6 | [Full RLHF Pipeline](06_fine_tuning_with_rlhf.ipynb) | End-to-end implementation |
+| 7 | [GRPO](07_grpo.ipynb) | Group Relative Policy Optimization |
 
 ## Prerequisites
 
@@ -35,6 +37,7 @@ This section covers how RL is used to align language models with human preferenc
 | **Reward Model** | Train to predict human preferences |
 | **PPO** | Optimize policy to maximize reward |
 | **DPO** | Direct optimization without reward model |
+| **GRPO** | Group-relative optimization without critic (DeepSeek-R1) |
 
 ## The RLHF Pipeline
 
@@ -60,6 +63,7 @@ This section covers how RL is used to align language models with human preferenc
 | DPO and Alternatives — Direct Preference Optimization | [Core] | [md](./dpo-and-alternatives.md) · [interview](./dpo-and-alternatives-interview.md) · [notebook](./04_dpo_and_alternatives.ipynb) · [experiments](./04_dpo_and_alternatives_experiments.ipynb) |
 | TRL Library Tutorial — using Hugging Face TRL | [Core] | [md](./trl-library-tutorial.md) · [interview](./trl-library-tutorial-interview.md) · [notebook](./05_trl_library_tutorial.ipynb) · [experiments](./05_trl_library_tutorial_experiments.ipynb) |
 | Fine-tuning with RLHF — end-to-end pipeline | [Core] | [md](./fine-tuning-with-rlhf.md) · [interview](./fine-tuning-with-rlhf-interview.md) · [notebook](./06_fine_tuning_with_rlhf.ipynb) · [experiments](./06_fine_tuning_with_rlhf_experiments.ipynb) |
+| GRPO — Group Relative Policy Optimization (DeepSeek-R1) | [Core] | [md](./grpo.md) · [interview](./grpo-interview.md) · [notebook](./07_grpo.ipynb) · [experiments](./07_grpo_experiments.ipynb) |
 
 ## Required Libraries
 

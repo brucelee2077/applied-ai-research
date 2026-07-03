@@ -8,6 +8,22 @@
 > - 💡 Alternatives landscape: RLAIF, Constitutional AI, KTO, ORPO, IPO
 > - 🏭 When to choose DPO vs PPO in production
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π_θ, π_ref | Trained policy and frozen reference policy |
+> | r(x, y) | Implicit reward — derived from log-probability ratios |
+> | β | Temperature parameter — controls trade-off between reward and KL |
+> | Z(x) | Partition function — normalizes probabilities (cancels in DPO) |
+> | σ(x) | Sigmoid — converts score to probability |
+> | L_DPO | DPO loss — binary cross-entropy on preference pairs |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **RLHF objective** — max E[r(x,y)] - β·KL(π_θ \|\| π_ref) ([what-is-rlhf-interview.md](./what-is-rlhf-interview.md))
+> - **Reward model** — r_φ(x, y) from Bradley-Terry model ([reward-modeling-interview.md](./reward-modeling-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

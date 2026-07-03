@@ -8,6 +8,21 @@
 > - 💡 MDP design decisions: state representation, action space, reward shaping
 > - 🏭 Formulating real-world problems as MDPs
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | P(s'\|s, a) | Probability of reaching state s' from state s by taking action a |
+> | Σ_{s'} | Sum over all possible next states s' |
+> | \|S\|, \|A\| | Number of states, number of actions |
+> | γ ∈ [0, 1) | Discount factor — between 0 (inclusive) and 1 (exclusive) |
+> | O(...) | "On the order of" — describes how computation scales |
+>
+> **RL concepts used here** (defined in the previous file):
+> - **Policy π(a\|s)** — probability of choosing action a in state s
+> - **Return G_t** — total discounted reward from time t onward
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 A Markov Decision Process (MDP) is the mathematical framework that formalizes sequential decision-making under uncertainty. It defines states, actions, transition probabilities, and rewards. The Markov property — the future depends only on the present state, not on the past — is what makes the problem tractable.
@@ -28,15 +43,35 @@ An MDP is a 5-tuple (S, A, P, R, γ):
 
 ### The Markov Property
 
-A state s_t has the Markov property if:
+**Step 1 — Words.** The Markov property says: if you know the current state, the past does not give you any extra information about the future. The current state is a complete summary of everything that matters. This is what makes RL tractable — the agent only needs to consider where it is now, not every step of how it got there.
+
+**Step 2 — Formula.** A state s_t has the Markov property if:
 
     P(s_{t+1} | s_t, a_t) = P(s_{t+1} | s_0, a_0, s_1, a_1, ..., s_t, a_t)
 
-In words: the next state depends only on the current state and action — the full history provides no additional information. This means the state is a sufficient statistic for the future.
+Where:
+- The left side uses only the current state s_t and action a_t
+- The right side uses the entire history from the beginning
+- The Markov property says these two are equal — history adds nothing
+
+**Step 3 — Worked example.** A chess game:
+
+```
+Markov: The current board position tells you everything about possible next moves.
+It does not matter if this position was reached in 10 moves or 40 moves.
+  P(next position | current board, move) = same regardless of past moves ✓
+
+NOT Markov: The position of a ball in Pong (without velocity).
+Knowing the ball is at position (5, 3) is not enough — you also need to know
+which direction it is moving. A single frame violates the Markov property.
+  Fix: stack the last 4 frames together as the state → velocity is implicit ✓
+```
 
 ### Transition Dynamics
 
-For a finite MDP, the transition function is a matrix for each action:
+**Step 1 — Words.** The transition function tells you: "If I am in state s and take action a, what is the probability of landing in each possible next state?" For a finite MDP, you can write this as a matrix — one matrix per action, where each entry is a probability.
+
+**Step 2 — Formula.** For a finite MDP, the transition function is a matrix for each action:
 
     P_a[i, j] = P(s' = j | s = i, a)
 
@@ -45,7 +80,20 @@ Where:
 - Each row sums to 1: Σ_{s'} P(s'|s, a) = 1 for all s, a
 - |S| is the number of states
 
-Example with 3 states and 2 actions: P has shape (2 × 3 × 3) — two 3×3 matrices, one per action.
+**Step 3 — Worked example.** A simple 3-state world (A, B, C) with action "move right":
+
+```
+         To A    To B    To C
+From A [  0.1    0.8     0.1  ]   ← 80% chance of reaching B
+From B [  0.0    0.2     0.8  ]   ← 80% chance of reaching C
+From C [  0.0    0.0     1.0  ]   ← C is a terminal state (stays)
+
+Row sums: 0.1+0.8+0.1 = 1.0 ✓
+          0.0+0.2+0.8 = 1.0 ✓
+          0.0+0.0+1.0 = 1.0 ✓
+```
+
+This is one matrix. A second action (e.g., "move left") would have a different matrix.
 
 ### Reward Function Variants
 

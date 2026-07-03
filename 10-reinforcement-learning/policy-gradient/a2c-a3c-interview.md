@@ -8,6 +8,22 @@
 > - 💡 A2C vs PPO — what PPO adds on top of A2C
 > - 🏭 Production architecture: vectorized environments, gradient clipping, distributed training
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Â_t | Advantage estimate at time t |
+> | δ_t | TD error: r + γV(s') - V(s) |
+> | H[π] | Entropy of the policy — measures how random the actions are |
+> | λ | GAE parameter — controls bias-variance trade-off (separate from γ) |
+> | n_envs | Number of parallel environments |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Actor-Critic** — two networks: actor (policy) and critic (value) ([actor-critic-interview.md](./actor-critic-interview.md))
+> - **GAE** — Generalized Advantage Estimation: Â = Σ (γλ)^l δ_{t+l}
+> - **Entropy bonus** — encourages exploration by penalizing overly deterministic policies
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

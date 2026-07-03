@@ -8,6 +8,23 @@
 > - 💡 SAC vs TD3 vs PPO: on-policy/off-policy, stochastic/deterministic, discrete/continuous
 > - 🏭 SAC for robotics: sim-to-real transfer and real-world deployment
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | H[π] = H(π(·\|s)) | Entropy of policy — how random the action distribution is |
+> | α (temperature) | Controls exploration: higher α → more random actions |
+> | Q(s, a; θ) | Soft Q-function (includes entropy) |
+> | N(μ, σ²) | Gaussian distribution for continuous actions |
+> | log π(a\|s) | Log-probability of action (needed for entropy) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Actor-critic** — policy network + Q-network(s)
+> - **Off-policy** — learns from replay buffer (like DQN, unlike PPO)
+> - **Target networks** — slowly-updated copies for stable targets
+> - **KL divergence** — entropy maximization relates to minimizing KL to uniform
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

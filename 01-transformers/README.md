@@ -2,6 +2,14 @@
 
 ![Status](https://img.shields.io/badge/status-complete-brightgreen)
 
+## Start Here: Build Your Transformer in 28 Days
+
+New to transformers? Follow the day-by-day build guide. Each day takes 5-15 minutes. By Day 24, you'll have a working transformer that generates text.
+
+**[Start Day 1 →](./days/day-01-words-to-numbers.md)** | [Full blueprint](./days/README.md) | [Check progress](./days/check.py)
+
+---
+
 ## The Mystery Worth Solving
 
 Here's something that genuinely puzzled researchers when it first happened:

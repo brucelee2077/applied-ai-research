@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scaling Laws: IsoFLOP Parabolas & the Chinchilla Frontier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);
+  padding-bottom:4rem;min-height:100vh}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+/* top bar */
+.nav{position:sticky;top:0;z-index:100;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border2);height:54px}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.9rem;font-weight:700}
+.nav-link{font-family:var(--mono);font-size:.78rem;color:var(--accent);text-decoration:none;white-space:nowrap}
+.nav-link:hover{color:var(--accent-d);text-decoration:underline}
+
+/* main */
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.6rem}
+.intro{color:var(--text2);font-size:1.02rem;margin-bottom:1.5rem}
+.intro code{font-family:var(--mono);font-size:.9em;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:.05rem .35rem}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.25rem 1.35rem;margin-bottom:1.5rem}
+
+.card-label{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem 1.5rem}
+.ctrl{display:flex;flex-direction:column;gap:.3rem}
+.ctrl-top{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ctrl-name{font-size:.85rem;font-weight:600}
+.ctrl-name .sym{font-family:var(--mono);color:var(--accent-d)}
+.ctrl-val{font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border-radius:6px;padding:.05rem .45rem}
+.ctrl-hint{font-size:.72rem;color:var(--muted);line-height:1.3}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer;margin-top:.2rem}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);
+  border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+
+.budget-row{grid-column:1 / -1;display:flex;flex-direction:column;gap:.4rem}
+.budget-btns{display:flex;flex-wrap:wrap;gap:.5rem}
+.budget-btn{font-family:var(--mono);font-size:.78rem;font-weight:600;color:var(--text2);
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r-full);
+  padding:.35rem .8rem;cursor:pointer;transition:all .12s var(--ease)}
+.budget-btn:hover{border-color:var(--accent)}
+.budget-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.reset-btn{font-family:var(--body);font-size:.8rem;font-weight:600;color:var(--muted);
+  background:transparent;border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.35rem .8rem;cursor:pointer;transition:all .12s var(--ease)}
+.reset-btn:hover{border-color:var(--accent);color:var(--accent-d)}
+
+/* figure */
+.fig-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1rem 1rem .5rem;margin-bottom:1rem}
+svg{display:block;width:100%;height:auto}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.5rem}
+.ro{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:.85rem 1rem}
+.ro-label{font-size:.72rem;color:var(--muted);margin-bottom:.25rem;line-height:1.3}
+.ro-val{font-family:var(--mono);font-size:1.15rem;font-weight:600;color:var(--text)}
+.ro-val.ok{color:var(--ok)}
+.ro-val.warn{color:var(--warn)}
+.ro-sub{font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-top:.15rem}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:.75rem 1.1rem;font-size:.78rem;color:var(--text2);
+  padding:.4rem .2rem .2rem}
+.legend-item{display:flex;align-items:center;gap:.4rem}
+.legend-swatch{width:16px;height:3px;border-radius:2px;flex-shrink:0}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* notice box */
+.notice{background:var(--accent-l);border:1px solid #BFE0EB;border-radius:var(--r-lg);
+  padding:1.1rem 1.3rem;margin-bottom:1.5rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem;
+  display:flex;align-items:center;gap:.4rem}
+.notice ul{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.notice li{font-size:.9rem;color:var(--text);padding-left:1.3rem;position:relative;line-height:1.5}
+.notice li::before{content:"→";position:absolute;left:0;color:var(--accent);font-weight:700}
+.notice li b{color:var(--accent-d)}
+.notice code{font-family:var(--mono);font-size:.85em;background:rgba(255,255,255,.6);
+  border-radius:5px;padding:.02rem .3rem}
+
+.formula{font-family:var(--mono);font-size:.85rem;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:.6rem .8rem;margin:.75rem 0 0;color:var(--text2);overflow-x:auto}
+
+@media(max-width:640px){
+  h1{font-size:1.45rem}
+  .controls{grid-template-columns:1fr}
+  .readouts{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Scaling Laws</span>
+    <a class="nav-link" href="../index.html">← All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <span class="eyebrow">Frontier Lab · ML Systems</span>
+  <h1>Scaling Laws: IsoFLOP Parabolas &amp; the Chinchilla Frontier</h1>
+  <p class="intro">
+    A <b>scaling law</b> predicts model loss from two knobs: parameter count <code>N</code> and training
+    tokens <code>D</code>. Training compute is fixed at <code>C = 6·N·D</code> FLOPs. For each compute budget
+    there is one best way to split it between a bigger model and more data. This page lets you find that split.
+  </p>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <div class="card-label">Controls — tune the loss law, then pick a compute budget to highlight</div>
+    <div class="controls" id="controls">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Param exponent <span class="sym">α</span> (alpha)</span>
+          <span class="ctrl-val" id="v-alpha">0.34</span>
+        </div>
+        <input type="range" id="s-alpha" min="0.10" max="0.60" step="0.01" value="0.34">
+        <span class="ctrl-hint">How fast loss drops as the model grows (bigger = params matter more).</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Data exponent <span class="sym">β</span> (beta)</span>
+          <span class="ctrl-val" id="v-beta">0.28</span>
+        </div>
+        <input type="range" id="s-beta" min="0.10" max="0.60" step="0.01" value="0.28">
+        <span class="ctrl-hint">How fast loss drops as tokens grow (bigger = data matters more).</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Param coefficient <span class="sym">A</span></span>
+          <span class="ctrl-val" id="v-A">406</span>
+        </div>
+        <input type="range" id="s-A" min="100" max="800" step="1" value="406">
+        <span class="ctrl-hint">Size of the "not enough params" penalty term A·N⁻ᵅ.</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Data coefficient <span class="sym">B</span></span>
+          <span class="ctrl-val" id="v-B">410</span>
+        </div>
+        <input type="range" id="s-B" min="100" max="800" step="1" value="410">
+        <span class="ctrl-hint">Size of the "not enough data" penalty term B·D⁻ᵝ.</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Irreducible loss <span class="sym">E</span></span>
+          <span class="ctrl-val" id="v-E">1.69</span>
+        </div>
+        <input type="range" id="s-E" min="0.50" max="2.50" step="0.01" value="1.69">
+        <span class="ctrl-hint">The floor no amount of compute can beat (entropy of the data).</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-name">Kaplan point: params bias</span>
+          <span class="ctrl-val" id="v-kaplan">4.0×</span>
+        </div>
+        <input type="range" id="s-kaplan" min="1.5" max="12" step="0.5" value="4.0">
+        <span class="ctrl-hint">Push params this many × above optimal → an under-trained model.</span>
+      </div>
+
+      <div class="budget-row">
+        <span class="ctrl-name">Highlight a compute budget <b>C</b> (FLOPs)</span>
+        <div class="budget-btns" id="budget-btns"></div>
+      </div>
+      <div class="budget-row" style="align-items:flex-start">
+        <button class="reset-btn" id="reset">Reset to Chinchilla defaults</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIGURE -->
+  <div class="fig-wrap">
+    <svg id="chart" viewBox="0 0 860 500" role="img"
+      aria-label="IsoFLOP curves: training loss versus model size on a log axis, one curve per compute budget, with each curve's minimum marked and the minima joined into the compute-optimal frontier.">
+    </svg>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <!-- READOUTS -->
+  <div class="readouts" id="readouts">
+    <div class="ro">
+      <div class="ro-label">Compute-optimal model size <b>N*</b><br>for the highlighted budget</div>
+      <div class="ro-val" id="ro-nstar">—</div>
+      <div class="ro-sub" id="ro-nstar-sub"></div>
+    </div>
+    <div class="ro">
+      <div class="ro-label">Chinchilla ratio <b>D*/N*</b><br>optimal tokens per parameter</div>
+      <div class="ro-val ok" id="ro-ratio">—</div>
+      <div class="ro-sub" id="ro-ratio-sub">rule of thumb ≈ 20</div>
+    </div>
+    <div class="ro">
+      <div class="ro-label">Kaplan-style point<br>extra loss from under-training</div>
+      <div class="ro-val warn" id="ro-kaplan">—</div>
+      <div class="ro-sub" id="ro-kaplan-sub"></div>
+    </div>
+  </div>
+
+  <!-- NOTICE -->
+  <div class="notice">
+    <h3>What to notice</h3>
+    <ul>
+      <li>Each colored curve is <b>one fixed compute budget</b>. It is a parabola in <code>log N</code>: too few
+        params (left) wastes compute on data; too many params (right) starves the model of tokens. There is exactly
+        <b>one best N</b> at the bottom — the compute-optimal point <b>N*</b>.</li>
+      <li>Joining the minima across budgets draws the <b>compute-optimal frontier</b>. It is a straight line in
+        log-log space, so <b>N* ∝ C<sup>β/(α+β)</sup></b> — a power law. When α ≈ β, <b>N* and D* grow at the
+        same rate</b> (both ∝ √C): the Chinchilla result of ~<b>20 tokens per parameter</b>.</li>
+      <li>The <b>orange dot</b> is a Kaplan-style choice: too many params, too few tokens. It sits up the right
+        wall of the parabola — same compute, <b>higher loss</b>. Kaplan (2020) over-weighted N; Chinchilla (2022)
+        showed N and D should scale together.</li>
+    </ul>
+    <div class="formula" id="formula-box">L(N, D) = E + A·N<sup>−α</sup> + B·D<sup>−β</sup> &nbsp;•&nbsp; C = 6·N·D &nbsp;•&nbsp; N* = [ α·A·C<sup>β</sup> / (β·B·6<sup>β</sup>) ]<sup>1/(α+β)</sup></div>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---- graceful degradation if d3 is missing ----
+  if (typeof window.d3 === "undefined") {
+    console.warn("D3 failed to load from ./d3.v7.min.js — showing fallback message.");
+    var svgEl = document.getElementById("chart");
+    if (svgEl) {
+      svgEl.outerHTML =
+        '<div class="fallback">This interactive figure needs D3.js, which did not load.' +
+        ' Please make sure <code>d3.v7.min.js</code> sits next to this page, then reload.</div>';
+    }
+    return;
+  }
+
+  var d3 = window.d3;
+  var reduceMotion = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = reduceMotion ? 0 : 350;
+
+  // ---- state (Chinchilla-like defaults from Hoffmann et al. 2022) ----
+  var DEFAULTS = { alpha:0.34, beta:0.28, A:406, B:410, E:1.69, kaplan:4.0 };
+  var state = Object.assign({}, DEFAULTS);
+
+  // compute budgets to draw as IsoFLOP curves (FLOPs)
+  var BUDGETS = [1e17, 1e18, 1e19, 1e20, 1e21];
+  var BUDGET_LABELS = ["1e17", "1e18", "1e19", "1e20", "1e21"];
+  // warm sequential palette from cool -> warm accent
+  var CURVE_COLORS = ["#8FB9C8", "#57A0B8", "#2A7B9B", "#1F6280", "#12405A"];
+  var highlightIdx = 3; // default highlight 1e20
+
+  // ---- math ----------------------------------------------------------
+  // loss with N params and D tokens
+  function loss(N, D){
+    return state.E + state.A * Math.pow(N, -state.alpha)
+                   + state.B * Math.pow(D, -state.beta);
+  }
+  // loss along an IsoFLOP slice: D = C/(6N)
+  function lossAtBudget(N, C){
+    var D = C / (6 * N);
+    return loss(N, D);
+  }
+  // closed-form compute-optimal N* for a budget C:
+  // N* = [ alpha*A*C^beta / (beta*B*6^beta) ]^(1/(alpha+beta))
+  function optimalN(C){
+    var a = state.alpha, b = state.beta;
+    var num = a * state.A * Math.pow(C, b);
+    var den = b * state.B * Math.pow(6, b);
+    return Math.pow(num / den, 1 / (a + b));
+  }
+  function optimalD(C){ return C / (6 * optimalN(C)); }
+
+  // ---- chart scaffold ------------------------------------------------
+  var W = 860, H = 500;
+  var margin = { top: 24, right: 24, bottom: 54, left: 62 };
+  var innerW = W - margin.left - margin.right;
+  var innerH = H - margin.top - margin.bottom;
+
+  var svg = d3.select("#chart");
+  var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  // x = log10(N). Choose a range wide enough that every budget's minimum is visible.
+  var xDomain = [6.3, 12.2];              // 10^6.3 (~2M) .. 10^12.2 (~1.6T) params
+  var x = d3.scaleLinear().domain(xDomain).range([0, innerW]);
+  var y = d3.scaleLinear().range([innerH, 0]); // loss, domain set dynamically
+
+  // axes groups
+  var gx = g.append("g").attr("transform", "translate(0," + innerH + ")");
+  var gy = g.append("g");
+  var gGrid = g.append("g").attr("class", "grid");
+
+  // axis labels
+  g.append("text")
+    .attr("x", innerW / 2).attr("y", innerH + 42)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#5A544E").attr("font-size", 13).attr("font-weight", 600)
+    .attr("font-family", "'DM Sans',sans-serif")
+    .text("Model size  N  (parameters, log scale)");
+
+  g.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -innerH / 2).attr("y", -46)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#5A544E").attr("font-size", 13).attr("font-weight", 600)
+    .attr("font-family", "'DM Sans',sans-serif")
+    .text("Training loss  L  (lower is better)");
+
+  // layered groups (draw order)
+  var gCurves   = g.append("g");
+  var gFrontier = g.append("g");
+  var gMinima   = g.append("g");
+  var gKaplan   = g.append("g");
+  var gTip      = g.append("g");
+
+  // human-readable big number, e.g. 7.0B, 350M, 1.2T
+  function fmtCount(v){
+    if (v >= 1e12) return (v/1e12).toFixed(1) + "T";
+    if (v >= 1e9)  return (v/1e9).toFixed(1)  + "B";
+    if (v >= 1e6)  return (v/1e6).toFixed(0)  + "M";
+    if (v >= 1e3)  return (v/1e3).toFixed(0)  + "K";
+    return v.toFixed(0);
+  }
+
+  // sample one IsoFLOP curve as an array of {lx, N, loss}
+  function sampleCurve(C){
+    var pts = [];
+    var steps = 90;
+    for (var i = 0; i <= steps; i++){
+      var lx = xDomain[0] + (xDomain[1] - xDomain[0]) * i / steps;
+      var N = Math.pow(10, lx);
+      pts.push({ lx: lx, N: N, loss: lossAtBudget(N, C) });
+    }
+    return pts;
+  }
+
+  // ---- render --------------------------------------------------------
+  function render(){
+    var curves = BUDGETS.map(sampleCurve);
+
+    // y-domain: from a bit below the best loss to a sensible cap above it,
+    // so the parabola shape is clearly visible for the highlighted budget.
+    var minLoss = d3.min(curves, function(c){ return d3.min(c, function(p){ return p.loss; }); });
+    // cap: use the highlighted curve's loss near the left/right edges (worst visible)
+    var hi = curves[highlightIdx];
+    var edgeLoss = Math.max(hi[0].loss, hi[hi.length-1].loss);
+    var top = Math.min(edgeLoss, minLoss + Math.max(1.2, (edgeLoss - minLoss)));
+    // guard against degenerate range
+    if (!(top > minLoss)) top = minLoss + 1;
+    y.domain([Math.max(0, minLoss - 0.15), top + 0.15]).nice();
+
+    // axes
+    var xTicks = [6,7,8,9,10,11,12].filter(function(t){ return t>=xDomain[0]-0.5 && t<=xDomain[1]+0.5; });
+    gx.transition().duration(DUR).call(
+      d3.axisBottom(x).tickValues(xTicks).tickFormat(function(d){
+        return fmtCount(Math.pow(10, d)); // show 1M, 1B... instead of 10^d
+      })
+    );
+    gy.transition().duration(DUR).call(d3.axisLeft(y).ticks(6).tickFormat(function(d){ return d.toFixed(1); }));
+
+    // faint horizontal gridlines
+    gGrid.transition().duration(DUR).call(
+      d3.axisLeft(y).ticks(6).tickSize(-innerW).tickFormat("")
+    );
+    gGrid.selectAll("line").attr("stroke", "#EEEBE5");
+    gGrid.select(".domain").remove();
+
+    // style axis text
+    g.selectAll(".tick text").attr("font-family", "'JetBrains Mono',monospace")
+      .attr("font-size", 11).attr("fill", "#6B645E");
+    g.selectAll(".domain, .tick line").attr("stroke", "#D8D1C6");
+    gGrid.selectAll(".tick line").attr("stroke", "#EEEBE5");
+
+    var lineGen = d3.line()
+      .x(function(p){ return x(p.lx); })
+      .y(function(p){ return y(p.loss); })
+      .curve(d3.curveBasis);
+
+    // ---- IsoFLOP curves (join) ----
+    var paths = gCurves.selectAll("path.curve").data(curves);
+    paths.enter().append("path")
+      .attr("class", "curve")
+      .attr("fill", "none")
+      .attr("stroke-linecap", "round")
+      .merge(paths)
+      .transition().duration(DUR)
+      .attr("d", lineGen)
+      .attr("stroke", function(d, i){ return CURVE_COLORS[i]; })
+      .attr("stroke-width", function(d, i){ return i === highlightIdx ? 3.4 : 1.8; })
+      .attr("opacity", function(d, i){ return i === highlightIdx ? 1 : 0.5; });
+    paths.exit().remove();
+
+    // ---- minima + frontier ----
+    var minima = BUDGETS.map(function(C){
+      var Ns = optimalN(C);
+      var lx = Math.log10(Ns);
+      // clamp label position into view but keep true value
+      return { C: C, N: Ns, lx: lx, loss: lossAtBudget(Ns, C) };
+    });
+
+    // frontier line through minima
+    var frontierGen = d3.line()
+      .x(function(p){ return x(p.lx); })
+      .y(function(p){ return y(p.loss); });
+    var fpath = gFrontier.selectAll("path.frontier").data([minima]);
+    fpath.enter().append("path")
+      .attr("class", "frontier")
+      .attr("fill", "none")
+      .attr("stroke", "#BE3E26")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "2 5")
+      .attr("stroke-linecap", "round")
+      .attr("opacity", 0.85)
+      .merge(fpath)
+      .transition().duration(DUR)
+      .attr("d", frontierGen);
+
+    // minima dots
+    var dots = gMinima.selectAll("circle.min").data(minima);
+    dots.enter().append("circle")
+      .attr("class", "min")
+      .attr("r", 4.5)
+      .attr("fill", "#fff")
+      .attr("stroke-width", 2.5)
+      .merge(dots)
+      .transition().duration(DUR)
+      .attr("cx", function(p){ return x(p.lx); })
+      .attr("cy", function(p){ return y(p.loss); })
+      .attr("r", function(p, i){ return i === highlightIdx ? 6 : 4.5; })
+      .attr("stroke", "#BE3E26");
+    dots.exit().remove();
+
+    // ---- Kaplan under-trained point on the highlighted curve ----
+    var Chi = BUDGETS[highlightIdx];
+    var Nopt = optimalN(Chi);
+    var Nkap = Nopt * state.kaplan;                 // too many params
+    var lxKap = Math.log10(Nkap);
+    var kapInView = lxKap <= xDomain[1] + 0.05;
+    var lossKap = lossAtBudget(Nkap, Chi);
+
+    gKaplan.selectAll("*").remove();
+    if (kapInView){
+      var kx = x(Math.min(lxKap, xDomain[1]));
+      var ky = y(lossKap);
+      // connector from optimum up to kaplan point along the curve wall
+      gKaplan.append("line")
+        .attr("x1", x(Math.log10(Nopt))).attr("y1", y(lossAtBudget(Nopt, Chi)))
+        .attr("x2", kx).attr("y2", ky)
+        .attr("stroke", "#C99A12").attr("stroke-width", 1.4)
+        .attr("stroke-dasharray", "3 3").attr("opacity", 0.7);
+      gKaplan.append("circle")
+        .attr("cx", kx).attr("cy", ky).attr("r", 6.5)
+        .attr("fill", "#C99A12").attr("stroke", "#fff").attr("stroke-width", 2);
+      gKaplan.append("text")
+        .attr("x", kx - 9).attr("y", ky - 9).attr("text-anchor", "end")
+        .attr("fill", "#9A7208").attr("font-size", 11).attr("font-weight", 700)
+        .attr("font-family", "'DM Sans',sans-serif")
+        .text("Kaplan (under-trained)");
+    }
+
+    // label the highlighted minimum
+    gTip.selectAll("*").remove();
+    var hm = minima[highlightIdx];
+    var hmx = x(Math.min(Math.max(hm.lx, xDomain[0]), xDomain[1]));
+    var hmy = y(hm.loss);
+    gTip.append("text")
+      .attr("x", hmx).attr("y", hmy + 22).attr("text-anchor", "middle")
+      .attr("fill", "#1F6280").attr("font-size", 11).attr("font-weight", 700)
+      .attr("font-family", "'DM Sans',sans-serif")
+      .text("N* = " + fmtCount(hm.N));
+
+    updateReadouts(minima, Nkap, lossKap, Chi);
+    updateFormula();
+  }
+
+  // ---- readouts + formula --------------------------------------------
+  function updateReadouts(minima, Nkap, lossKap, Chi){
+    var hm = minima[highlightIdx];
+    var Dstar = optimalD(Chi);
+    var ratio = Dstar / hm.N;
+    var lossOpt = lossAtBudget(hm.N, Chi);
+    var extra = lossKap - lossOpt;
+
+    document.getElementById("ro-nstar").textContent = fmtCount(hm.N) + " params";
+    document.getElementById("ro-nstar-sub").textContent =
+      "D* = " + fmtCount(Dstar) + " tokens  ·  C = " + BUDGET_LABELS[highlightIdx] + " FLOP";
+
+    document.getElementById("ro-ratio").textContent = ratio.toFixed(1) + " tok/param";
+    var ratioEl = document.getElementById("ro-ratio");
+    // green when near the ~20 rule, warn when far
+    ratioEl.className = "ro-val " + (ratio >= 8 && ratio <= 60 ? "ok" : "warn");
+
+    var kapRatio = (Chi / (6 * Nkap)) / Nkap; // D_kap / N_kap
+    document.getElementById("ro-kaplan").textContent = "+" + extra.toFixed(3) + " loss";
+    document.getElementById("ro-kaplan-sub").textContent =
+      state.kaplan.toFixed(1) + "× params  ·  only " + kapRatio.toFixed(1) + " tok/param";
+  }
+
+  function updateFormula(){
+    var a = state.alpha, b = state.beta;
+    var exp = (b / (a + b));
+    document.getElementById("formula-box").innerHTML =
+      "L(N, D) = " + state.E.toFixed(2) + " + " + state.A + "·N<sup>−" + a.toFixed(2) + "</sup> + " +
+      state.B + "·D<sup>−" + b.toFixed(2) + "</sup>" +
+      " &nbsp;•&nbsp; C = 6·N·D &nbsp;•&nbsp; N* ∝ C<sup>" + exp.toFixed(2) +
+      "</sup>,  D* ∝ C<sup>" + (a/(a+b)).toFixed(2) + "</sup>";
+  }
+
+  // ---- legend --------------------------------------------------------
+  function buildLegend(){
+    var el = document.getElementById("legend");
+    var html = "";
+    BUDGET_LABELS.forEach(function(lab, i){
+      html += '<span class="legend-item"><span class="legend-swatch" style="background:' +
+        CURVE_COLORS[i] + '"></span>C = ' + lab + ' FLOP</span>';
+    });
+    html += '<span class="legend-item"><span class="legend-swatch" ' +
+      'style="background:#BE3E26;height:2px"></span>Compute-optimal frontier</span>';
+    html += '<span class="legend-item"><span class="legend-dot" ' +
+      'style="background:#C99A12"></span>Kaplan under-trained point</span>';
+    el.innerHTML = html;
+  }
+
+  // ---- budget buttons ------------------------------------------------
+  function buildBudgetButtons(){
+    var wrap = document.getElementById("budget-btns");
+    wrap.innerHTML = "";
+    BUDGET_LABELS.forEach(function(lab, i){
+      var btn = document.createElement("button");
+      btn.className = "budget-btn" + (i === highlightIdx ? " active" : "");
+      btn.textContent = lab + " FLOP";
+      btn.addEventListener("click", function(){
+        highlightIdx = i;
+        Array.prototype.forEach.call(wrap.children, function(c, ci){
+          c.classList.toggle("active", ci === i);
+        });
+        render();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  // ---- sliders -------------------------------------------------------
+  function bindSlider(id, key, fmt){
+    var s = document.getElementById("s-" + id);
+    var v = document.getElementById("v-" + id);
+    function sync(){
+      var val = parseFloat(s.value);
+      state[key] = val;
+      v.textContent = fmt(val);
+      render();
+    }
+    s.addEventListener("input", sync);
+    return { s:s, v:v, fmt:fmt };
+  }
+
+  var sliders = {
+    alpha:  bindSlider("alpha",  "alpha",  function(x){ return x.toFixed(2); }),
+    beta:   bindSlider("beta",   "beta",   function(x){ return x.toFixed(2); }),
+    A:      bindSlider("A",      "A",      function(x){ return String(Math.round(x)); }),
+    B:      bindSlider("B",      "B",      function(x){ return String(Math.round(x)); }),
+    E:      bindSlider("E",      "E",      function(x){ return x.toFixed(2); }),
+    kaplan: bindSlider("kaplan", "kaplan", function(x){ return x.toFixed(1) + "×"; })
+  };
+
+  document.getElementById("reset").addEventListener("click", function(){
+    state = Object.assign({}, DEFAULTS);
+    highlightIdx = 3;
+    Object.keys(sliders).forEach(function(k){
+      var slid = sliders[k];
+      slid.s.value = DEFAULTS[k];
+      slid.v.textContent = slid.fmt(DEFAULTS[k]);
+    });
+    buildBudgetButtons();
+    render();
+  });
+
+  // ---- go ------------------------------------------------------------
+  buildLegend();
+  buildBudgetButtons();
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 7 · Day 3 — The Load Balancing Problem: Why Routers Collapse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w07-d03-moeload">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 7 Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-02-moe-scaling-deviations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 2 · Week 7 · Day 3 (Wed)</span>
+    <h1>The Load Balancing Problem<br>Why Routers Collapse</h1>
+    <p class="lead">A trained router should spread tokens roughly evenly across experts. Left alone, it does the opposite: it learns to send almost everything to a handful of favorite experts and starve the rest. Today: why that collapse happens, why it's a vicious cycle once it starts, and the auxiliary loss that Switch Transformer and GShard both use to stop it.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why router collapse is self-reinforcing, state the Switch Transformer auxiliary loss <code>loss_aux = α · N · Σ(f_i · P_i)</code> and why its minimum is exactly <code>α</code>, and connect expert capacity + token dropping to why a fixed load-balancing loss alone isn't the whole story.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is "load balancing," and why does an MoE router need it?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–2's MoE fundamentals (experts, router, top-k, sparse activation) and the idea of active vs. total parameters. <b>No prior load-balancing math needed.</b></div></div>
+
+      <h4>Quick recap: what does the router actually do?</h4>
+      <p>Each Mixture-of-Experts (<span class="term">MoE</span>) layer has a small <span class="term">router</span> network. For every token, the router outputs a score for each expert, turns those scores into probabilities with a softmax, and then sends the token to the top-<code>k</code> highest-scoring experts (Switch Transformer uses <code>k=1</code>, GShard uses <code>k=2</code>). Only the chosen experts do any work on that token — this is what keeps MoE's per-token compute cheap even though the total parameter count across all experts is huge.</p>
+
+      <h4>What is "load balancing," and why is it a problem at all?</h4>
+      <p><span class="term">Load balancing</span> means making sure tokens get spread out roughly evenly across all the available experts, instead of piling up on just a few. You might assume a trained router would naturally learn to do this — after all, spreading load seems like the "smart" thing to do. It does not happen by default. Left to train with only the language-modeling loss, routers tend to fall into <span class="term">routing collapse</span>: a small number of experts start getting picked slightly more often (maybe just by random initialization), those experts then get more gradient updates and become slightly better at handling whatever tokens they see, which makes the router even more likely to pick them next time. Within a few thousand steps, most of the expert capacity can end up unused while 1 or 2 experts absorb the majority of tokens.</p>
+
+      <h4>So what's today's catch?</h4>
+      <p>The fix is not "hope harder." Fedus et al.'s Switch Transformer paper (2021) and Lepikhin et al.'s GShard paper (2020) both add a second loss term — an <span class="term">auxiliary load-balancing loss</span> — that is added to the ordinary language-modeling loss during training. It directly penalizes uneven routing, so the optimizer is pushed to spread tokens across experts even though nothing about next-token prediction alone would ask for that. There's a second, complementary piece too: even with the auxiliary loss nudging things toward balance, real batches are never perfectly even, so systems also give each expert a hard <span class="term">capacity</span> limit and simply <em>drop</em> tokens that arrive after an expert is full. We'll build both pieces today.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Primary sources (optional): <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Fedus et al. — Switch Transformer (arXiv:2101.03961)</a> · <a href="https://arxiv.org/abs/2006.16668" target="_blank" rel="noopener">Lepikhin et al. — GShard (arXiv:2006.16668)</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">The restaurant with one popular waiter</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a restaurant with 8 waiters and a host who seats every new table.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🙋‍♂️🍽️</span><h5>The collapse: one waiter gets all the tables</h5><p>Early on, one waiter happens to get a couple of easy tables and does well. The host starts noticing he's "good," and sends him more tables. He gets even more practice, gets even better and faster, and the host sends him still more. Meanwhile the other 7 waiters stand around getting no practice at all — they never improve, because they never get customers.</p></div>
+        <div class="card"><span class="big">🎫🙋‍♀️🙋‍♂️🙋‍♀️</span><h5>The fix: a ticket-based cap per waiter</h5><p>The manager hands out a limited number of table-tickets to each waiter per shift, and also scores the host on how evenly tickets got used — not just on how happy customers were. Now the host is pushed to spread new tables around, and every waiter gets enough practice to actually get good.</p></div>
+      </div>
+      <p><strong>In one line:</strong> a router that is only rewarded for good predictions will happily send everything to its early favorites — you have to reward it separately for spreading tokens out, and also hard-cap how much any one expert can take.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the "manager's score" (the auxiliary loss) isn't a separate rule bolted on after training — it's summed directly into the same loss the router's weights get gradients from, every single step. And the "ticket cap" (expert capacity) isn't a fairness policy — it's a hard memory/compute limit: an expert's per-batch buffer physically cannot hold more than its capacity, so anything past that limit doesn't wait in line, it gets dropped and skips that layer entirely.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three routing scenarios</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal, 8 experts each time (<code>N=8</code>), looking at how tokens actually land. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="uniform" type="button">① uniform routing: healthy</button>
+          <button class="play-btn" data-demo="collapse" type="button">② collapsed routing: 2 experts dominate</button>
+          <button class="play-btn" data-demo="capacity" type="button">③ capacity limit: tokens get dropped</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The auxiliary loss, and why its minimum is exactly α</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>For a batch of <code>T</code> tokens routed across <code>N</code> experts, define two per-expert quantities: <code>f_i</code> = the <strong>fraction of tokens actually dispatched</strong> to expert <code>i</code> (a hard count, via argmax/top-k), and <code>P_i</code> = the <strong>mean router probability</strong> mass expert <code>i</code> received across the batch (a soft, differentiable average of the softmax output).</li>
+        <li>The Switch Transformer auxiliary loss is <code>loss_aux = α · N · Σ_i (f_i · P_i)</code>, summed over all <code>N</code> experts, with <code>α</code> a small fixed hyperparameter (Switch Transformer uses <code>α = 0.01</code>).</li>
+        <li><code>f_i</code> alone isn't differentiable (argmax has no useful gradient), so the loss multiplies it by the differentiable <code>P_i</code> — this is exactly how the loss can push gradients back into the router's weights even though the actual token-to-expert assignment is a hard, non-differentiable choice.</li>
+        <li>Both <code>f_i</code> and <code>P_i</code> are probability-like: <code>Σ_i f_i = 1</code> and <code>Σ_i P_i = 1</code>. Perfectly uniform routing means <code>f_i = P_i = 1/N</code> for every expert.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>loss_aux = α · N · Σ_i (f_i · P_i)</code>, minimized at uniform routing where it equals exactly <code>α</code><br><span style="font-size:.85rem;color:var(--text2)">Plug in <code>f_i = P_i = 1/N</code>: the sum has <code>N</code> terms, each of size <code>(1/N)·(1/N)</code>, so the total is <code>N · (1/N²) = 1/N</code>. Multiply by <code>α · N</code>: <code>α · N · (1/N) = α</code>. That's the constant floor — <code>loss_aux</code> can never go below <code>α</code>, and it only reaches <code>α</code> when routing is perfectly even. Any skew away from uniform strictly increases it above <code>α</code>.</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>It fights a genuinely self-reinforcing failure</strong> — without it, a slight early imbalance compounds: more tokens → more gradient signal → better expert → even more tokens. The auxiliary loss adds constant pressure in the opposite direction, every step, so imbalance can't freely compound.</li>
+        <li><strong>Capacity is the second, independent safety net</strong> — the auxiliary loss shapes training incentives, but any single batch can still be locally uneven by chance. Systems set <code>expert_capacity = (T/N) · capacity_factor</code> (a hard buffer size per expert) and drop tokens once an expert's buffer is full, tracking a <code>drop_rate</code>. A higher <code>capacity_factor</code> (e.g. 1.25 or 1.5 instead of 1.0) means bigger buffers and fewer dropped tokens, at the cost of more allocated (and often wasted) compute/memory per expert.</li>
+        <li><strong>Production consequence</strong> — dropped tokens don't get an error; the model just skips that expert's transformation for them that layer (often via a residual/identity pass-through), silently degrading quality on whichever tokens got unlucky. Tuning <code>α</code> and <code>capacity_factor</code> together is a real trade-off: too little balancing pressure risks collapse, too much can slightly hurt the primary language-modeling loss, and too tight a capacity risks dropping a lot of tokens.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> random early imbalance → favored experts get more gradient signal → they get better → router favors them even more → collapse, unless the auxiliary loss's constant pressure toward uniform <code>f_i, P_i</code> counteracts it, and a hard per-expert capacity limit catches whatever imbalance survives training.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Collapse, the aux loss floor, and capacity</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Simulate collapse, capacity dropping, and the balancing fix</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's artifact: a small reproducible JAX/NumPy simulation of MoE token routing and load balancing, showing both the failure (collapse + dropped tokens) and the fix (the auxiliary loss actually converging toward uniform routing).</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Simulate a batch of <code>T=2048</code> synthetic tokens routed to <code>N=8</code> experts, with router logits deliberately skewed so 2 experts get roughly 3x the average softmax weight — this reproduces routing collapse.</li>
+        <li>Implement <code>expert_capacity = (T/N) · capacity_factor</code> and a dispatch loop that drops tokens once an expert's running counter hits capacity, tracking <code>dropped_token_count</code> and <code>drop_rate</code> for <code>capacity_factor</code> in <code>{1.0, 1.25, 1.5, 2.0}</code>, printing the real <code>drop_rate</code> number for each.</li>
+        <li>Implement the Switch Transformer auxiliary loss <code>loss_aux = α · N · Σ_i (f_i · P_i)</code> as a JAX function operating on per-token router softmax outputs. Print <code>loss_aux</code> for both the uniform case (must equal <code>α</code> within float tolerance) and the skewed/collapsed case (must be strictly higher).</li>
+        <li>Run a toy gradient-descent loop (a few hundred steps, plain JAX autodiff) on only the router's logits, using <code>loss_aux</code> as the sole objective, and plot how <code>f_i</code> and <code>P_i</code> converge toward <code>1/N</code> over steps — saved as <code>load_balance_convergence.png</code>.</li>
+        <li>A short written summary (printed in the script's final block or an adjacent markdown note) states in plain language what the capacity-factor-vs-drop-rate trade-off and the loss convergence demonstrate, tying back to the Switch Transformer and GShard papers' claims.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha:</b> don't confuse the two mechanisms. The auxiliary loss is a <em>training-time</em> incentive that shapes the router's weights over many steps — it can't guarantee any single batch is perfectly balanced. Expert capacity is an <em>inference/forward-pass-time</em> hard limit that drops tokens no matter how well-trained the router is, whenever a batch happens to be locally uneven. A well-trained router (low loss_aux) still needs a capacity buffer greater than 1.0x to avoid meaningful drop rates in practice.</div></div>
+      <h4>Option A · write it yourself</h4>
+      <p>Build <code>experiments/week07_jax/moe_load_balancing.py</code> (plus a short <code>README.md</code> or docstring writeup in the same directory) with the four bullets above, using JAX/NumPy.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 7 Day 3 artifact.
+
+Create experiments/week07_jax/moe_load_balancing.py (plus a short README.md or docstring writeup in the same directory) that:
+1. Simulates a batch of T=2048 synthetic tokens and N=8 experts with router logits deliberately skewed so 2 experts get ~3x the average softmax weight, reproducing routing collapse.
+2. Implements expert_capacity = (T/N) * capacity_factor and a dispatch loop that drops tokens once an expert's running counter hits capacity, tracking dropped_token_count and drop_rate for capacity_factor in {1.0, 1.25, 1.5, 2.0}, printing the real drop_rate for each.
+3. Implements the Switch Transformer auxiliary loss loss_aux = alpha * N * sum_i(f_i * P_i) as a JAX function on per-token router softmax outputs. Verify numerically that perfectly uniform routing gives loss_aux = alpha (the constant-minimum property from the paper), and that the skewed/collapsed distribution gives a strictly higher loss_aux.
+4. Runs a toy gradient-descent loop (a few hundred steps, plain JAX autodiff) on only the router's logits, using loss_aux as the sole objective, and plots how f_i and P_i converge toward 1/N over steps, saved as load_balance_convergence.png.
+Must run end-to-end with `python experiments/week07_jax/moe_load_balancing.py` with no errors. Print, for each capacity_factor, the resulting drop_rate as a real number, and print loss_aux for both the uniform and skewed cases. End with a short plain-language summary of what the capacity-factor-vs-drop-rate trade-off and the loss convergence demonstrate, tying back to the Switch Transformer and GShard papers' claims.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-07/day-03-log.md</code>: at which <code>capacity_factor</code> did your <code>drop_rate</code> first fall below 1%, and does that match what the load-balancing loss convergence plot would predict?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 3 complete!</h3>
+    <p>You now know why MoE routers collapse without help, why the Switch Transformer auxiliary loss has a hard floor of exactly <code>α</code> at perfect balance, and why expert capacity is a separate, necessary safety net on top of it. You've done MoE fundamentals, its scaling deviations, and the load-balancing problem.<br>Next: <code>start today</code> → Day 4 is distributed MoE routing (the all-to-all bottleneck).</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-02-moe-scaling-deviations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  uniform:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># healthy routing, N=8 experts</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> f = [<span class="num">0.125</span>]*<span class="num">8</span>   <span class="dim"># dispatch fraction per expert</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> P = [<span class="num">0.125</span>]*<span class="num">8</span>   <span class="dim"># mean router probability per expert</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss_aux(f, P, alpha=<span class="num">0.01</span>)\n<span class="ok">0.01</span>   <span class="hl"># exactly alpha — the constant floor</span>\n'+
+    '<span class="dim"># every expert gets ~256 of the 2048 tokens — full utilization</span>',
+    take:'<b>①  Uniform routing.</b> Every expert gets an equal share of tokens and probability mass. loss_aux hits its theoretical minimum, exactly α — nothing lower is possible.'},
+  collapse:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># collapsed routing: 2 experts dominate</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> f = [<span class="num">0.3</span>, <span class="num">0.3</span>, <span class="num">0.0667</span>, <span class="num">0.0667</span>, <span class="num">0.0667</span>, <span class="num">0.0667</span>, <span class="num">0.0667</span>, <span class="num">0.0667</span>]\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss_aux(f, f, alpha=<span class="num">0.01</span>)   <span class="dim"># P ≈ f here for illustration</span>\n<span class="bad">≈0.01654</span>   <span class="hl"># strictly above alpha=0.01</span>\n'+
+    '<span class="dim"># experts 0 and 1 get ~614 tokens each; experts 2-7 get ~137 each — a self-reinforcing gap</span>',
+    take:'<b>②  Collapse.</b> A small early skew compounds: favored experts get more gradient signal, get better, and the router favors them even more. loss_aux rises above α, correctly flagging the imbalance.'},
+  capacity:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># T=2048 tokens, N=8 experts, one overloaded expert gets 400 tokens routed to it</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> expert_capacity = (<span class="num">2048</span>/<span class="num">8</span>) * capacity_factor\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> capacity_factor = <span class="num">1.0</span>  →  capacity = <span class="num">256</span>\n<span class="bad">dropped_token_count = 144,  drop_rate ≈ 36% (for that expert)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> capacity_factor = <span class="num">1.5</span>  →  capacity = <span class="num">384</span>\n<span class="ok">dropped_token_count = 16,  drop_rate ≈ 4% (for that expert)</span>',
+    take:'<b>③  Capacity limits.</b> Even a well-trained router can send a locally uneven batch to one expert. Capacity is a hard buffer size; anything past it is dropped — raising capacity_factor trades more allocated compute for fewer dropped tokens.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Eight experts, target uniform routing\"><text x=\"10\" y=\"20\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#6B645E\">Target: T=2048 tokens spread evenly over N=8 experts</text><g>\n<rect x=\"20\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"80\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"140\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"200\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"260\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"320\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"380\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n<rect x=\"440\" y=\"140\" width=\"48\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/>\n</g><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#1F6280\" text-anchor=\"middle\">\n<text x=\"44\" y=\"160\">E0</text><text x=\"104\" y=\"160\">E1</text><text x=\"164\" y=\"160\">E2</text><text x=\"224\" y=\"160\">E3</text><text x=\"284\" y=\"160\">E4</text><text x=\"344\" y=\"160\">E5</text><text x=\"404\" y=\"160\">E6</text><text x=\"464\" y=\"160\">E7</text>\n</g><g font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#2C2A28\" text-anchor=\"middle\">\n<text x=\"44\" y=\"90\">256</text><text x=\"104\" y=\"90\">256</text><text x=\"164\" y=\"90\">256</text><text x=\"224\" y=\"90\">256</text><text x=\"284\" y=\"90\">256</text><text x=\"344\" y=\"90\">256</text><text x=\"404\" y=\"90\">256</text><text x=\"464\" y=\"90\">256</text>\n</g><g fill=\"#2A7B9B\">\n<rect x=\"20\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"80\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"140\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"200\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"260\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"320\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"380\" y=\"105\" width=\"48\" height=\"35\"/><rect x=\"440\" y=\"105\" width=\"48\" height=\"35\"/>\n</g><text x=\"260\" y=\"185\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">every expert: f_i = P_i = 1/8 = 0.125 — this is the goal, not the default</text></svg>", "note": "<b>Setup: 8 experts, 2048 tokens.</b> If routing were perfectly fair, each of the <code>N=8</code> experts would get exactly <code>256</code> tokens — a flat bar chart. Nothing about the language-modeling loss actually asks for this."}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Self-reinforcing collapse loop\"><rect x=\"30\" y=\"18\" width=\"180\" height=\"40\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"120\" y=\"42\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11.5\" fill=\"#C93B3B\" font-weight=\"600\">1. small early skew</text><path d=\"M210 38 h60\" stroke=\"#6B645E\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M264 33 L272 38 L264 43\" fill=\"#6B645E\"/><rect x=\"280\" y=\"18\" width=\"210\" height=\"40\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"385\" y=\"42\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11.5\" fill=\"#C93B3B\" font-weight=\"600\">2. more tokens → more gradient</text><path d=\"M385 58 v34\" stroke=\"#6B645E\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M380 84 L385 92 L390 84\" fill=\"#6B645E\"/><rect x=\"280\" y=\"98\" width=\"210\" height=\"40\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"385\" y=\"122\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11.5\" fill=\"#C93B3B\" font-weight=\"600\">3. expert gets better, faster</text><path d=\"M280 118 h-60\" stroke=\"#6B645E\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M226 113 L218 118 L226 123\" fill=\"#6B645E\"/><rect x=\"30\" y=\"98\" width=\"180\" height=\"40\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"120\" y=\"122\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11.5\" fill=\"#C93B3B\" font-weight=\"600\">4. router favors it even more</text><path d=\"M120 98 v-10\" stroke=\"#6B645E\" stroke-width=\"1.6\" fill=\"none\" stroke-dasharray=\"3 3\"/><path d=\"M120 40 v-10 M120 30 h0\" stroke=\"#C93B3B\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M115 85 L120 78 L125 85\" fill=\"#6B645E\"/><text x=\"120\" y=\"75\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#C93B3B\" font-weight=\"700\">loops back to 1 →</text><rect x=\"110\" y=\"165\" width=\"300\" height=\"44\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"260\" y=\"183\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#9A7208\" font-weight=\"700\">nothing in the LM loss pushes back</text><text x=\"260\" y=\"200\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#9A7208\">so the loop compounds unchecked</text></svg>", "note": "<b>Why balance doesn't happen for free.</b> A tiny early lucky break for one expert becomes a closed feedback loop: more tokens give more gradient signal, which makes that expert better, which makes the router pick it even more. Nothing in the next-token-prediction loss opposes this cycle."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Collapsed routing distribution\"><text x=\"10\" y=\"18\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#6B645E\">Actual outcome after unchecked training: 2 experts dominate</text><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#C93B3B\" text-anchor=\"middle\">\n<text x=\"44\" y=\"48\">614</text><text x=\"104\" y=\"48\">614</text>\n</g><g fill=\"#C93B3B\">\n<rect x=\"20\" y=\"55\" width=\"48\" height=\"90\"/><rect x=\"80\" y=\"55\" width=\"48\" height=\"90\"/>\n</g><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\" text-anchor=\"middle\">\n<text x=\"164\" y=\"128\">137</text><text x=\"224\" y=\"128\">137</text><text x=\"284\" y=\"128\">137</text><text x=\"344\" y=\"128\">137</text><text x=\"404\" y=\"128\">137</text><text x=\"464\" y=\"128\">137</text>\n</g><g fill=\"#E5DFD6\" stroke=\"#6B645E\" stroke-width=\"1\">\n<rect x=\"140\" y=\"135\" width=\"48\" height=\"10\"/><rect x=\"200\" y=\"135\" width=\"48\" height=\"10\"/><rect x=\"260\" y=\"135\" width=\"48\" height=\"10\"/><rect x=\"320\" y=\"135\" width=\"48\" height=\"10\"/><rect x=\"380\" y=\"135\" width=\"48\" height=\"10\"/><rect x=\"440\" y=\"135\" width=\"48\" height=\"10\"/>\n</g><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#2C2A28\" text-anchor=\"middle\">\n<text x=\"44\" y=\"160\">E0</text><text x=\"104\" y=\"160\">E1</text><text x=\"164\" y=\"160\">E2</text><text x=\"224\" y=\"160\">E3</text><text x=\"284\" y=\"160\">E4</text><text x=\"344\" y=\"160\">E5</text><text x=\"404\" y=\"160\">E6</text><text x=\"464\" y=\"160\">E7</text>\n</g><text x=\"260\" y=\"182\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">f_0 = f_1 = 0.3 each; f_2..f_7 ≈ 0.0667 each — starved capacity everywhere else</text></svg>", "note": "<b>What collapse actually looks like in numbers.</b> Two experts absorb <code>0.3</code> of all tokens each while the other six split the remaining <code>0.4</code> — roughly <code>0.0667</code> each. Most of the model's expert capacity sits idle."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Building the auxiliary loss formula\"><rect x=\"20\" y=\"16\" width=\"480\" height=\"40\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\" stroke-width=\"1.3\"/><text x=\"40\" y=\"41\" font-family=\"JetBrains Mono,monospace\" font-size=\"13\" fill=\"#2C2A28\">loss_aux = α · N · Σ<tspan font-size=\"9\" dy=\"3\">i</tspan><tspan dy=\"-3\"> (f_i · P_i)</tspan></text><g><rect x=\"30\" y=\"70\" width=\"150\" height=\"48\" rx=\"7\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.4\"/><text x=\"105\" y=\"90\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">f_i</text><text x=\"105\" y=\"107\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9.5\" fill=\"#1F6280\">hard dispatch fraction</text></g><text x=\"195\" y=\"98\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"16\" fill=\"#6B645E\">×</text><g><rect x=\"210\" y=\"70\" width=\"150\" height=\"48\" rx=\"7\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.4\"/><text x=\"285\" y=\"90\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" font-weight=\"700\" fill=\"#9A7208\">P_i</text><text x=\"285\" y=\"107\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9.5\" fill=\"#9A7208\">soft mean softmax prob</text></g><path d=\"M370 94 h30\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><path d=\"M394 89 L402 94 L394 99\" fill=\"#6B645E\"/><g><rect x=\"406\" y=\"70\" width=\"90\" height=\"48\" rx=\"7\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.4\"/><text x=\"451\" y=\"90\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" font-weight=\"700\" fill=\"#1a5c38\">gradient</text><text x=\"451\" y=\"107\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9\" fill=\"#1a5c38\">flows here</text></g><text x=\"260\" y=\"148\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">argmax (f_i) has no gradient — multiplying by differentiable P_i is how the router's weights still get pushed</text></svg>", "note": "<b>Why the loss multiplies f_i by P_i.</b> <code>f_i</code> comes from a hard argmax/top-k choice with no useful gradient. <code>P_i</code> is the soft, differentiable mean softmax probability. Multiplying them lets a gradient reach the router's weights even though token routing itself is a discrete decision."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Loss as a function of routing skew, floor at alpha\"><line x1=\"50\" y1=\"170\" x2=\"490\" y2=\"170\" stroke=\"#6B645E\" stroke-width=\"1.3\"/><line x1=\"50\" y1=\"170\" x2=\"50\" y2=\"20\" stroke=\"#6B645E\" stroke-width=\"1.3\"/><text x=\"270\" y=\"192\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#6B645E\">routing skew (uniform → collapsed)</text><text x=\"18\" y=\"95\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#6B645E\" transform=\"rotate(-90 18 95)\">loss_aux</text><path d=\"M50 150 Q 200 148 340 90 T 480 40\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"2.2\"/><line x1=\"50\" y1=\"150\" x2=\"490\" y2=\"150\" stroke=\"#2D8B55\" stroke-width=\"1.5\" stroke-dasharray=\"5 4\"/><circle cx=\"50\" cy=\"150\" r=\"5\" fill=\"#2D8B55\"/><text x=\"58\" y=\"146\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#2D8B55\" font-weight=\"700\">α = 0.01 (floor, uniform)</text><circle cx=\"480\" cy=\"40\" r=\"5\" fill=\"#C93B3B\"/><text x=\"330\" y=\"55\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"700\">≈0.01654 (this lesson's skew)</text></svg>", "note": "<b>The proof, visualized.</b> Plugging <code>f_i = P_i = 1/N</code> into the formula gives <code>α · N · (N · 1/N²) = α</code> exactly — a hard floor no configuration can beat. Any skew, like the 0.3/0.3/0.0667×6 split, strictly pushes the loss above that floor to about <code>0.01654</code>."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Expert capacity buffer overflow, tokens dropped\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#6B645E\">One overloaded expert, capacity_factor = 1.0 → capacity = 256</text><rect x=\"30\" y=\"32\" width=\"260\" height=\"46\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.5\"/><text x=\"160\" y=\"52\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#1a5c38\" font-weight=\"700\">256 tokens accepted</text><text x=\"160\" y=\"68\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9.5\" fill=\"#1a5c38\">buffer exactly full</text><rect x=\"290\" y=\"32\" width=\"146\" height=\"46\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"363\" y=\"52\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#C93B3B\" font-weight=\"700\">144 tokens</text><text x=\"363\" y=\"68\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9.5\" fill=\"#C93B3B\">dropped — never processed</text><path d=\"M436 55 h30\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><path d=\"M460 50 L468 55 L460 60\" fill=\"#C93B3B\"/><rect x=\"472\" y=\"32\" width=\"18\" height=\"46\" rx=\"3\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.3\"/><text x=\"260\" y=\"105\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">400 tokens were routed to this expert — the buffer physically holds only 256</text><rect x=\"90\" y=\"122\" width=\"340\" height=\"40\" rx=\"7\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\" stroke-width=\"1.3\"/><text x=\"260\" y=\"140\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#2C2A28\" font-weight=\"600\">dropped tokens skip this layer via residual pass-through</text><text x=\"260\" y=\"155\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9.5\" fill=\"#6B645E\">no error thrown — silently degraded, not crashed</text></svg>", "note": "<b>Capacity: the second, independent safety net.</b> Even a well-trained router can send a locally uneven batch to one expert. <code>expert_capacity = (T/N) · capacity_factor</code> is a hard buffer; anything past it — here 144 of 400 tokens — is dropped with no error, just skipped for that layer."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Drop rate vs capacity factor trade-off\"><line x1=\"50\" y1=\"160\" x2=\"490\" y2=\"160\" stroke=\"#6B645E\" stroke-width=\"1.3\"/><line x1=\"50\" y1=\"160\" x2=\"50\" y2=\"20\" stroke=\"#6B645E\" stroke-width=\"1.3\"/><text x=\"270\" y=\"182\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#6B645E\">capacity_factor</text><text x=\"18\" y=\"95\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#6B645E\" transform=\"rotate(-90 18 95)\">drop_rate</text><path d=\"M75 45 Q140 90 220 118 T480 152\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"2.2\"/><circle cx=\"75\" cy=\"45\" r=\"4.5\" fill=\"#C93B3B\"/><text x=\"75\" y=\"32\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#C93B3B\">1.0 → 36%</text><circle cx=\"220\" cy=\"118\" r=\"4.5\" fill=\"#C99A12\"/><text x=\"220\" y=\"105\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#9A7208\">1.25 → ~13%</text><circle cx=\"340\" cy=\"142\" r=\"4.5\" fill=\"#2D8B55\"/><text x=\"340\" y=\"129\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#1a5c38\">1.5 → 4%</text><circle cx=\"480\" cy=\"152\" r=\"4.5\" fill=\"#2D8B55\"/><text x=\"480\" y=\"139\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#1a5c38\">2.0 → ~1%</text><text x=\"270\" y=\"18\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#6B645E\">bigger buffer = fewer drops, more allocated (often wasted) compute/memory</text></svg>", "note": "<b>The real trade-off.</b> Raising <code>capacity_factor</code> from <code>1.0</code> to <code>1.5</code> cuts this expert's drop rate from about 36% to about 4%, but every expert's buffer — and the compute reserved for it — grows too, even on batches that never fill it."}, {"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Two safety nets, training-time and inference-time\"><rect x=\"25\" y=\"25\" width=\"220\" height=\"100\" rx=\"9\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.6\"/><text x=\"135\" y=\"52\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#1F6280\" font-weight=\"700\">loss_aux</text><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#1F6280\">training-time incentive</text><text x=\"135\" y=\"90\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#1F6280\">pushes f_i, P_i → 1/N</text><text x=\"135\" y=\"108\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9\" fill=\"#5A544E\">no per-batch guarantee</text><rect x=\"275\" y=\"25\" width=\"220\" height=\"100\" rx=\"9\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.6\"/><text x=\"385\" y=\"52\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#9A7208\" font-weight=\"700\">expert_capacity</text><text x=\"385\" y=\"72\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#9A7208\">inference-time hard limit</text><text x=\"385\" y=\"90\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#9A7208\">drops overflow tokens</text><text x=\"385\" y=\"108\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9\" fill=\"#5A544E\">bounds worst case, every batch</text><path d=\"M245 75 h30\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><path d=\"M269 70 L277 75 L269 80\" fill=\"#6B645E\"/><text x=\"260\" y=\"66\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"9\" fill=\"#6B645E\">complementary</text><text x=\"260\" y=\"148\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"10.5\" fill=\"#6B645E\">a low loss_aux does not remove the need for capacity_factor &gt; 1.0</text></svg>", "note": "<b>Closing synthesis.</b> These are two different mechanisms, not one: <code>loss_aux</code> statistically nudges the router toward balance across training, while <code>expert_capacity</code> is a hard, per-batch limit that bounds worst-case drops no matter how well-trained the router is."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[{"q": "You train an MoE with the Switch Transformer auxiliary loss active (α = 0.01, N = 8), and after convergence you measure loss_aux ≈ 0.0138, not the theoretical floor of 0.01. A teammate says this proves the auxiliary loss implementation is buggy. Where do you look first?", "opts": ["Recheck whether loss_aux ever equals exactly α in a real trained model — a floor of α is only reached at perfectly uniform f_i = P_i = 1/N, and pushing loss_aux all the way to α would fight the primary language-modeling loss, so a small residual gap above α on a real batch is expected, not necessarily a bug", "Immediately suspect the language-modeling loss is miscomputed, since only that loss could account for the gap", "Conclude α must be set too high and should be lowered until loss_aux reaches exactly 0.01", "Assume N was miscounted, since loss_aux only equals α when N is a power of 2"], "ans": 0, "fb": "Right. The α floor is a mathematical minimum reached only at perfect uniformity (f_i = P_i = 1/N for every expert) — it's not a target the trained model is expected to hit exactly, because the optimizer is also minimizing the primary LM loss, and some routing skew is the normal cost of letting tokens go to whichever expert actually helps prediction. A gap like 0.0138 vs 0.01 is consistent with healthy, mostly-balanced training, not a bug. The tempting wrong answer blames the LM loss or α or N directly — but nothing in the lesson's derivation says a *trained* model must hit the floor; it only proves the floor exists and is unreachable from below, so a value slightly above it needs no separate explanation before checking the balance is 'slightly above,' not wildly above (which would then warrant investigation)."}, {"q": "Two teams train the same MoE architecture. Team A uses α = 0.01 and capacity_factor = 1.0. Team B uses α = 0.001 and capacity_factor = 1.5. Team A reports lower perplexity on held-out text but a much higher token drop_rate. Which trade-off most directly explains this pattern?", "opts": ["Team A's smaller capacity_factor (1.0) gives each expert a much tighter buffer than Team B's 1.5, so any batch that is even slightly uneven overflows and drops tokens far more often — this is the direct cause of the drop_rate gap, independent of the fact that Team A's larger α (0.01) also happens to push harder for balance", "Team A's α is unrelated to drop_rate; drop_rate is purely a function of capacity_factor, so α's only effect is on perplexity, and comparing the two teams' α values tells you nothing useful here", "Team B's lower perplexity would be higher if not for capacity_factor, since capacity_factor and α always move loss_aux in the same direction", "The two teams' drop_rate difference is explained entirely by using different T or N, not by α or capacity_factor"], "ans": 0, "fb": "Right. Team A's capacity_factor of 1.0 gives much smaller per-expert buffers than Team B's 1.5, so Team A drops far more tokens whenever a batch is locally uneven, exactly as the lesson's capacity_factor curve shows (1.0 → 36% drop_rate vs 1.5 → ~4% for the same overloaded expert). That is the causal lever that directly explains the drop_rate gap. Team A's larger α (0.01 vs Team B's 0.001) applies more training-time balancing pressure, which is a separate mechanism and does not by itself account for drops on any single batch. The tempting wrong answer treats α and capacity_factor as decoupled or interchangeable, but the lesson stresses they are complementary, independent levers — one shapes training incentives, the other bounds worst-case per-batch overflow — and only capacity_factor explains the drop_rate gap here."}, {"q": "A teammate implements loss_aux by computing f_i with softmax probabilities directly (soft counts) instead of hard top-k dispatch counts, then multiplies by P_i as usual. Training runs fine and loss_aux still decreases. What is the subtle wrongness, and where do you look first?", "opts": ["loss_aux would still be mathematically valid since f_i and P_i both sum to 1; there is no wrongness to find", "Using soft counts for f_i defeats the term's purpose: the whole point of the f_i · P_i product is that f_i captures the actual hard dispatch decision (which is what really overloads or starves an expert), while P_i alone carries the gradient — if f_i is also softmax-derived, the loss no longer measures the real dispatch imbalance and can look balanced on paper while the hard top-k routing (and expert_capacity dropping) stays collapsed", "The bug is that P_i should have been computed with argmax instead of softmax, not f_i", "The bug is that loss_aux should not include N at all if f_i is soft, so the floor would still be α regardless"], "ans": 1, "fb": "Right. The lesson is explicit that f_i is deliberately a hard, non-differentiable quantity (the actual argmax/top-k dispatch fraction) precisely because that's what determines real expert load and token dropping — P_i is the soft stand-in used only to let gradients flow. If you replace f_i with a soft approximation too, loss_aux can converge nicely (because two softmax-derived quantities are easy to make agree) while the real top-k routing that feeds expert_capacity is still collapsed, since the loss is no longer honestly measuring hard dispatch imbalance. You'd catch this by checking the actual per-expert token counts (or drop_rate) against what loss_aux implies, not by trusting loss_aux's convergence alone. The tempting wrong answer says there's no issue because f_i and P_i both sum to 1 — but summing to 1 doesn't mean they measure the same thing, and the lesson's whole point is that f_i's hardness is what makes the metric meaningful."}, {"q": "You observe that raising capacity_factor from 1.0 to 2.0 cuts drop_rate from 36% to about 1%, but wall-clock training throughput drops noticeably and GPU memory usage rises even on batches where no tokens were ever dropped at capacity_factor 1.0. What is the most likely cause?", "opts": ["capacity_factor changes α, so the auxiliary loss is now more expensive to compute", "expert_capacity = (T/N) · capacity_factor is a buffer size allocated per expert up front, so doubling capacity_factor doubles the reserved compute/memory per expert on every batch regardless of whether that batch would have overflowed — the cost is paid unconditionally, not just when it prevents a drop", "Higher capacity_factor forces top-k to route to more experts per token, which is what raises compute", "The slowdown must be from more frequent gradient updates to loss_aux, since capacity_factor and loss_aux share the same backward pass"], "ans": 1, "fb": "Right. Expert capacity is a hard, pre-allocated buffer size — expert_capacity = (T/N) · capacity_factor — reserved for every batch whether or not tokens actually reach that limit, exactly as the lesson notes: 'a higher capacity_factor means bigger buffers... at the cost of more allocated (and often wasted) compute/memory per expert.' So the memory/throughput cost scales with capacity_factor unconditionally, even on batches that were already fine at capacity_factor 1.0. The tempting wrong answer blames α or top-k or loss_aux's backward pass, but capacity_factor and α are independent knobs (one shapes buffer size at dispatch time, the other shapes training-time balancing incentive) and top-k's k is a separate architectural choice unrelated to capacity_factor."}];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

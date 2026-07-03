@@ -9,6 +9,18 @@
 > - 🏭 Real-world RL applications and deployment challenges
 > - 🗺️ Taxonomy of RL methods
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Σ_{t=0}^{∞} | Add up values from t=0 to infinity |
+> | E_π[...] | Expected (average) value when following policy π |
+> | γ^t | Discount factor raised to the power t (makes future rewards smaller) |
+> | argmax_π | "The policy π that gives the maximum value" |
+> | ε | Epsilon — a small number controlling how often the agent explores randomly |
+>
+> No RL prerequisites — this is the first file. If the symbols above are unfamiliar, see the [Math Refresher](../math-refresher.md).
+
 ## Brief Restatement
 
 Reinforcement learning is learning through interaction. An agent takes actions in an environment, receives rewards, and learns a policy that maximizes cumulative reward. Unlike supervised learning (which requires labeled examples), RL learns from trial and error with delayed, scalar feedback.
@@ -26,31 +38,71 @@ At each step:
 2. Agent picks action a_t from its policy π(a|s)
 3. Environment returns reward r_t and next state s_{t+1}
 
-The agent's goal is to find a policy π* that maximizes the **expected return**:
+**Step 1 — Words.** The agent's goal is to find a policy (strategy) that earns the highest total reward over time. Future rewards are worth less than immediate rewards — the discount factor γ controls how much less. The expected return J(π) averages this total over all the randomness in the environment and the policy.
+
+**Step 2 — Formula.**
 
     J(π) = E_π [ Σ_{t=0}^{∞} γ^t · r_t ]
 
 Where:
-- E_π means "expected value when following policy π"
-- γ ∈ [0, 1) is the discount factor
-- r_t is the reward at time t
-- The sum is the discounted return G_t
+- J(π) = the quality score of policy π (higher is better)
+- E_π = expected value when following policy π
+- γ ∈ [0, 1) = discount factor — how much future rewards are worth relative to now
+- r_t = reward at time step t
+- Σ_{t=0}^{∞} γ^t · r_t = the discounted return — the total reward, with future rewards shrinking
 
 The optimal policy is:
 
     π* = argmax_π J(π)
 
+In words: π* is the policy that produces the highest expected return J out of all possible policies.
+
+**Step 3 — Worked example.** CartPole game: the agent gets +1 reward for every step the pole stays upright. Episode ends after 200 steps (max) or when the pole falls. Using γ = 0.99:
+
+```
+Perfect policy (200 steps):
+  J = 1 + 0.99×1 + 0.99²×1 + ... + 0.99¹⁹⁹×1
+    = (1 - 0.99²⁰⁰) / (1 - 0.99)
+    ≈ 86.7
+
+Bad policy (pole falls at step 10):
+  J = 1 + 0.99 + 0.99² + ... + 0.99⁹
+    ≈ 9.6
+
+The perfect policy has J ≈ 86.7. The bad policy has J ≈ 9.6.
+π* is the policy that achieves 86.7.
+```
+
 ### Epsilon-Greedy Exploration
 
-The simplest exploration strategy:
+**Step 1 — Words.** The simplest way to handle the explore-vs-exploit dilemma. Most of the time, the agent picks the action it currently thinks is best (exploit). But with a small probability ε, it picks a completely random action instead (explore). This ensures the agent keeps trying new things and does not get stuck.
+
+**Step 2 — Formula.**
 
     a_t = { random action     with probability ε
           { argmax_a Q(s_t, a)  with probability 1 - ε
 
 Where:
-- ε ∈ [0, 1] controls the exploration rate
-- Q(s, a) is the current action-value estimate
-- As learning progresses, ε is typically decayed toward 0
+- ε ∈ [0, 1] = exploration rate (e.g., ε = 0.1 means 10% of the time, explore)
+- Q(s, a) = the current estimate of how good action a is in state s
+- argmax_a Q(s_t, a) = "pick the action with the highest estimated value"
+- As learning progresses, ε is typically decayed toward 0 (explore less over time)
+
+**Step 3 — Worked example.** 4 actions, ε = 0.1, current Q-values: Q(s, left)=3, Q(s, right)=7, Q(s, up)=5, Q(s, down)=2.
+
+```
+Best action: right (Q = 7)
+
+Probability of each action:
+  left:  ε/4 = 0.1/4 = 0.025
+  right: (1 - ε) + ε/4 = 0.9 + 0.025 = 0.925
+  up:    ε/4 = 0.025
+  down:  ε/4 = 0.025
+
+Sum: 0.025 + 0.925 + 0.025 + 0.025 = 1.0 ✓
+
+The agent picks "right" 92.5% of the time and explores randomly 7.5% of the time.
+```
 
 ---
 

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speculative Decoding: Draft &amp; Verify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --bad:#BE3E26; --bad-l:#FBEAE6; --warn:#C99A12; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+.nav{position:sticky;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:800;color:var(--text)}
+.nav-back{font-size:.85rem;color:var(--accent);font-weight:600}
+
+main{max-width:860px;margin:0 auto;padding:2.2rem 1.25rem 0}
+
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.12}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.4rem}
+.card h3{font-family:var(--display);font-size:1.15rem;font-weight:700;margin-bottom:.9rem}
+
+.controls{display:grid;grid-template-columns:1fr;gap:1.1rem}
+.ctrl label{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;font-size:.92rem;font-weight:600;margin-bottom:.35rem}
+.ctrl .desc{font-weight:400;font-size:.82rem;color:var(--muted)}
+.ctrl .val{font-family:var(--mono);font-size:.9rem;font-weight:600;color:var(--accent-d);background:var(--accent-l);padding:2px 9px;border-radius:var(--r-sm);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--fill,50%),var(--border) var(--fill,50%),var(--border) 100%);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--surface);border:3px solid var(--accent);box-shadow:var(--sh-sm);cursor:pointer;transition:transform .1s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.12)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--surface);border:3px solid var(--accent);cursor:pointer}
+
+.btnrow{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.4rem}
+.btn{font-family:var(--body);font-size:.85rem;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem 1rem;cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{background:var(--accent-d);color:#fff}
+
+.figwrap{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.6rem;margin-top:.4rem}
+svg{display:block;width:100%;height:auto}
+.fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+
+.readouts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-top:1.1rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem;text-align:center}
+.ro .lab{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.ro .num{font-family:var(--mono);font-size:1.4rem;font-weight:600;color:var(--accent-d);margin-top:.25rem;line-height:1.1}
+.ro .sub{font-size:.72rem;color:var(--text2);margin-top:.2rem}
+
+.legend{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.8rem;font-size:.82rem;color:var(--text2)}
+.legend .item{display:flex;align-items:center;gap:.4rem}
+.legend .sw{width:15px;height:15px;border-radius:4px;display:inline-block}
+
+.formula{font-family:var(--mono);font-size:.85rem;background:var(--bg-warm);border:1px solid var(--border2);border-radius:var(--r-sm);padding:.7rem .9rem;color:var(--accent-d);margin-top:1rem;overflow-x:auto}
+.formula .note{color:var(--muted);font-size:.78rem}
+
+.notice{background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem;margin-bottom:1.4rem}
+.notice h3{font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.2rem}
+.notice li{margin-bottom:.5rem;font-size:.94rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+
+@media (max-width:560px){
+  .readouts{grid-template-columns:1fr}
+  .hero h1{font-size:1.6rem}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Speculative Decoding</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Inference &middot; Fast Decoding</span>
+    <h1>Speculative Decoding: Draft &amp; Verify</h1>
+    <p class="intro">
+      A tiny fast model <b>guesses</b> the next few tokens; the big slow model <b>checks all of them in one pass</b>
+      and keeps every guess up to the first mistake. Same output as normal decoding &mdash; often 2&ndash;3&times; faster.
+    </p>
+  </div>
+
+  <!-- WHAT AM I LOOKING AT -->
+  <div class="notice">
+    <h3>What am I looking at?</h3>
+    <ul>
+      <li>Normal decoding makes <b>one token per slow forward pass</b> of the big model. That is the speed limit we want to beat.</li>
+      <li>Here a <b>small fast draft model</b> guesses the next <b>k</b> tokens. The <b>big target model</b> then checks all k guesses in a <b>single</b> pass and keeps every guess up to the first wrong one, plus one correction token.</li>
+      <li>The sliders let you change how many tokens the draft guesses (<b>k</b>), how often the draft agrees with the target (<b>&alpha;</b>), and how cheap the draft is (<b>c</b>). The first figure draws one round; the second figure shows how the speedup changes with k.</li>
+    </ul>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h3>Controls</h3>
+    <div class="controls">
+      <div class="ctrl">
+        <label for="k">Speculation length <span class="desc">k &mdash; tokens the draft proposes each round</span>
+          <span class="val" id="kv">4</span></label>
+        <input type="range" id="k" min="1" max="8" step="1" value="4">
+      </div>
+      <div class="ctrl">
+        <label for="alpha">Acceptance rate <span class="desc">&alpha; &mdash; chance the target agrees with each draft token</span>
+          <span class="val" id="alphav">0.80</span></label>
+        <input type="range" id="alpha" min="0" max="1" step="0.01" value="0.80">
+      </div>
+      <div class="ctrl">
+        <label for="c">Draft cost ratio <span class="desc">c &mdash; one draft step costs this fraction of one target step</span>
+          <span class="val" id="cv">0.10</span></label>
+        <input type="range" id="c" min="0.01" max="0.5" step="0.01" value="0.10">
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="btn primary" id="run">&#9654; Run one round</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+    <div class="readouts">
+      <div class="ro">
+        <div class="lab">Tokens / round</div>
+        <div class="num" id="roTok">&mdash;</div>
+        <div class="sub">expected, incl. correction</div>
+      </div>
+      <div class="ro">
+        <div class="lab">Speedup</div>
+        <div class="num" id="roSpeed">&mdash;</div>
+        <div class="sub">vs. plain autoregressive</div>
+      </div>
+      <div class="ro">
+        <div class="lab">Best k</div>
+        <div class="num" id="roBestK">&mdash;</div>
+        <div class="sub">for current &alpha;, c</div>
+      </div>
+    </div>
+    <div class="formula">
+      E[tokens/round] = (1 &minus; &alpha;<sup>k+1</sup>) / (1 &minus; &alpha;)
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      speedup = E[tokens/round] / (1 + k&middot;c)
+      <div class="note">cost/round = 1 target pass + k draft passes = 1 + k&middot;c &nbsp;(target pass = 1 unit)</div>
+    </div>
+  </div>
+
+  <!-- ROUND FIGURE -->
+  <div class="card">
+    <h3>One round: draft proposes, target verifies</h3>
+    <div class="figwrap">
+      <svg id="round" viewBox="0 0 820 300" role="img"
+        aria-label="Diagram of one speculative decoding round showing draft-proposed tokens verified by the target model, with accepted, rejected, and correction tokens."></svg>
+    </div>
+    <div class="legend">
+      <span class="item"><span class="sw" style="background:var(--ok)"></span> Accepted draft token</span>
+      <span class="item"><span class="sw" style="background:var(--bad)"></span> Rejected (and all after it discarded)</span>
+      <span class="item"><span class="sw" style="background:var(--warn)"></span> Correction token (from target)</span>
+      <span class="item"><span class="sw" style="background:var(--accent)"></span> Draft proposal</span>
+    </div>
+  </div>
+
+  <!-- SPEEDUP CURVE -->
+  <div class="card">
+    <h3>Speedup vs. speculation length k</h3>
+    <p style="font-size:.9rem;color:var(--text2);margin-bottom:.6rem">
+      The curve rises, peaks, then falls. Small k barely helps; large k wastes draft work when &alpha; is low.
+      The dot marks your current k.
+    </p>
+    <div class="figwrap">
+      <svg id="curve" viewBox="0 0 820 340" role="img"
+        aria-label="Line chart of expected speedup versus speculation length k, highlighting the optimal k for the chosen acceptance rate and draft cost."></svg>
+    </div>
+  </div>
+
+  <!-- WHAT TO NOTICE -->
+  <div class="notice">
+    <h3>What to notice</h3>
+    <ul>
+      <li><b>One forward pass, many tokens.</b> The target verifies all k drafted tokens in a single parallel pass, breaking the one-token-per-forward lock of normal autoregressive decoding.</li>
+      <li><b>Speedup lives and dies on &alpha;.</b> The gain depends on how often the cheap draft agrees with the target. High &alpha; &rarr; big win; low &alpha; &rarr; a large k just burns draft compute you throw away.</li>
+      <li><b>It is exact.</b> The accept/reject rule is designed so the kept tokens are distributed <i>exactly</i> as if the target had sampled them directly &mdash; no quality loss, only speed.</li>
+    </ul>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- state ----------
+  var state = { k:4, alpha:0.80, c:0.10 };
+
+  // ---------- math (verified) ----------
+  // Expected tokens generated per round (accepted draft tokens + 1 correction/bonus token).
+  // Standard speculative-sampling expectation: sum_{i=0..k} alpha^i = (1 - alpha^(k+1))/(1 - alpha).
+  function expTokens(alpha, k){
+    if (alpha >= 0.999999) return k + 1;          // limit as alpha->1
+    return (1 - Math.pow(alpha, k + 1)) / (1 - alpha);
+  }
+  // Cost of one round in "target forward pass" units: 1 target verify + k sequential draft steps.
+  function costPerRound(k, c){ return 1 + k * c; }
+  // Speedup vs vanilla autoregressive (which makes 1 token per unit-cost target pass).
+  function speedup(alpha, k, c){ return expTokens(alpha, k) / costPerRound(k, c); }
+  // Best integer k in [1,8] for current alpha, c.
+  function bestK(alpha, c){
+    var best = 1, bestS = -Infinity;
+    for (var kk = 1; kk <= 8; kk++){
+      var s = speedup(alpha, kk, c);
+      if (s > bestS){ bestS = s; best = kk; }
+    }
+    return best;
+  }
+
+  // ---------- control wiring (works even without d3) ----------
+  var els = {
+    k: document.getElementById('k'), kv: document.getElementById('kv'),
+    alpha: document.getElementById('alpha'), alphav: document.getElementById('alphav'),
+    c: document.getElementById('c'), cv: document.getElementById('cv'),
+    run: document.getElementById('run'), reset: document.getElementById('reset'),
+    roTok: document.getElementById('roTok'), roSpeed: document.getElementById('roSpeed'),
+    roBestK: document.getElementById('roBestK')
+  };
+
+  function sliderFill(el){
+    var min = +el.min, max = +el.max, v = +el.value;
+    var pct = ((v - min) / (max - min)) * 100;
+    el.style.setProperty('--fill', pct + '%');
+  }
+
+  function updateReadouts(){
+    var et = expTokens(state.alpha, state.k);
+    var sp = speedup(state.alpha, state.k, state.c);
+    els.roTok.textContent = et.toFixed(2);
+    els.roSpeed.textContent = sp.toFixed(2) + '×';
+    els.roBestK.textContent = bestK(state.alpha, state.c);
+  }
+
+  els.k.addEventListener('input', function(){
+    state.k = +this.value; els.kv.textContent = state.k; sliderFill(this);
+    lastRound = null; drawRound(); drawCurve(); updateReadouts();
+  });
+  els.alpha.addEventListener('input', function(){
+    state.alpha = +this.value; els.alphav.textContent = state.alpha.toFixed(2); sliderFill(this);
+    lastRound = null; drawRound(); drawCurve(); updateReadouts();
+  });
+  els.c.addEventListener('input', function(){
+    state.c = +this.value; els.cv.textContent = state.c.toFixed(2); sliderFill(this);
+    drawCurve(); updateReadouts();
+  });
+  els.run.addEventListener('click', function(){ simulateRound(); });
+  els.reset.addEventListener('click', function(){ lastRound = null; drawRound(); });
+
+  sliderFill(els.k); sliderFill(els.alpha); sliderFill(els.c);
+  updateReadouts();
+
+  // ---------- d3 guard ----------
+  if (!window.d3){
+    console.warn('[speculative-decoding] d3 not found at ./d3.v7.min.js — showing fallback message.');
+    ['round','curve'].forEach(function(id){
+      var svg = document.getElementById(id);
+      if (svg){
+        svg.outerHTML = '<div class="fallback">Interactive figure needs D3 (d3.v7.min.js in this folder). ' +
+          'The controls and numbers above still work.</div>';
+      }
+    });
+    return;
+  }
+
+  var d3 = window.d3;
+  var T = REDUCE ? 0 : 550;   // transition duration
+
+  // ---------- simulated round (a concrete Bernoulli sample) ----------
+  // lastRound = { accepted: int in [0..k], k: int }  ; null = show expected (average) view.
+  var lastRound = null;
+
+  function simulateRound(){
+    var k = state.k, accepted = 0;
+    // Accept tokens left-to-right; each is accepted independently w.p. alpha; stop at first reject.
+    for (var i = 0; i < k; i++){
+      if (Math.random() < state.alpha) accepted++;
+      else break;
+    }
+    lastRound = { accepted: accepted, k: k };
+    drawRound();
+  }
+
+  // ---------- ROUND FIGURE ----------
+  var roundSvg = d3.select('#round');
+  var RW = 820, RH = 300;
+  var box = 62, gap = 14, startX = 30;
+  var draftY = 70, targetY = 200;
+
+  function drawRound(){
+    var k = state.k;
+    roundSvg.selectAll('*').remove();
+
+    // -- Row labels
+    roundSvg.append('text').attr('x', startX).attr('y', draftY - 24)
+      .attr('font-family', 'var(--display)').attr('font-size', 15).attr('font-weight', 700)
+      .attr('fill', '#2C2A28').text('1. Draft model proposes k tokens (cheap, sequential)');
+
+    roundSvg.append('text').attr('x', startX).attr('y', targetY - 24)
+      .attr('font-family', 'var(--display)').attr('font-size', 15).attr('font-weight', 700)
+      .attr('fill', '#2C2A28').text('2. Target verifies ALL k in ONE parallel pass, then samples a correction');
+
+    // -- Draft proposals (blue boxes)
+    var draftData = d3.range(k).map(function(i){ return { i:i }; });
+    var dg = roundSvg.selectAll('.draft').data(draftData).enter().append('g').attr('class','draft');
+    dg.append('rect')
+      .attr('x', function(d){ return startX + d.i * (box + gap); })
+      .attr('y', draftY).attr('width', box).attr('height', box).attr('rx', 10)
+      .attr('fill', '#E4F2F7').attr('stroke', '#2A7B9B').attr('stroke-width', 2);
+    dg.append('text')
+      .attr('x', function(d){ return startX + d.i * (box + gap) + box/2; })
+      .attr('y', draftY + box/2 + 5).attr('text-anchor','middle')
+      .attr('font-family','var(--mono)').attr('font-size',13).attr('fill','#1F6280')
+      .text(function(d){ return 't' + (d.i + 1); });
+
+    // -- Big "one forward pass" bracket connecting all k to the target
+    var lastRight = startX + (k - 1) * (box + gap) + box;
+    roundSvg.append('rect')
+      .attr('x', startX - 6).attr('y', draftY - 6)
+      .attr('width', lastRight - startX + 12).attr('height', box + 12).attr('rx', 12)
+      .attr('fill','none').attr('stroke','#C99A12').attr('stroke-width',1.5).attr('stroke-dasharray','5 4')
+      .attr('opacity', 0.0)
+      .transition().duration(T).attr('opacity', 0.55);
+
+    // arrow down to target
+    roundSvg.append('defs').append('marker').attr('id','arr')
+      .attr('viewBox','0 0 10 10').attr('refX',5).attr('refY',5)
+      .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto-start-reverse')
+      .append('path').attr('d','M0,0 L10,5 L0,10 z').attr('fill','#6B645E');
+    roundSvg.append('line')
+      .attr('x1', startX + (lastRight - startX)/2).attr('y1', draftY + box + 6)
+      .attr('x2', startX + (lastRight - startX)/2).attr('y2', targetY - 8)
+      .attr('stroke','#6B645E').attr('stroke-width',1.5).attr('marker-end','url(#arr)');
+
+    // -- Determine accepted count: sample if we have one, else expected (rounded for the picture)
+    var accepted;
+    var isSample = !!lastRound && lastRound.k === k;
+    if (isSample){
+      accepted = lastRound.accepted;
+    } else {
+      // expected accepted DRAFT tokens = alpha*(1-alpha^k)/(1-alpha) ; round for the illustration
+      var expAcc = (state.alpha >= 0.999999) ? k : state.alpha * (1 - Math.pow(state.alpha,k)) / (1 - state.alpha);
+      accepted = Math.min(k, Math.round(expAcc));
+    }
+
+    // -- Target verification row: accepted (green) up to first reject (red), rest greyed/discarded
+    var tg = roundSvg.selectAll('.tgt').data(draftData).enter().append('g').attr('class','tgt');
+    tg.append('rect')
+      .attr('x', function(d){ return startX + d.i * (box + gap); })
+      .attr('y', targetY).attr('width', box).attr('height', box).attr('rx', 10)
+      .attr('fill', function(d){
+        if (d.i < accepted) return '#2D8B55';          // accepted
+        if (d.i === accepted) return '#BE3E26';         // first rejected
+        return '#EDEAE4';                               // discarded (after reject)
+      })
+      .attr('stroke', function(d){
+        if (d.i < accepted) return '#236e43';
+        if (d.i === accepted) return '#8f2f1d';
+        return '#DAD4CB';
+      })
+      .attr('stroke-width', 2)
+      .attr('opacity', 0)
+      .transition().delay(function(d){ return REDUCE ? 0 : d.i * 90; }).duration(T)
+      .attr('opacity', function(d){ return d.i > accepted ? 0.45 : 1; });
+    tg.append('text')
+      .attr('x', function(d){ return startX + d.i * (box + gap) + box/2; })
+      .attr('y', targetY + box/2 + 5).attr('text-anchor','middle')
+      .attr('font-family','var(--mono)').attr('font-size',13).attr('font-weight',600)
+      .attr('fill', function(d){ return d.i <= accepted ? '#fff' : '#9c968d'; })
+      .attr('opacity', 0)
+      .text(function(d){
+        if (d.i < accepted) return '✓';
+        if (d.i === accepted) return '✗';
+        return '—';
+      })
+      .transition().delay(function(d){ return REDUCE ? 0 : d.i * 90 + 120; }).duration(T)
+      .attr('opacity', 1);
+
+    // -- Correction token (yellow) appended after the accepted prefix.
+    // If all k accepted (accepted === k), it's the "bonus" token; else it replaces the rejected one.
+    var corrX = startX + accepted * (box + gap);
+    var corrLabel = (accepted === k) ? 'bonus' : 'fix';
+    var cg = roundSvg.append('g').attr('opacity', 0);
+    cg.append('rect')
+      .attr('x', corrX).attr('y', targetY).attr('width', box).attr('height', box).attr('rx', 10)
+      .attr('fill','#C99A12').attr('stroke','#9a7609').attr('stroke-width',2);
+    cg.append('text')
+      .attr('x', corrX + box/2).attr('y', targetY + box/2 - 3).attr('text-anchor','middle')
+      .attr('font-family','var(--mono)').attr('font-size',12).attr('font-weight',600).attr('fill','#fff')
+      .text('t' + (accepted + 1) + '*');
+    cg.append('text')
+      .attr('x', corrX + box/2).attr('y', targetY + box/2 + 15).attr('text-anchor','middle')
+      .attr('font-family','var(--body)').attr('font-size',10).attr('fill','#fff').text(corrLabel);
+    cg.transition().delay(REDUCE ? 0 : (accepted + 1) * 90 + 120).duration(T).attr('opacity', 1);
+
+    // -- Summary line
+    var kept = accepted + 1; // accepted draft tokens + one target correction/bonus token
+    var summary = isSample
+      ? ('This round: ' + accepted + ' of ' + k + ' draft tokens accepted + 1 correction = ' + kept + ' tokens for one target pass.')
+      : ('Typical picture (α=' + state.alpha.toFixed(2) + '): ~' + accepted + ' accepted + 1 correction. Press “Run one round” to sample.');
+    roundSvg.append('text')
+      .attr('x', startX).attr('y', RH - 18)
+      .attr('font-family','var(--body)').attr('font-size',13).attr('fill','#5A544E')
+      .text(summary);
+  }
+
+  // ---------- SPEEDUP CURVE ----------
+  var curveSvg = d3.select('#curve');
+  var CW = 820, CH = 340;
+  var m = { top: 24, right: 26, bottom: 52, left: 60 };
+  var iw = CW - m.left - m.right, ih = CH - m.top - m.bottom;
+
+  function drawCurve(){
+    curveSvg.selectAll('*').remove();
+    var g = curveSvg.append('g').attr('transform', 'translate(' + m.left + ',' + m.top + ')');
+
+    // Fine-grained k for a smooth curve (formula is defined for real k>=1).
+    var pts = [];
+    for (var kk = 1; kk <= 8; kk += 0.05){
+      pts.push({ k: kk, s: speedup(state.alpha, kk, state.c) });
+    }
+    var intPts = d3.range(1, 9).map(function(kk){ return { k: kk, s: speedup(state.alpha, kk, state.c) }; });
+
+    var x = d3.scaleLinear().domain([1, 8]).range([0, iw]);
+    var maxS = d3.max(pts, function(d){ return d.s; });
+    var yTop = Math.max(1.05, maxS * 1.12);
+    var y = d3.scaleLinear().domain([0, yTop]).range([ih, 0]);
+
+    // gridlines
+    g.append('g').selectAll('line').data(y.ticks(5)).enter().append('line')
+      .attr('x1',0).attr('x2',iw).attr('y1',function(d){return y(d);}).attr('y2',function(d){return y(d);})
+      .attr('stroke','#EEEBE5').attr('stroke-width',1);
+
+    // baseline speedup = 1 (no gain) reference
+    g.append('line')
+      .attr('x1',0).attr('x2',iw).attr('y1',y(1)).attr('y2',y(1))
+      .attr('stroke','#BE3E26').attr('stroke-width',1.2).attr('stroke-dasharray','5 4').attr('opacity',0.6);
+    g.append('text').attr('x', iw - 4).attr('y', y(1) - 6).attr('text-anchor','end')
+      .attr('font-family','var(--mono)').attr('font-size',10).attr('fill','#BE3E26').text('1× (no gain)');
+
+    // axes
+    var xAxis = d3.axisBottom(x).ticks(8).tickFormat(d3.format('d'));
+    var yAxis = d3.axisLeft(y).ticks(5).tickFormat(function(d){ return d.toFixed(1) + '×'; });
+    g.append('g').attr('transform','translate(0,' + ih + ')').call(xAxis)
+      .call(function(sel){ sel.selectAll('text').attr('font-family','var(--mono)').attr('font-size',11).attr('fill','#5A544E'); })
+      .call(function(sel){ sel.selectAll('line,path').attr('stroke','#CFC8BD'); });
+    g.append('g').call(yAxis)
+      .call(function(sel){ sel.selectAll('text').attr('font-family','var(--mono)').attr('font-size',11).attr('fill','#5A544E'); })
+      .call(function(sel){ sel.selectAll('line,path').attr('stroke','#CFC8BD'); });
+
+    // axis labels
+    g.append('text').attr('x', iw/2).attr('y', ih + 40).attr('text-anchor','middle')
+      .attr('font-family','var(--body)').attr('font-size',12.5).attr('font-weight',600).attr('fill','#2C2A28')
+      .text('Speculation length k (tokens drafted per round)');
+    g.append('text').attr('transform','rotate(-90)').attr('x', -ih/2).attr('y', -44).attr('text-anchor','middle')
+      .attr('font-family','var(--body)').attr('font-size',12.5).attr('font-weight',600).attr('fill','#2C2A28')
+      .text('Expected speedup (× vs autoregressive)');
+
+    // area under curve (soft)
+    var area = d3.area().x(function(d){return x(d.k);}).y0(ih).y1(function(d){return y(d.s);})
+      .curve(d3.curveMonotoneX);
+    g.append('path').datum(pts).attr('d', area).attr('fill','#E4F2F7').attr('opacity',0.7);
+
+    // line
+    var line = d3.line().x(function(d){return x(d.k);}).y(function(d){return y(d.s);}).curve(d3.curveMonotoneX);
+    var path = g.append('path').datum(pts).attr('d', line)
+      .attr('fill','none').attr('stroke','#2A7B9B').attr('stroke-width',2.8);
+    if (!REDUCE){
+      var L = path.node().getTotalLength();
+      path.attr('stroke-dasharray', L + ' ' + L).attr('stroke-dashoffset', L)
+        .transition().duration(700).ease(d3.easeCubicOut).attr('stroke-dashoffset', 0);
+    }
+
+    // integer-k dots
+    g.selectAll('.kd').data(intPts).enter().append('circle').attr('class','kd')
+      .attr('cx', function(d){return x(d.k);}).attr('cy', function(d){return y(d.s);})
+      .attr('r', 3.2).attr('fill','#2A7B9B');
+
+    // optimal-k marker (star-ish diamond)
+    var bk = bestK(state.alpha, state.c);
+    var bs = speedup(state.alpha, bk, state.c);
+    g.append('circle').attr('cx', x(bk)).attr('cy', y(bs)).attr('r', 9)
+      .attr('fill','none').attr('stroke','#2D8B55').attr('stroke-width',2.2);
+    g.append('text').attr('x', x(bk)).attr('y', y(bs) - 16).attr('text-anchor','middle')
+      .attr('font-family','var(--mono)').attr('font-size',11).attr('font-weight',600).attr('fill','#2D8B55')
+      .text('best k=' + bk);
+
+    // current-k marker (filled accent dot on the curve)
+    var cs = speedup(state.alpha, state.k, state.c);
+    var cur = g.append('circle').attr('cx', x(state.k)).attr('cy', y(cs)).attr('r', 6.5)
+      .attr('fill','#1F6280').attr('stroke','#fff').attr('stroke-width',2);
+    if (!REDUCE){
+      cur.attr('opacity',0).transition().delay(700).duration(300).attr('opacity',1);
+    }
+    g.append('text').attr('x', x(state.k)).attr('y', y(cs) + 24).attr('text-anchor', state.k > 6 ? 'end' : 'middle')
+      .attr('font-family','var(--mono)').attr('font-size',11).attr('font-weight',600).attr('fill','#1F6280')
+      .text('you: k=' + state.k + ' → ' + cs.toFixed(2) + '×');
+  }
+
+  // ---------- initial draw ----------
+  drawRound();
+  drawCurve();
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,21 @@
 > - 💡 Online vs episodic updates — when each wins
 > - 🏭 Actor-critic as the foundation for PPO, SAC, and RLHF
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π(a\|s; θ) | Actor — policy network with weights θ |
+> | V(s; φ) | Critic — value network with weights φ |
+> | δ_t | TD error used as advantage estimate: r + γV(s') - V(s) |
+> | ∇_θ log π | Score function gradient (from policy gradient theorem) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Policy gradient / REINFORCE** — actor update direction
+> - **TD error** — critic's surprise signal, used as advantage estimate
+> - **Variance reduction via baseline** — the critic IS the baseline
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

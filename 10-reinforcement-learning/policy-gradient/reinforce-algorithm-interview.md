@@ -8,6 +8,21 @@
 > - 💡 Vanilla REINFORCE vs with baseline — when each matters
 > - 🏭 REINFORCE as the foundation for PPO and RLHF
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | θ | Policy network weights |
+> | α | Learning rate |
+> | ∇_θ log π_θ(a_t\|s_t) | Gradient of the log-probability — direction to push θ |
+> | G_t | Discounted return from time step t |
+> | L(θ) | Loss function (negative for gradient descent) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Policy gradient theorem** — ∇J = E[∇log π × R(τ)] ([policy-gradient-intuition-interview.md](./policy-gradient-intuition-interview.md))
+> - **G_t = r_t + γ·G_{t+1}** — discounted return (computed backward)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

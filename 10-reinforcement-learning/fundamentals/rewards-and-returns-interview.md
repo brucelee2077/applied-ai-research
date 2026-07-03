@@ -8,6 +8,21 @@
 > - 💡 Reward shaping: potential-based vs arbitrary
 > - 🏭 Reward engineering in production systems
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Σ_{k=0}^{∞} | Sum from k=0 to infinity |
+> | γ^k | Discount factor raised to power k (0.99² = 0.98, 0.99¹⁰ = 0.90, etc.) |
+> | r_t | Reward received at time step t |
+> | ∈ [0, 1) | "Between 0 and 1, including 0 but not 1" |
+> | ℝ | The set of all real numbers (any number, positive or negative) |
+> | O(...) | "On the order of" — how fast something grows |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **MDP (S, A, P, R, γ)** — the mathematical framework for RL problems ([markov-decision-processes-interview.md](./markov-decision-processes-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 The reward is the scalar feedback the agent receives after each action. The return is the cumulative (optionally discounted) sum of rewards over time. The discount factor γ controls how much the agent values future rewards relative to immediate ones. Maximizing expected return is the RL objective.
@@ -18,7 +33,9 @@ The reward is the scalar feedback the agent receives after each action. The retu
 
 ### Reward
 
-At each time step t, the agent receives a reward r_t ∈ ℝ. The reward function can be written as:
+**Step 1 — Words.** At each time step, the environment gives the agent a single number called the reward. It tells the agent how good or bad that one step was. The reward depends on where the agent was, what it did, and where it ended up.
+
+**Step 2 — Formula.**
 
     r_t = R(s_t, a_t, s_{t+1})
 
@@ -26,18 +43,43 @@ Where:
 - s_t is the current state
 - a_t is the action taken
 - s_{t+1} is the next state
+- R is the reward function (defined by the environment)
+
+**Step 3 — Worked example.** A grid world where the goal is at position (3,3):
+
+```
+Agent at (1,1), moves right, arrives at (2,1): r = -1  (small penalty for each step)
+Agent at (2,3), moves right, arrives at (3,3): r = +10 (reached the goal!)
+Agent at (1,1), moves into wall, stays at (1,1): r = -1 (step penalty, no progress)
+```
 
 ### Return (Undiscounted)
 
-The total return from time step t is:
+**Step 1 — Words.** The return is the total reward the agent collects from some point onward until the episode ends. It is just a simple sum — add up all the rewards.
+
+**Step 2 — Formula.**
 
     G_t = r_t + r_{t+1} + r_{t+2} + ... = Σ_{k=0}^{T-t} r_{t+k}
 
+Where:
+- G_t = total return starting from time step t
+- T = the final time step of the episode
+
 This works for finite-horizon (episodic) tasks where T is the terminal time step.
+
+**Step 3 — Worked example.** A 5-step episode with rewards [1, -1, 2, 0, 10]:
+
+```
+G_0 = 1 + (-1) + 2 + 0 + 10 = 12    (total from the start)
+G_2 = 2 + 0 + 10 = 12                 (total from step 2 onward)
+G_4 = 10                               (only the last reward)
+```
 
 ### Discounted Return
 
-For infinite-horizon tasks, the undiscounted return can be infinite. We fix this with discounting:
+**Step 1 — Words.** For tasks that can go on forever, the undiscounted sum can be infinite. We fix this by making future rewards worth less — each step into the future, the reward is multiplied by γ, then γ², then γ³, and so on. A reward 10 steps from now is worth γ¹⁰ times as much as a reward right now.
+
+**Step 2 — Formula.**
 
     G_t = r_t + γ·r_{t+1} + γ²·r_{t+2} + ... = Σ_{k=0}^{∞} γ^k · r_{t+k}
 
@@ -46,19 +88,45 @@ Where:
 - γ^k shrinks rewards that are k steps in the future
 - The sum converges because |G_t| ≤ R_max / (1 - γ) when rewards are bounded by R_max
 
+**Step 3 — Worked example.** Rewards = [1, -1, 2, 0, 10], γ = 0.9:
+
+```
+G_0 = 1×(0.9⁰) + (-1)×(0.9¹) + 2×(0.9²) + 0×(0.9³) + 10×(0.9⁴)
+    = 1×1.0 + (-1)×0.9 + 2×0.81 + 0×0.729 + 10×0.656
+    = 1.0 - 0.9 + 1.62 + 0 + 6.56
+    = 8.28
+
+Compare to undiscounted G_0 = 12. The discounted return is smaller because
+the big reward (10) at step 4 is multiplied by 0.9⁴ = 0.656.
+```
+
 ### Recursive Form
 
-The return satisfies a recursive relationship:
+**Step 1 — Words.** There is a shortcut for computing the return. Instead of adding up every future reward, you can say: "the return from now = the reward I get now + γ times the return from the next step." This recursive formula is the foundation of the Bellman equation and every value-based RL algorithm.
+
+**Step 2 — Formula.**
 
     G_t = r_t + γ · G_{t+1}
 
-In words: the return from now equals the immediate reward plus the discounted return from the next step. This is the foundation of the Bellman equation.
+**Step 3 — Worked example.** Same rewards [1, -1, 2, 0, 10], γ = 0.9, computed backward:
+
+```
+G_4 = 10                                   (last step)
+G_3 = 0 + 0.9 × 10     = 9.0
+G_2 = 2 + 0.9 × 9.0    = 10.1
+G_1 = -1 + 0.9 × 10.1  = 8.09
+G_0 = 1 + 0.9 × 8.09   = 8.28  ✓  (matches the forward calculation)
+```
 
 ### Effective Horizon
 
-The discount factor γ creates an effective planning horizon:
+**Step 1 — Words.** The discount factor γ controls how far into the future the agent "sees." With γ = 0.9, rewards more than about 10 steps away have almost no influence. With γ = 0.99, the agent cares about rewards up to about 100 steps away. This is called the effective horizon.
+
+**Step 2 — Formula.**
 
     H_eff = 1 / (1 - γ)
+
+**Step 3 — Worked example.**
 
 | γ | Effective horizon | Agent behavior |
 |---|---|---|
@@ -146,11 +214,31 @@ The bias-variance trade-off of γ:
 
 ### Potential-Based Reward Shaping
 
-Adding an arbitrary shaping reward F(s, a, s') can change the optimal policy. But **potential-based shaping** preserves it:
+**Step 1 — Words.** Adding extra rewards to help the agent learn faster is called reward shaping. But if you add the wrong kind of extra reward, the agent might learn a completely different (wrong) strategy. There is one safe type of shaping: potential-based shaping. It speeds up learning without changing what the best strategy is.
+
+**Step 2 — Formula.**
 
     F(s, a, s') = γ · Φ(s') - Φ(s)
 
-Where Φ(s) is a potential function (any function of state). This was proven by Ng, Harada & Russell (1999).
+Where:
+- Φ(s) is a "potential" function — any function that assigns a score to each state
+- F is the shaping reward added on top of the real reward
+- γ is the same discount factor used in the return
+
+This was proven safe by Ng, Harada & Russell (1999).
+
+**Step 3 — Worked example.** Navigation task: the agent needs to reach position (10, 10). Use Φ(s) = -distance_to_goal:
+
+```
+Agent moves from (3, 3) to (4, 3). Distance shrinks from 9.9 to 8.5.
+
+Φ(s)  = -9.9
+Φ(s') = -8.5
+F = 0.99 × (-8.5) - (-9.9) = -8.415 + 9.9 = +1.485
+
+The agent gets a positive shaping bonus for moving closer to the goal.
+The optimal policy stays the same — the agent just learns it faster.
+```
 
 | Shaping Type | Preserves Optimal Policy? | Risk |
 |---|---|---|

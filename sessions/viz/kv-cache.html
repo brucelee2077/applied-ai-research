@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV-Cache Growth & MHA vs GQA vs MQA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 14px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);
+  padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+/* top bar */
+.nav{position:sticky;top:0;left:0;right:0;height:54px;z-index:100;
+  background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem 1.6rem}
+@media(max-width:620px){.controls{grid-template-columns:1fr}}
+.ctrl{display:flex;flex-direction:column;gap:.35rem}
+.ctrl-top{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem}
+.ctrl-label{font-size:.85rem;font-weight:600;color:var(--text)}
+.ctrl-val{font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);padding:1px 8px;border-radius:var(--r-sm);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;
+  border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);
+  border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.ctrl-hint{font-size:.72rem;color:var(--muted)}
+
+/* toggle groups */
+.toggle-row{display:flex;flex-wrap:wrap;gap:1.5rem;margin-bottom:1.1rem;align-items:flex-start}
+.tgroup{display:flex;flex-direction:column;gap:.4rem}
+.tgroup-label{font-size:.85rem;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;background:var(--surface2)}
+.seg button{font-family:var(--body);font-size:.82rem;font-weight:600;color:var(--text2);
+  background:transparent;border:none;padding:.45rem .85rem;cursor:pointer;transition:all .15s}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button:hover:not(.on){background:var(--accent-l)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.3rem}
+@media(max-width:620px){.readouts{grid-template-columns:1fr}}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.9rem 1rem}
+.ro-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
+.ro-val{font-family:var(--mono);font-size:1.35rem;font-weight:600;color:var(--accent-d);line-height:1.1}
+.ro-sub{font-size:.72rem;color:var(--muted);margin-top:.25rem}
+.ro.warn .ro-val{color:var(--bad)}
+.ro.good .ro-val{color:var(--ok)}
+
+/* figures */
+.fig-wrap{width:100%}
+svg{display:block;width:100%;height:auto}
+.fig-note{font-size:.78rem;color:var(--muted);margin-top:.5rem;text-align:center}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;
+  border:1px dashed var(--bad);border-radius:var(--r-md);background:#fff}
+
+.formula{font-family:var(--mono);font-size:.82rem;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:.9rem 1rem;color:var(--text2);margin-bottom:1.2rem;line-height:1.7;overflow-x:auto}
+.formula b{color:var(--accent-d)}
+
+/* takeaway */
+.notice{background:var(--accent-l);border:1px solid #BEE0EB;border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.1rem}
+.notice li{margin-bottom:.5rem;font-size:.92rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+
+.axis-label{font-family:var(--body);font-size:11px;fill:var(--muted)}
+.tick text{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.tick line{stroke:var(--border)}
+.grid line{stroke:var(--border);stroke-dasharray:2 3;opacity:.7}
+.grid path{stroke:none}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <span class="nav-title">KV-Cache Growth</span>
+    <a class="nav-back" href="../index.html">← All lessons</a>
+  </div>
+</div>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Inference · Memory</span>
+    <h1>KV-Cache Growth & MHA vs GQA vs MQA</h1>
+    <p class="intro">
+      When a transformer generates text one token at a time, it stores the <b>keys</b> and <b>values</b>
+      of every past token so it never recomputes them. That store is the <b>KV cache</b>. This page lets
+      you feel how big it gets — and why sharing K/V heads (GQA, MQA) is the trick modern models use to keep it small.
+    </p>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h2>Configuration</h2>
+
+    <div class="toggle-row">
+      <div class="tgroup">
+        <span class="tgroup-label">Attention variant</span>
+        <div class="seg" id="segVariant" role="group" aria-label="Attention variant">
+          <button data-v="mha" class="on">MHA</button>
+          <button data-v="gqa">GQA</button>
+          <button data-v="mqa">MQA</button>
+        </div>
+      </div>
+      <div class="tgroup">
+        <span class="tgroup-label">Precision (bytes / element)</span>
+        <div class="seg" id="segDtype" role="group" aria-label="Precision">
+          <button data-b="2" class="on">fp16 · 2B</button>
+          <button data-b="1">fp8 · 1B</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">Sequence length</span><span class="ctrl-val" id="valSeq">4,096 tokens</span></div>
+        <input type="range" id="sSeq" min="8" max="17" step="1" value="12" aria-label="Sequence length exponent">
+        <span class="ctrl-hint">powers of two, 256 → 131,072 tokens</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">Batch size</span><span class="ctrl-val" id="valBatch">1</span></div>
+        <input type="range" id="sBatch" min="1" max="64" step="1" value="1" aria-label="Batch size">
+        <span class="ctrl-hint">concurrent sequences in the batch</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">Number of layers</span><span class="ctrl-val" id="valLayers">32</span></div>
+        <input type="range" id="sLayers" min="1" max="126" step="1" value="32" aria-label="Number of layers">
+        <span class="ctrl-hint">transformer decoder blocks</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">Query heads</span><span class="ctrl-val" id="valQHeads">32</span></div>
+        <input type="range" id="sQHeads" min="1" max="128" step="1" value="32" aria-label="Number of query heads">
+        <span class="ctrl-hint">attention heads per layer</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">Head dimension</span><span class="ctrl-val" id="valHeadDim">128</span></div>
+        <input type="range" id="sHeadDim" min="32" max="256" step="16" value="128" aria-label="Head dimension">
+        <span class="ctrl-hint">size of each head's key/value vector</span>
+      </div>
+
+      <div class="ctrl" id="ctrlGroup">
+        <div class="ctrl-top"><span class="ctrl-label">GQA group size</span><span class="ctrl-val" id="valGroup">8</span></div>
+        <input type="range" id="sGroup" min="1" max="32" step="1" value="8" aria-label="GQA group size">
+        <span class="ctrl-hint">query heads sharing one K/V head → <span id="kvHeadsHint">4</span> KV heads</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- READOUTS -->
+  <div class="readouts">
+    <div class="ro" id="roCache">
+      <div class="ro-label">KV cache size</div>
+      <div class="ro-val" id="roCacheVal">—</div>
+      <div class="ro-sub" id="roCacheSub">current config, current variant</div>
+    </div>
+    <div class="ro" id="roKvHeads">
+      <div class="ro-label">KV heads</div>
+      <div class="ro-val" id="roKvHeadsVal">—</div>
+      <div class="ro-sub" id="roKvHeadsSub">vs 32 query heads</div>
+    </div>
+    <div class="ro good" id="roReduce">
+      <div class="ro-label">Reduction vs MHA</div>
+      <div class="ro-val" id="roReduceVal">—</div>
+      <div class="ro-sub">less K/V to store &amp; read</div>
+    </div>
+  </div>
+
+  <!-- LINE CHART -->
+  <div class="card">
+    <h2>KV cache vs sequence length</h2>
+    <div class="fig-wrap">
+      <svg id="lineChart" viewBox="0 0 760 380" role="img"
+           aria-label="Line chart of KV cache size in gigabytes versus sequence length for the current configuration, with the currently selected sequence length marked."></svg>
+    </div>
+    <p class="fig-note">Cache grows <b>linearly</b> with sequence length. The dot marks your current sequence length. The dashed line shows a typical 70B model's weight size (140 GB in fp16) for scale.</p>
+  </div>
+
+  <!-- BAR CHART -->
+  <div class="card">
+    <h2>MHA vs GQA vs MQA at this sequence length</h2>
+    <div class="fig-wrap">
+      <svg id="barChart" viewBox="0 0 760 300" role="img"
+           aria-label="Bar chart comparing KV cache size in gigabytes for multi-head attention, grouped-query attention, and multi-query attention at the current sequence length."></svg>
+    </div>
+    <p class="fig-note">Same config, only the number of K/V heads differs. Fewer K/V heads → smaller cache.</p>
+  </div>
+
+  <!-- FORMULA -->
+  <div class="card">
+    <h2>The formula</h2>
+    <div class="formula">
+      KV_bytes = <b>2</b> × n_layers × <b>n_kv_heads</b> × head_dim × seq_len × batch × bytes<br><br>
+      <span style="color:var(--muted)">the <b>2</b> is for K and V · <b>n_kv_heads</b> is what MHA / GQA / MQA change:</span><br>
+      MHA: n_kv_heads = n_query_heads &nbsp;·&nbsp; GQA: n_kv_heads = n_query_heads ÷ group_size &nbsp;·&nbsp; MQA: n_kv_heads = 1
+    </div>
+    <div class="notice">
+      <h3>What to notice</h3>
+      <ul>
+        <li>The cache grows <b>linearly</b> with sequence length <i>and</i> with batch size. Double the context, double the cache. This is why long-context serving is expensive.</li>
+        <li>At long context and large batch, the KV cache can <b>dwarf the model weights</b> — watch the line cross the 70B-weights marker. Now the cache, not the weights, decides how many requests fit in memory.</li>
+        <li><b>MQA and GQA shrink the cache</b> by having many query heads share a few K/V heads. That is <i>why</i> modern models (Llama, Mistral, Gemma) use GQA: it cuts KV memory and bandwidth with almost no quality loss.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var lineSvgEl = document.getElementById('lineChart');
+  var barSvgEl  = document.getElementById('barChart');
+
+  // Graceful degradation if D3 failed to load.
+  if (typeof window.d3 === 'undefined') {
+    console.warn('[kv-cache] D3 not found (window.d3 undefined) — showing fallback, controls disabled.');
+    var msg = 'Could not load the chart library (d3.v7.min.js). The interactive figure is unavailable, but the formula and explanation above still apply.';
+    [lineSvgEl, barSvgEl].forEach(function(sv){
+      if (sv && sv.parentNode) {
+        var div = document.createElement('div');
+        div.className = 'fallback';
+        div.textContent = msg;
+        sv.parentNode.replaceChild(div, sv);
+      }
+    });
+    return;
+  }
+
+  var d3 = window.d3;
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DUR = prefersReduced ? 0 : 450;
+
+  // ---- state ----
+  var state = {
+    variant: 'mha',      // mha | gqa | mqa
+    bytes: 2,            // 2 = fp16, 1 = fp8
+    seqExp: 12,          // seq_len = 2^seqExp
+    batch: 1,
+    layers: 32,
+    qHeads: 32,
+    headDim: 128,
+    group: 8
+  };
+
+  var GB = 1024 * 1024 * 1024; // bytes per gibibyte
+  var WEIGHTS_70B_GB = 140;    // ~70B params * 2 bytes (fp16) reference marker
+
+  // KV heads for a given variant, given current query heads / group size.
+  function kvHeadsFor(variant){
+    if (variant === 'mqa') return 1;
+    if (variant === 'gqa') {
+      // group_size query heads share one KV head; at least 1 KV head, capped at qHeads.
+      var g = Math.max(1, Math.min(state.group, state.qHeads));
+      return Math.max(1, Math.ceil(state.qHeads / g));
+    }
+    return state.qHeads; // mha
+  }
+
+  // Cache size in BYTES for a given seq_len and variant, using current state.
+  function cacheBytes(seqLen, variant){
+    var kvHeads = kvHeadsFor(variant);
+    return 2 * state.layers * kvHeads * state.headDim * seqLen * state.batch * state.bytes;
+  }
+
+  // Human-friendly byte formatting (MB / GB / TB).
+  function fmtBytes(b){
+    var gb = b / GB;
+    if (gb < 0.01)  return (b / (1024*1024)).toFixed(1) + ' MB';
+    if (gb < 1000)  return gb.toFixed(gb < 10 ? 2 : 1) + ' GB';
+    return (gb / 1024).toFixed(2) + ' TB';
+  }
+  function fmtInt(n){ return n.toLocaleString('en-US'); }
+
+  // ---- static line-chart layout ----
+  var lineSvg = d3.select(lineSvgEl);
+  var LW = 760, LH = 380;
+  var lm = {top: 20, right: 20, bottom: 46, left: 66};
+  var lineIW = LW - lm.left - lm.right;
+  var lineIH = LH - lm.top - lm.bottom;
+
+  var lineG = lineSvg.append('g').attr('transform', 'translate(' + lm.left + ',' + lm.top + ')');
+  var gxAxis = lineG.append('g').attr('class','tick').attr('transform','translate(0,' + lineIH + ')');
+  var gyAxis = lineG.append('g').attr('class','tick');
+  var gGrid  = lineG.append('g').attr('class','grid');
+
+  // sequence-length domain: 256 .. 131072 (2^8 .. 2^17)
+  var SEQ_MIN = 256, SEQ_MAX = 131072;
+  var xScale = d3.scaleLog().base(2).domain([SEQ_MIN, SEQ_MAX]).range([0, lineIW]);
+  var yScale = d3.scaleLinear().range([lineIH, 0]);
+
+  var linePath = lineG.append('path')
+    .attr('fill','none').attr('stroke','#2A7B9B').attr('stroke-width',2.5)
+    .attr('stroke-linejoin','round');
+  var weightsLine = lineG.append('line')
+    .attr('stroke','#BE3E26').attr('stroke-width',1.5).attr('stroke-dasharray','5 4').attr('opacity',0.8);
+  var weightsLabel = lineG.append('text')
+    .attr('class','axis-label').attr('fill','#BE3E26').attr('text-anchor','end').attr('font-size','10px');
+  var marker = lineG.append('circle')
+    .attr('r',5.5).attr('fill','#1F6280').attr('stroke','#fff').attr('stroke-width',2);
+  var markerLbl = lineG.append('text')
+    .attr('class','axis-label').attr('fill','#1F6280').attr('font-size','10.5px').attr('font-weight','600');
+
+  // axis titles
+  lineG.append('text').attr('class','axis-label').attr('text-anchor','middle')
+    .attr('x', lineIW/2).attr('y', lineIH + 40).text('sequence length (tokens, log₂ scale)');
+  lineG.append('text').attr('class','axis-label').attr('text-anchor','middle')
+    .attr('transform','rotate(-90)').attr('x', -lineIH/2).attr('y', -50).text('KV cache size (GB)');
+
+  var seqTickVals = [256,512,1024,2048,4096,8192,16384,32768,65536,131072];
+
+  function drawLine(){
+    // Build the curve across the full seq range for the current variant/config.
+    var pts = seqTickVals.map(function(s){
+      return { seq: s, gb: cacheBytes(s, state.variant) / GB };
+    });
+    var maxGb = d3.max(pts, function(d){ return d.gb; });
+    // include the weights marker in the y-range so it stays visible, add headroom
+    var yTop = Math.max(maxGb, WEIGHTS_70B_GB) * 1.1;
+    if (yTop <= 0) yTop = 1;
+    yScale.domain([0, yTop]);
+
+    var xAxis = d3.axisBottom(xScale).tickValues(seqTickVals)
+      .tickFormat(function(d){ return d >= 1024 ? (d/1024) + 'k' : d; });
+    var yAxis = d3.axisLeft(yScale).ticks(6).tickFormat(function(d){ return d < 10 ? d.toFixed(1) : d; });
+
+    gxAxis.transition().duration(DUR).call(xAxis);
+    gyAxis.transition().duration(DUR).call(yAxis);
+    gGrid.transition().duration(DUR).call(
+      d3.axisLeft(yScale).ticks(6).tickSize(-lineIW).tickFormat('')
+    );
+
+    var lineGen = d3.line()
+      .x(function(d){ return xScale(d.seq); })
+      .y(function(d){ return yScale(d.gb); });
+
+    linePath.datum(pts).transition().duration(DUR).attr('d', lineGen);
+
+    // weights reference line
+    var wy = yScale(WEIGHTS_70B_GB);
+    weightsLine.transition().duration(DUR)
+      .attr('x1',0).attr('x2',lineIW).attr('y1',wy).attr('y2',wy);
+    weightsLabel.transition().duration(DUR)
+      .attr('x', lineIW - 4).attr('y', wy - 5)
+      .text('70B weights ≈ 140 GB (fp16)');
+
+    // current-seq marker
+    var curSeq = Math.pow(2, state.seqExp);
+    var curGb = cacheBytes(curSeq, state.variant) / GB;
+    var mx = xScale(curSeq), my = yScale(curGb);
+    marker.transition().duration(DUR).attr('cx', mx).attr('cy', my);
+
+    // keep label inside the plot area
+    var anchor = mx > lineIW - 120 ? 'end' : 'start';
+    var lx = anchor === 'end' ? mx - 9 : mx + 9;
+    markerLbl.transition().duration(DUR)
+      .attr('x', lx).attr('y', Math.max(12, my - 10)).attr('text-anchor', anchor)
+      .text(fmtBytes(cacheBytes(curSeq, state.variant)) + ' @ ' + fmtInt(curSeq) + ' tok');
+  }
+
+  // ---- bar chart ----
+  var barSvg = d3.select(barSvgEl);
+  var BW = 760, BH = 300;
+  var bm = {top: 24, right: 20, bottom: 54, left: 66};
+  var barIW = BW - bm.left - bm.right;
+  var barIH = BH - bm.top - bm.bottom;
+  var barG = barSvg.append('g').attr('transform', 'translate(' + bm.left + ',' + bm.top + ')');
+  var bxAxis = barG.append('g').attr('class','tick').attr('transform','translate(0,' + barIH + ')');
+  var byAxis = barG.append('g').attr('class','tick');
+  var bGrid  = barG.append('g').attr('class','grid');
+
+  barG.append('text').attr('class','axis-label').attr('text-anchor','middle')
+    .attr('transform','rotate(-90)').attr('x', -barIH/2).attr('y', -50).text('KV cache size (GB)');
+
+  var barColors = { MHA:'#BE3E26', GQA:'#C99A12', MQA:'#2D8B55' };
+  var xBand = d3.scaleBand().range([0, barIW]).padding(0.35);
+  var yBar  = d3.scaleLinear().range([barIH, 0]);
+
+  function drawBars(){
+    var curSeq = Math.pow(2, state.seqExp);
+    var data = ['mha','gqa','mqa'].map(function(v){
+      return {
+        key: v.toUpperCase(),
+        variant: v,
+        gb: cacheBytes(curSeq, v) / GB,
+        bytes: cacheBytes(curSeq, v),
+        kv: kvHeadsFor(v)
+      };
+    });
+
+    xBand.domain(data.map(function(d){ return d.key; }));
+    var maxGb = d3.max(data, function(d){ return d.gb; }) || 1;
+    yBar.domain([0, maxGb * 1.18]);
+
+    var xAxis = d3.axisBottom(xBand);
+    var yAxis = d3.axisLeft(yBar).ticks(5).tickFormat(function(d){ return d < 10 ? d.toFixed(1) : d; });
+    bxAxis.transition().duration(DUR).call(xAxis);
+    byAxis.transition().duration(DUR).call(yAxis);
+    bGrid.transition().duration(DUR).call(
+      d3.axisLeft(yBar).ticks(5).tickSize(-barIW).tickFormat('')
+    );
+
+    // bars
+    var bars = barG.selectAll('rect.bar').data(data, function(d){ return d.key; });
+    bars.enter().append('rect').attr('class','bar')
+        .attr('x', function(d){ return xBand(d.key); })
+        .attr('width', xBand.bandwidth())
+        .attr('y', barIH).attr('height', 0)
+        .attr('rx', 5)
+        .attr('fill', function(d){ return barColors[d.key]; })
+        .attr('opacity', function(d){ return d.variant === state.variant ? 1 : 0.45; })
+      .merge(bars)
+        .attr('stroke', function(d){ return d.variant === state.variant ? '#2C2A28' : 'none'; })
+        .attr('stroke-width', 1.5)
+        .transition().duration(DUR)
+        .attr('x', function(d){ return xBand(d.key); })
+        .attr('width', xBand.bandwidth())
+        .attr('y', function(d){ return yBar(d.gb); })
+        .attr('height', function(d){ return barIH - yBar(d.gb); })
+        .attr('fill', function(d){ return barColors[d.key]; })
+        .attr('opacity', function(d){ return d.variant === state.variant ? 1 : 0.45; });
+    bars.exit().remove();
+
+    // value labels on top
+    var labels = barG.selectAll('text.blbl').data(data, function(d){ return d.key; });
+    labels.enter().append('text').attr('class','blbl axis-label')
+        .attr('text-anchor','middle').attr('fill','#2C2A28').attr('font-weight','600').attr('font-size','11px')
+        .attr('x', function(d){ return xBand(d.key) + xBand.bandwidth()/2; })
+        .attr('y', barIH)
+      .merge(labels)
+        .transition().duration(DUR)
+        .attr('x', function(d){ return xBand(d.key) + xBand.bandwidth()/2; })
+        .attr('y', function(d){ return yBar(d.gb) - 7; })
+        .tween('text', function(d){
+          var self = d3.select(this);
+          return function(){ self.text(fmtBytes(d.bytes)); };
+        });
+    labels.exit().remove();
+
+    // kv-head sublabels under each bar name
+    var subs = barG.selectAll('text.bsub').data(data, function(d){ return d.key; });
+    subs.enter().append('text').attr('class','bsub axis-label')
+        .attr('text-anchor','middle').attr('font-size','10px').attr('fill','#6B645E')
+        .attr('x', function(d){ return xBand(d.key) + xBand.bandwidth()/2; })
+        .attr('y', barIH + 36)
+      .merge(subs)
+        .transition().duration(DUR)
+        .attr('x', function(d){ return xBand(d.key) + xBand.bandwidth()/2; })
+        .attr('y', barIH + 36)
+        .text(function(d){ return d.kv + (d.kv === 1 ? ' KV head' : ' KV heads'); });
+    subs.exit().remove();
+  }
+
+  // ---- readouts ----
+  function updateReadouts(){
+    var curSeq = Math.pow(2, state.seqExp);
+    var curBytes = cacheBytes(curSeq, state.variant);
+    var mhaBytes = cacheBytes(curSeq, 'mha');
+    var kvHeads = kvHeadsFor(state.variant);
+
+    d3.select('#roCacheVal').text(fmtBytes(curBytes));
+    d3.select('#roCacheSub').text(state.variant.toUpperCase() + ' · ' + fmtInt(curSeq) + ' tok · batch ' + state.batch);
+    // warn styling when cache exceeds the 70B-weights reference
+    d3.select('#roCache').classed('warn', curBytes / GB > WEIGHTS_70B_GB);
+
+    d3.select('#roKvHeadsVal').text(kvHeads);
+    d3.select('#roKvHeadsSub').text('vs ' + state.qHeads + ' query heads');
+
+    var reduce = mhaBytes / curBytes; // >= 1
+    d3.select('#roReduceVal').text(reduce >= 1.005 ? (reduce.toFixed(reduce < 10 ? 2 : 1) + '×') : '1× (baseline)');
+    d3.select('#roReduce').classed('good', reduce > 1.005);
+  }
+
+  // ---- control-value labels ----
+  function updateCtrlLabels(){
+    var curSeq = Math.pow(2, state.seqExp);
+    d3.select('#valSeq').text(fmtInt(curSeq) + ' tokens');
+    d3.select('#valBatch').text(state.batch);
+    d3.select('#valLayers').text(state.layers);
+    d3.select('#valQHeads').text(state.qHeads);
+    d3.select('#valHeadDim').text(state.headDim);
+    d3.select('#valGroup').text(state.group);
+    // GQA hint: how many KV heads the current group size yields
+    var g = Math.max(1, Math.min(state.group, state.qHeads));
+    d3.select('#kvHeadsHint').text(Math.max(1, Math.ceil(state.qHeads / g)));
+    // grey out group control unless GQA is active
+    d3.select('#ctrlGroup').style('opacity', state.variant === 'gqa' ? 1 : 0.4);
+    d3.select('#sGroup').property('disabled', state.variant !== 'gqa');
+  }
+
+  function renderAll(){
+    updateCtrlLabels();
+    updateReadouts();
+    drawLine();
+    drawBars();
+  }
+
+  // ---- wire up sliders ----
+  d3.select('#sSeq').on('input', function(){ state.seqExp = +this.value; renderAll(); });
+  d3.select('#sBatch').on('input', function(){ state.batch = +this.value; renderAll(); });
+  d3.select('#sLayers').on('input', function(){ state.layers = +this.value; renderAll(); });
+  d3.select('#sQHeads').on('input', function(){
+    state.qHeads = +this.value;
+    // keep group size sensible relative to query heads
+    if (state.group > state.qHeads) { state.group = state.qHeads; d3.select('#sGroup').property('value', state.group); }
+    renderAll();
+  });
+  d3.select('#sHeadDim').on('input', function(){ state.headDim = +this.value; renderAll(); });
+  d3.select('#sGroup').on('input', function(){ state.group = +this.value; renderAll(); });
+
+  // ---- wire up toggles ----
+  d3.selectAll('#segVariant button').on('click', function(){
+    var v = this.getAttribute('data-v');
+    state.variant = v;
+    d3.selectAll('#segVariant button').classed('on', false);
+    d3.select(this).classed('on', true);
+    renderAll();
+  });
+  d3.selectAll('#segDtype button').on('click', function(){
+    state.bytes = +this.getAttribute('data-b');
+    d3.selectAll('#segDtype button').classed('on', false);
+    d3.select(this).classed('on', true);
+    renderAll();
+  });
+
+  // initial paint
+  renderAll();
+})();
+</script>
+</body>
+</html>

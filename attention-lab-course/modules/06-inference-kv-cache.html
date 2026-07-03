@@ -1,0 +1,388 @@
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">Inference &amp; the KV Cache</h1>
+      <p class="module-subtitle">Why generating an answer is bottlenecked by re-reading, not by math — and how production systems fight back.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============ SCREEN 1 — HOOK + SCRIBE METAPHOR ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The model re-reads everything, every single word</h2>
+        <p>When a model writes you an answer, it does it one
+          <span class="term" data-definition="A token is one chunk of text the model handles at a time — often a word or part of a word. 'Attention' might be one token; 'reinforcement' might be split into several.">token</span>
+          at a time. Before it writes each new token, it re-reads everything it has said so far. That re-reading, not the math, is the bottleneck.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">✍️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Metaphor: a scribe taking dictation</strong>
+            <p>Imagine a scribe writing down a long story word by word. Before adding each new word, the scribe re-reads the <em>entire transcript so far</em> to stay consistent. The pile of pages already written is the <strong>KV cache</strong>. Re-reading the whole pile before every new word is the cost we will study. The analogy breaks down in one place: a real scribe could just remember the recent context, but the model literally reloads the whole cache from memory at every step.</p>
+          </div>
+        </div>
+
+        <p>This module is the finale. You already know <em>what</em> attention computes. Now you will learn why the same operation behaves like two completely different machines: a fast parallel one while <span class="term" data-definition="Training is the phase where the model learns. It is shown full example sequences and updates its internal weights. All tokens are present at once, so the work is one big parallel computation.">training</span>, and a memory-starved sequential one while <span class="term" data-definition="Inference (also called decoding) is the phase where a trained model is used to produce output for a user. For text generation it runs autoregressively — one new token at a time.">inference</span> generates text.</p>
+      </section>
+
+      <!-- ============ SCREEN 2 — TRAINING vs DECODE (SIDE BY SIDE) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One operation, two very different machines</h2>
+        <p>The attention formula does not change between training and generation. What changes is the <em>shape</em> of the inputs — and that single difference flips the bottleneck from compute to memory.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚡</div>
+            <h4 class="pattern-title">Training — parallel</h4>
+            <p class="pattern-desc">All <strong>N</strong> tokens are known up front. Q, K, and V are full <strong>N × d</strong> matrices. The whole <strong>N × N</strong> attention grid is one big parallel
+              <span class="term" data-definition="Matmul is short for matrix multiplication — the core arithmetic of deep learning. GPUs are built to do enormous matmuls extremely fast.">matmul</span>.
+              The GPU is doing heavy arithmetic, so this phase is <strong>compute-bound</strong>: speed is limited by how many math operations per second the chip can do.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🔁</div>
+            <h4 class="pattern-title">Decode — autoregressive</h4>
+            <p class="pattern-desc">Only one new token is born per step. Its Query is a single <strong>1 × d</strong> row. The past Keys and Values are kept in a
+              <span class="term" data-definition="The KV cache stores the Key and Value vectors already computed for every past token, so they never have to be recomputed. It grows by one row each time a new token is generated.">KV cache</span>
+              and just <em>appended to</em>, never recomputed. Per-token math is tiny, but every step you must re-read the whole cache from memory, so this phase is <strong>memory-bandwidth-bound</strong>.</p>
+          </div>
+        </div>
+
+        <p>The phrase to lock in: <strong>autoregressive</strong> generation.</p>
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: the bottleneck moved, not the math</strong>
+            <p>An <span class="term" data-definition="Autoregressive means each new output depends on all the outputs before it. The model feeds its own previous tokens back in to produce the next one — like predicting word 5 from words 1 through 4.">autoregressive</span> decode step does almost no arithmetic — a 1 × d query against the cache. The expensive part is <span class="term" data-definition="HBM (High Bandwidth Memory) is the fast memory sitting next to the GPU chip where weights and the KV cache live. It is fast, but reading from it still takes time — and that read time is the bottleneck during decoding.">HBM</span> bandwidth: loading the whole growing cache from memory into the chip on every single step. A system can be <span class="term" data-definition="Memory-bandwidth bound means the speed limit is how fast data can be moved from memory into the compute units — not how fast the math runs. The chip sits idle waiting for data.">memory-bandwidth bound</span> while the math units sit mostly idle.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 3 — HERO FLOW ANIMATION OF DECODE ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Trace one decode step, end to end</h2>
+        <p>Follow what happens when the model generates one token. Watch the cache grow by exactly one row each step — and notice that the past Keys and Values are <strong>re-read</strong>, never rebuilt.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Start: the prompt is already processed. The KV cache holds one Key row and one Value row for each prompt token."},
+          {"highlight":"flow-actor-2","label":"A new token is born. Its Query is a single 1 x d row — just this one position asking who to listen to.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-3","label":"Score the new Query against the WHOLE cached K. The past keys are loaded from HBM and re-read — never recomputed.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Softmax turns those scores into weights, then blend the cached Values (V) into this token output."},
+          {"highlight":"flow-actor-4","label":"Append this token K and V to the cache. The cache grows by exactly one row.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-2","label":"Repeat for the next token. Each step re-reads a slightly larger cache from HBM — that growing re-read is the bandwidth cost."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">📚</div>
+              <span>KV Cache</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">Q</div>
+              <span>New Query (1 × d)</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">⚖️</div>
+              <span>Score + Blend</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">➕</div>
+              <span>Append to Cache</span>
+            </div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+
+          <div class="flow-step-label" id="flow-label">Click "Next Step" to watch one token get generated</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📈</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why this is the wall</strong>
+            <p>The cache size grows with sequence length × layers × heads × head-dimension. At step 1000 you re-read roughly 1000 rows; at step 8000 you re-read 8000. The arithmetic per step barely moved, but the bytes moved from HBM keep climbing. That is why long answers feel slower toward the end.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 4 — THE CAUSAL MASK (CODE-TO-ENGLISH) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The one line that makes generation left-to-right</h2>
+        <p>Why can the model only ever go forward, one token at a time? Because of a
+          <span class="term" data-definition="A causal mask blocks each token from seeing tokens that come after it. 'Causal' means a cause must come before its effect — so a token can only attend to the past, never the future.">causal mask</span>.
+          Here is the exact line from the reference implementation. Read the plain-English column on the right.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-line"><span class="code-function">scores</span> = np.<span class="code-function">where</span>(mask, scores, -np.inf)</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Wherever the mask says "you are allowed to look here," keep the real score.</p>
+              <p class="tl">Wherever it says "this is a future token," replace the score with negative infinity.</p>
+              <p class="tl">After softmax, negative infinity becomes a weight of zero — so a token can never listen to words that come after it. That is what forces generation to run left to right.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔗</div>
+          <div class="callout-content">
+            <strong class="callout-title">Mask + cache are the same idea, seen twice</strong>
+            <p>During training, the causal mask hides the future inside one big parallel matmul, so every position is trained as if it only saw the past. During decoding, that "only the past exists" rule is automatic — the future tokens have not been generated yet. The KV cache is simply how we avoid recomputing that growing past from scratch on every step.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 5 — COMMON CONFUSIONS ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Five confusions that sink interviews</h2>
+        <p>These are the misreads that separate "I memorized a diagram" from "I understand the mechanism." Get each one straight.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Attention means the model understands."</strong>
+              <p>No. It computes relevance and <em>routes</em> information. Any understanding lives in the learned weights across the whole stack, not in one softmax.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"If token A attends to B, A copies B's embedding."</strong>
+              <p>No. A receives B's <strong>Value</strong> — the payload — scaled by the Query·Key weight. Routing decides <em>how much</em>; the Value is <em>what</em> actually flows. Routing is not the same as payload.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Softmax is taken over the whole matrix."</strong>
+              <p>No. It is row-wise, over the keys. Each query gets its own probability distribution that sums to 1. Get the axis wrong and attention silently turns to nonsense.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"Q, K, and V are three different inputs."</strong>
+              <p>No. In <span class="term" data-definition="Self-attention is attention where the queries, keys, and values all come from the same sequence — the sentence attends to itself. This is the kind used inside a single block of a language model.">self-attention</span> they are three learned projections of the <em>same</em> input. A token labels itself and decides what it carries.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✕</div>
+            <div class="step-body">
+              <strong>"FlashAttention is a faster, approximate or sub-quadratic algorithm."</strong>
+              <p>No. <span class="term" data-definition="FlashAttention is an IO-aware way of computing exact attention. It keeps the same math and same O(n squared) compute, but never writes the full n-by-n score matrix to memory, cutting memory traffic dramatically.">FlashAttention</span> gives the exact same output and the same O(n²) compute. It only changes <em>memory IO</em> by never materializing the full n × n score matrix.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 6 — THE FIXES (PATTERN CARDS) ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The fixes you should be able to name</h2>
+        <p>Once you can say "decode is memory-bandwidth bound because we re-read the KV cache from HBM," every production fix becomes obvious — each one attacks the cache or the bandwidth directly.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🗜️</div>
+            <h4 class="pattern-title">MQA / GQA</h4>
+            <p class="pattern-desc"><span class="term" data-definition="MQA (Multi-Query Attention) and GQA (Grouped-Query Attention) let many attention heads share the same Keys and Values instead of each having its own. Fewer K/V copies means a much smaller KV cache to load each step.">MQA / GQA</span> share K and V across heads, so the cache shrinks. Less to load from HBM each step means a faster decode for the same model.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🧩</div>
+            <h4 class="pattern-title">PagedAttention / vLLM</h4>
+            <p class="pattern-desc"><span class="term" data-definition="PagedAttention, used by the vLLM serving system, stores the KV cache in small fixed-size blocks like operating-system memory pages. This stops the cache from fragmenting and wasting memory, so a GPU can serve many more users at once.">PagedAttention</span> stores the cache in small fixed-size blocks, like memory pages. No fragmentation means one GPU can fit far more concurrent requests.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🔢</div>
+            <h4 class="pattern-title">Quantized cache</h4>
+            <p class="pattern-desc">Store the cached Keys and Values in fewer bits (for example 8-bit instead of 16-bit). Fewer bytes per row means less to read from HBM each step — directly attacking the bandwidth bottleneck.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🚌</div>
+            <h4 class="pattern-title">Continuous batching</h4>
+            <p class="pattern-desc"><span class="term" data-definition="Continuous batching keeps the GPU busy by adding new requests and dropping finished ones on the fly, instead of waiting for a whole fixed batch to finish. It packs more useful work into each memory read.">Continuous batching</span> keeps the GPU full by swapping requests in and out as they finish, so each expensive cache read serves more users.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Design trade-off to verbalize</strong>
+            <p>MQA/GQA and a quantized cache both shrink the cache, but they can cost a little quality — sharing K/V across heads or using fewer bits throws away some precision. The staff-level answer names the lever <em>and</em> the price: "GQA cuts the cache and speeds decode, but I would A/B the eval scores before shipping, because sharing K/V can dent quality on long-context tasks." Naming the cost is the signal.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 7 — VICTORY LAP ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Victory lap — you can now hold your own in a design review</h2>
+        <p>This was the last module, and you leveled all the way up. Walk into the room able to do every one of these without notes.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Explain what attention computes — and what it does not</strong>
+              <p>A learned, per-token, per-layer soft lookup over the sequence. Routing, not understanding.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Derive softmax(Q Kᵀ / √d<sub>k</sub>) V with shapes</strong>
+              <p>Score, scale, softmax row-wise, blend the Values — every symbol and shape labeled, and why we divide by √d<sub>k</sub>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Reason about the O(n²) cost and the long-context memory wall</strong>
+              <p>10× longer context means 100× attention memory. You know why FlashAttention helps and why it changes memory IO, not the math.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">✓</div>
+            <div class="step-body">
+              <strong>Explain the KV cache and the decode bottleneck in a review</strong>
+              <p>Training is compute-bound; decode is memory-bandwidth-bound. You can name MQA/GQA, PagedAttention, quantized cache, and continuous batching — and the trade-off each carries.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🚀</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where this goes next</strong>
+            <p>Everything you built here is the prerequisite for two more topics that plug into this same course later: <strong>Multi-Head Attention</strong> (why one head is not enough) and <strong>Positional Encoding</strong> (how to give order to an operation that is otherwise blind to it). You now have the foundation they both stand on.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 8 — QUIZ ============ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check yourself — interview-shaped</h2>
+        <p>These test reasoning, not recall. Take a beat before each one.</p>
+
+        <div class="quiz-container" id="quiz-module6">
+
+          <div class="quiz-question-block"
+               data-correct="opt-bw"
+               data-explanation-right="Per-token compute during decode is tiny — a single 1 x d query against the cache. The expensive part is loading the whole growing KV cache from HBM on every step, so memory bandwidth sets the speed limit."
+               data-explanation-wrong="Compute is the bottleneck during training, not decode. During autoregressive decode the math per token is tiny; the cost is re-reading the entire KV cache from HBM each step — that is memory bandwidth.">
+            <h3 class="quiz-question">A teammate says "let's buy a GPU with more math throughput to speed up text generation." Why might that barely help?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-compute" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It would help a lot — decode is limited by how fast the chip does math</span>
+              </button>
+              <button class="quiz-option" data-value="opt-bw" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Decode is memory-bandwidth bound — it re-reads the KV cache from HBM each step, so more math throughput sits mostly idle</span>
+              </button>
+              <button class="quiz-option" data-value="opt-disk" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Generation is limited by disk read speed</span>
+              </button>
+              <button class="quiz-option" data-value="opt-net" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It is limited by network latency to the user</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-reread"
+               data-explanation-right="The cache holds the Key and Value vectors of every past token. We re-read them instead of recomputing because they never change once produced — recomputing the whole past at every step would turn cheap decoding into an O(n squared) blowup per token."
+               data-explanation-wrong="The cache does not store the final answer or the attention weights — it stores past Keys and Values. We keep them because they are fixed once computed; recomputing the entire past on every new token would be hugely wasteful, so we re-read instead.">
+            <h3 class="quiz-question">What does the KV cache store, and why re-read it instead of recomputing it each step?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-answer" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the final generated answer so we don't repeat words</span>
+              </button>
+              <button class="quiz-option" data-value="opt-reread" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the Keys and Values of past tokens; they never change, so re-reading is far cheaper than recomputing the whole past each step</span>
+              </button>
+              <button class="quiz-option" data-value="opt-weights" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the softmax attention weights, which we reuse directly</span>
+              </button>
+              <button class="quiz-option" data-value="opt-queries" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It stores the Query rows so the model can re-ask old questions</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-shape"
+               data-explanation-right="During training all N tokens are present, so Q, K, V are full N x d matrices and the N x N attention is one big parallel matmul — heavy math, compute-bound. During decode only a 1 x d query is new each step while the cache is re-read from HBM — tiny math, bandwidth-bound."
+               data-explanation-wrong="The formula is identical in both phases. What flips the bottleneck is the input shape: training has all N tokens at once (big parallel matmul, compute-bound), while decode produces one row at a time and re-reads the cache (tiny math, memory-bandwidth-bound).">
+            <h3 class="quiz-question">In one sentence: why is training compute-bound while autoregressive decode is memory-bandwidth-bound?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-formula" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training and decoding use two different attention formulas</span>
+              </button>
+              <button class="quiz-option" data-value="opt-shape" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training processes all N tokens as one big parallel matmul (heavy math), while decode adds one 1 × d row at a time and must re-read the whole cache from HBM (tiny math, lots of memory traffic)</span>
+              </button>
+              <button class="quiz-option" data-value="opt-precision" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because training uses higher numerical precision than decoding</span>
+              </button>
+              <button class="quiz-option" data-value="opt-mask" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because only decoding uses the causal mask</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-cache"
+               data-explanation-right="GQA makes heads share Keys and Values, which shrinks the KV cache. A smaller cache means fewer bytes to load from HBM each decode step — directly relieving the memory-bandwidth bottleneck. The catch to mention: sharing K/V can cost a little quality, so you'd verify eval scores."
+               data-explanation-wrong="GQA does not change the math output or add compute — and it is not about disk. Its job is to make heads share K and V so the KV cache is smaller, which cuts the HBM traffic that bottlenecks decoding.">
+            <h3 class="quiz-question">You're serving a chat model and decode is too slow. Why would switching to GQA help, and what would you watch?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-faster-math" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It makes the attention math itself run with fewer operations</span>
+              </button>
+              <button class="quiz-option" data-value="opt-cache" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Heads share K/V, so the KV cache shrinks and there's less to load from HBM each step — watch eval scores, since sharing can dent quality</span>
+              </button>
+              <button class="quiz-option" data-value="opt-disk2" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It moves the cache to disk so it never fills GPU memory</span>
+              </button>
+              <button class="quiz-option" data-value="opt-exact" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It removes the causal mask so tokens can attend in both directions</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

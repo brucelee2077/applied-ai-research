@@ -8,6 +8,22 @@
 > - 💡 SFT vs RLHF vs DPO: when each is appropriate
 > - 🏭 Scaling from InstructGPT to modern production systems
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π_θ | Policy being trained (the language model with weights θ) |
+> | π_ref | Reference policy — frozen copy of the SFT model |
+> | r_φ(x, y) | Reward model — scores a response y given prompt x |
+> | KL(π_θ \|\| π_ref) | KL divergence — how far the trained model has drifted from the reference |
+> | β | KL penalty coefficient — controls the drift penalty strength |
+> | σ(x) | Sigmoid function — maps a number to (0, 1) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **PPO** — the policy optimization algorithm used in RLHF ([ppo-from-scratch-interview.md](../advanced-algorithms/ppo-from-scratch-interview.md))
+> - **KL divergence** — measures distance between distributions
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

@@ -8,6 +8,18 @@
 > - 💡 IQL vs QMIX vs MADDPG: when each wins
 > - 🏭 Production: self-play curriculum, population-based training, scalability
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π_i | Policy of agent i |
+> | Q_tot | Joint Q-value (all agents combined) |
+> | Nash equilibrium | State where no agent benefits from changing strategy alone |
+> | \|A\|^n | Joint action space — exponential in number of agents n |
+>
+> **RL concepts used here:** MDPs, Q-learning, policy gradients (extended to multiple agents).
+> See [math-refresher.md](../math-refresher.md) for notation lookup.
+
 ---
 
 ## Brief restatement

@@ -1,0 +1,350 @@
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">The Cost of Attention</h1>
+      <p class="module-subtitle">Attention reads every word against every other word. Double the text and you quadruple the work. Here is where long context gets expensive — and the trick that saves it.</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 1 — HOOK + HANDSHAKE METAPHOR -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why does long context get so expensive?</h2>
+
+        <p>You already know the core operation: every token compares itself against every other token. That sounds harmless for ten words. It is brutal for a hundred thousand.</p>
+
+        <p>Picture a party where every guest must shake hands with every other guest. With 5 guests that is about 10 handshakes. With 50 guests it is around 1,225. Add a few more people and the handshakes explode — far faster than the guest list grows.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🤝</div>
+            <h4 class="pattern-title">Guests = tokens</h4>
+            <p class="pattern-desc">Each token is a guest at the party. The sequence length we call <strong>n</strong> is the guest count.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">💥</div>
+            <h4 class="pattern-title">Handshakes = pairs</h4>
+            <p class="pattern-desc">Every pair of tokens must be compared. The pairs grow with the <strong>square</strong> of the guest count.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔁</div>
+            <h4 class="pattern-title">Where it breaks</h4>
+            <p class="pattern-desc">Real handshakes happen once. Attention redoes <em>all</em> the pairings at <strong>every layer</strong> of the network.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The shape of the cost</strong>
+            <p>Comparing every token to every other token is an
+              <span class="term" data-definition="Big-O notation describes how the cost of an operation grows as the input grows. O(n) means cost grows in step with n. O(n squared) means cost grows with n times itself — so doubling n makes it four times bigger.">O(n²)</span>
+              operation: the work grows with the square of the sequence length. This single fact drives almost every long-context engineering decision in modern language models.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 2 — O(n) vs O(n^2): TWO OBJECTS, TWO GROWTH RATES -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Two objects, two very different growth rates</h2>
+
+        <p>Inside an attention layer there are two memory objects that matter. One grows gently. One grows viciously. Telling them apart is the whole game.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📏</div>
+            <div>
+              <strong>The token tensor — shape n × d — grows like O(n)</strong>
+              <p>Each of the <strong>n</strong> tokens is a vector of length <strong>d</strong> (the model dimension). Add one token, add one row. Memory grows in a straight line.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-accent)">🟥</div>
+            <div>
+              <strong>The score matrix — shape n × n — grows like O(n²)</strong>
+              <p>The
+                <span class="term" data-definition="To materialize a tensor means to actually allocate it in memory and fill in every number — as opposed to computing values on the fly and throwing them away. The n by n score matrix is materialized when every pairwise score is written to memory at once.">materialized</span>
+                table of every-token-against-every-token. Add one token and you add a whole new row <em>and</em> a whole new column. Memory grows like the square.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>Put real numbers on it. We will use
+          <span class="term" data-definition="fp16 means 16-bit floating point — a way to store a number using 2 bytes instead of the usual 4. Models use it to halve memory and run faster on GPUs, at the cost of a little numerical precision.">fp16</span>,
+          where every number takes 2 bytes. This is the standard precision for the activations inside a running model.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in">
+            <code class="badge-code">n × d × 2 bytes</code>
+            <span class="badge-desc"><strong>Token tensor (fp16).</strong> n rows, each of width d, two bytes per number. Linear in n — this is the gentle one.</span>
+          </div>
+          <div class="badge-item animate-in">
+            <code class="badge-code">n × n × 2 bytes</code>
+            <span class="badge-desc"><strong>Score matrix (fp16).</strong> n rows by n columns, two bytes per number. Quadratic in n — this is the one that explodes.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📊</div>
+          <div class="callout-content">
+            <strong class="callout-title">The ratio that tells the story</strong>
+            <p>Divide the two: the score matrix is exactly <strong>n ÷ d</strong> times bigger than the token tensor. While n is smaller than d, the token tensor dominates. The moment n grows past d, the n × n matrix takes over — and from there it never looks back.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 3 — HERO D3 COST CHART -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch the cost curves cross</h2>
+
+        <p>This is the picture to keep in your head. Three memory-growth curves on
+          <span class="term" data-definition="A log-log chart plots both axes on a logarithmic scale, where each step multiplies rather than adds. Curves that explode (like n squared) become straight lines, so you can compare growth rates at a glance instead of one curve flattening the others into the floor.">log-log axes</span>:
+          the token tensor (n × d), the score matrix (n × n), and FlashAttention.</p>
+
+        <div id="attn-cost-controls">
+          <label>Sequence length n: <output id="attn-n-out">512</output><input id="attn-n" type="range" min="128" max="131072" step="128" value="512"></label>
+          <label>Model dim d: <output id="attn-d-out">1024</output><input id="attn-d" type="range" min="128" max="8192" step="128" value="1024"></label>
+          <label><input id="attn-flash" type="checkbox"> Enable FlashAttention (do not materialize n x n)</label>
+        </div>
+        <div id="attn-cost-chart"></div>
+        <p id="attn-cost-caption" style="color: var(--color-text-muted); font-size: var(--text-sm); font-style: italic; margin-top: var(--space-2);"></p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Drag n and watch the wall appear</strong>
+            <p>Slide <strong>n</strong> to the right. At first the token-tensor line sits on top. Then the n × n curve crosses above it and shoots past everything else — that crossing point is the <strong>long-context wall</strong>. Now tick the FlashAttention box: the n × n curve vanishes and a flat O(n) curve takes its place.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 4 — THE 100x-PER-10x RULE + MEMORY WALL -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The 100×-per-10× rule</h2>
+
+        <p>Here is the one number an interviewer wants to hear you reach for instantly. It falls straight out of the square.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Make the context 10× longer</strong>
+              <p>Go from an 8,000-token prompt to an 80,000-token prompt. That is a 10× increase in n.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Attention memory grows ~100×</strong>
+              <p>The n × n score matrix scales with n², and 10² is 100. So the attention memory balloons by roughly one hundred times.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Prefill compute grows ~100× too</strong>
+              <p>The
+                <span class="term" data-definition="Prefill is the first pass an LLM makes over your whole prompt before it writes anything. It computes attention across all the prompt tokens at once. Because every token attends to every token, prefill cost scales with n squared.">prefill</span>
+                pass does ~O(n²·d)
+                <span class="term" data-definition="FLOPs means floating point operations — the count of individual multiply-and-add steps a computation needs. It is the standard way to measure raw compute cost, separate from how much memory the work uses.">FLOPs</span>,
+                so the work to read a 10× longer prompt also rises by about 100×.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Long context is fundamentally a memory problem</strong>
+            <p>The token tensor stays small. The n × n matrix is what you run out of room for first. So when someone asks "why can't this model just take a million tokens?", the honest first answer is not "not enough compute" — it is "not enough memory to hold all the pairwise scores."</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 5 — FLASHATTENTION + CODE-TO-ENGLISH -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">FlashAttention: same answer, far less memory</h2>
+
+        <p>FlashAttention is the trick that softens the wall. It is
+          <span class="term" data-definition="IO-aware means the algorithm is designed around the cost of moving data between memory levels, not just the cost of arithmetic. It deliberately keeps work inside fast on-chip memory to avoid slow trips to and from the big, slow memory.">IO-aware</span>:
+          it organizes the work to avoid the expensive memory traffic, instead of changing the math.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🧮</div>
+            <h4 class="pattern-title">Compute: unchanged</h4>
+            <p class="pattern-desc">Still O(n²) FLOPs. The same number of multiply-adds. The exact same output, number for number.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📉</div>
+            <h4 class="pattern-title">Memory: O(n)</h4>
+            <p class="pattern-desc">It never builds the full n × n matrix. It walks through it in tiles, keeping only running totals — so attention memory drops to linear.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">⚡</div>
+            <h4 class="pattern-title">Why it is faster too</h4>
+            <p class="pattern-desc">It keeps each tile inside fast on-chip memory and avoids round trips to slow
+              <span class="term" data-definition="HBM (High Bandwidth Memory) is the large pool of memory that sits beside a GPU. It is big but comparatively slow to read from. Writing and re-reading a giant n by n matrix to HBM is exactly the traffic FlashAttention avoids.">HBM</span>.</p>
+          </div>
+        </div>
+
+        <p>In production you rarely write the attention math by hand. You call one fused function, and the library uses a
+          <span class="term" data-definition="FlashAttention is an IO-aware attention algorithm. It computes attention in tiles and never stores the full n by n score matrix, cutting attention memory from O(n squared) down to O(n) while producing the exact same result.">FlashAttention</span>-backed kernel under the hood when it is available.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-line"><span class="code-keyword">import</span> torch.nn.functional <span class="code-keyword">as</span> F</span>
+<span class="code-line"><span class="code-comment"># Fused, FlashAttention-backed when available. Does NOT materialize the n×n matrix.</span></span>
+<span class="code-line">out = F.<span class="code-function">scaled_dot_product_attention</span>(q, k, v, is_causal=<span class="code-keyword">True</span>)</span>
+</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Pull in PyTorch's bundle of ready-made neural-network operations and call it <code>F</code>.</p>
+              <p class="tl">A note for the reader: this one call is fused (the whole attention is done in a single optimized step) and uses FlashAttention when the hardware supports it — so it never writes out the full n × n score table.</p>
+              <p class="tl">Run attention on the queries, keys, and values in one go. <code>is_causal=True</code> means each token may only look back at earlier tokens, never ahead. The result <code>out</code> is the new, context-mixed representation — identical to the slow way, just computed without ever holding the giant matrix in memory.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>That last line is the FlashAttention curve from the chart. Same output as the slow path, but the memory it uses is the flat O(n) line, not the exploding O(n²) one.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Failure mode &amp; the trade-off worth naming</strong>
+            <p>The first wall you hit at scale is an
+              <span class="term" data-definition="OOM stands for Out Of Memory — the moment a program asks for more memory than the GPU has, and the run crashes. At long context the n by n score matrix and the growing KV cache are the usual culprits.">OOM</span>
+              crash from the n × n matrix (and a growing
+              <span class="term" data-definition="The KV cache stores the Key and Value vectors of every token already processed, so the model does not recompute them for each new token during generation. It grows with sequence length and is the central topic of the next module.">KV cache</span>,
+              which the next module covers). FlashAttention saves memory IO but does <strong>not</strong> reduce FLOPs — your compute bill is unchanged. If you need to cut compute, that means sparse or sliding-window attention, which lower the work by <em>approximating</em> the result instead of computing every pair exactly.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- SCREEN 6 — QUIZ -->
+      <!-- ============================================================ -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>These are interview-shaped. Pick the answer you would defend in a design review, not just the one that sounds right.</p>
+
+        <div class="quiz-container" id="quiz-module5">
+
+          <div class="quiz-question-block"
+               data-correct="opt-100x"
+               data-explanation-right="Exactly. Attention memory tracks the n × n matrix, which scales with n². A 10× longer context means 10² = 100× more attention memory — and roughly 100× more prefill FLOPs as well."
+               data-explanation-wrong="Think about the shape of the object that dominates. Attention memory follows the n × n score matrix, and that grows with n SQUARED. So a 10× change in n is a 10² = 100× change, not 10×.">
+            <h3 class="quiz-question">You extend a model's context from 8,000 tokens to 80,000 tokens — a 10× increase. Roughly how much does the attention memory change?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-10x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 10× — it grows in step with the context length.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-100x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 100× — the n × n score matrix grows with n².</span>
+              </button>
+              <button class="quiz-option" data-value="opt-2x" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>About 2× — only the newest tokens add cost.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-mem"
+               data-explanation-right="Right. FlashAttention is a memory-IO trick: it never materializes the n × n matrix, so attention memory drops to O(n). The FLOPs stay O(n²) and the output is bit-for-bit the same — it is not an approximation."
+               data-explanation-wrong="FlashAttention does not touch the math. It produces the exact same output and the exact same O(n²) compute. What it changes is how memory is used — by tiling the work and never building the full n × n matrix, so attention memory becomes O(n).">
+            <h3 class="quiz-question">A teammate says "we switched to FlashAttention, so attention is now O(n) compute." What is wrong with that statement?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mem" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Compute is still O(n²). FlashAttention only cuts memory to O(n) by not materializing the matrix.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-approx" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing is wrong — FlashAttention returns an approximate output to save compute.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-kv" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Nothing is wrong — it works by removing the need for a KV cache.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-scores"
+               data-explanation-right="Correct. The token tensor (n × d) is linear in n and stays small. The n × n score matrix is what you run out of room for first — long context is fundamentally a memory problem, and the n × n object is where it bites."
+               data-explanation-wrong="The token tensor is n × d — linear in n — so it grows gently and is rarely the first thing to run out. The object that explodes is the n × n score matrix, which grows with the square of n. That is the first thing to OOM at long context.">
+            <h3 class="quiz-question">Your long-context job crashes with an out-of-memory error during the prefill pass. Which object is the most likely culprit?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-token" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The token tensor (n × d) — it scales with the model dimension.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-scores" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The n × n score matrix — it grows with the square of the context length.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-weights" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The model weights — they grow with the context length.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-sparse"
+               data-explanation-right="Exactly. FlashAttention saves memory IO but keeps the same O(n²) FLOPs. To actually cut the compute you move to sparse or sliding-window attention, which skip most pairs — but that approximates the full attention rather than computing every pair exactly."
+               data-explanation-wrong="FlashAttention is the wrong lever here: it leaves FLOPs at O(n²) and only saves memory. To reduce the compute itself you need sparse or sliding-window attention, which trade exactness for fewer pairs to score.">
+            <h3 class="quiz-question">Prefill is compute-bound and you must cut the FLOPs, not just the memory. Which approach actually does that — and what is the cost?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-flash" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Enable FlashAttention — it lowers the FLOPs for free.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-fp16" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Switch to fp16 — halving the bytes halves the FLOPs.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-sparse" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Use sparse or sliding-window attention — it skips most pairs, but the result is an approximation.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Next: a different bottleneck</strong>
+            <p>Training does all positions at once, so it is bound by the n × n compute you just measured. Inference reveals a completely different bottleneck — generating one token at a time, where the cost is loading the <strong>KV cache</strong> from memory every step. That is the next module.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

@@ -8,6 +8,23 @@
 > - 💡 Linear vs nonlinear approximators: convergence guarantees and trade-offs
 > - 🏭 From tabular to DQN: the exact changes needed for production deep RL
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Q(s, a; θ) | Q-value computed by a neural network with weights θ |
+> | θ | All weights and biases of the neural network |
+> | ∇_θ | Gradient with respect to θ — direction to adjust weights |
+> | L(θ) | Loss function — measures how wrong the predictions are |
+> | W_l, b_l | Weight matrix and bias vector for layer l of the network |
+> | activation() | A function like ReLU: f(x) = max(0, x) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Q-learning update** — Q(s,a) ← Q(s,a) + α[r + γ max Q(s',a') - Q(s,a)] ([q-learning-interview.md](../classic-algorithms/q-learning-interview.md))
+> - **TD error δ** — r + γV(s') - V(s) — the surprise signal
+> - **Bellman optimality equation** — Q* satisfies Q* = E[r + γ max Q*]
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 Function approximation replaces the Q-table with a parameterized function — typically a neural network — that maps states to Q-values. Instead of storing one value per state-action pair, the network uses a fixed number of parameters (weights and biases) that generalize across similar states. This makes RL feasible in large or continuous state spaces, but introduces new instabilities: the deadly triad of function approximation, bootstrapping, and off-policy learning can cause training to diverge.
@@ -28,7 +45,9 @@ The key difference: updating θ to improve Q(s, a; θ) for one state also change
 
 ### The Semi-Gradient TD Update
 
-We want to minimize the mean squared TD error:
+**Step 1 — Words.** We want to adjust the neural network weights θ so that Q(s, a; θ) gets closer to the TD target (reward + discounted estimate of the next state). The "semi" in semi-gradient means we treat the target as a fixed number — we only take the gradient through the prediction, not through the target. This is intentional: taking the gradient through the target makes the update unstable because the target itself depends on θ.
+
+**Step 2 — Formula.** We want to minimize the mean squared TD error:
 
     L(θ) = E[ (y - Q(s, a; θ))² ]
 

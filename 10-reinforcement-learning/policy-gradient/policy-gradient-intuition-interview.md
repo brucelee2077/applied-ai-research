@@ -8,6 +8,25 @@
 > - 💡 Discrete vs continuous action parameterization
 > - 🏭 Where policy gradients appear in production (RLHF, robotics, game AI)
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | J(θ) | Objective function — average return under policy π_θ |
+> | ∇_θ | Gradient with respect to network weights θ |
+> | log π_θ(a\|s) | Log-probability of action a in state s under policy π_θ |
+> | p(τ\|θ) | Probability of a full trajectory τ under policy π_θ |
+> | Π_{t=0}^{T} | Product over all time steps (multiply probabilities) |
+> | R(τ) | Total return of trajectory τ |
+> | softmax | Converts raw scores (logits) into probabilities that sum to 1 |
+> | N(μ, σ²) | Gaussian/normal distribution with mean μ and variance σ² |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **π(a\|s)** — policy as probability distribution over actions
+> - **G_t** — discounted return
+> - **V^π(s), Q^π(s,a)** — value functions (for comparison with value-based methods)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement
@@ -60,7 +79,18 @@ Taking the gradient of J(θ):
          = ∫ ∇_θ p(τ|θ) R(τ) dτ
 ```
 
-Now apply the **log-derivative trick**: ∇_θ p(τ|θ) = p(τ|θ) × ∇_θ log p(τ|θ):
+Now apply the **log-derivative trick**: ∇_θ p(τ|θ) = p(τ|θ) × ∇_θ log p(τ|θ).
+
+Why does this work? The chain rule gives us:
+
+```
+∇_θ log p(τ|θ) = ∇_θ p(τ|θ) / p(τ|θ)       (derivative of log = derivative / original)
+
+Multiply both sides by p(τ|θ):
+p(τ|θ) × ∇_θ log p(τ|θ) = ∇_θ p(τ|θ)       (the log-derivative trick!)
+```
+
+This lets us replace the hard-to-compute ∇p with something we can sample:
 
 ```
 ∇_θ J(θ) = ∫ p(τ|θ) × ∇_θ log p(τ|θ) × R(τ) dτ

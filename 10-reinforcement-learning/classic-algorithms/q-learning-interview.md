@@ -8,6 +8,25 @@
 > - 💡 Q-learning vs SARSA: on-policy vs off-policy trade-off
 > - 🏭 From tabular Q-learning to DQN: the path to deep RL
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Q(s, a) | Estimated value of taking action a in state s |
+> | max_{a'} Q(s', a') | Highest Q-value across all actions in the next state |
+> | α | Learning rate |
+> | γ | Discount factor |
+> | argmax_a | "The action with the highest Q-value" |
+> | Σ_t | Sum over time steps |
+> | E[...] | Expected value |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Q^π(s,a), Q\*(s,a)** — action-value function, optimal action-value ([policies-and-value-functions-interview.md](../fundamentals/policies-and-value-functions-interview.md))
+> - **Bellman optimality equation** — Q\* = E[r + γ max Q\*] ([bellman-equations-interview.md](../fundamentals/bellman-equations-interview.md))
+> - **TD error δ** — surprise signal ([temporal-difference-learning-interview.md](./temporal-difference-learning-interview.md))
+> - **ε-greedy** — explore with probability ε, exploit otherwise
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 Q-learning is an off-policy TD control algorithm that learns the optimal action-value function Q* directly, without needing to follow the optimal policy. It does this by using the max operator in the update target: the agent updates Q(s,a) toward r + γ max_{a'} Q(s', a'), regardless of which action it actually takes next. This separation between the behavior policy (what the agent does) and the target policy (what it learns about) is the key innovation.
@@ -18,7 +37,9 @@ Q-learning is an off-policy TD control algorithm that learns the optimal action-
 
 ### The Q-Learning Update
 
-After observing a transition (s, a, r, s'), Q-learning updates:
+**Step 1 — Words.** Q-learning learns the value of each action in each state. After taking action a in state s, getting reward r, and landing in s', it updates Q(s, a) toward a target. The target uses the **maximum** Q-value at the next state — the best the agent could do from there. This is what makes Q-learning "off-policy": it learns about the optimal action regardless of what action it actually took next.
+
+**Step 2 — Formula.** After observing a transition (s, a, r, s'), Q-learning updates:
 
     Q(s, a) ← Q(s, a) + α · [ r + γ · max_{a'} Q(s', a') - Q(s, a) ]
 
@@ -27,6 +48,21 @@ Where:
 - γ ∈ [0, 1) is the discount factor
 - max_{a'} Q(s', a') is the maximum Q-value over all actions in the next state
 - The term in brackets is the TD error: δ = r + γ max_{a'} Q(s', a') - Q(s, a)
+
+**Step 3 — Worked example.** Agent in state A, takes action "right", gets reward 3, lands in state B. Q-values: Q(A, right) = 5.0, Q(B, left) = 2.0, Q(B, right) = 8.0. α = 0.1, γ = 0.9:
+
+```
+max_{a'} Q(B, a') = max(2.0, 8.0) = 8.0
+
+TD target = 3 + 0.9 × 8.0 = 10.2
+TD error  = 10.2 - 5.0 = 5.2
+
+Q(A, right) ← 5.0 + 0.1 × 5.2 = 5.52
+
+The estimate increased because the outcome (reward + best future) was better
+than expected. Note: it used max Q(B) = 8.0, not the Q of the action actually
+taken next — this is the off-policy property.
+```
 
 ### Off-Policy Property
 

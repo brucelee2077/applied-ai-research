@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 14 · Day 2 — Tensor Memory Acceleration (TMA)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w14-d02-tma">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 14 Day 2</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-01-modern-kernel-dsls.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-worker-overlapping.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 4 · Week 14 · Day 2 (Tue)</span>
+    <h1>Tensor Memory<br>Acceleration</h1>
+    <p class="lead">Your GPU's math cores are the most expensive part of the chip — and they sit idle waiting for slow memory. The H100 has a dedicated hardware unit, the <em>TMA</em>, whose only job is to fetch data blocks fast so the cores never wait. Today: what it does, and how ThunderKittens turns it into one line of code.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain what the Tensor Memory Accelerator does, why a <code>tensor map descriptor</code> replaces thousands of address calculations, how an <code>mbarrier</code> lets loads overlap compute, and how TK exposes it as <code>tma::load_async</code>.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two kinds of memory, and the unit that moves data between them</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> normal programming fluency and this week's earlier lessons on tiles and warp-level compute. You know a <span class="term">GPU kernel</span> is just the program that runs on the GPU. <b>No hardware background needed — we start from the machine.</b></div></div>
+
+      <h4>Start with the machine: two memories that matter</h4>
+      <p>A GPU has two kinds of memory we care about here.</p>
+      <ul>
+        <li><span class="term">HBM</span> (High Bandwidth Memory) is the large, slow, off-chip "global" memory. On an H100 it holds about <strong>80 GB</strong> and runs near <strong>3 TB/s</strong>.</li>
+        <li><span class="term">SMEM</span> (shared memory) is a tiny, fast scratchpad on each <span class="term">SM</span> (Streaming Multiprocessor — one of the ~132 compute clusters on the chip). It holds about <strong>227 KB</strong> and runs near <strong>33 TB/s</strong>, more than 10× faster than HBM.</li>
+      </ul>
+      <p>To do math on data, you must first <strong>copy it from slow HBM into fast SMEM</strong>. The math only runs on data that is already sitting in SMEM. A <span class="term">tile</span> is a small rectangular block of a matrix — ThunderKittens' basic tile is 16×16.</p>
+
+      <h4>The problem: the old way to copy wastes the expensive cores</h4>
+      <p>In the old way, every <span class="term">thread</span> (one worker lane) computes the exact HBM byte address of the element it wants, issues a load, and waits. Computing those addresses — called <span class="term">address generation</span> — burns registers and instructions. Worse, threads then sit idle during the slow HBM round-trip. That waiting is the bottleneck: the tensor cores are the fast, expensive part of the chip, and they stall.</p>
+
+      <h4>The answer: TMA (Tensor Memory Accelerator)</h4>
+      <p><span class="term">TMA</span> is a piece of dedicated silicon introduced on the NVIDIA <strong>Hopper</strong> architecture (H100) whose only job is bulk tensor copies. You describe the tensor <em>once</em> in a small data structure called a <span class="term">tensor map descriptor</span> — base pointer, the tensor's shape and strides, the tile size, and how bytes are laid out (<span class="term">swizzled</span>) to avoid bank conflicts. Then you issue <strong>one</strong> instruction: "copy tile (i, j) from HBM into this SMEM slot." TMA itself computes every element address from the descriptor and streams the whole tile over.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div><b>The copy is asynchronous.</b> Your compute threads do NOT wait. They fire the copy and immediately keep working on a tile they loaded earlier. To know when the incoming tile has actually arrived, TMA signals an <span class="term">mbarrier</span> (a memory-barrier object in SMEM that counts arriving bytes); a consumer warp waits on that barrier before touching the new tile.<br><span style="font-size:.85rem;color:var(--text2)">This split lets you overlap "load next tile" with "compute on current tile" — the producer/consumer pipeline.</span></div></div>
+
+      <h4>How ThunderKittens uses it</h4>
+      <p>TK exposes a global layout descriptor called a <code>gl</code> — a 4D view of your tensor, like <code>{batch, head, length, embed}</code> in PyTorch. From that <code>gl</code>, TK <strong>automatically builds the TMA tensor map descriptor for you</strong>; you never write the fiddly descriptor code. It wraps both synchronous copies (<code>cp.async</code>) and async TMA copies behind one interface: <code>tma::load_async(smem_dst, global_src, tile_index, barrier)</code> to bring a tile in, and <code>tma::store_async(global_dst, smem_src, tile_index)</code> to write one out. So TK gives you the speed of TMA with a one-line, PyTorch-flavored call.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official sources (optional): <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">ThunderKittens paper (arXiv:2410.20399)</a> · <a href="https://github.com/HazyResearch/ThunderKittens" target="_blank" rel="noopener">ThunderKittens on GitHub</a> · <a href="https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk" target="_blank" rel="noopener">Hazy Research: a quick intro to TK</a> · <a href="https://docs.nvidia.com/cuda/" target="_blank" rel="noopener">NVIDIA CUDA docs</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A dedicated runner for a busy kitchen</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a busy restaurant kitchen. The chefs (the tensor cores) are the expensive, fast part — you never want them standing still. Ingredients live in a giant walk-in freezer down the hall (HBM: big, but slow to reach). The chef's countertop (SMEM) is tiny but instantly reachable.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🚶‍♂️🥶</span><h5>Old way: chef walks to the freezer</h5><p>Each chef walks to the freezer, finds the exact shelf and box for every single ingredient, carries it back, then cooks. Half the shift is spent walking and searching, not cooking.</p></div>
+        <div class="card"><span class="big">🛎️🏃‍♂️</span><h5>TMA: a runner with a pick-list</h5><p>You hand a runner a card once ("tray is 16 boxes wide, shelves spaced like this, aisle stride is that"). Now the chef just calls "bring tray 7" and keeps cooking. The runner finds every shelf and delivers the whole tray, then rings a bell when it lands.</p></div>
+      </div>
+      <p><strong>In one line:</strong> the card is the tensor map descriptor, "bring tray 7" is one <code>load_async</code> call, and the bell is the mbarrier. The chef only glances up when the bell rings.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real runner carries one tray at a time and can chat; TMA moves a rigidly-shaped block whose geometry was fixed in advance, makes no decisions, and only copies — it does zero cooking (no arithmetic). And the "bell" is not a sound; it is a byte-counter the chef must <em>choose</em> to check, or the chef will grab a half-delivered tray.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three TMA experiments</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal for a tiny TK-style tool. Each button runs one experiment and prints what it measured. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="addrgen" type="button">① address-gen: manual vs TMA</button>
+          <button class="play-btn" data-demo="overlap" type="button">② async overlap: fire &amp; keep computing</button>
+          <button class="play-btn" data-demo="stages" type="button">③ pipeline stages vs throughput</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of TMA, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>You build a <strong>tensor map descriptor</strong> once: base pointer, shape, strides, tile size, and swizzle. This is the reusable geometry of the whole tensor. In TK, the <code>gl</code> auto-generates it.</li>
+        <li>Each copy is then <strong>one instruction</strong> that names a tile index. TMA derives every element address from the descriptor — the compute cores do zero address math.</li>
+        <li>The copy is <strong>asynchronous</strong>: issue it and return immediately. The compute warps keep running while the data streams in.</li>
+        <li>An <strong>mbarrier</strong> in SMEM counts arriving bytes. A consumer warp must <code>wait()</code> on it before touching the freshly loaded slot — otherwise it reads a half-delivered tile.</li>
+        <li>With <strong>N pipeline stages</strong> you keep N SMEM slots (a ring buffer). TMA loads ahead into empty slots while compute reads filled ones.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>tma::load_async(k_smem[1], K_global, idx1, bar);  // fire — returns instantly</code><br><code>mm_ABt(attn, q_smem, k_smem[0]);              // compute slot 0 meanwhile</code><br><code>wait(bar);                                     // block only on the barrier</code><br><span style="font-size:.85rem;color:var(--text2)">"Start loading tile 1, compute on tile 0 in parallel, then wait for tile 1 to land." Load and compute overlap.</span></div></div>
+
+      <h4>Why it's a superpower</h4>
+      <ul>
+        <li><strong>Address math off the cores</strong> — one descriptor replaces thousands of per-thread address computations, freeing registers and instruction slots for real work.</li>
+        <li><strong>HBM latency hidden</strong> — because the copy is async, loading the next tile overlaps computing on the current one, so the slow HBM round-trip disappears behind useful math.</li>
+        <li><strong>Deeper buffering keeps everything saturated</strong> — TK's GEMM goes 260 → 484 → 683 → 760 TFLOPS as stages go 1 → 4. Same math, ~2.9× faster, purely from better TMA overlap.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> tensor cores are the expensive part → they stall waiting on slow HBM → TMA does the bulk async copy with hardware address generation → an mbarrier lets loads overlap compute → multi-stage buffering keeps both the TMA engine and the tensor cores busy → the memory bottleneck goes away.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Simulate the TMA pipeline and measure the speedup</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task: build a small, reproducible experiment in plain Python/NumPy (no GPU needed) that models the two TMA ideas — moving address generation off the compute cores, and overlapping async loads with compute — and measures how buffer stages change throughput, mirroring TK's real GEMM stage sweep.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>An address-cost function returns <strong>1</strong> address-generation instruction for the TMA path and <strong>W×H</strong> for the manual path; a test asserts <code>1</code> vs <code>4096</code> for a 64×64 tile.</li>
+        <li>A discrete-event pipeline simulator with configurable stages (1..4) models per-tile HBM load latency and per-tile compute time, overlapping loads with compute via an mbarrier-style arrival check.</li>
+        <li><code>python tma_pipeline_sim.py --sweep-stages 1 4</code> prints a monotonically increasing throughput number (mirrors 260 → 484 → 683 → 760 TFLOPS) and asserts stage-4 &gt; stage-1.</li>
+        <li>The 1-stage (no-overlap) total time equals <code>sum(load_i + compute_i)</code>; a test asserts multi-stage total time is strictly less.</li>
+        <li>A saved plot <code>stages_vs_throughput.png</code> exists after a run, and <code>pytest test_tma_pipeline.py</code> passes with exit code 0.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to encode:</b> never touch a slot before its mbarrier says "arrived" — use it early and you compute on a half-filled tile. And with N stages you have only N slots, so before loading into a slot, confirm the consumer finished reading the tile already there; skip that and the incoming copy overwrites data still in use — a silent data race, not a crash. More stages costs scarce SMEM, so past the point where loads are fully hidden, extra stages just lower occupancy.</div></div>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/w14-tue-tma/tma_pipeline_sim.py</code> (with <code>README.md</code> and <code>test_tma_pipeline.py</code> alongside) covering the criteria above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Tuesday artifact on the Tensor Memory Accelerator (TMA).
+
+Create experiments/w14-tue-tma/tma_pipeline_sim.py (plus README.md and test_tma_pipeline.py alongside), NumPy/Python only, no GPU required:
+1. address_gen_cost(tile_w, tile_h, mode): returns the number of address-generation instructions. Manual path = tile_w * tile_h (each thread computes base + row*stride + col). TMA path = 1 (one descriptor drives all addresses). For a 64x64 tile this is 4096 vs 1.
+2. A discrete-event pipeline simulator simulate_pipeline(load_times, compute_times, stages): models per-tile HBM load latency and per-tile compute time. With `stages` SMEM slots (a ring buffer), a producer issues async loads into empty/free slots while a consumer computes on filled slots, using an mbarrier-style arrival check; before reusing a slot it must confirm the consumer finished the tile there. Returns total wall-clock time. With stages=1 there is no overlap, so total == sum(load_i + compute_i).
+3. effective_throughput = total_flops / total_time. Run a stage sweep 1..4 and print throughput per stage, monotonically increasing (mirror TK's 260 -> 484 -> 683 -> 760 TFLOPS trend). Assert stage-4 > stage-1.
+4. Save a matplotlib plot stages_vs_throughput.png showing the rising curve. No savefig-less runs.
+
+test_tma_pipeline.py must assert: address_gen_cost(64,64,'manual')==4096 and ...'tma')==1; simulate_pipeline with stages=1 equals sum(load+compute); a multi-stage run is strictly less (overlap reduced wall-clock). `python tma_pipeline_sim.py --sweep-stages 1 4` runs the sweep and asserts stage-4 > stage-1.
+
+README.md: one paragraph on each of the two claims tested — (a) address generation moves off the compute cores, (b) async double/triple buffering hides HBM latency — with the one-line mapping to TK's tma::load_async / tma::store_async API. Then run everything to confirm pytest passes.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-14/day-02-log.md</code>: in the simulator, why does adding a 5th stage eventually <em>stop</em> helping? (Hint: once loads are fully hidden, extra slots only cost SMEM and lower occupancy.)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 2 complete!</h3>
+    <p>You now know why the H100 has dedicated silicon just to copy data: the tensor cores are too expensive to leave idle. TMA does bulk async copies with hardware address generation, an mbarrier lets loads overlap compute, and deeper buffering keeps everything saturated — TK wraps it all in <code>tma::load_async</code>.<br>Next: <code>start today</code> → Day 3 is <code>worker overlapping</code> (the producer/consumer warps in detail).</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-01-modern-kernel-dsls.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-worker-overlapping.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  addrgen:{html:'<span class="prompt">tk$</span> <span class="fn">sim</span> <span class="kw">addrgen</span> <span class="str">--tile</span> <span class="num">64x64</span> <span class="str">--mode</span> both\n'+
+    '<span class="dim"># manual: each of 4096 elements needs base + row*stride + col computed by threads</span>\n'+
+    'manual cp.async : addr-calc instrs = <span class="num">4096</span>  regs/thread = <span class="num">18</span>  <span class="bad">threads busy doing math, not compute</span>\n'+
+    'TMA load_async  : addr-calc instrs = <span class="num">1</span>     regs/thread = <span class="num">2</span>   <span class="ok">TMA engine derives all 4096 addrs from descriptor</span>\n'+
+    '<span class="hl">takeaway: one descriptor replaces 4096 per-thread address computations</span>',
+    take:'<b>①  Address generation moves off the cores.</b> The manual path makes threads compute 4096 addresses; TMA derives them all from one descriptor, freeing registers and instruction slots for real math.'},
+  overlap:{html:'<span class="prompt">tk$</span> <span class="fn">trace</span> <span class="kw">pipeline</span> <span class="str">--stages</span> <span class="num">2</span>\n'+
+    't=<span class="num">0</span>  <span class="fn">tma::load_async</span>(k_smem[<span class="num">1</span>], K_global, idx1, bar)  <span class="dim">// producer fires, returns immediately</span>\n'+
+    't=<span class="num">0</span>  <span class="fn">mm_ABt</span>(attn, q_smem, k_smem[<span class="num">0</span>])            <span class="ok">// consumer computes on slot 0 in parallel</span>\n'+
+    't=<span class="num">1</span>  wait(bar)  <span class="ok">arrived: 32768 / 32768 bytes</span>            <span class="dim">// tile for slot 1 landed</span>\n'+
+    't=<span class="num">1</span>  swap buffers -&gt; compute slot 1, load slot 0\n'+
+    '<span class="hl">HBM latency hidden behind compute: chef never waits at the freezer</span>',
+    take:'<b>②  Fire the copy, keep computing.</b> The async load returns instantly; compute runs on the tile you already have, and you only <code>wait()</code> on the mbarrier once the next tile has landed.'},
+  stages:{html:'<span class="prompt">tk$</span> <span class="fn">bench</span> <span class="kw">gemm</span> <span class="str">--sweep-stages</span> <span class="num">1..4</span>\n'+
+    'stages=<span class="num">1</span>  <span class="num">260</span> TFLOPS   <span class="bad">[no overlap: load then compute, serial]</span>\n'+
+    'stages=<span class="num">2</span>  <span class="num">484</span> TFLOPS   [double-buffer: hide most load latency]\n'+
+    'stages=<span class="num">3</span>  <span class="num">683</span> TFLOPS\n'+
+    'stages=<span class="num">4</span>  <span class="num">760</span> TFLOPS   <span class="ok">[deep buffer keeps TMA + tensor cores saturated]</span>\n'+
+    '<span class="hl">Same math, 2.9x faster — deeper TMA buffering is why</span>',
+    take:'<b>③  Deeper buffering hides more latency.</b> Real TK GEMM (4096³) goes 260 → 760 TFLOPS as stages go 1 → 4. The math is identical; extra SMEM slots let TMA prefetch while the cores compute.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up. `viz` is inline HTML/SVG (use the .dgram/.node
+   diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
+   is the short explanation beside it. Engine below is fixed across all lessons. */
+var BUILD=[
+ {viz:'<div class="dgram col">'+
+    '<span class="node ok">SM · tensor cores</span>'+
+    '<span class="node">SMEM &nbsp;227 KB · 33 TB/s</span>'+
+    '<span class="arrow">▲</span>'+
+    '<span class="node dim">the copy that must happen first</span>'+
+    '<span class="arrow">▲</span>'+
+    '<span class="node v">HBM &nbsp;80 GB · 3 TB/s</span></div>',
+  note:'<b>Two memories, one copy.</b> Big slow <code>HBM</code> at the bottom, tiny fast <code>SMEM</code> on top next to the tensor cores. Math only runs on data already in SMEM, so this copy sits on the critical path.'},
+ {viz:'<div class="dgram col">'+
+    '<span class="node hot">SM — IDLE ⏱ waiting on HBM</span>'+
+    '<span><span class="node dim">t0</span><span class="node dim">t1</span><span class="node dim">t2</span><span class="node dim">t3</span><span class="node dim">t4</span><span class="node dim">t5</span><span class="node dim">t6</span><span class="node dim">t7</span></span>'+
+    '<span class="dim">each thread: compute addr → wait ↓</span>'+
+    '<span class="node v">HBM (slow round-trip)</span></div>',
+  note:'<b>The old bottleneck.</b> 8 threads each compute their own byte address and wait on HBM. Per-thread address math wastes registers, and the expensive cores stall doing nothing.'},
+ {viz:'<div class="dgram col">'+
+    '<span class="node">thread</span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="node dash">"bring tile (i,j)" — 1 instruction</span>'+
+    '<span class="arrow">▼</span>'+
+    '<span class="node ok">TMA engine</span> <span class="node dim">◀ card: base·shape·strides·tile 16x16·swizzle</span>'+
+    '<span class="arrow">▼</span>'+
+    '<span class="node v">HBM</span></div>',
+  note:'<b>Add the TMA engine + descriptor.</b> The <code>tensor map descriptor</code> is set up once. Now the 8 thin thread-arrows collapse into ONE instruction naming a tile index — the TMA does the rest.'},
+ {viz:'<svg viewBox="0 0 320 120" width="320" height="120" role="img" aria-label="TMA computes addresses and streams a tile into SMEM">'+
+    '<rect x="4" y="8" width="150" height="104" rx="8" fill="#EDE9F8" stroke="#7C6DAA"/>'+
+    '<text x="79" y="26" text-anchor="middle" font-family="monospace" font-size="10" fill="#5E5191">TMA: addr=base+row*stride+col</text>'+
+    '<g fill="#E4F2F7" stroke="#2A7B9B">'+
+    '<rect x="16" y="36" width="20" height="16"/><rect x="40" y="36" width="20" height="16"/><rect x="64" y="36" width="20" height="16"/><rect x="88" y="36" width="20" height="16"/>'+
+    '<rect x="16" y="56" width="20" height="16"/><rect x="40" y="56" width="20" height="16"/><rect x="64" y="56" width="20" height="16"/><rect x="88" y="56" width="20" height="16"/>'+
+    '<rect x="16" y="76" width="20" height="16"/><rect x="40" y="76" width="20" height="16"/><rect x="64" y="76" width="20" height="16"/><rect x="88" y="76" width="20" height="16"/></g>'+
+    '<text x="120" y="70" font-family="monospace" font-size="18" fill="#6B645E">▶</text>'+
+    '<rect x="200" y="36" width="112" height="56" rx="6" fill="#E8F5EE" stroke="#2D8B55"/>'+
+    '<text x="256" y="60" text-anchor="middle" font-family="monospace" font-size="10" fill="#1a5c38">SMEM slot</text>'+
+    '<text x="256" y="76" text-anchor="middle" font-family="monospace" font-size="10" fill="#1a5c38">16x16 tile</text></svg>',
+  note:'<b>Hardware address generation.</b> Inside TMA the descriptor expands into every element address, filling a 16×16 grid, then one wide stream carries the whole tile into a SMEM slot. The cores do zero address math.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node dash">SM: fire &amp; forget ▶ load_async</span></span>'+
+    '<span class="node">mbarrier: 0 / 32768 bytes</span>'+
+    '<span class="arrow">▼</span>'+
+    '<span class="node">mbarrier: 32768 / 32768 bytes</span>'+
+    '<span class="arrow">▼</span>'+
+    '<span class="node ok">✓ ARRIVED</span> <span class="node dash">◀ SM: wait() blocks only here</span></div>',
+  note:'<b>The async bell (mbarrier).</b> A byte-counter in SMEM ticks up as the tile lands, then flips to ARRIVED. Issuing the copy and consuming the result are split, so the SM keeps working in between and only <code>wait()</code> blocks.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node v">Producer</span> <span class="node">load tile 0</span><span class="node">load tile 1</span><span class="node">load tile 2</span></span>'+
+    '<span class="dim">┆ handoff = mbarrier ┆ handoff = mbarrier ┆</span>'+
+    '<span><span class="node ok">Consumer</span> <span class="node dim">idle</span><span class="node">mm tile 0</span><span class="node">mm tile 1</span></span></div>',
+  note:'<b>Producer / consumer overlap.</b> The load warps run one step ahead of the compute warps; loading tile N+1 overlaps computing tile N, and each mbarrier hands a finished load off to the matching compute. HBM latency now hides completely behind compute.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node dash">slot 0</span><span class="node">slot 1</span><span class="node ok">slot 2</span><span class="node v">slot 3</span> <span class="arrow">↻</span></span>'+
+    '<span class="dim">TMA writes ahead into free slots · compute reads filled slots</span>'+
+    '<svg viewBox="0 0 300 90" width="300" height="90" role="img" aria-label="throughput rising 260 to 760 TFLOPS across 1 to 4 stages">'+
+    '<g fill="#2A7B9B">'+
+    '<rect x="18" y="61" width="46" height="25"/>'+
+    '<rect x="82" y="43" width="46" height="43"/>'+
+    '<rect x="146" y="24" width="46" height="62"/>'+
+    '<rect x="210" y="15" width="46" height="71"/></g>'+
+    '<g font-family="monospace" font-size="10" fill="#5A544E" text-anchor="middle">'+
+    '<text x="41" y="58">260</text><text x="105" y="40">484</text><text x="169" y="21">683</text><text x="233" y="12">760</text>'+
+    '<text x="41" y="88" fill="#6B645E">s1</text><text x="105" y="88" fill="#6B645E">s2</text><text x="169" y="88" fill="#6B645E">s3</text><text x="233" y="88" fill="#6B645E">s4</text></g></svg></div>',
+  note:'<b>Multi-stage ring buffer.</b> With 4 SMEM slots, TMA loads ahead into empty slots while compute reads filled ones. Deeper buffering keeps both TMA and tensor cores saturated: 260 → 484 → 683 → 760 TFLOPS. TK exposes this as one <code>stages</code> number.'},
+ {viz:'<div class="dgram col">'+
+    '<span class="node ok">gl K_global {batch, head, length, embed}</span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="node dash">TK auto-builds tensor map descriptor</span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="node">tma::load_async(k_smem[1], K_global, idx1, bar)</span>'+
+    '<span class="node">tma::store_async(O_global, o_smem, idx1)</span>'+
+    '<span class="node dim">▼ hardware + PTX (all of the above)</span></div>',
+  note:'<b>The TK wrapper on top.</b> You write two PyTorch-like lines. From the 4D <code>gl</code>, TK generates the tensor map descriptor and drives the mbarriers, ring buffer, and async engine beneath — you never touch the fiddly descriptor code.'}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What single job is the Tensor Memory Accelerator (TMA) dedicated silicon designed to do?',
+  opts:['Perform the matrix multiply on tiles once they are in SMEM','Copy bulk tensor tiles between HBM and SMEM, generating all element addresses itself','Compress activations to save HBM capacity','Schedule which warps run on which SM'],
+  ans:1, fb:'TMA does the bulk async copy and derives every address from a descriptor; it performs no arithmetic and does no scheduling.'},
+ {q:'2. Why is a tensor map descriptor set up once rather than per copy?',
+  opts:['Because it stores the running result of the matmul','Because it holds base pointer, shape, strides, tile size, and swizzle — fixed facts TMA reuses to compute addresses for any tile','Because descriptors are encrypted and slow to build','Because it caches the data itself in registers'],
+  ans:1, fb:'The descriptor is the reusable geometry of the tensor; once TMA has it, each copy is just a tile index, so one instruction replaces thousands of per-thread address calculations.'},
+ {q:'3. In a TMA-based pipeline, what is the role of the mbarrier when using <code>tma::load_async</code>?',
+  opts:['It locks HBM so no other kernel can read it','It counts arriving bytes so a consumer warp knows when the tile has fully landed before using it','It converts the tile from bf16 to fp32','It picks which SMEM slot to load into automatically'],
+  ans:1, fb:'Because the copy is asynchronous, the compute (consumer) side must wait on the mbarrier\'s arrival count; touching the slot early reads a half-delivered tile.'},
+ {q:'4. TK\'s GEMM hits 260 TFLOPS with 1 pipeline stage and 760 with 4. What causes the speedup?',
+  opts:['More stages use a faster matmul algorithm','More stages reduce the total number of floating-point operations','Deeper buffering lets TMA prefetch future tiles while tensor cores compute current ones, hiding HBM latency','More stages move the data into registers instead of SMEM'],
+  ans:2, fb:'The math is identical; extra SMEM buffer stages overlap async TMA loads with compute so neither the memory engine nor the tensor cores stall.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

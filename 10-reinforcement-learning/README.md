@@ -78,6 +78,7 @@ Using RL to align language models with human preferences.
 - DPO and Alternatives
 - TRL Library Tutorial
 - End-to-End RLHF Pipeline
+- GRPO (Group Relative Policy Optimization)
 
 ### 7. Applications
 Real-world RL applications and case studies.
@@ -92,6 +93,7 @@ Real-world RL applications and case studies.
 - **Required:** Completion of `00-neural-networks/fundamentals/` (for deep RL sections)
 - **Recommended:** `02-fine-tuning/` (for RLHF section)
 - **Python skills:** NumPy, PyTorch basics
+- **Math notation:** If symbols like Σ, E[X], ∇, or argmax are unfamiliar, read the [Math Refresher](./math-refresher.md) first — it explains every symbol used in this module with plain English and small examples
 
 ## Installation
 
@@ -199,6 +201,7 @@ Coming from other sections? Jump to what interests you:
 | DPO and Alternatives — Direct Preference Optimization | [Core] | [md](./rlhf/dpo-and-alternatives.md) · [interview](./rlhf/dpo-and-alternatives-interview.md) · [notebook](./rlhf/04_dpo_and_alternatives.ipynb) · [experiments](./rlhf/04_dpo_and_alternatives_experiments.ipynb) |
 | TRL Library Tutorial — Transformer Reinforcement Learning | [Core] | [md](./rlhf/trl-library-tutorial.md) · [interview](./rlhf/trl-library-tutorial-interview.md) · [notebook](./rlhf/05_trl_library_tutorial.ipynb) · [experiments](./rlhf/05_trl_library_tutorial_experiments.ipynb) |
 | Fine-tuning with RLHF — end-to-end RLHF pipeline | [Core] | [md](./rlhf/fine-tuning-with-rlhf.md) · [interview](./rlhf/fine-tuning-with-rlhf-interview.md) · [notebook](./rlhf/06_fine_tuning_with_rlhf.ipynb) · [experiments](./rlhf/06_fine_tuning_with_rlhf_experiments.ipynb) |
+| GRPO — Group Relative Policy Optimization (DeepSeek-R1) | [Core] | [md](./rlhf/grpo.md) · [interview](./rlhf/grpo-interview.md) · [notebook](./rlhf/07_grpo.ipynb) · [experiments](./rlhf/07_grpo_experiments.ipynb) |
 
 ### applications/
 

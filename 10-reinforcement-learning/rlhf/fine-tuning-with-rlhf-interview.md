@@ -8,6 +8,20 @@
 > - 💡 DPO path vs PPO path: decision framework with quantitative trade-offs
 > - 🏭 Iterative RLHF, A/B testing, and production deployment
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | L_SFT | Supervised fine-tuning loss (cross-entropy) |
+> | L_RM | Reward model loss (Bradley-Terry) |
+> | J(θ) | RLHF objective — E[r] - β·KL |
+> | KL budget | Maximum allowed KL divergence from reference |
+> | Win rate | Fraction of times the model's output is preferred by humans |
+>
+> **RL concepts used here** (all defined in earlier RLHF files):
+> - **Full RLHF pipeline** — SFT → Reward Model → PPO/DPO
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

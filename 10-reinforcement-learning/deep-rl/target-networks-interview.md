@@ -8,6 +8,20 @@
 > - 💡 Hard vs soft updates: convergence properties and algorithm preferences
 > - 🏭 Target networks in modern algorithms: SAC, TD3, DDPG
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | θ | Online (learning) network weights — updated every step |
+> | θ⁻ | Target network weights — updated slowly |
+> | τ | Polyak averaging coefficient (small, e.g., 0.005) |
+> | C | Hard update frequency (copy θ to θ⁻ every C steps) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **DQN loss** — L = E[(r + γ max Q(s'; θ⁻) - Q(s,a; θ))²]
+> - **Semi-gradient** — target treated as constant, no gradient through θ⁻
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 The target network is a frozen copy of the Q-network used only for computing TD targets. Without it, the target r + γ max Q(s'; θ) changes every time the online network θ is updated, creating a positive feedback loop: overestimated Q-values produce inflated targets, which push Q-values higher. The target network θ⁻ breaks this loop by providing a stable target for many training steps before being updated. Hard updates copy θ to θ⁻ every C steps. Soft (Polyak) updates blend θ into θ⁻ every step with a small mixing factor τ.

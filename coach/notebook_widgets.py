@@ -33,15 +33,15 @@ from coach.core import (
     start_session, end_session, load_state, save_state,
     award_xp, get_cohort_percentile, record_quiz_answer,
     get_due_concepts, spend_tokens, record_boss_result,
-    BADGES, RARITY_EMOJI, COST_HINT_REVEAL, COST_SKIP_PREREQ, COST_STREAK_SHIELD,
+    BADGES, RARITY_EMOJI, COST_HINT_REVEAL, COST_SKIP_PREREQ,
     TOKENS_QUIZ_PASS, XP_QUIZ_PASS, XP_QUIZ_RETRY,
     MODULE_STUDY_NOTEBOOKS, ALL_MODULES,
+    BUILD_DAYS, PHASE_NAMES, get_build_progress,
 )
 
 # ── Color palette ──────────────────────────────────────────────────────────────
 COLORS = {
     "xp":      "#4CAF50",
-    "streak":  "#FF6B35",
     "warning": "#FF9800",
     "danger":  "#F44336",
     "boss":    "#9C27B0",
@@ -118,49 +118,20 @@ def render_session_start(module_id: str, notebook_name: str) -> dict:
     ctx = start_session(module_id, notebook_name)
     state = ctx["state"]
     player = state["player"]
-    streak = state["streak"]
 
     xp = player["xp"]
     level_num = ctx["level_num"]
     level_name = ctx["level_name"]
     xp_into = ctx["xp_into_level"]
     xp_needed = ctx["xp_needed_for_next"]
-    current_streak = streak["current"]
-    fire = streak.get("fire_active", False)
     tokens = player["tokens"]
     percentile = ctx["percentile"]
     top_pct = 100 - percentile
-
-    # ── Streak line ──
-    fire_tag = ""
-    if current_streak >= 30:
-        fire_tag = '<span style="color:#FFD700"> 🔥🔥🔥 LEGENDARY 3.0x</span>'
-    elif current_streak >= 14:
-        fire_tag = '<span style="color:#FF6B35"> 🔥🔥 ON FIRE 2.0x</span>'
-    elif current_streak >= 7:
-        fire_tag = '<span style="color:#FF6B35"> 🔥 ON FIRE 1.5x</span>'
-    elif current_streak >= 3:
-        fire_tag = '<span style="color:#FFA726"> 🔥 1.25x</span>'
-
-    streak_html = (
-        f'<b style="color:#FF6B35; font-size:18px">{current_streak} DAY STREAK</b>'
-        f'{fire_tag}'
-        f'<span style="color:#888; font-size:11px; margin-left:10px">Longest: {streak["longest"]}d</span>'
-    )
 
     # ── XP bar ──
     level_color = LEVEL_COLORS.get(level_num, "#2196F3")
     xp_bar = _progress_bar(xp_into, xp_needed, color=level_color, height=18,
                             label=f"Level {level_num} — {level_name}  →  Level {level_num+1}")
-
-    # ── Warning ──
-    warning_html = ""
-    if ctx["warning"]:
-        warning_html = f"""
-<div style="background:#b71c1c; border-radius:6px; padding:10px 14px; margin:8px 0;
-     font-weight:bold; color:#fff; font-size:13px;">
-  ⚠️ {ctx['warning']}
-</div>"""
 
     # ── Cohort status ──
     cohort_html = (
@@ -225,10 +196,8 @@ def render_session_start(module_id: str, notebook_name: str) -> dict:
   <div style="font-size:11px; color:#666; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px">
     ML Interview Coach  ·  {module_id}  ·  {nb_label}
   </div>
-  <div style="margin-bottom:10px">{streak_html}</div>
   {xp_bar}
   {cohort_html}
-  {warning_html}
   {welcome_html}
   {boss_html}
   {review_html}
@@ -264,10 +233,9 @@ def render_session_end(context: dict) -> None:
     # ── XP gain line ──
     xp_html = ""
     if xp_result:
-        mult_str = f" × {xp_result['multiplier']}x streak" if xp_result["multiplier"] > 1.0 else ""
         xp_html = f"""
 <div style="font-size:16px; color:#4CAF50; font-weight:bold; margin:8px 0;">
-  +{xp_result['base_xp']} XP{mult_str} = <span style="font-size:20px">+{xp_result['xp_awarded']} XP</span>
+  +{xp_result['xp_awarded']} XP
   <span style="font-size:12px; color:#888; margin-left:8px">+{xp_result['tokens_awarded']} tokens</span>
 </div>"""
 
@@ -729,7 +697,7 @@ def render_boss_battle_widget(module_id: str) -> None:
     Score: {score_pct*100:.0f}%  ·  Time: {elapsed_min:.1f} min
   </div>
   <div style="color:#4CAF50; font-size:14px; margin-top:8px">
-    +{xp_r['xp_awarded']} XP (×{xp_r['multiplier']}x streak)  ·  +20 tokens
+    +{xp_r['xp_awarded']} XP  ·  +20 tokens
   </div>
   {badges_html}
   {unlocked_html}
@@ -803,8 +771,6 @@ def render_token_shop() -> None:
     result_box = widgets.HTML(value="")
 
     items = [
-        ("streak_shield", "Streak Shield",
-         f"Protect your streak for 1 missed day", COST_STREAK_SHIELD, "🛡️"),
         ("hint_reveal",   "Hint Reveal",
          f"Reveal a quiz hint without penalty",   COST_HINT_REVEAL,   "💡"),
         ("skip_prereq",   "Skip Prerequisite",
@@ -828,8 +794,6 @@ def render_token_shop() -> None:
                 s = load_state()
                 try:
                     spend_tokens(s, icost, iid)
-                    if iid == "streak_shield":
-                        s["streak"]["shields_remaining"] += 1
                     save_state(s)
                     balance_label.value = _balance_html(s["player"]["tokens"])
                     result_box.value = (
@@ -867,3 +831,80 @@ def _balance_html(tokens: int) -> str:
         f'<div style="font-family:Courier New; font-size:14px; color:#FFD700; margin:6px 0;">'
         f'💰 Token Balance: <b>{tokens}</b></div>'
     )
+
+
+# ── Build-a-Transformer diagram ──────────────────────────────────────────────
+def render_build_diagram_text(state: dict) -> str:
+    """
+    Return a plain-text ASCII diagram of the transformer build progress.
+    Used by check.py (terminal) and optionally by Jupyter widgets.
+    """
+    model = state.get("model_status", {}).get("components", {})
+
+    def _status(comp_id: str) -> str:
+        if model.get(comp_id, {}).get("built"):
+            return "DONE"
+        return "    "
+
+    def _bar(comp_id: str, label: str, width: int = 22) -> str:
+        done = model.get(comp_id, {}).get("built", False)
+        tag = label.center(width)
+        if done:
+            return f"[{tag}]"
+        return f" {tag} "
+
+    lines = []
+    lines.append("")
+    lines.append("  Your Transformer Blueprint")
+    lines.append("  ==========================")
+    lines.append("")
+    lines.append(f"  {_bar('embedding', 'Embedding')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('positional_encoding', 'Positional Encoding')}")
+    lines.append("          |")
+    lines.append("    +-----+-----+")
+    lines.append("    |  Q  K  V  |")
+    lines.append(f"  {_bar('qkv_projection', 'Q/K/V Projection')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('dot_product', 'Dot Product')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('scaling', 'Scaling (1/sqrt d)')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('softmax', 'Softmax')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('attention_output', 'Attention Output')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('multi_head_split', 'Multi-Head Split')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('head_concat_project', 'Head Concat+Project')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('residual_connection', 'Residual Connection')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('layer_norm', 'Layer Norm')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('ffn', 'Feed-Forward Net')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('transformer_block', 'Transformer Block')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('causal_mask', 'Causal Mask')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('training_loop', 'Training Loop')}")
+    lines.append("          |")
+    lines.append(f"  {_bar('text_generation', 'Text Generation')}")
+    lines.append("")
+
+    built_count = sum(1 for c in model.values() if c.get("built"))
+    total = len(model)
+    pct = built_count / total * 100 if total else 0
+
+    bar_width = 20
+    filled = round(pct / 100 * bar_width)
+    bar = "#" * filled + "." * (bar_width - filled)
+    lines.append(f"  Progress: [{bar}] {pct:.0f}% ({built_count}/{total} components)")
+    lines.append("")
+
+    # Legend
+    lines.append("  [  label  ] = built     label   = not yet")
+    lines.append("")
+
+    return "\n".join(lines)

@@ -8,6 +8,18 @@
 > - 💡 From-scratch vs TRL: when each is appropriate
 > - 🏭 Production deployment: LoRA merging, inference optimization, monitoring
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | π_θ, π_ref | Trained and reference policies |
+> | KL, β | KL divergence and penalty coefficient |
+> | LoRA rank r | Low-rank adaptation dimension (smaller = fewer parameters) |
+>
+> **RL concepts used here** (all defined in earlier RLHF files):
+> - **SFT, Reward Modeling, PPO, DPO** — the four training stages TRL implements
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

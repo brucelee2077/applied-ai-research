@@ -8,6 +8,21 @@
 > - 💡 Advantage function design choices — MC vs TD vs GAE
 > - 🏭 Advantage estimation in PPO and real systems
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | b(s) | Baseline function — subtracted from G_t to reduce variance |
+> | A^π(s, a) | Advantage — Q(s,a) - V(s), how much better action a is than average |
+> | Var(...) | Variance — measures how spread out values are |
+> | E[...] | Expected value |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **REINFORCE update** — θ ← θ + α × ∇log π × G_t ([reinforce-algorithm-interview.md](./reinforce-algorithm-interview.md))
+> - **V^π(s)** — state-value function (used as baseline)
+> - **Q^π(s,a)** — action-value function
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

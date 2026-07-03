@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attention, Visualized · Frontier Lab Visual Tutorial</title>
+<meta name="description" content="An interactive, bilingual (中文/English) learning lab on the attention mechanism for senior engineers heading into frontier AI labs." />
+<link rel="stylesheet" href="styles.css" />
+<!-- D3 visualization styles for this tutorial page only (calm blue lab look).
+     Kept here so we never touch the verbatim course CSS file. -->
+<style>
+  /* D3 viz container: full width, centered, breathing room on top */
+  .d3-viz{width:100%; max-width:760px; margin:14px auto 6px; display:flex; justify-content:center}
+  .d3-viz svg{width:100%; height:auto; display:block}
+
+  /* D3 axis lines/ticks — muted, match the site's line color */
+  .d3-axis path,
+  .d3-axis line{stroke:#cbd2e0}
+  .d3-axis .domain{stroke:#cbd2e0}
+  .d3-axis text{fill:#64708a; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif; font-size:11px}
+
+  /* shared label/title text inside the D3 figures */
+  .d3-axis-label{fill:#64708a; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif; font-size:11px}
+  .d3-axis-title{fill:#475069; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif; font-size:11.5px; font-weight:700}
+
+  /* heatmap: clickable query-row labels + active-row emphasis */
+  .d3-viz .row-label{font-size:12px; font-weight:600; fill:#3a4660}
+  .d3-viz .row-label:hover{fill:#2563eb}
+  .d3-viz .row-label.row-active{fill:#2563eb; font-weight:800}
+  .d3-viz .col-label{font-size:12px; fill:#3a4660}
+  .d3-viz .d3-cell{transition:stroke .12s, stroke-width .12s}
+  .d3-viz .d3-cell.row-active{stroke:#2563eb; stroke-width:2}
+
+  /* tooltip: a single fixed, light card; hidden until shown */
+  .d3-tooltip{
+    position:fixed; top:0; left:0; z-index:200; pointer-events:none;
+    background:#fff; border:1px solid #e6e9f2; border-radius:9px;
+    padding:7px 10px; font-size:12.5px; line-height:1.45; color:#1f2735;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+    box-shadow:0 4px 16px rgba(16,24,40,.12); opacity:0; transition:opacity .12s;
+  }
+  .d3-tooltip b{color:#0f1726}
+
+  /* ---- viz ② pipeline: D3 matrices ---- */
+  .d3-num{font-family:var(--mono); font-size:12px; fill:#1f2735}      /* cell numbers */
+  .d3-op{fill:#475069; font-size:20px; font-weight:700; font-family:var(--mono)}  /* · = × ÷  (WCAG-AA contrast) */
+  .d3-shape{fill:#64708a; font-family:var(--mono); font-size:10px}    /* "2×2" shape tags (WCAG-AA contrast) */
+  .mtx-cell{transition:stroke .15s, stroke-width .15s, opacity .2s}
+  .mtx-cell.contrib-q{stroke:#2563eb; stroke-width:2.5}   /* query row feeding a score */
+  .mtx-cell.contrib-k{stroke:#7c3aed; stroke-width:2.5}   /* key row feeding a score */
+  .mtx-cell.contrib-v{stroke:#f97316; stroke-width:2.5}   /* value row feeding output */
+  .mtx-cell.target{stroke:#6366f1; stroke-width:3}        /* the cell being explained */
+
+  /* visible keyboard-focus ring for focusable SVG elements (row labels, pipeline cells) */
+  .d3-viz .row-label:focus, .d3-viz [tabindex]:focus{outline:2px solid #6366f1; outline-offset:2px; border-radius:3px}
+  .d3-viz .row-label:focus:not(:focus-visible), .d3-viz [tabindex]:focus:not(:focus-visible){outline:none}
+  .d3-viz .row-label:focus-visible, .d3-viz [tabindex]:focus-visible{outline:2px solid #6366f1; outline-offset:2px}
+
+  /* ---- viz ③ scaling: D3 twin bars + d_k selector ---- */
+  .bar-val{font-family:var(--mono); font-size:11.5px; fill:#475069}
+  .dk-row{display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; margin:4px 0 2px}
+  .dk-row .dk-lbl{font-size:.84rem; color:var(--muted); font-weight:600}
+  .dk-row .btn{padding:5px 12px; font-size:.82rem}
+
+  /* ---- viz ⑤ kv-cache: D3 grid + live size readout ---- */
+  #kv-grid svg{width:100%; max-width:540px; height:auto; display:block; margin:0 auto}
+  .kv-rect{transition:stroke .15s, stroke-width .15s}
+  .kv-size-readout{max-width:560px; margin:10px auto 0; background:#f7f8fc; border:1px solid #e6e9f2;
+    border-left:3px solid #6366f1; border-radius:0 10px 10px 0; padding:9px 13px; font-size:.85rem; color:#33405c}
+  .kv-size-readout b{font-family:var(--mono); color:#1f2735}
+
+  /* ---- viz ④ cost: smooth box resize when the sliders move ---- */
+  .cost-square{transition:width .35s ease, height .35s ease}
+</style>
+</head>
+<body>
+
+<!-- ============ TOP PROGRESS BAR ============ -->
+<div id="progress-track" aria-hidden="true"><div id="progress-bar"></div></div>
+
+<!-- ============ MOBILE NAV TOGGLE ============ -->
+<button id="nav-toggle" aria-label="Toggle navigation">☰ Sections</button>
+
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-title">Attention<span class="brand-dot">.</span>Lab</div>
+      <div class="brand-sub">Frontier Lab Visual Tutorial</div>
+    </div>
+
+    <nav aria-label="Module sections">
+      <div class="nav-group-label">Module 01 · Attention</div>
+      <a class="nav-link" data-target="home">Start Here</a>
+      <a class="nav-link" data-target="objective">1 · Objective</a>
+      <a class="nav-link" data-target="intuition">2 · Intuition 直觉</a>
+      <a class="nav-link" data-target="analogy">3 · Analogy 类比</a>
+      <a class="nav-link" data-target="mental-model">4 · Mental Model</a>
+      <a class="nav-link" data-target="technical">5 · The Math 技术机制</a>
+      <a class="nav-link" data-target="lab">6 · Interactive Lab</a>
+      <a class="nav-link" data-target="implementation">7 · Implementation</a>
+      <a class="nav-link" data-target="staff-lens">8 · Staff Engineer Lens</a>
+      <a class="nav-link" data-target="frontier">9 · Frontier Lab Relevance</a>
+      <a class="nav-link" data-target="confusions">10 · Common Confusions</a>
+      <a class="nav-link" data-target="quiz">11 · Mini Quiz</a>
+      <a class="nav-link" data-target="artifact">12 · Artifact + Log</a>
+    </nav>
+
+    <div class="checklist-wrap">
+      <div class="nav-group-label">Progress checklist</div>
+      <ul id="checklist"><!-- built by main.js --></ul>
+      <button id="reset-progress" class="ghost-btn">Reset progress</button>
+    </div>
+
+    <div class="nav-group-label" style="margin-top:18px">Coming next</div>
+    <div class="future-mod">Module 02 · Multi-Head Attention</div>
+    <div class="future-mod">Module 03 · Positional Encoding</div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main id="content">
+
+  <!-- ---------- HOME / LANDING ---------- -->
+  <section id="home" class="module-section hero">
+    <span class="kicker">Frontier Lab · Research Engineer Track</span>
+    <h1>Attention, Visualized</h1>
+    <p class="lede">
+      每个 token 都在问一个问题：<strong>right now, who should I listen to?</strong>
+      This is an interactive lab — not a blog post — for building <em>deep, interview-ready</em> intuition
+      about the one operation that powers every modern LLM.
+    </p>
+
+    <div class="card-grid">
+      <div class="info-card">
+        <div class="info-card-h">🎯 Learning objective</div>
+        <p>By the end you can derive <code>softmax(QKᵀ/√d_k)V</code> from scratch, reason about its
+        <strong>O(n²)</strong> cost, explain <strong>KV cache</strong> and <strong>FlashAttention</strong>,
+        and defend design choices in a staff-level review.</p>
+      </div>
+      <div class="info-card">
+        <div class="info-card-h">👤 Who this is for</div>
+        <p>A <strong>senior software engineer</strong> — strong in systems, still building intuition for
+        deep learning internals. We assume you can read code and reason about latency, memory, and scale.</p>
+      </div>
+      <div class="info-card">
+        <div class="info-card-h">⏱️ Estimated time</div>
+        <p><strong>60–90 minutes</strong> for a serious pass. Don't rush the Interactive Lab — the sliders
+        are where intuition actually forms.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-loop">
+      <div class="callout-title">How to use this lab</div>
+      <p>Follow the loop. Reading alone will not build intuition — the artifact will.</p>
+      <div class="loop">
+        <span>Read</span><i>→</i><span>Understand</span><i>→</i><span>Visualize</span><i>→</i>
+        <span>Implement</span><i>→</i><span>Measure</span><i>→</i><span>Write</span><i>→</i><span>Reflect</span>
+      </div>
+      <p class="muted">用中文建立直觉，用 English 记住 technical terms 与 interview phrasing。Check off each section
+      in the sidebar as you go — your progress is saved in this browser.</p>
+    </div>
+  </section>
+
+  <!-- ---------- 1 · OBJECTIVE ---------- -->
+  <section id="objective" class="module-section">
+    <div class="sec-head"><span class="sec-num">1</span><h2>Objective</h2></div>
+    <p>When you finish this module, you should be able to do all of the following without notes:</p>
+    <ul class="check-list">
+      <li>Explain in one sentence <strong>what attention computes</strong> — and what it does <em>not</em>.</li>
+      <li>Derive the scaled dot-product formula and label <strong>every symbol and shape</strong>.</li>
+      <li>Explain why we divide by <code>√d_k</code>, with the failure mode if you don't.</li>
+      <li>Reason about <strong>O(n²)</strong> compute/memory and why long context is a <em>memory</em> problem.</li>
+      <li>Explain <strong>KV cache</strong>: why inference is autoregressive, and why memory bandwidth dominates.</li>
+      <li>Implement <code>scaled_dot_product_attention</code> from scratch and verify it numerically.</li>
+      <li>Answer the design-review questions in the <strong>Staff Engineer Lens</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- ---------- 2 · INTUITION ---------- -->
+  <section id="intuition" class="module-section">
+    <div class="sec-head"><span class="sec-num">2</span><h2>Intuition <span class="zh">直觉</span></h2></div>
+    <div class="callout callout-intuition">
+      <p>这里的 intuition 是：attention 并不是模型在“理解世界”，而是在<strong>每一层 (every layer)</strong> 里
+      重新计算 token 之间的 <strong>relevance（相关性）</strong>。换句话说，每个 token 都在问：
+      <em>right now, who should I listen to?</em></p>
+      <p>注意力不是 memory，也不是 understanding。它是一个<strong>动态的、可学习的 routing 机制</strong>
+      (a dynamic, learnable routing mechanism)：根据当前内容，决定信息从哪些 token 流向哪些 token。</p>
+    </div>
+    <p>The key shift for a systems engineer: think of attention as a <strong>content-addressed lookup</strong>
+    that runs fresh at every layer. Older models (RNNs) passed a single hidden state left-to-right through a
+    keyhole. Attention instead lets every position read every other position <em>in parallel</em> and decide,
+    by learned similarity, how much each one matters <em>right now</em>.</p>
+    <p class="takeaway"><strong>One-liner to remember:</strong> attention = a learned, per-token,
+    per-layer soft lookup over the sequence. 不是理解，是 routing。</p>
+  </section>
+
+  <!-- ---------- 3 · ANALOGY ---------- -->
+  <section id="analogy" class="module-section">
+    <div class="sec-head"><span class="sec-num">3</span><h2>Analogy <span class="zh">类比</span></h2></div>
+    <p>Picture walking into a <strong>library</strong> looking for books about dinosaurs.</p>
+    <div class="qkv-cards">
+      <div class="qkv-card q"><div class="qkv-tag">Query (Q)</div><p>你的问题：“I want dinosaurs.” 当前 token 在<em>寻找</em>什么。</p></div>
+      <div class="qkv-card k"><div class="qkv-tag">Key (K)</div><p>书架上的标签：“Science”, “History”. 每个 token <em>对外宣传</em>自己是什么。</p></div>
+      <div class="qkv-card v"><div class="qkv-tag">Value (V)</div><p>架子上真正的书。每个 token <em>携带</em>的实际信息 (the payload)。</p></div>
+    </div>
+    <p>You compare your question (Q) to every shelf label (K). The better the match, the more books (V) you
+    take from that shelf. You walk away with a <strong>weighted blend</strong> — not a single book. Even a
+    poorly-matching shelf contributes a little. That blend <em>is</em> attention.</p>
+    <div class="callout callout-warn">
+      <div class="callout-title">Where the analogy breaks 类比的边界</div>
+      <p>In a real library, someone else writes the labels and stocks the books. In attention, each token
+      <strong>creates its own Q, K, and V at the same time</strong> — they are three learned projections of the
+      same input vector. A token labels itself <em>and</em> decides what it carries.</p>
+    </div>
+    <p class="takeaway"><strong>Routing vs. payload (记住这个区分):</strong> Q·K decides <em>who you listen to</em>
+    (the routing). V is <em>what you actually receive</em> (the payload). 全程我们用<span class="swatch q"></span>蓝色表示
+    Q/K（matchmakers），用<span class="swatch v"></span>橙色表示 V（payload）。</p>
+  </section>
+
+  <!-- ---------- 4 · MENTAL MODEL ---------- -->
+  <section id="mental-model" class="module-section">
+    <div class="sec-head"><span class="sec-num">4</span><h2>Mental Model</h2></div>
+    <p>Hold this picture in your head:</p>
+    <div class="callout callout-model">
+      <p>A sequence is a <strong>fully-connected graph</strong> of tokens. Attention draws
+      <strong>learned, content-dependent weighted edges</strong> between them, and <strong>recomputes all the
+      edges at every layer</strong>. Each token's new representation is a weighted blend of every token's
+      <span class="hl-v">payload (V)</span>, where the weights come from <span class="hl-q">query–key match
+      (Q·K)</span>.</p>
+    </div>
+    <p>Three properties fall out of this picture, and they explain almost everything downstream:</p>
+    <ul class="check-list">
+      <li><strong>Parallel:</strong> all pairs computed at once → great for GPUs, but it's <code>n × n</code> pairs.</li>
+      <li><strong>Content-dependent:</strong> the edges change with the input — that's the power, and why you
+      can't precompute them.</li>
+      <li><strong>Permutation-blind:</strong> attention itself has no sense of order — that's why we add
+      <em>positional encoding</em> (Module 03).</li>
+    </ul>
+  </section>
+
+  <!-- ---------- 5 · TECHNICAL ---------- -->
+  <section id="technical" class="module-section">
+    <div class="sec-head"><span class="sec-num">5</span><h2>The Math <span class="zh">技术机制</span></h2></div>
+
+    <p><strong>Plain English first.</strong> For each token, score it against every token (dot product), shrink
+    the scores so softmax stays gentle, turn scores into weights that sum to 1, then take a weighted blend of
+    the value vectors. That's it.</p>
+
+    <p><strong>The formula:</strong></p>
+    <div class="formula">Attention(Q, K, V) = softmax<span class="paren">(</span>
+      <span class="frac"><span class="num">Q Kᵀ</span><span class="den">√d<sub>k</sub></span></span>
+      <span class="paren">)</span> V</div>
+
+    <table class="symbol-table">
+      <thead><tr><th>Symbol</th><th>Shape</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>Q</code></td><td>n × d<sub>k</sub></td><td>Queries — what each of the n tokens is looking for</td></tr>
+        <tr><td><code>K</code></td><td>n × d<sub>k</sub></td><td>Keys — what each token advertises</td></tr>
+        <tr><td><code>V</code></td><td>n × d<sub>v</sub></td><td>Values — the payload each token carries</td></tr>
+        <tr><td><code>QKᵀ</code></td><td>n × n</td><td>Raw similarity scores (this is the O(n²) object)</td></tr>
+        <tr><td><code>d<sub>k</sub></code></td><td>scalar</td><td>Key/query dimension; we scale by its square root</td></tr>
+        <tr><td><code>softmax</code></td><td>row-wise</td><td>Each <em>row</em> → weights over keys, summing to 1</td></tr>
+        <tr><td><code>output</code></td><td>n × d<sub>v</sub></td><td>Each token's new, context-mixed representation</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Implementation meaning:</strong> <code>QKᵀ</code> is one matmul, softmax is a row-wise reduction,
+    and the final <code>×V</code> is another matmul. The whole thing is two matmuls and a softmax — which is
+    exactly why it maps so well onto GPU tensor cores.</p>
+
+    <div class="callout callout-warn">
+      <div class="callout-title">Common confusion 常见误区</div>
+      <p>Softmax is applied <strong>per row</strong> (over the keys), not over the whole matrix. Each query
+      gets its own probability distribution over the keys. Get the axis wrong and your attention silently
+      becomes nonsense.</p>
+    </div>
+
+    <details class="deep-dive">
+      <summary>Mini exercise · 动手算一下 (reveal answer)</summary>
+      <p>Take <code>Q_sat = [0,1]</code>, <code>K_cat = [1,0]</code>, <code>K_sat = [0,1]</code>, <code>d_k = 2</code>.
+      Compute the two scores, scale by √2, softmax, and say which token "sat" listens to more.</p>
+      <p class="answer"><strong>Answer:</strong> score(sat→cat) = 0/√2 = 0; score(sat→sat) = 1/√2 ≈ 0.707.
+      softmax([0, 0.707]) ≈ [0.33, 0.67] → "sat" listens 67% to itself, 33% to "cat". The Interactive Lab
+      computes the full matrix live so you can check yourself.</p>
+    </details>
+  </section>
+
+  <!-- ---------- 6 · INTERACTIVE LAB ---------- -->
+  <section id="lab" class="module-section">
+    <div class="sec-head"><span class="sec-num">6</span><h2>Interactive Lab</h2></div>
+    <p class="muted">Five workbenches. Each tells you what to <strong>control</strong>, what <strong>changes</strong>,
+    what to <strong>notice</strong>, and the <strong>takeaway</strong>. Play before you read on.</p>
+
+    <!-- VIZ 1: HEATMAP -->
+    <div class="viz-panel">
+      <h3>① The attention matrix — who does each word listen to?</h3>
+      <p class="viz-meta"><b>Control:</b> hover any cell; click a row label. <b>Changes:</b> a tooltip shows the
+      exact weight, and the chosen row lights up. <b>Notice:</b> rows = the word <em>doing the looking</em> (query),
+      columns = the word <em>being looked at</em> (key). Click the row <em>“it”</em> — it points at <em>“cat”</em>.</p>
+      <!-- NOTE: #heatmap-sentence and #heatmap-caption were removed on purpose.
+           main.js initHeatmap() now hits its own `if (!box) return;` guard and
+           quietly does nothing — intended and safe. The D3 heatmap replaces it. -->
+      <div id="d3-heatmap" class="d3-viz"></div>
+      <p id="d3-heatmap-caption" class="viz-caption">Hover any cell, or click a row label, to see who that word listens to.</p>
+      <p class="takeaway"><b>Takeaway:</b> attention is a per-token distribution over the other tokens —
+      that's how “it” resolves to “cat” without any grammar rules.</p>
+    </div>
+
+    <!-- VIZ 2: PIPELINE -->
+    <div class="viz-panel">
+      <h3>② The pipeline, with real numbers and shapes</h3>
+      <p class="viz-meta"><b>Control:</b> step through the stages. <b>Changes:</b> matrices update with live math
+      on the tiny <code>“cat sat”</code> example. <b>Notice:</b> the shapes printed at each stage.</p>
+      <div class="pipeline-controls">
+        <button id="pipe-prev" class="btn">‹ Prev</button>
+        <span id="pipe-step" class="pipe-step">Stage 0 / 4</span>
+        <button id="pipe-next" class="btn btn-primary">Next ›</button>
+      </div>
+      <p id="pipe-explain" class="viz-caption"></p>
+      <div id="pipe-visuals" class="pipe-visuals"></div>
+      <p class="takeaway"><b>Takeaway:</b> the final step is a <span class="hl-q">routing weight</span> acting as a
+      volume knob on the <span class="hl-v">payload V</span> — the result <code>[0.33, 1.00]</code> matches the
+      hand derivation exactly.</p>
+    </div>
+
+    <!-- VIZ 3: SCALING -->
+    <div class="viz-panel">
+      <h3>③ Break it — why divide by √d<sub>k</sub>?</h3>
+      <p class="viz-meta"><b>Control:</b> toggle scaling on/off. <b>Changes:</b> the softmax weights. <b>Notice:</b>
+      with scaling off, one option crushes all others.</p>
+      <div class="scale-toggle-row">
+        <span id="scale-label-off" class="scale-label active">Scaling OFF</span>
+        <button id="scale-toggle" class="switch" aria-label="Toggle scaling"><span class="knob"></span></button>
+        <span id="scale-label-on" class="scale-label">Scaling ON</span>
+      </div>
+      <div class="bars">
+        <div class="bar-row"><span>🍕 Pizza</span><div class="bar-track"><div id="bar-pizza" class="bar-fill"></div></div><span id="pct-pizza" class="pct">0%</span></div>
+        <div class="bar-row"><span>🍝 Pasta</span><div class="bar-track"><div id="bar-pasta" class="bar-fill amber"></div></div><span id="pct-pasta" class="pct">0%</span></div>
+        <div class="bar-row"><span>🥗 Salad</span><div class="bar-track"><div id="bar-salad" class="bar-fill green"></div></div><span id="pct-salad" class="pct">0%</span></div>
+      </div>
+      <!-- D3 twin-bar chart (logits ↔ softmax) with a d_k selector replaces the
+           CSS bars above when D3 is present; d3-viz.js hides .bars in that case. -->
+      <div id="d3-scaling" class="d3-viz"></div>
+      <p id="scale-caption" class="viz-caption"></p>
+      <p class="takeaway"><b>Takeaway:</b> large dot products make softmax razor-sharp and gradients tiny.
+      Dividing by √d<sub>k</sub> keeps scores in a healthy range so the model can blend multiple sources.</p>
+    </div>
+
+    <!-- VIZ 4: COST EXPLORER -->
+    <div class="viz-panel">
+      <h3>④ The O(n²) cost &amp; memory explorer</h3>
+      <p class="viz-meta"><b>Control:</b> sequence length <code>n</code>, model dim <code>d</code>, and a
+      FlashAttention toggle. <b>Changes:</b> the two boxes and the memory gauge. <b>Notice:</b> when the
+      <span class="hl-q">n×d</span> box stops growing but the <span class="hl-warn">n×n</span> box explodes.</p>
+      <div class="cost-controls">
+        <label>Sequence length n: <output id="cost-n-out">512</output>
+          <input id="cost-n" type="range" min="128" max="131072" step="128" value="512" /></label>
+        <label>Model dim d: <output id="cost-d-out">1024</output>
+          <input id="cost-d" type="range" min="128" max="8192" step="128" value="1024" /></label>
+        <label class="flash-toggle"><input id="cost-flash" type="checkbox" /> Enable FlashAttention (don't materialize n×n)</label>
+      </div>
+      <div class="cost-boxes">
+        <div class="cost-box">
+          <div class="cost-box-label">Token tensor · n×d · <span class="hl-q">O(n)</span></div>
+          <div id="cost-box-linear" class="cost-square linear"></div>
+          <div id="cost-mem-linear" class="cost-mem"></div>
+        </div>
+        <div class="cost-box">
+          <div class="cost-box-label">Attention scores · n×n · <span class="hl-warn">O(n²)</span></div>
+          <div id="cost-box-quad" class="cost-square quad"></div>
+          <div id="cost-mem-quad" class="cost-mem"></div>
+        </div>
+      </div>
+      <!-- D3 memory growth chart: complements the two boxes above, does not replace them. -->
+      <div id="d3-cost-chart" class="d3-viz"></div>
+      <p id="cost-caption" class="viz-caption"></p>
+      <p class="takeaway"><b>Takeaway:</b> long context is fundamentally a <strong>memory</strong> problem.
+      FlashAttention keeps the same O(n²) <em>compute</em> but avoids materializing the n×n matrix, so attention
+      <em>memory</em> drops to O(n). That's why it's IO-aware, not a compute trick.</p>
+    </div>
+
+    <!-- VIZ 5: KV CACHE -->
+    <div class="viz-panel">
+      <h3>⑤ Training vs. inference — the KV cache</h3>
+      <p class="viz-meta"><b>Control:</b> switch mode; in inference, click “Generate next token”. <b>Changes:</b>
+      Q shrinks to a single row; K and V <em>append</em> a cached row each step. <b>Notice:</b> we never recompute
+      past keys/values — we re-read them.</p>
+      <div class="kv-mode-row">
+        <button id="kv-train" class="btn btn-primary">Training (parallel)</button>
+        <button id="kv-infer" class="btn">Inference (autoregressive)</button>
+      </div>
+      <div id="kv-grid" class="kv-grid"></div>
+      <div class="kv-actions">
+        <button id="kv-generate" class="btn" disabled>Generate next token ▸</button>
+        <button id="kv-reset" class="btn ghost-btn" disabled>Reset</button>
+      </div>
+      <p id="kv-caption" class="viz-caption"></p>
+      <p class="takeaway"><b>Takeaway:</b> at decode time, compute per token is small but you must <em>load</em> the
+      whole KV cache from HBM every step. That makes autoregressive inference <strong>memory-bandwidth bound</strong>
+      — the reason for MQA/GQA, PagedAttention (vLLM), and quantized caches.</p>
+    </div>
+  </section>
+
+  <!-- ---------- 7 · IMPLEMENTATION ---------- -->
+  <section id="implementation" class="module-section">
+    <div class="sec-head"><span class="sec-num">7</span><h2>Implementation View</h2></div>
+    <p>Roughly what the code looks like. Read it after you've played with the pipeline viz — the shapes will
+    map directly onto what you saw.</p>
+    <pre class="code"><code>import numpy as np
+
+def softmax(x, axis=-1):
+    x = x - x.max(axis=axis, keepdims=True)   # numerical stability
+    e = np.exp(x)
+    return e / e.sum(axis=axis, keepdims=True)
+
+def scaled_dot_product_attention(Q, K, V, mask=None):
+    # Q: (n, d_k)  K: (n, d_k)  V: (n, d_v)
+    d_k = Q.shape[-1]
+    scores = Q @ K.T / np.sqrt(d_k)           # (n, n)  <-- the O(n^2) object
+    if mask is not None:                      # causal mask: forbid looking ahead
+        scores = np.where(mask, scores, -np.inf)
+    weights = softmax(scores, axis=-1)        # row-wise: each query sums to 1
+    return weights @ V, weights               # (n, d_v), (n, n)</code></pre>
+    <details class="deep-dive">
+      <summary>PyTorch one-liner (production path)</summary>
+      <pre class="code"><code>import torch.nn.functional as F
+# Fused, FlashAttention-backed when available. Does NOT materialize the n×n matrix.
+out = F.scaled_dot_product_attention(q, k, v, is_causal=True)</code></pre>
+      <p class="muted">In real models you'd reshape into heads <code>(batch, heads, n, d_head)</code> and use the
+      fused kernel — that's the bridge to FlashAttention you saw in viz ④.</p>
+    </details>
+  </section>
+
+  <!-- ---------- 8 · STAFF ENGINEER LENS ---------- -->
+  <section id="staff-lens" class="module-section">
+    <div class="sec-head"><span class="sec-num">8</span><h2>Staff Engineer Lens</h2></div>
+    <div class="callout callout-staff">
+      <div class="callout-title">🔭 Read this concept like a design review</div>
+      <ul class="check-list">
+        <li><strong>Where is the bottleneck?</strong> <em>Training:</em> compute-bound — attention is
+        ~O(n²·d) FLOPs and dominates at long context. <em>Inference decode:</em> memory-bandwidth-bound —
+        you re-read the KV cache every token.</li>
+        <li><strong>What metric reveals the problem?</strong> MFU / GPU utilization, tokens/sec,
+        attention memory (GB), KV-cache size (GB), prefill vs decode latency, p50/p99, loss curve, eval score.</li>
+        <li><strong>What breaks at 10× scale?</strong> 10× longer context → <strong>100× attention memory</strong>
+        (n×n) and 100× prefill FLOPs. KV cache grows linearly with n × layers × heads × d_head → OOM is the
+        first wall you hit.</li>
+        <li><strong>What would a strong engineer ask?</strong> “Is this prefill- or decode-bound? What's the
+        batch size and is it continuous batching? Are we paging the KV cache? MQA/GQA? Quantized cache?
+        Is FlashAttention actually being used or did a reshape silently fall back to the slow path?”</li>
+      </ul>
+    </div>
+    <p>The fixes you should be able to name: <strong>FlashAttention</strong> (IO-aware, O(n) attention memory),
+    <strong>MQA/GQA</strong> (share K/V across heads → smaller cache), <strong>PagedAttention / vLLM</strong>
+    (no cache fragmentation), <strong>sliding-window / sparse attention</strong> (sub-quadratic), and
+    <strong>continuous batching</strong> (keep the GPU busy across requests).</p>
+  </section>
+
+  <!-- ---------- 9 · FRONTIER LAB RELEVANCE ---------- -->
+  <section id="frontier" class="module-section">
+    <div class="sec-head"><span class="sec-num">9</span><h2>Why this matters for frontier labs</h2></div>
+    <div class="card-grid">
+      <div class="info-card"><div class="info-card-h">Training</div><p>Attention FLOPs dominate long-context
+        pretraining. FlashAttention and sequence parallelism are table stakes; getting the kernel path right is
+        worth millions in compute.</p></div>
+      <div class="info-card"><div class="info-card-h">Serving</div><p>The KV cache <em>is</em> the inference
+        memory wall. Continuous batching + PagedAttention determine how many users one GPU can serve.</p></div>
+      <div class="info-card"><div class="info-card-h">Evaluation</div><p>Long-context behavior
+        (needle-in-a-haystack, “lost in the middle”) is an attention story — you measure whether the model
+        actually routes to the right tokens far away.</p></div>
+      <div class="info-card"><div class="info-card-h">Reading papers</div><p><em>Attention Is All You Need</em>
+        (2017) → <em>FlashAttention</em> (Dao, 2022) → GQA, sliding-window, linear/sparse attention. This module
+        is the prerequisite for all of them.</p></div>
+    </div>
+  </section>
+
+  <!-- ---------- 10 · COMMON CONFUSIONS ---------- -->
+  <section id="confusions" class="module-section">
+    <div class="sec-head"><span class="sec-num">10</span><h2>Common Confusions</h2></div>
+    <div class="confusion"><b>“Attention means the model understands.”</b> No — it computes relevance and routes
+      information. Understanding (if any) lives in the learned weights and the whole stack, not in one softmax.</div>
+    <div class="confusion"><b>“If A attends to B, A copies B's embedding.”</b> No — A receives B's
+      <span class="hl-v">Value (payload)</span>, scaled by the <span class="hl-q">Q·K weight (routing)</span>.
+      Routing ≠ payload. The model can match on one space and transmit another.</div>
+    <div class="confusion"><b>“Softmax is over the whole matrix.”</b> No — it's row-wise, over the keys. Each
+      query gets its own distribution that sums to 1.</div>
+    <div class="confusion"><b>“Q, K, V are three different inputs.”</b> No — in self-attention they're three
+      learned projections of the <em>same</em> input.</div>
+    <div class="confusion"><b>“FlashAttention changes the math / is sub-quadratic compute.”</b> No — same exact
+      output, same O(n²) compute. It changes <em>memory IO</em> by not materializing the n×n matrix.</div>
+  </section>
+
+  <!-- ---------- 11 · MINI QUIZ ---------- -->
+  <section id="quiz" class="module-section">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Mini Quiz</h2></div>
+    <p class="muted">Answer before revealing. Aim for 4/4 — these are interview-shaped.</p>
+    <div id="quiz-container"></div>
+    <div id="quiz-score" class="quiz-score"></div>
+  </section>
+
+  <!-- ---------- 12 · ARTIFACT + RESEARCH LOG ---------- -->
+  <section id="artifact" class="module-section">
+    <div class="sec-head"><span class="sec-num">12</span><h2>Produce an Artifact</h2></div>
+    <p>Do not stop at reading. Produce something. Check items off — saved in this browser.</p>
+    <ul id="artifact-list" class="artifact-checklist">
+      <li data-id="impl">Implement <code>scaled_dot_product_attention</code> in numpy from scratch.</li>
+      <li data-id="verify">Verify it reproduces the lab's <code>“cat sat”</code> numbers: weights ≈ [0.33, 0.67], output ≈ [0.33, 1.00].</li>
+      <li data-id="plot">Plot the n×n attention matrix for a toy sentence as a heatmap.</li>
+      <li data-id="measure">Compute attention memory (fp16) for n = 1k / 8k / 32k and confirm the 100×-per-10× scaling.</li>
+      <li data-id="kv">Estimate KV-cache size (GB) for a 32-layer model at n = 8k and explain the decode bottleneck.</li>
+      <li data-id="log">Write a 5-line research log: what surprised you, and one experiment you'd run next.</li>
+    </ul>
+
+    <div class="callout callout-log">
+      <div class="callout-title">📓 Research Log Prompt</div>
+      <p class="muted">Saved automatically to this browser. Prompts: What did the sliders change in your mental
+      model? Where would attention break first at 10× scale? What's the one experiment you'd run?</p>
+      <textarea id="research-log" rows="6" placeholder="今天我意识到… / Today I realized that attention is really about routing, and the first wall at scale is…"></textarea>
+      <div id="log-status" class="log-status">Not saved yet.</div>
+    </div>
+
+    <div class="callout callout-loop" style="margin-top:18px">
+      <div class="callout-title">Next step</div>
+      <p>When this clicks, you're ready for <strong>Module 02 · Multi-Head Attention</strong> (why one head isn't
+      enough) and <strong>Module 03 · Positional Encoding</strong> (giving order to a permutation-blind op).
+      Tell me “go” and I'll build them with the same pipeline.</p>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>Module 01 of the Frontier Lab Visual Tutorial · built from your repo's
+    <code>attention-mechanisms.md</code>. <a href="../01-transformers/architecture/attention-mechanisms.md">Read the
+    full written explanation →</a></p>
+  </footer>
+
+  </main>
+</div>
+
+<script src="d3.v7.min.js"></script>
+<script src="main.js"></script>
+<script src="d3-viz.js"></script>
+</body>
+</html>

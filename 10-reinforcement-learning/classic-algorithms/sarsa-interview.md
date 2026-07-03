@@ -8,6 +8,23 @@
 > - 💡 Expected SARSA as a bridge between SARSA and Q-learning
 > - 🏭 On-policy methods in production: from SARSA to PPO
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Q(s, a) | Estimated value of taking action a in state s |
+> | Q(s', a') | Q-value of the next state-action pair (the action actually taken) |
+> | α | Learning rate |
+> | γ | Discount factor |
+> | ε | Exploration rate (fraction of random actions) |
+> | \|A\| | Number of available actions |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Q-learning update** — uses max_{a'} Q(s', a'), off-policy ([q-learning-interview.md](./q-learning-interview.md))
+> - **TD error δ** — surprise signal ([temporal-difference-learning-interview.md](./temporal-difference-learning-interview.md))
+> - **ε-greedy** — explore randomly with probability ε
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 SARSA (State-Action-Reward-State-Action) is an on-policy TD control algorithm. Unlike Q-learning, which uses max_{a'} Q(s', a') in the update target, SARSA uses Q(s', a') where a' is the action actually selected by the current policy. This means SARSA's Q-values reflect the true performance of the policy being followed, including the cost of exploration. The result is safer behavior near dangerous states but convergence to Q^π instead of Q*.
@@ -18,7 +35,9 @@ SARSA (State-Action-Reward-State-Action) is an on-policy TD control algorithm. U
 
 ### The SARSA Update
 
-After observing the quintuple (s, a, r, s', a'), SARSA updates:
+**Step 1 — Words.** SARSA is like Q-learning's cautious sibling. Instead of asking "what is the best thing I could do from the next state?" (Q-learning), SARSA asks "what did I actually do in the next state?" It uses the Q-value of the action the agent actually chose, not the maximum. This means SARSA's estimates reflect the real performance of the current policy, including the cost of random exploration.
+
+**Step 2 — Formula.** After observing the quintuple (s, a, r, s', a'), SARSA updates:
 
     Q(s, a) ← Q(s, a) + α · [ r + γ · Q(s', a') - Q(s, a) ]
 
@@ -27,6 +46,25 @@ Where:
 - The TD error is: δ = r + γ · Q(s', a') - Q(s, a)
 
 The name comes from the five elements needed: **S**tate, **A**ction, **R**eward, **S**tate', **A**ction'.
+
+**Step 3 — Worked example.** Agent in state A, takes "right" (reward 3), lands in B, then ε-greedy selects "left" in B. Q(A, right) = 5.0, Q(B, left) = 2.0, Q(B, right) = 8.0. α = 0.1, γ = 0.9:
+
+```
+SARSA uses Q(B, left) = 2.0  (the action actually selected by ε-greedy)
+Q-learning would use max Q(B) = 8.0  (the best possible action)
+
+SARSA:
+  TD target = 3 + 0.9 × 2.0 = 4.8
+  Q(A, right) ← 5.0 + 0.1 × (4.8 - 5.0) = 4.98  (decreased!)
+
+Q-learning:
+  TD target = 3 + 0.9 × 8.0 = 10.2
+  Q(A, right) ← 5.0 + 0.1 × (10.2 - 5.0) = 5.52  (increased!)
+
+SARSA's estimate went DOWN because the ε-greedy policy picked a bad action (left=2.0
+instead of right=8.0). SARSA reflects the reality of the ε-greedy policy — including
+its mistakes. Q-learning ignores the actual action and uses the optimistic max.
+```
 
 ### On-Policy Property
 

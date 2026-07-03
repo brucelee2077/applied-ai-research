@@ -8,6 +8,25 @@
 > - 💡 Bellman backup vs sampling-based methods (TD, MC)
 > - 🏭 Approximate dynamic programming and practical solvers
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | Σ_a, Σ_{s'} | Sum over all actions or all next states |
+> | π(a\|s) | Policy — probability of action a in state s |
+> | P(s'\|s,a) | Transition probability — chance of landing in s' |
+> | R(s,a,s') | Reward for the transition from s to s' via action a |
+> | γ | Discount factor (0 to 1, not including 1) |
+> | max_a | "The action a that gives the largest value" |
+> | argmax_a | "Which action a gives the largest value" |
+> | \|\|...\|\|_∞ | Max-norm — the largest absolute value across all states |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **V^π(s)** — expected return from state s under policy π ([policies-and-value-functions-interview.md](./policies-and-value-functions-interview.md))
+> - **Q^π(s,a)** — expected return from (s, a) under policy π
+> - **G_t = r_t + γ·G_{t+1}** — discounted return (recursive form, from [rewards-and-returns-interview.md](./rewards-and-returns-interview.md))
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 The Bellman equation decomposes the value of a state into the immediate reward plus the discounted value of the next state. This recursive structure is the engine inside every RL algorithm. The expectation version evaluates a given policy; the optimality version finds the best policy.
@@ -18,11 +37,17 @@ The Bellman equation decomposes the value of a state into the immediate reward p
 
 ### Bellman Expectation Equation for V^π
 
-Starting from the definition:
+**Step 1 — Words.** The Bellman equation says: the value of a state equals the reward you get right now, plus the discounted value of where you end up next. Instead of computing the return from scratch (summing all future rewards), you break it into one step plus the value of the next state. This recursion is the engine inside every RL algorithm.
 
-    V^π(s) = E_π [ r_t + γ · G_{t+1} | s_t = s ]
+**Step 2 — Formula.** Starting from the definition of V and expanding one step at a time:
 
-Expanding the expectation over actions and next states:
+```
+V^π(s) = E_π[ G_t | s_t = s ]
+       = E_π[ r_t + γ·G_{t+1} | s_t = s ]          (recursive return)
+       = E_{a~π}[ E_{s'~P}[ r + γ·V^π(s') ] ]       (tower property of expectations)
+```
+
+The tower property says: first average over next states (inner expectation), then average over actions (outer expectation). Writing this out explicitly:
 
     V^π(s) = Σ_a π(a|s) · Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · V^π(s') ]
 
@@ -33,25 +58,55 @@ Where:
 - γ is the discount factor
 - V^π(s') is the value of the next state under the same policy
 
-In words: the value of a state is the weighted average (over actions and next states) of the immediate reward plus the discounted future value.
+**Step 3 — Worked example.** State A, two actions (left, right), γ = 0.9. Policy: π(left|A) = 0.4, π(right|A) = 0.6. Deterministic transitions:
+
+```
+Left:  goes to state B (reward = 0), V^π(B) = 2.0
+Right: goes to state C (reward = 1), V^π(C) = 3.0
+
+V^π(A) = π(left|A) × [R(A,left,B) + γ × V^π(B)]
+       + π(right|A) × [R(A,right,C) + γ × V^π(C)]
+       = 0.4 × [0 + 0.9 × 2.0]  +  0.6 × [1 + 0.9 × 3.0]
+       = 0.4 × 1.8  +  0.6 × 3.7
+       = 0.72 + 2.22
+       = 2.94
+```
 
 ### Bellman Expectation Equation for Q^π
 
+**Step 1 — Words.** The Q version works the same way, but starts one step later — it assumes you have already chosen action a, so there is no sum over actions at the first level. You sum over next states, get the reward, then sum over the next action at s' (because the policy decides what to do there).
+
+**Step 2 — Formula.**
+
     Q^π(s,a) = Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · Σ_{a'} π(a'|s') · Q^π(s',a') ]
 
-Or equivalently:
+Or equivalently, using V^π instead of expanding Q at the next state:
 
     Q^π(s,a) = Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · V^π(s') ]
 
+**Step 3 — Worked example.** From the same MDP:
+
+```
+Q^π(A, right) = Σ_{s'} P(s'|A, right) × [R + γ × V^π(s')]
+              = 1.0 × [1 + 0.9 × 3.0]    (deterministic: always goes to C)
+              = 3.7
+```
+
 ### Bellman Optimality Equation for V*
 
-The optimal value function V* satisfies:
+**Step 1 — Words.** The optimality version asks: "What is the best possible value of state s?" Instead of averaging over actions (weighted by the policy), we take the maximum — the best action. The optimal policy always picks the best action, so there is no need to average.
+
+**Step 2 — Formula.**
 
     V*(s) = max_a Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · V*(s') ]
 
 The key difference from the expectation equation: instead of averaging over actions (weighted by π), we take the **max** over actions. The optimal policy always picks the best action.
 
 ### Bellman Optimality Equation for Q*
+
+**Step 1 — Words.** The Q* version starts by taking action a, observes the reward, and then picks the best action at the next state (because the optimal policy is greedy with respect to Q*). Once you have Q*, the optimal policy is trivial — just pick the action with the highest Q*.
+
+**Step 2 — Formula.**
 
     Q*(s,a) = Σ_{s'} P(s'|s,a) · [ R(s,a,s') + γ · max_{a'} Q*(s',a') ]
 

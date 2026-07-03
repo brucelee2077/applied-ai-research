@@ -8,6 +8,26 @@
 > - 💡 PPO-Clip vs PPO-Penalty vs TRPO — practical comparison
 > - 🏭 PPO for RLHF: how the same algorithm aligns language models
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | r_t(θ) = π_θ/π_old | Probability ratio — how much the policy changed for this action |
+> | clip(r, 1-ε, 1+ε) | Clamp ratio between [1-ε, 1+ε] (ε ≈ 0.2) |
+> | Â_t | Advantage estimate (via GAE) |
+> | L^CLIP | PPO clipped surrogate objective |
+> | L^VF | Value function loss (MSE) |
+> | S[π] = H(π) | Entropy bonus — encourages exploration |
+> | c₁, c₂ | Coefficients for value loss and entropy (0.5 and 0.01) |
+> | δ_t | TD error: r + γV(s') - V(s) |
+> | λ | GAE parameter (typically 0.95) |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Trust region intuition** — why bounded policy updates matter ([trust-region-methods-interview.md](./trust-region-methods-interview.md))
+> - **Actor-critic** — policy (actor) and value function (critic)
+> - **GAE** — Â = Σ (γλ)^l δ_{t+l}
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

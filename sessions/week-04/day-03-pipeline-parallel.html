@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 4 · Day 3 — Pipeline Parallelism: Layers Across Devices &amp; the Bubble</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w04-d03-pp">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 4 Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-02-tensor-parallel.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Parallelism</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-llama3-tpu.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training LLaMA 3 on TPUs</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 1 · Week 4 · Day 3 (Wed)</span>
+    <h1>Pipeline Parallelism<br>Layers Across Devices &amp; the Bubble</h1>
+    <p class="lead">Your model is too big for one device. One fix: put different <em>layers</em> on different devices and pass the batch through, stage by stage — like an assembly line. But there's a cost: the <em>bubble</em>, the idle time while the line fills up and drains. Today: how to shrink it.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain what a pipeline stage is, describe why the <code>bubble</code> wastes device time, show how <em>micro-batching</em> shrinks it, and compute the bubble fraction <code>(p-1)/(m+p-1)</code> for any number of stages and micro-batches.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is pipeline parallelism, and what is the bubble?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network is a stack of <span class="term">layers</span> (layer 1 feeds layer 2, which feeds layer 3, and so on), and that a <span class="term">device</span> is one GPU or one TPU chip. <b>No prior parallelism experience needed.</b></div></div>
+
+      <h4>The problem: the model is bigger than one device</h4>
+      <p>A large model can have hundreds of layers and billions of weights. Sometimes the whole model does not fit in the memory of a single device. You cannot run what you cannot store. So you must split the model across several devices.</p>
+      <p>One way to split is by <strong>layer</strong>. This is <span class="term">pipeline parallelism</span> (PP): you cut the stack of layers into groups and put each group on a different device.</p>
+
+      <h4>The idea: layers become stages</h4>
+      <p>Say the model has 8 layers and you have 4 devices. You could do:</p>
+      <ul>
+        <li>Device 1 holds layers 1–2</li>
+        <li>Device 2 holds layers 3–4</li>
+        <li>Device 3 holds layers 5–6</li>
+        <li>Device 4 holds layers 7–8</li>
+      </ul>
+      <p>Each device now holds one <span class="term">stage</span>: a stage is just "the group of layers living on one device." A batch of data flows through the pipeline stage by stage. Device 1 does its layers, hands the result to Device 2, which hands its result to Device 3, and so on. This is exactly how work moves down an assembly line.</p>
+
+      <h4>The catch: the bubble</h4>
+      <p>Here is the problem. When Device 1 is working on the first layers, Devices 2, 3, and 4 have nothing to do yet — the data has not reached them. They sit <strong>idle</strong>. This wasted idle time is called the <span class="term">bubble</span>. The same thing happens at the end: once the data has passed Device 1, it goes idle while the later devices finish.</p>
+      <p>So a naive pipeline wastes a lot of device time waiting. The fix — <span class="term">micro-batching</span> — is the heart of today's lesson, and we'll build it up in the playground.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/1811.06965" target="_blank" rel="noopener">GPipe: Efficient Training of Giant Neural Networks (Huang et al., 2018)</a> — the paper that introduced pipeline micro-batching.</div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">An assembly line of workers</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a factory line with 4 workers. Each worker does one step, then passes the product to the next worker. The product must travel down the whole line before it is finished.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🧍💤💤💤</span><h5>one product = huge bubble</h5><p>Send in a single product. Worker 1 builds their part, then workers 2, 3, 4 wait. When it reaches worker 4, workers 1, 2, 3 are done and idle. Most of the line stands still — that idle time is the bubble.</p></div>
+        <div class="card"><span class="big">🧍🏗️🏗️🏗️</span><h5>many products = full line</h5><p>Now feed in many small products back-to-back. As soon as worker 1 passes product A to worker 2, worker 1 starts product B. Soon every worker is busy on a different product. The line stays full.</p></div>
+      </div>
+      <p><strong>In one line:</strong> devices are the workers, layers are the work each worker does, and feeding many small <span class="term">micro-batches</span> (small pieces of the batch) back-to-back keeps every device busy — so the bubble shrinks.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers can each build a whole product alone. Pipeline devices cannot — each device only holds <em>some</em> of the layers, so every micro-batch <em>must</em> pass through all stages in order. The dependency is strict.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three views of the pipeline bubble</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated timeline. We have <code>p = 4</code> stages (devices). Each row is one device; each cell is one time slot. <code>██</code> = busy, <code>··</code> = idle (bubble). <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="naive" type="button">① naive pipeline (m = 1)</button>
+          <button class="play-btn" data-demo="micro" type="button">② micro-batching (m = 8)</button>
+          <button class="play-btn" data-demo="formula" type="button">③ the bubble-fraction formula</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of the pipeline, and why micro-batching wins</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>Split the model's layers into <code>p</code> <strong>stages</strong>, one per device. A batch flows through stage 1, then stage 2, ..., then stage <code>p</code>.</li>
+        <li>A stage can only start once the stage before it has passed along its result. This strict order is why early devices work first and later devices wait.</li>
+        <li>The <strong>bubble</strong> is the total idle time. It has two parts: the <em>fill</em> (start-up, while later stages wait for data to arrive) and the <em>drain</em> (wind-down, while early stages wait for the last data to finish).</li>
+        <li><strong>Micro-batching:</strong> split the batch into <code>m</code> smaller <span class="term">micro-batches</span> and feed them in one after another. While stage 1 works on micro-batch 2, stage 2 can already work on micro-batch 1. The stages overlap, so idle time shrinks.</li>
+      </ul>
+
+      <h4>The bubble fraction</h4>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>bubble fraction ≈ (p - 1) / (m + p - 1)</code><br><span style="font-size:.85rem;color:var(--text2)"><code>p</code> = number of stages, <code>m</code> = number of micro-batches. It is the share of device time that is wasted (idle). Fill + drain together cost about <code>p - 1</code> time slots; total useful work spans about <code>m + p - 1</code> slots.</span></div></div>
+      <p>The key insight: <code>p - 1</code> is fixed by how many stages you have, but you can make <code>m</code> as large as you like. Push <code>m</code> up and the fraction falls toward zero. That is the whole trick.</p>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>It lets huge models fit</strong> — no single device needs to hold all the layers, so you can train models far bigger than one chip's memory.</li>
+        <li><strong>The bubble is the price</strong> — split naively (<code>m = 1</code>) and you waste most of your expensive devices. Micro-batching buys most of that time back.</li>
+        <li><strong>It composes</strong> — pipeline parallelism stacks with tensor parallelism (Day 2) and data parallelism (Day 1). Real large-scale training uses all three together.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> model too big for one device → split layers into stages across devices → strict stage order creates idle bubble → split the batch into many micro-batches → stages overlap → bubble fraction <code>(p-1)/(m+p-1)</code> shrinks as <code>m</code> grows.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a bubble-fraction calculator and plot</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): write a small script that computes the pipeline <strong>bubble fraction</strong> and plots how it drops as you add more micro-batches — so you can <em>see</em> the trick from the walkthrough.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Define <code>bubble(p, m) = (p - 1) / (m + p - 1)</code> for <code>p</code> stages and <code>m</code> micro-batches.</li>
+        <li>For <code>p = 4</code>, print the fraction at <code>m = 1, 8, 32</code> and confirm they match <code>0.75</code>, <code>≈0.27</code>, <code>≈0.09</code>.</li>
+        <li>Plot the bubble fraction versus <code>m</code> (say <code>m = 1..64</code>) for a few stage counts (e.g. <code>p = 2, 4, 8</code>), one line per <code>p</code>.</li>
+        <li>Save the plot to a PNG so you can look at it later. Confirm every curve trends toward zero as <code>m</code> grows.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/week04/pipeline_bubble.py</code> with the four bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 4 Day 3 artifact.
+
+Create experiments/week04/pipeline_bubble.py that:
+1. Defines bubble(p, m) = (p - 1) / (m + p - 1), where p is the number of pipeline stages and m is the number of micro-batches.
+2. For p=4, prints the bubble fraction at m=1, 8, 32 and asserts they are approximately 0.75, 0.2727, and 0.0857.
+3. Plots the bubble fraction vs m (m from 1 to 64) for p in {2, 4, 8}, one labeled line per p, with axis labels and a legend.
+4. Saves the figure to experiments/week04/pipeline_bubble.png and prints the path.
+Add a brief comment on each step explaining the pipeline bubble and micro-batching, then run it to confirm it works.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-04/day-03-log.md</code>: with <code>p</code> stages fixed, why can the bubble never quite reach exactly zero no matter how large <code>m</code> gets? (Hint: the <code>p - 1</code> in the numerator.)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 3 complete!</h3>
+    <p>You can now split a model's layers across devices as a pipeline, name the <code>bubble</code> (the idle fill-and-drain time), and shrink it with micro-batching — plus compute the bubble fraction <code>(p-1)/(m+p-1)</code> for any setup.<br>Next: <code>start today</code> → Day 4 puts it all together: training LLaMA 3 on TPUs.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-02-tensor-parallel.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Parallelism</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-llama3-tpu.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training LLaMA 3 on TPUs</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  naive:{html:'<span class="dim"># p=4 stages, m=1 (one batch, no micro-batching). ██ busy · ·· idle</span>\n'+
+    '<span class="fn">dev1</span>: <span class="ok">██</span> <span class="bad">·· ·· ··</span>\n'+
+    '<span class="fn">dev2</span>: <span class="bad">··</span> <span class="ok">██</span> <span class="bad">·· ··</span>\n'+
+    '<span class="fn">dev3</span>: <span class="bad">·· ··</span> <span class="ok">██</span> <span class="bad">··</span>\n'+
+    '<span class="fn">dev4</span>: <span class="bad">·· ·· ··</span> <span class="ok">██</span>\n'+
+    '<span class="dim"># bubble = (4-1)/(1+4-1) =</span> <span class="hl">3/4 = 75% idle</span>',
+    take:'<b>①  Naive pipeline (m=1).</b> Only one device works at a time — the rest wait to fill, then wait to drain. 75% of your expensive devices sit idle. This is the bubble at its worst.'},
+  micro:{html:'<span class="dim"># p=4 stages, m=8 micro-batches fed back-to-back. digits = which micro-batch</span>\n'+
+    '<span class="fn">dev1</span>: <span class="ok">1 2 3 4 5 6 7 8</span> <span class="bad">· · ·</span>\n'+
+    '<span class="fn">dev2</span>: <span class="bad">·</span> <span class="ok">1 2 3 4 5 6 7 8</span> <span class="bad">· ·</span>\n'+
+    '<span class="fn">dev3</span>: <span class="bad">· ·</span> <span class="ok">1 2 3 4 5 6 7 8</span> <span class="bad">·</span>\n'+
+    '<span class="fn">dev4</span>: <span class="bad">· · ·</span> <span class="ok">1 2 3 4 5 6 7 8</span>\n'+
+    '<span class="dim"># bubble = (4-1)/(8+4-1) =</span> <span class="hl">3/11 ≈ 27% idle</span>',
+    take:'<b>②  Micro-batching (m=8).</b> Each device chews through 8 small micro-batches back-to-back, so the middle of the run keeps everyone busy. Idle time drops from 75% to about 27%.'},
+  formula:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">bubble</span>(p, m): <span class="kw">return</span> (p - <span class="num">1</span>) / (m + p - <span class="num">1</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> [bubble(<span class="num">4</span>, m) <span class="kw">for</span> m <span class="kw">in</span> (<span class="num">1</span>, <span class="num">8</span>, <span class="num">32</span>, <span class="num">128</span>)]\n'+
+    '<span class="ok">[0.75, 0.27, 0.086, 0.023]</span>   <span class="hl"># more micro-batches → less idle</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> bubble(<span class="num">8</span>, <span class="num">1</span>), bubble(<span class="num">8</span>, <span class="num">64</span>)\n'+
+    '<span class="ok">(0.875, 0.099)</span>   <span class="dim"># more stages p → bigger start-up cost</span>',
+    take:'<b>③  The formula.</b> <code>(p-1)/(m+p-1)</code>. The <code>p-1</code> on top is fixed by your stage count; the <code>m</code> on the bottom is yours to grow. Push m up and the bubble falls toward zero.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<div class=\"build-embed\"><iframe src=\"../viz/parallelism.html\" title=\"Interactive: DP · FSDP · TP · PP on a Device Mesh\" loading=\"lazy\"></iframe><div class=\"cap\">↑ interactive — drag the controls. <a href=\"../viz/parallelism.html\" target=\"_blank\" rel=\"noopener\">open full screen ↗</a></div></div>", "note": "<b>Play with the live version first.</b> Move the sliders above to build intuition for <b>DP · FSDP · TP · PP on a Device Mesh</b>, then scroll down for the piece-by-piece explanation."}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span class=\"kw\">def</span> <span class=\"fn\">bubble</span>(p, m): <span class=\"kw\">return</span> (p - <span class=\"num\">1</span>) / (m + p - <span class=\"num\">1</span>)</div>", "note": "<b>def bubble(p, m): return (p - 1) / (m + p - 1)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">p = <span class=\"num\">4</span>                       <span style=\"color:#6C7086\"># 4 stages (devices)</span></div>", "note": "<b>4 stages (devices)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># --- naive: one batch, no micro-batching ---</span></div>", "note": "<b>--- naive: one batch, no micro-batching ---</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">bubble(p, m=<span class=\"num\">1</span>)               <span style=\"color:#6C7086\"># (4-1)/(1+4-1) = 3/4</span></div>", "note": "<b>(4-1)/(1+4-1) = 3/4</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> <span class=\"out\">0.75   → 75% of device time is IDLE (huge bubble)</span></div>", "note": "<b>→ 0.75   → 75% of device time is IDLE (huge bubble)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># --- micro-batching: split the batch into 8 ---</span></div>", "note": "<b>--- micro-batching: split the batch into 8 ---</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">bubble(p, m=<span class=\"num\">8</span>)               <span style=\"color:#6C7086\"># (4-1)/(8+4-1) = 3/11</span></div>", "note": "<b>(4-1)/(8+4-1) = 3/11</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> <span class=\"out\">0.27   → only ~27% idle (bubble shrank)</span></div>", "note": "<b>→ 0.27   → only ~27% idle (bubble shrank)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># --- more micro-batches: split into 32 ---</span></div>", "note": "<b>--- more micro-batches: split into 32 ---</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">bubble(p, m=<span class=\"num\">32</span>)              <span style=\"color:#6C7086\"># (4-1)/(32+4-1) = 3/35</span></div>", "note": "<b>(4-1)/(32+4-1) = 3/35</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> <span class=\"out\">0.09   → ~9% idle — the line stays almost full</span></div>", "note": "<b>→ 0.09   → ~9% idle — the line stays almost full</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># lesson: p is fixed, but push m up and the bubble → 0</span></div>", "note": "<b>lesson: p is fixed, but push m up and the bubble → 0</b>"}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[{"q": "You profile a pipeline-parallel training run with <code>p = 8</code> stages and <code>m = 8</code> micro-batches. Device utilization is far below what <code>bubble(8, 8) = 7/15 ≈ 47%</code> idle would predict as the theoretical floor — actual idle time is much higher. What is the most likely cause?", "opts": ["The bubble formula is only an approximation, so large gaps between predicted and measured idle time are expected and not worth investigating", "One stage (e.g. the one holding the embedding or final layers) does more compute or communication per micro-batch than the others, so faster stages stall waiting on the slowest stage — the pipeline is bottlenecked by an unbalanced split, not by the fill/drain bubble alone", "You should increase p to reduce the bubble fraction, since more stages always overlap better", "The GPUs are defective and need to be replaced"], "ans": 1, "fb": "Right. The (p-1)/(m+p-1) formula assumes every stage takes equal time per micro-batch. If layers are split unevenly (a common mistake when embedding/output layers or attention-heavy blocks land on one stage), the slowest stage becomes the bottleneck and every other stage idles waiting on it — idle time beyond the theoretical bubble. The tempting wrong answer is raising p: increasing stages actually raises the (p-1) term in the numerator, making the bubble fraction worse, not better, so that 'fix' would make utilization drop further, not recover it."}, {"q": "A teammate increases <code>m</code> from 8 to 128 for a <code>p = 4</code> pipeline expecting idle time to keep shrinking toward zero as the formula suggests. Training throughput does improve but then plateaus and total step time starts creeping back up. What should you check first?", "opts": ["Recompute bubble(4, 128) by hand — the formula must be wrong", "Whether activation memory now exceeds device capacity: smaller micro-batches mean more in-flight activations must be kept for the backward pass across stages, so pushing m very high trades the bubble away for a memory or per-step overhead cost that isn't captured in the idealized formula", "Whether the learning rate schedule needs to change because m changed", "Whether the number of devices p should also be increased to match m"], "ans": 1, "fb": "Right. The bubble formula only models idle time from fill/drain; it says nothing about memory. Naive pipelining (like GPipe) must store activations for every in-flight micro-batch until the backward pass reaches it, so very large m increases peak memory and per-micro-batch fixed overhead (communication, kernel launch), which can outweigh the shrinking bubble and cause throughput to plateau or regress. The tempting wrong answer is blaming the formula's math — the formula itself is fine, it's just an incomplete model of the real system, so 'recompute it by hand' finds nothing new."}, {"q": "Which single factor most directly decides how small you can push the pipeline bubble fraction for a fixed number of stages <code>p</code>, and why can't you just push it to zero?", "opts": ["The number of devices p, because more devices always overlap better", "The number of micro-batches m you can feasibly use, because m sits in the denominator and can shrink the fraction arbitrarily close to zero, but m is capped in practice by the fixed per-micro-batch overhead and activation memory that grows with how many micro-batches are in flight", "The choice of optimizer, because Adam handles gradient noise from micro-batching better than SGD", "The network bandwidth between devices, because that determines the fill time directly and nothing else matters"], "ans": 1, "fb": "Right. Algebraically, (p-1) is fixed once you pick your stage count, so the only lever you control is m in the denominator — but you can't take m to infinity: each micro-batch adds fixed overhead (communication round-trips, kernel launch cost) and keeps its activations resident until backward pass, so memory and per-step overhead set a practical ceiling on m long before the bubble reaches zero. The tempting wrong answer is p — increasing p actually increases the (p-1) numerator, making the bubble worse for the same m, exactly the opposite of what's needed."}, {"q": "You combine pipeline parallelism (p=4) with tensor parallelism (from Day 2) on the same cluster. Compared to pure pipeline parallelism at the same total device count, what changes about the bubble, and why is this the right trade-off to reason about?", "opts": ["The bubble fraction formula (p-1)/(m+p-1) no longer applies at all once TP is added, so bubble analysis becomes meaningless", "The bubble fraction for the pipeline dimension is unchanged by adding TP inside each stage — TP only speeds up the compute within a stage (via intra-layer sharding), so the same p and m still set the same fill/drain idle fraction; the benefit of combining them is fitting bigger stages in memory and reducing per-stage latency, not shrinking the pipeline bubble itself", "Adding TP makes the bubble fraction exactly (p-1)/(m+p-1) squared", "TP eliminates the need for micro-batching entirely, so m can be set to 1 with no downside"], "ans": 1, "fb": "Right. TP shards the work within each stage (e.g. splitting matrix multiplies across devices) but doesn't change the pipeline's stage-to-stage dependency structure, so the fill/drain bubble formula still governs the pipeline dimension independently — combining PP and TP is about fitting larger stages and cutting per-stage latency, not about reducing the pipeline bubble fraction itself. The tempting wrong answer is claiming TP removes the need for micro-batching: TP addresses a different axis (intra-layer compute), and setting m=1 would still incur the full (p-1)/p bubble regardless of how much TP speeds up each stage's work."}];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

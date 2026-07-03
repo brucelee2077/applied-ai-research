@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Roofline Model — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+/* top bar */
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
+.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
+.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.mem{color:var(--bad)}.ro-v.comp{color:var(--ok)}
+@media(max-width:560px){.readouts{grid-template-columns:1fr}}
+
+/* figure */
+.figwrap{width:100%}
+svg#roof{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.axis path,.axis line{stroke:var(--border);stroke-width:1}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.axis-title{fill:var(--text2);font-family:var(--body);font-size:12px;font-weight:600}
+.grid line{stroke:var(--border2);stroke-width:1;shape-rendering:crispEdges}
+.grid path{stroke:none}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+
+/* takeaway */
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+.k-mem{color:var(--bad);font-weight:600}.k-comp{color:var(--ok);font-weight:600}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">The Roofline Model</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Performance modeling</span>
+    <h1>The Roofline Model</h1>
+    <p><b>What am I looking at?</b> The roofline model shows the fastest speed a kernel can reach on a chip,
+    given how much math it does per byte of memory it moves. If it moves too many bytes for too little math,
+    memory bandwidth caps it (the sloped roof). If it does plenty of math per byte, raw compute caps it (the flat roof).</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Peak compute <span class="ctrl-hint">(bf16 matmul throughput)</span></span>
+          <span class="ctrl-val" id="val-flops">989 TFLOP/s</span>
+        </div>
+        <input type="range" id="flops" min="100" max="2000" step="1" value="989"
+               aria-label="Peak compute in teraFLOP per second">
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Memory bandwidth <span class="ctrl-hint">(HBM read/write)</span></span>
+          <span class="ctrl-val" id="val-bw">3.35 TB/s</span>
+        </div>
+        <input type="range" id="bw" min="0.5" max="8" step="0.05" value="3.35"
+               aria-label="Memory bandwidth in teraBytes per second">
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Your kernel's arithmetic intensity <span class="ctrl-hint">(FLOPs per byte)</span></span>
+          <span class="ctrl-val" id="val-ai">4.0 FLOP/byte</span>
+        </div>
+        <input type="range" id="ai" min="-1" max="3" step="0.01" value="0.602"
+               aria-label="Arithmetic intensity in FLOPs per byte, log scale">
+      </div>
+
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Try a kernel:</span>
+        <button class="preset-btn" data-ai="1">LLM decode (batch 1) &middot; ~1</button>
+        <button class="preset-btn" data-ai="16">LLM decode (batch 16) &middot; ~16</button>
+        <button class="preset-btn" data-ai="120">Prefill / big GEMM &middot; ~120</button>
+        <button class="preset-btn" data-ai="400">FlashAttention (long seq) &middot; ~400</button>
+      </div>
+
+      <div class="readouts">
+        <div class="ro">
+          <div class="ro-k">Ridge intensity</div>
+          <div class="ro-v" id="ro-ridge">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Bound by</div>
+          <div class="ro-v" id="ro-bound">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Attainable throughput</div>
+          <div class="ro-v" id="ro-attain">&mdash;</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Roofline</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="roof" viewBox="0 0 720 460" role="img"
+           aria-label="Roofline plot: attainable throughput in FLOP per second versus arithmetic intensity in FLOPs per byte, on log-log axes. A sloped memory-bandwidth ceiling meets a flat compute ceiling at the ridge point.">
+      </svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>The kernel sits at <b>attainable = min(peak_compute, intensity &times; bandwidth)</b>.
+        Left of the ridge it is <span class="k-mem">memory-bound</span> (the sloped roof, limited by loading bytes);
+        right of the ridge it is <span class="k-comp">compute-bound</span> (the flat roof, limited by raw FLOPs).</li>
+      <li>The ridge point is <b>intensity_ridge = peak_compute / bandwidth</b>. Most LLM <b>decode</b> lives far to the
+        <span class="k-mem">left</span> of it: each token reloads all the weights but does little math per byte, so it is bound by weight loading, not compute.</li>
+      <li>Raising arithmetic intensity &mdash; <b>bigger batch</b>, <b>kernel fusion</b>, <b>FlashAttention</b> &mdash;
+        moves the dot <span class="k-comp">right</span> toward the compute roof, where the expensive silicon is actually used.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById("roof");
+
+  // Graceful degradation if D3 failed to load.
+  if (typeof window.d3 === "undefined") {
+    console.warn("[roofline] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) {
+      svgEl.outerHTML =
+        '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>' +
+        'Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>';
+    }
+    return;
+  }
+
+  var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = reduceMotion ? 0 : 260;
+
+  // ---- units -------------------------------------------------------------
+  // Internal base units:
+  //   compute in FLOP/s, bandwidth in bytes/s, intensity in FLOP/byte.
+  // Sliders expose compute in TFLOP/s and bandwidth in TB/s.
+  var TFLOP = 1e12;   // 1 TFLOP/s = 1e12 FLOP/s
+  var TB    = 1e12;   // 1 TB/s    = 1e12 bytes/s
+
+  // ---- axis domains (log10) ---------------------------------------------
+  // X: arithmetic intensity, FLOP/byte, from 0.1 to 1000.
+  var AI_MIN = 0.1, AI_MAX = 1000;
+  // Y: throughput, FLOP/s. Cover 1 TFLOP/s .. 4 PFLOP/s so the roof always fits.
+  var Y_MIN = 1e12, Y_MAX = 4e15;
+
+  // ---- geometry ----------------------------------------------------------
+  var W = 720, H = 460;
+  var M = { top: 24, right: 28, bottom: 52, left: 70 };
+  var iw = W - M.left - M.right;
+  var ih = H - M.top - M.bottom;
+
+  var svg = d3.select(svgEl);
+  var root = svg.append("g").attr("transform", "translate(" + M.left + "," + M.top + ")");
+
+  var x = d3.scaleLog().domain([AI_MIN, AI_MAX]).range([0, iw]);
+  var y = d3.scaleLog().domain([Y_MIN, Y_MAX]).range([ih, 0]);
+
+  // ---- gridlines ---------------------------------------------------------
+  root.append("g")
+      .attr("class", "grid")
+      .attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(x).ticks(4, "~s").tickSize(-ih).tickFormat(""));
+  root.append("g")
+      .attr("class", "grid")
+      .call(d3.axisLeft(y).ticks(4, "~s").tickSize(-iw).tickFormat(""));
+
+  // ---- axes --------------------------------------------------------------
+  function fmtAI(d){
+    if (d >= 1) return d3.format("~s")(d);
+    return d3.format("~g")(d);        // 0.1, 0.01 -> readable
+  }
+  // Throughput ticks: show as TFLOP/s / PFLOP/s.
+  function fmtFlops(d){
+    if (d >= 1e15) return (d / 1e15) + " P";
+    if (d >= 1e12) return (d / 1e12) + " T";
+    if (d >= 1e9)  return (d / 1e9) + " G";
+    return d3.format("~s")(d);
+  }
+
+  root.append("g")
+      .attr("class", "axis")
+      .attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(x)
+        .tickValues([0.1, 1, 10, 100, 1000])
+        .tickFormat(fmtAI));
+
+  root.append("g")
+      .attr("class", "axis")
+      .call(d3.axisLeft(y)
+        .tickValues([1e12, 1e13, 1e14, 1e15])
+        .tickFormat(fmtFlops));
+
+  // axis titles
+  root.append("text")
+      .attr("class", "axis-title")
+      .attr("x", iw / 2).attr("y", ih + 40)
+      .attr("text-anchor", "middle")
+      .text("Arithmetic intensity  (FLOPs / byte, log scale)");
+
+  root.append("text")
+      .attr("class", "axis-title")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -ih / 2).attr("y", -52)
+      .attr("text-anchor", "middle")
+      .text("Attainable throughput  (FLOP/s, log scale)");
+
+  // ---- dynamic elements (created once, updated on change) ----------------
+  var roofPath = root.append("path")
+      .attr("fill", "none")
+      .attr("stroke", "var(--accent)")
+      .attr("stroke-width", 2.5)
+      .attr("stroke-linejoin", "round");
+
+  // faint shading under the roof to suggest "achievable region"
+  var roofFill = root.append("path")
+      .attr("fill", "var(--accent)")
+      .attr("opacity", 0.06);
+
+  var ridgeLine = root.append("line")
+      .attr("stroke", "var(--warn)")
+      .attr("stroke-width", 1.5)
+      .attr("stroke-dasharray", "5 4");
+
+  var ridgeLabel = root.append("text")
+      .attr("fill", "var(--warn)")
+      .attr("font-family", "var(--mono)")
+      .attr("font-size", "10px")
+      .attr("font-weight", "600")
+      .attr("text-anchor", "middle");
+
+  // region labels
+  var memLabel = root.append("text")
+      .attr("fill", "var(--bad)")
+      .attr("font-family", "var(--body)")
+      .attr("font-size", "11px")
+      .attr("font-weight", "600")
+      .attr("text-anchor", "middle")
+      .attr("opacity", 0.75)
+      .text("memory-bound");
+  var compLabel = root.append("text")
+      .attr("fill", "var(--ok)")
+      .attr("font-family", "var(--body)")
+      .attr("font-size", "11px")
+      .attr("font-weight", "600")
+      .attr("text-anchor", "middle")
+      .attr("opacity", 0.75)
+      .text("compute-bound");
+
+  // dropline from the kernel dot down to the x axis
+  var dropX = root.append("line")
+      .attr("stroke", "var(--muted)")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "2 3")
+      .attr("opacity", 0.6);
+
+  var kernelDot = root.append("circle")
+      .attr("r", 7)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 2);
+
+  var kernelLabel = root.append("text")
+      .attr("font-family", "var(--mono)")
+      .attr("font-size", "10px")
+      .attr("font-weight", "600")
+      .attr("text-anchor", "middle");
+
+  // ---- helpers -----------------------------------------------------------
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  // attainable throughput at a given intensity (FLOP/s)
+  function attainable(ai, peakFlops, bw){
+    return Math.min(peakFlops, ai * bw);
+  }
+
+  // ---- state / read sliders ---------------------------------------------
+  var elFlops = document.getElementById("flops");
+  var elBw    = document.getElementById("bw");
+  var elAi    = document.getElementById("ai");
+
+  var valFlops = document.getElementById("val-flops");
+  var valBw    = document.getElementById("val-bw");
+  var valAi    = document.getElementById("val-ai");
+
+  var roRidge  = document.getElementById("ro-ridge");
+  var roBound  = document.getElementById("ro-bound");
+  var roAttain = document.getElementById("ro-attain");
+
+  // Pretty-print a FLOP/s value.
+  function prettyFlops(f){
+    if (f >= 1e15) return (f / 1e15).toFixed(2) + " PFLOP/s";
+    if (f >= 1e12) return (f / 1e12).toFixed(1) + " TFLOP/s";
+    if (f >= 1e9)  return (f / 1e9).toFixed(1) + " GFLOP/s";
+    return d3.format(".2s")(f) + "FLOP/s";
+  }
+  // Pretty-print arithmetic intensity.
+  function prettyAI(ai){
+    if (ai >= 100) return ai.toFixed(0);
+    if (ai >= 10)  return ai.toFixed(1);
+    if (ai >= 1)   return ai.toFixed(2);
+    return ai.toFixed(3);
+  }
+
+  function draw(){
+    // read raw slider values
+    var peakT = +elFlops.value;                 // TFLOP/s
+    var bwT   = +elBw.value;                     // TB/s
+    var ai    = Math.pow(10, +elAi.value);       // FLOP/byte (slider is log10)
+
+    // convert to base units
+    var peakFlops = peakT * TFLOP;               // FLOP/s
+    var bwBytes   = bwT * TB;                     // bytes/s
+
+    // ridge point: where sloped ceiling meets flat ceiling
+    var ridge = peakFlops / bwBytes;             // FLOP/byte
+    var ridgeClamped = clamp(ridge, AI_MIN, AI_MAX);
+
+    // ---- update slider readouts ----
+    valFlops.textContent = peakT.toFixed(0) + " TFLOP/s";
+    valBw.textContent    = bwT.toFixed(2) + " TB/s";
+    valAi.textContent    = prettyAI(ai) + " FLOP/byte";
+
+    // ---- roofline path across the visible x-range ----
+    // At the left edge, throughput = AI_MIN * bw (may be below Y_MIN — clamped by scale).
+    // The line is piecewise: sloped up to the ridge, then flat at peak.
+    var pts = [];
+    pts.push([AI_MIN, Math.min(peakFlops, AI_MIN * bwBytes)]);
+    if (ridge > AI_MIN && ridge < AI_MAX) {
+      pts.push([ridge, peakFlops]);              // the corner (ridge point)
+    }
+    pts.push([AI_MAX, Math.min(peakFlops, AI_MAX * bwBytes)]);
+
+    var line = d3.line()
+        .x(function(d){ return x(d[0]); })
+        .y(function(d){ return y(clamp(d[1], Y_MIN, Y_MAX)); });
+
+    roofPath.transition().duration(DUR).attr("d", line(pts));
+
+    // filled achievable region (roof down to bottom axis)
+    var fillPts = pts.slice();
+    var area = "M" + x(AI_MIN) + "," + y(clamp(pts[0][1], Y_MIN, Y_MAX));
+    for (var i = 1; i < fillPts.length; i++){
+      area += "L" + x(fillPts[i][0]) + "," + y(clamp(fillPts[i][1], Y_MIN, Y_MAX));
+    }
+    area += "L" + x(AI_MAX) + "," + y(Y_MIN);
+    area += "L" + x(AI_MIN) + "," + y(Y_MIN) + "Z";
+    roofFill.transition().duration(DUR).attr("d", area);
+
+    // ---- ridge line + label ----
+    var showRidge = ridge > AI_MIN && ridge < AI_MAX;
+    ridgeLine
+        .style("display", showRidge ? null : "none")
+        .transition().duration(DUR)
+        .attr("x1", x(ridgeClamped)).attr("x2", x(ridgeClamped))
+        .attr("y1", 0).attr("y2", ih);
+    ridgeLabel
+        .style("display", showRidge ? null : "none")
+        .transition().duration(DUR)
+        .attr("x", x(ridgeClamped))
+        .attr("y", 12);
+    ridgeLabel.text("ridge " + prettyAI(ridge));
+
+    // ---- region labels positioned around the ridge ----
+    var leftX = showRidge ? x(Math.sqrt(AI_MIN * ridgeClamped)) : x(Math.sqrt(AI_MIN * AI_MAX));
+    var rightX = showRidge ? x(Math.sqrt(ridgeClamped * AI_MAX)) : null;
+    memLabel.transition().duration(DUR).attr("x", leftX).attr("y", ih - 12);
+    compLabel
+        .style("display", showRidge ? null : "none")
+        .transition().duration(DUR)
+        .attr("x", rightX).attr("y", 30);
+
+    // ---- kernel dot on the roof ----
+    var attain = attainable(ai, peakFlops, bwBytes);   // FLOP/s
+    var isMemBound = ai < ridge;                        // left of ridge
+    var dotColor = isMemBound ? "var(--bad)" : "var(--ok)";
+
+    var px = x(clamp(ai, AI_MIN, AI_MAX));
+    var py = y(clamp(attain, Y_MIN, Y_MAX));
+
+    kernelDot.transition().duration(DUR)
+        .attr("cx", px).attr("cy", py)
+        .attr("fill", dotColor);
+
+    dropX.transition().duration(DUR)
+        .attr("x1", px).attr("x2", px)
+        .attr("y1", py).attr("y2", ih);
+
+    // keep the dot label inside the plot
+    var labelY = py - 12 < 8 ? py + 20 : py - 12;
+    kernelLabel.transition().duration(DUR)
+        .attr("x", clamp(px, 32, iw - 32))
+        .attr("y", labelY)
+        .attr("fill", dotColor);
+    kernelLabel.text("your kernel");
+
+    // ---- numeric readouts ----
+    roRidge.textContent = prettyAI(ridge) + " FLOP/byte";
+
+    roBound.textContent = isMemBound ? "Memory" : "Compute";
+    roBound.className = "ro-v " + (isMemBound ? "mem" : "comp");
+
+    // fraction of peak reached
+    var frac = attain / peakFlops;
+    roAttain.textContent = prettyFlops(attain) + "  (" + (frac * 100).toFixed(0) + "% of peak)";
+    roAttain.className = "ro-v " + (isMemBound ? "mem" : "comp");
+  }
+
+  // ---- wire up controls --------------------------------------------------
+  ["input", "change"].forEach(function(evt){
+    elFlops.addEventListener(evt, draw);
+    elBw.addEventListener(evt, draw);
+    elAi.addEventListener(evt, draw);
+  });
+
+  // preset buttons set the arithmetic-intensity slider (log10)
+  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      var target = +btn.getAttribute("data-ai");
+      var log = clamp(Math.log10(target), +elAi.min, +elAi.max);
+      elAi.value = log;
+      draw();
+    });
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>

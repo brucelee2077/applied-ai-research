@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer Compute &amp; Memory: C≈6ND and the Footprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --bad:#BE3E26; --bad-l:#FDEEE9; --warn:#C99A12; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+  /* memory bar colors */
+  --c-w:#2A7B9B; --c-g:#7B6DAA; --c-o:#C99A12; --c-a:#2D8B55;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+.nav{position:sticky;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-size:.8rem;color:var(--muted);border:1px solid var(--border);border-radius:var(--r-sm);padding:.35rem .7rem}
+.nav-back:hover{color:var(--accent);border-color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2.5rem 1.25rem 0}
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.hero .lead{margin-top:.6rem;font-size:1.05rem;color:var(--text2);line-height:1.45}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.6rem}
+.card h2{font-family:var(--display);font-size:1.25rem;font-weight:700;margin-bottom:.3rem}
+.card .sub{font-size:.92rem;color:var(--text2);margin-bottom:1.1rem}
+.formula{font-family:var(--mono);font-size:1rem;background:var(--bg-warm);border:1px solid var(--border);border-radius:var(--r-md);padding:.7rem 1rem;margin:.9rem 0;color:var(--accent-d);text-align:center;line-height:1.7}
+.formula b{color:var(--text)}
+
+.ctrls{display:grid;gap:1rem;margin:1rem 0 1.3rem}
+@media(min-width:620px){.ctrls.two{grid-template-columns:1fr 1fr}}
+.ctrl{display:flex;flex-direction:column;gap:.35rem}
+.ctrl-top{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem}
+.ctrl-label{font-size:.85rem;font-weight:600}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);background:var(--accent-l);padding:2px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.ctrl-hint{font-size:.72rem;color:var(--muted)}
+
+.seg{display:flex;flex-wrap:wrap;gap:.4rem;margin:.2rem 0}
+.seg button{font-family:var(--mono);font-size:.78rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.4rem .7rem;cursor:pointer;transition:all .15s}
+.seg button:hover{border-color:var(--accent);color:var(--accent)}
+.seg button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.readouts{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-top:.4rem}
+@media(max-width:560px){.readouts{grid-template-columns:1fr}}
+.ro{border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem 1rem;background:var(--surface2)}
+.ro .k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.ro .v{font-family:var(--mono);font-size:1.35rem;font-weight:600;color:var(--accent-d);margin-top:.15rem;line-height:1.2}
+.ro .v small{font-size:.78rem;color:var(--text2);font-weight:500}
+
+figure{margin:1rem 0 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);padding:.6rem}
+figure svg{display:block;width:100%;height:auto}
+.fig-fallback{padding:2rem 1rem;text-align:center;color:var(--muted);font-size:.9rem}
+
+.status{display:flex;align-items:center;gap:.7rem;margin-top:1rem;padding:.85rem 1.1rem;border-radius:var(--r-md);border-left:4px solid;font-size:.92rem;font-weight:500}
+.status .ic{font-size:1.15rem}
+.status.fit{background:var(--ok-l);border-color:var(--ok);color:var(--ok)}
+.status.fsdp{background:var(--warn-l);border-color:var(--warn);color:#8A6D12}
+.status.tp{background:var(--bad-l);border-color:var(--bad);color:var(--bad)}
+.status b{font-weight:700}
+
+.take{margin-top:.4rem;background:var(--accent-l);border:1px solid #cfe6ee;border-left:4px solid var(--accent);border-radius:var(--r-md);padding:1.1rem 1.3rem}
+.take h3{font-family:var(--display);font-size:1.02rem;color:var(--accent-d);margin-bottom:.5rem}
+.take ul{margin:0 0 0 1.1rem}
+.take li{margin-bottom:.4rem;font-size:.92rem;color:var(--text)}
+.take li:last-child{margin-bottom:0}
+.take b{color:var(--accent-d)}
+
+.legend{display:flex;flex-wrap:wrap;gap:.9rem;margin:.6rem 0 0;padding:0 .3rem;font-size:.78rem;color:var(--text2)}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+footer{max-width:860px;margin:2.5rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+
+@media(max-width:600px){.hero h1{font-size:1.6rem}.card{padding:1.1rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+
+<body>
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Transformer Compute &amp; Memory</span>
+    <a class="nav-back" href="../index.html">← All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <header class="hero">
+    <span class="eyebrow">Frontier Lab · ML Systems</span>
+    <h1>C ≈ 6ND and the Training Footprint</h1>
+    <p class="lead">Two numbers every ML-systems engineer keeps in their head: how many <b>FLOPs</b> (floating-point
+    operations) it takes to train a model, and how much <b>memory</b> that training actually eats. Move the sliders and watch both.</p>
+  </header>
+
+  <!-- ============ WHAT AM I LOOKING AT? ============ -->
+  <section class="card" style="background:var(--surface2)">
+    <h2>What am I looking at?</h2>
+    <p class="sub" style="margin-bottom:0">This page has two calculators. <b>Part 1</b> estimates how much
+    <b>compute</b> (raw math work, measured in FLOPs) it takes to train a model — using the simple rule
+    that each parameter costs about six FLOPs for every token of training data. <b>Part 2</b> estimates
+    how much <b>memory</b> that same training needs, and stacks the four things you must keep on the chip
+    at once: the model weights, their gradients, the Adam optimizer's extra buffers, and the activations.
+    Drag the sliders in each part. The numbers, the chart, and the "fits / needs sharding" verdict all
+    update as you move them.</p>
+  </section>
+
+  <!-- ============ PART 1: COMPUTE ============ -->
+  <section class="card">
+    <h2>Part 1 · Training compute: C ≈ 6ND</h2>
+    <p class="sub">A rule of thumb: training a dense transformer costs about six FLOPs per parameter, per token seen.</p>
+
+    <div class="formula">
+      C &nbsp;≈&nbsp; <b>6</b> · <b>N</b> · <b>D</b>
+      &nbsp;&nbsp;<span style="font-size:.82rem;color:var(--text2)">( 6 = 2 FLOP per multiply-add × [1 forward + 2 backward] )</span>
+    </div>
+    <p class="sub" style="margin-bottom:.4rem">N = number of parameters &nbsp;·&nbsp; D = number of training tokens. Inference is forward-only, so it costs about <b>2ND</b> instead of 6ND.</p>
+
+    <div class="ctrls two">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <label class="ctrl-label" for="sN">N — parameters</label>
+          <span class="ctrl-val" id="vN">7.0 B</span>
+        </div>
+        <input type="range" id="sN" min="0" max="1000" value="794" aria-label="number of parameters (log scale)">
+        <span class="ctrl-hint">1 M → 70 B (log scale)</span>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <label class="ctrl-label" for="sD">D — training tokens</label>
+          <span class="ctrl-val" id="vD">1.4 T</span>
+        </div>
+        <input type="range" id="sD" min="0" max="1000" value="856" aria-label="number of training tokens (log scale)">
+        <span class="ctrl-hint">1 M → 15 T (log scale)</span>
+      </div>
+    </div>
+
+    <div class="readouts">
+      <div class="ro"><div class="k">Training compute (6ND)</div><div class="v" id="roFlops">—</div></div>
+      <div class="ro"><div class="k">≈ H100 time <small>(one GPU, 40% MFU)</small></div><div class="v" id="roDays">—</div></div>
+    </div>
+
+    <figure>
+      <svg id="svgCompute" viewBox="0 0 720 260" role="img"
+        aria-label="Log-log chart of training compute in FLOPs versus number of parameters, with the current point marked."></svg>
+      <div class="fig-fallback" id="fbCompute" hidden></div>
+    </figure>
+    <div class="legend" style="padding-top:.4rem">
+      <span><i style="background:var(--accent)"></i> your model (6ND)</span>
+      <span><i style="background:#7B6DAA"></i> a few known scales</span>
+    </div>
+  </section>
+
+  <!-- ============ PART 2: MEMORY ============ -->
+  <section class="card">
+    <h2>Part 2 · Training memory footprint</h2>
+    <p class="sub">To train with Adam you must hold four things in device memory at once. Only one of them is the model.</p>
+
+    <div class="formula" style="font-size:.92rem;text-align:left;line-height:2">
+      weights = <b>N · bytes</b> &nbsp;·&nbsp; gradients = <b>N · bytes</b><br>
+      optimizer (Adam) = <b>2 · N · bytes</b> &nbsp;<span style="color:var(--bad)">← the "2×" people forget</span> (momentum + variance)<br>
+      activations ≈ <b>batch · seq · layers · hidden · 34</b> bytes &nbsp;<span style="font-size:.8rem;color:var(--text2)">(rough fp16 estimate, no checkpointing)</span>
+    </div>
+
+    <div class="ctrls two">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <label class="ctrl-label" for="sN2">N — parameters</label>
+          <span class="ctrl-val" id="vN2">7.0 B</span>
+        </div>
+        <input type="range" id="sN2" min="0" max="1000" value="794" aria-label="number of parameters (log scale), linked to Part 1">
+        <span class="ctrl-hint">shared with Part 1</span>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <label class="ctrl-label" for="sMem">Device memory budget</label>
+          <span class="ctrl-val" id="vMem">80 GB</span>
+        </div>
+        <input type="range" id="sMem" min="16" max="192" value="80" step="8" aria-label="per-device memory budget in gigabytes">
+        <span class="ctrl-hint">per accelerator (e.g. H100 = 80 GB)</span>
+      </div>
+    </div>
+
+    <div class="ctrl" style="margin-bottom:1rem">
+      <div class="ctrl-top"><span class="ctrl-label">Weight dtype</span><span class="ctrl-val" id="vDtype">bf16 · 2 B/param</span></div>
+      <div class="seg" id="segDtype">
+        <button data-b="2" class="active">bf16 / fp16 (2 B)</button>
+        <button data-b="4">fp32 (4 B)</button>
+        <button data-b="1">fp8 (1 B)</button>
+      </div>
+    </div>
+
+    <div class="ctrls two">
+      <div class="ctrl">
+        <div class="ctrl-top"><label class="ctrl-label" for="sBatch">Batch (sequences)</label><span class="ctrl-val" id="vBatch">8</span></div>
+        <input type="range" id="sBatch" min="1" max="64" value="8" step="1" aria-label="micro-batch size in sequences">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><label class="ctrl-label" for="sSeq">Sequence length</label><span class="ctrl-val" id="vSeq">2048</span></div>
+        <input type="range" id="sSeq" min="512" max="8192" value="2048" step="512" aria-label="sequence length in tokens">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><label class="ctrl-label" for="sLayers">Layers</label><span class="ctrl-val" id="vLayers">32</span></div>
+        <input type="range" id="sLayers" min="4" max="120" value="32" step="1" aria-label="number of transformer layers">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><label class="ctrl-label" for="sHidden">Hidden size</label><span class="ctrl-val" id="vHidden">4096</span></div>
+        <input type="range" id="sHidden" min="512" max="16384" value="4096" step="256" aria-label="hidden dimension size">
+      </div>
+    </div>
+
+    <figure>
+      <svg id="svgMem" viewBox="0 0 720 300" role="img"
+        aria-label="Stacked bar of training memory (weights, gradients, Adam optimizer state, activations) compared to the device memory budget line."></svg>
+      <div class="fig-fallback" id="fbMem" hidden></div>
+    </figure>
+    <div class="legend">
+      <span><i style="background:var(--c-w)"></i> weights</span>
+      <span><i style="background:var(--c-g)"></i> gradients</span>
+      <span><i style="background:var(--c-o)"></i> Adam state (2×)</span>
+      <span><i style="background:var(--c-a)"></i> activations</span>
+    </div>
+
+    <div class="readouts" style="margin-top:1rem">
+      <div class="ro"><div class="k">Total training memory</div><div class="v" id="roTotal">—</div></div>
+      <div class="ro"><div class="k">Weights alone</div><div class="v" id="roWeights">—</div></div>
+    </div>
+
+    <div class="status" id="status"><span class="ic">•</span><span id="statusTxt">—</span></div>
+  </section>
+
+  <!-- ============ TAKEAWAY ============ -->
+  <div class="take">
+    <h3>What to notice</h3>
+    <ul>
+      <li><b>Training compute is ≈ 6ND</b>; inference (forward only) is ≈ 2ND. The factor 6 = 2 FLOP/multiply-add × (1 forward + 2 backward passes). Both scale linearly in params <i>and</i> tokens — double either and you double the bill.</li>
+      <li><b>Adam optimizer state alone is 2× the model size</b> (one buffer for momentum, one for variance). So weights + gradients + Adam ≈ 4× the weight bytes before any activations — the number people forget and then hit "out of memory".</li>
+      <li>When the stacked bar passes the budget line, one device can't hold it: you shard the optimizer/gradients/weights (<b>FSDP</b>), and past that you split each layer across devices too (<b>tensor parallel + FSDP</b>).</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  Frontier Lab · ML-systems study · C ≈ 6ND and the training footprint. Numbers are order-of-magnitude estimates for building intuition, not a substitute for profiling a real run.
+</footer>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var DUR = REDUCE ? 0 : 350;
+
+  // ---------- helpers ----------
+  // Map a 0..1000 slider position to a value on a log scale between lo and hi.
+  function logScaleFromSlider(pos, lo, hi){
+    var t = pos / 1000;                       // 0..1
+    return lo * Math.pow(hi / lo, t);         // geometric interpolation
+  }
+  // Format a big integer count (params / tokens) with unit suffix.
+  function fmtCount(x){
+    if (x >= 1e12) return (x/1e12).toFixed(x/1e12 >= 10 ? 0 : 1) + " T";
+    if (x >= 1e9)  return (x/1e9 ).toFixed(x/1e9  >= 10 ? 0 : 1) + " B";
+    if (x >= 1e6)  return (x/1e6 ).toFixed(x/1e6  >= 10 ? 0 : 1) + " M";
+    if (x >= 1e3)  return (x/1e3 ).toFixed(0) + " K";
+    return x.toFixed(0);
+  }
+  // Format FLOPs with scientific-ish suffix.
+  function fmtFlops(x){
+    var units = [[1e24,"YFLOP"],[1e21,"ZFLOP"],[1e18,"EFLOP"],[1e15,"PFLOP"],[1e12,"TFLOP"],[1e9,"GFLOP"]];
+    for (var i=0;i<units.length;i++){ if (x >= units[i][0]) return (x/units[i][0]).toFixed(2) + " " + units[i][1]; }
+    return x.toExponential(2) + " FLOP";
+  }
+  // Format bytes as GB (with TB rollover).
+  function fmtBytes(b){
+    var gb = b / 1e9;
+    if (gb >= 1000) return (gb/1000).toFixed(2) + " TB";
+    if (gb >= 10)   return gb.toFixed(0) + " GB";
+    return gb.toFixed(2) + " GB";
+  }
+  function fmtDays(days){
+    if (days >= 365) return (days/365).toFixed(1) + " GPU-yr";
+    if (days >= 1)   return days.toFixed(1) + " GPU-days";
+    var hrs = days*24;
+    if (hrs >= 1)    return hrs.toFixed(1) + " GPU-hr";
+    return (hrs*60).toFixed(0) + " GPU-min";
+  }
+
+  // ---------- constants ----------
+  var N_LO = 1e6, N_HI = 70e9;                 // params: 1M .. 70B
+  var D_LO = 1e6, D_HI = 15e12;                // tokens: 1M .. 15T
+  var H100_FLOPS = 989e12;                      // ~989 TFLOP/s bf16 dense (H100 SXM)
+  var MFU = 0.40;                               // assumed utilization
+  var ACT_COEF = 34;                            // rough per-layer activation coefficient
+
+  // graceful degradation
+  var HAS_D3 = (typeof window.d3 !== "undefined" && window.d3);
+  if (!HAS_D3){
+    console.warn("d3 not found (expected ./d3.v7.min.js) — showing static fallback message.");
+    ["fbCompute","fbMem"].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el){ el.hidden = false; el.textContent = "Interactive chart needs D3 (./d3.v7.min.js). The sliders and numbers above still work."; }
+    });
+    var sc = document.getElementById("svgCompute"), sm = document.getElementById("svgMem");
+    if (sc) sc.style.display = "none";
+    if (sm) sm.style.display = "none";
+  }
+
+  // ---------- state ----------
+  var state = {
+    Npos: 794, Dpos: 856,     // slider positions (≈ 7B params, ≈ 1.4T tokens)
+    bytes: 2,                 // weight dtype bytes/param
+    mem: 80,                  // budget GB
+    batch: 8, seq: 2048, layers: 32, hidden: 4096
+  };
+
+  // ---------- element refs ----------
+  var $ = function(id){ return document.getElementById(id); };
+  var sN=$("sN"), sD=$("sD"), sN2=$("sN2"), sMem=$("sMem"),
+      sBatch=$("sBatch"), sSeq=$("sSeq"), sLayers=$("sLayers"), sHidden=$("sHidden");
+
+  // ================= PART 1 CHART =================
+  var d3ns = HAS_D3 ? window.d3 : null;
+  var cW=720, cH=260, cM={t:20,r:20,b:42,l:64};
+  var cIW = cW-cM.l-cM.r, cIH = cH-cM.t-cM.b;
+  var gCompute, xC, yC, ptC, curveC;
+
+  // reference model scales (params, tokens) for the backdrop dots
+  var REF = [
+    {n:125e6,  d:300e9,  l:"GPT-2 M"},
+    {n:1.3e9,  d:300e9,  l:"1.3B"},
+    {n:7e9,    d:2e12,   l:"7B / 2T"},
+    {n:70e9,   d:15e12,  l:"70B / 15T"}
+  ];
+
+  function computeCurveData(){
+    // C = 6 N D at the CURRENT D, swept across the N range → a line in log-log.
+    var D = logScaleFromSlider(state.Dpos, D_LO, D_HI);
+    var pts = [];
+    for (var i=0;i<=60;i++){
+      var n = logScaleFromSlider(i/60*1000, N_LO, N_HI);
+      pts.push({n:n, c:6*n*D});
+    }
+    return pts;
+  }
+
+  function initCompute(){
+    if (!HAS_D3) return;
+    var svg = d3ns.select("#svgCompute");
+    svg.selectAll("*").remove();
+    gCompute = svg.append("g").attr("transform","translate("+cM.l+","+cM.t+")");
+
+    xC = d3ns.scaleLog().domain([N_LO, N_HI]).range([0, cIW]);
+    // y-domain: 6 * N * D over full ranges → set generous log bounds
+    yC = d3ns.scaleLog().domain([6*N_LO*D_LO, 6*N_HI*D_HI]).range([cIH, 0]).nice();
+
+    // grid + axes
+    var xAxis = d3ns.axisBottom(xC).ticks(5, function(d){ return fmtCount(d); }).tickSize(-cIH);
+    var yAxis = d3ns.axisLeft(yC).ticks(5, function(d){
+      var e = Math.round(Math.log10(d)); return "1e"+e;
+    }).tickSize(-cIW);
+
+    gCompute.append("g").attr("class","xaxis").attr("transform","translate(0,"+cIH+")").call(xAxis);
+    gCompute.append("g").attr("class","yaxis").call(yAxis);
+    gCompute.selectAll(".xaxis line,.yaxis line").attr("stroke","#E5DFD6");
+    gCompute.selectAll(".xaxis path,.yaxis path").attr("stroke","#C9C1B6");
+    gCompute.selectAll("text").attr("fill","#6B645E").style("font-family","'JetBrains Mono',monospace").style("font-size","10px");
+
+    // axis labels
+    gCompute.append("text").attr("x", cIW/2).attr("y", cIH+36).attr("text-anchor","middle")
+      .attr("fill","#5A544E").style("font-size","11px").style("font-weight","600").text("parameters  N  (log)");
+    gCompute.append("text").attr("transform","rotate(-90)").attr("x",-cIH/2).attr("y",-48).attr("text-anchor","middle")
+      .attr("fill","#5A544E").style("font-size","11px").style("font-weight","600").text("training FLOPs  6ND  (log)");
+
+    // reference dots
+    var D0 = 1; // placeholder; ref uses its own d
+    gCompute.selectAll(".ref").data(REF).enter().append("g").attr("class","ref").each(function(dd){
+      var g = d3ns.select(this);
+      var cx = xC(dd.n), cy = yC(6*dd.n*dd.d);
+      g.append("circle").attr("cx",cx).attr("cy",cy).attr("r",4).attr("fill","#7B6DAA").attr("opacity",.85);
+      g.append("text").attr("x",cx).attr("y",cy-8).attr("text-anchor","middle").attr("fill","#5E5191")
+        .style("font-size","9px").style("font-family","'JetBrains Mono',monospace").text(dd.l);
+    });
+
+    curveC = gCompute.append("path").attr("fill","none").attr("stroke","var(--accent)").attr("stroke-width",2.5).attr("opacity",.9);
+    ptC = gCompute.append("circle").attr("r",6).attr("fill","var(--accent)").attr("stroke","#fff").attr("stroke-width",2.5);
+    ptC.append("title");
+    gCompute.append("text").attr("class","ptlabel").attr("fill","var(--accent-d)")
+      .style("font-size","10px").style("font-weight","700").style("font-family","'JetBrains Mono',monospace");
+  }
+
+  function drawCompute(){
+    if (!HAS_D3) return;
+    var pts = computeCurveData();
+    var line = d3ns.line().x(function(p){ return xC(p.n); }).y(function(p){ return yC(p.c); }).curve(d3ns.curveMonotoneX);
+    curveC.attr("d", line(pts));
+
+    var N = logScaleFromSlider(state.Npos, N_LO, N_HI);
+    var D = logScaleFromSlider(state.Dpos, D_LO, D_HI);
+    var C = 6*N*D;
+    var cx = xC(N), cy = yC(C);
+    ptC.transition().duration(DUR).attr("cx",cx).attr("cy",cy);
+    ptC.select("title").text("N="+fmtCount(N)+", D="+fmtCount(D)+" → "+fmtFlops(C));
+
+    var lbl = gCompute.select(".ptlabel");
+    var flip = cx > cIW-90;
+    lbl.transition().duration(DUR)
+      .attr("x", flip ? cx-10 : cx+10)
+      .attr("y", cy-10)
+      .attr("text-anchor", flip ? "end" : "start");
+    lbl.text(fmtFlops(C));
+  }
+
+  // ================= PART 2 CHART =================
+  var mW=720, mH=300, mM={t:20,r:150,b:34,l:20};
+  var mIW = mW-mM.l-mM.r, mIH = mH-mM.t-mM.b;
+  var gMem, yM;
+
+  function memParts(){
+    var N = logScaleFromSlider(state.Npos, N_LO, N_HI);
+    var b = state.bytes;
+    var weights = N * b;
+    var grads   = N * b;
+    var opt     = 2 * N * b;                 // Adam: momentum + variance
+    // activations ~ batch * seq * layers * hidden * 34 bytes  (Korthikanti et al., fp16 baseline,
+    // no activation checkpointing). The 34 already assumes 2 bytes/element, so scale by (b/2) for other dtypes.
+    var act = state.batch * state.seq * state.layers * state.hidden * ACT_COEF * (b/2);
+    return {N:N, weights:weights, grads:grads, opt:opt, act:act,
+            total: weights+grads+opt+act};
+  }
+
+  function initMem(){
+    if (!HAS_D3) return;
+    var svg = d3ns.select("#svgMem");
+    svg.selectAll("*").remove();
+    gMem = svg.append("g").attr("transform","translate("+mM.l+","+mM.t+")");
+    yM = d3ns.scaleLinear().range([mIH, 0]);
+    gMem.append("g").attr("class","yaxisM");
+    // single stacked bar sits at left; budget line spans width
+    gMem.append("rect").attr("class","barSeg seg-w");
+    gMem.append("rect").attr("class","barSeg seg-g");
+    gMem.append("rect").attr("class","barSeg seg-o");
+    gMem.append("rect").attr("class","barSeg seg-a");
+    gMem.selectAll(".barSeg").attr("x", mIW*0.18).attr("width", mIW*0.34).attr("rx",3);
+    // budget line
+    gMem.append("line").attr("class","budget").attr("x1",0).attr("x2",mIW)
+      .attr("stroke","var(--bad)").attr("stroke-width",2).attr("stroke-dasharray","6 4");
+    gMem.append("text").attr("class","budgetLabel").attr("x",mIW).attr("text-anchor","end")
+      .attr("fill","var(--bad)").style("font-size","10px").style("font-weight","700").style("font-family","'JetBrains Mono',monospace");
+    // segment value labels (to the right of the bar)
+    gMem.append("g").attr("class","segLabels");
+    // y-axis title
+    gMem.append("text").attr("class","yTitle").attr("transform","rotate(-90)").attr("x",-mIH/2).attr("y",-6)
+      .attr("text-anchor","middle").attr("fill","#5A544E").style("font-size","11px").style("font-weight","600")
+      .text("memory");
+  }
+
+  function drawMem(){
+    if (!HAS_D3) return;
+    var p = memParts();
+    var totalGB = p.total/1e9;
+    var budgetGB = state.mem;
+    var top = Math.max(totalGB*1.12, budgetGB*1.12, 1);
+    yM.domain([0, top]);
+
+    // y axis
+    var yAxisM = d3ns.axisLeft(yM).ticks(5).tickSize(-mIW).tickFormat(function(d){ return d>=1000?(d/1000)+" TB":d+" GB"; });
+    var ax = gMem.select(".yaxisM").transition().duration(DUR).call(yAxisM);
+    gMem.selectAll(".yaxisM line").attr("stroke","#EEEBE5");
+    gMem.selectAll(".yaxisM path").attr("stroke","none");
+    gMem.selectAll(".yaxisM text").attr("fill","#6B645E").style("font-family","'JetBrains Mono',monospace").style("font-size","10px");
+
+    // helper: stacked rect from cumulative bottom
+    function seg(sel, valGB, base, color){
+      var y0 = yM(base), y1 = yM(base+valGB);
+      var h = Math.max(0, y0 - y1);
+      gMem.select(sel).transition().duration(DUR)
+        .attr("y", y1).attr("height", h).attr("fill", color);
+      return base + valGB;
+    }
+    var base = 0;
+    base = seg(".seg-w", p.weights/1e9, base, "var(--c-w)");
+    base = seg(".seg-g", p.grads/1e9,   base, "var(--c-g)");
+    base = seg(".seg-o", p.opt/1e9,     base, "var(--c-o)");
+    base = seg(".seg-a", p.act/1e9,     base, "var(--c-a)");
+
+    // budget line
+    var by = yM(budgetGB);
+    gMem.select(".budget").transition().duration(DUR).attr("y1",by).attr("y2",by);
+    gMem.select(".budgetLabel").transition().duration(DUR).attr("y", by-5)
+      .text("budget "+budgetGB+" GB");
+
+    // right-side segment labels
+    var segs = [
+      {c:"weights",   v:p.weights, col:"var(--c-w)"},
+      {c:"gradients", v:p.grads,   col:"var(--c-g)"},
+      {c:"Adam (2×)", v:p.opt,     col:"var(--c-o)"},
+      {c:"activations",v:p.act,    col:"var(--c-a)"}
+    ];
+    var lg = gMem.select(".segLabels");
+    var rows = lg.selectAll("g.row").data(segs);
+    var enter = rows.enter().append("g").attr("class","row");
+    enter.append("rect").attr("width",10).attr("height",10).attr("rx",2).attr("x", mIW+14);
+    enter.append("text").attr("x", mIW+30).attr("dy","0.9em").style("font-family","'JetBrains Mono',monospace").style("font-size","10px");
+    var merged = enter.merge(rows);
+    merged.attr("transform", function(d,i){ return "translate(0,"+(6 + i*30)+")"; });
+    merged.select("rect").attr("fill", function(d){ return d.col; });
+    merged.select("text").attr("fill","#2C2A28")
+      .html(function(d){ return d.c + "  " + fmtBytes(d.v); });
+
+    // ---- text readouts + status ----
+    $("roTotal").innerHTML   = fmtBytes(p.total);
+    $("roWeights").innerHTML = fmtBytes(p.weights) + " <small>(" + (100*p.weights/p.total).toFixed(0) + "% of total)</small>";
+
+    var st = $("status"), stx = $("statusTxt"), ic = st.querySelector(".ic");
+    st.classList.remove("fit","fsdp","tp");
+    // FSDP shards weights + gradients + optimizer state across data-parallel ranks,
+    // but each rank still holds its OWN activations (FSDP does not shard them).
+    // So the case FSDP alone cannot fix is when activations ALONE overflow one device —
+    // then you also need tensor parallelism to split each layer's activations across devices.
+    var actGB = p.act/1e9;
+    if (totalGB <= budgetGB){
+      st.classList.add("fit"); ic.textContent = "✓";
+      stx.innerHTML = "<b>Fits on one device.</b> "+fmtBytes(p.total)+" ≤ "+budgetGB+" GB — no model parallelism needed.";
+    } else if (actGB <= budgetGB){
+      st.classList.add("fsdp"); ic.textContent = "◧";
+      stx.innerHTML = "<b>Needs FSDP.</b> Total "+fmtBytes(p.total)+" > "+budgetGB+" GB, but per-device activations ("+fmtBytes(p.act)+") still fit — shard weights, gradients &amp; optimizer state across data-parallel ranks.";
+    } else {
+      st.classList.add("tp"); ic.textContent = "◫";
+      stx.innerHTML = "<b>Needs Tensor Parallel + FSDP.</b> Activations alone ("+fmtBytes(p.act)+") exceed "+budgetGB+" GB, and FSDP does not shard activations — split each layer across devices too.";
+    }
+  }
+
+  // ================= READOUTS (compute part) =================
+  function drawComputeReadouts(){
+    var N = logScaleFromSlider(state.Npos, N_LO, N_HI);
+    var D = logScaleFromSlider(state.Dpos, D_LO, D_HI);
+    var C = 6*N*D;
+    $("roFlops").innerHTML = fmtFlops(C);
+    var seconds = C / (H100_FLOPS * MFU);
+    var days = seconds / 86400;
+    $("roDays").innerHTML = fmtDays(days);
+  }
+
+  // ================= SYNC LABELS =================
+  function syncLabels(){
+    var N = logScaleFromSlider(state.Npos, N_LO, N_HI);
+    var D = logScaleFromSlider(state.Dpos, D_LO, D_HI);
+    $("vN").textContent  = fmtCount(N);
+    $("vN2").textContent = fmtCount(N);
+    $("vD").textContent  = fmtCount(D);
+    $("vMem").textContent = state.mem + " GB";
+    var dtypeName = state.bytes===4?"fp32":(state.bytes===2?"bf16":"fp8");
+    $("vDtype").textContent = dtypeName + " · " + state.bytes + " B/param";
+    $("vBatch").textContent  = state.batch;
+    $("vSeq").textContent    = state.seq;
+    $("vLayers").textContent = state.layers;
+    $("vHidden").textContent = state.hidden;
+  }
+
+  // ================= RENDER =================
+  function renderAll(){
+    syncLabels();
+    drawComputeReadouts();
+    drawCompute();
+    drawMem();
+  }
+
+  // ================= WIRE UP CONTROLS =================
+  function linkN(val){
+    state.Npos = +val;
+    sN.value = val; sN2.value = val;  // keep both N sliders in sync
+    renderAll();
+  }
+  sN.addEventListener("input", function(){ linkN(this.value); });
+  sN2.addEventListener("input", function(){ linkN(this.value); });
+  sD.addEventListener("input", function(){ state.Dpos = +this.value; renderAll(); });
+  sMem.addEventListener("input", function(){ state.mem = +this.value; renderAll(); });
+  sBatch.addEventListener("input", function(){ state.batch = +this.value; renderAll(); });
+  sSeq.addEventListener("input", function(){ state.seq = +this.value; renderAll(); });
+  sLayers.addEventListener("input", function(){ state.layers = +this.value; renderAll(); });
+  sHidden.addEventListener("input", function(){ state.hidden = +this.value; renderAll(); });
+
+  var segDtype = document.getElementById("segDtype");
+  segDtype.addEventListener("click", function(e){
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    state.bytes = +btn.getAttribute("data-b");
+    Array.prototype.forEach.call(segDtype.querySelectorAll("button"), function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    renderAll();
+  });
+
+  // ================= INIT =================
+  initCompute();
+  initMem();
+  renderAll();
+})();
+</script>
+</body>
+</html>

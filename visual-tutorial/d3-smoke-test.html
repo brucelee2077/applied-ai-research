@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Attention.Lab — D3 Heatmap Smoke Test</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f7fb; --panel:#ffffff; --ink:#1f2735; --muted:#64708a; --line:#e6e9f2;
+    --accent:#6366f1; --q:#2563eb; --v:#f97316;
+    --radius:16px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+       display:grid; place-items:start center; padding:40px 20px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+         box-shadow:var(--shadow); padding:26px 28px; max-width:760px}
+  h1{font-size:1.25rem; margin:0 0 4px}
+  .zh{color:var(--muted); font-weight:500}
+  .sub{color:var(--muted); font-size:.9rem; margin:0 0 18px}
+  .caption{margin-top:14px; font-size:.9rem; color:var(--muted); min-height:2.4em;
+           border-left:3px solid var(--accent); padding-left:12px}
+  .tooltip{position:absolute; visibility:hidden; background:#1f2735; color:#fff;
+           font-family:var(--mono); font-size:.78rem; padding:7px 10px; border-radius:8px;
+           pointer-events:none; box-shadow:var(--shadow); line-height:1.4}
+  .axis-label{font-family:var(--mono); font-size:11px; fill:var(--muted)}
+  .axis-title{font-size:11px; fill:var(--muted); text-transform:uppercase; letter-spacing:.08em}
+  .cell{stroke:#fff; stroke-width:1.5px; cursor:pointer}
+  .cell.row-hi{stroke:var(--accent); stroke-width:2.5px}
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Attention matrix <span class="zh">注意力矩阵</span> · D3 heatmap</h1>
+    <p class="sub">Each row = one query token. Color = how much that query attends to each key token
+      (row sums ≈ 1). Hover any cell; click a row label to trace one token's routing.</p>
+    <svg id="chart" role="img" aria-label="10 by 10 attention weight heatmap"></svg>
+    <div class="caption" id="caption">Hover a cell to read its weight. Notice row <code>it</code> → <code>cat</code>.</div>
+  </div>
+
+<script>
+// ----- Data: the tutorial's own "The cat sat ... it was tired" example -----
+const words = ["The","cat","sat","on","the","mat","because","it","was","tired"];
+const A = [
+  [0.9,0.1,0,0,0,0,0,0,0,0],
+  [0.1,0.7,0.1,0,0,0.1,0,0,0,0],
+  [0,0.45,0.4,0.05,0,0.1,0,0,0,0],
+  [0,0,0.1,0.8,0.1,0,0,0,0,0],
+  [0,0,0,0.1,0.8,0.1,0,0,0,0],
+  [0,0,0.1,0.1,0.1,0.7,0,0,0,0],
+  [0,0.15,0,0,0,0,0.65,0.1,0.1,0],
+  [0,0.7,0,0,0,0.05,0,0.05,0,0.2],
+  [0,0.1,0,0,0,0,0,0.1,0.6,0.2],
+  [0,0.45,0,0,0,0,0,0.1,0.1,0.35],
+];
+const caps = [
+  "‘The’ mostly looks at itself and the next word.",
+  "‘cat’ looks at itself and its action.",
+  "‘sat’ looks back at the cat — who sat?",
+  "‘on’ looks ahead to the object.",
+  "‘the’ looks at the mat.",
+  "‘mat’ ties to ‘sat’ and itself.",
+  "‘because’ links the two clauses.",
+  "‘it’ looks mostly at ‘cat’. That is how the model knows what ‘it’ means.",
+  "‘was’ looks at the subject and the feeling.",
+  "‘tired’ looks back at the cat — who is tired?",
+];
+
+// Flatten to {row, col, value}
+const data = [];
+A.forEach((r,i)=> r.forEach((v,j)=> data.push({row:i, col:j, value:v})));
+
+const tooltip = d3.select("body").append("div").attr("class","tooltip");
+
+function draw(){
+  const N = words.length;
+  const margin = {top:70, right:24, bottom:24, left:78};
+  const cell = 42;
+  const innerW = N*cell, innerH = N*cell;
+  const width = innerW + margin.left + margin.right;
+  const height = innerH + margin.top + margin.bottom;
+
+  const svg = d3.select("#chart").attr("width",width).attr("height",height);
+  svg.selectAll("*").remove();
+  const g = svg.append("g").attr("transform",`translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().domain(d3.range(N)).range([0,innerW]).padding(0.04);
+  const y = d3.scaleBand().domain(d3.range(N)).range([0,innerH]).padding(0.04);
+  // tutorial's query-blue, mapped through opacity-style sequential scale
+  const color = d3.scaleSequential(d3.interpolate("#ffffff","#2563eb")).domain([0,1]);
+
+  // axis titles
+  g.append("text").attr("class","axis-title").attr("x",innerW/2).attr("y",-52)
+    .attr("text-anchor","middle").text("Key — attended to →");
+  g.append("text").attr("class","axis-title").attr("transform","rotate(-90)")
+    .attr("x",-innerH/2).attr("y",-62).attr("text-anchor","middle").text("Query — attending");
+
+  // column labels
+  g.append("g").selectAll("text").data(words).join("text")
+    .attr("class","axis-label")
+    .attr("x",(d,i)=>x(i)+x.bandwidth()/2).attr("y",-8)
+    .attr("text-anchor","middle").text(d=>d);
+
+  // row labels (clickable)
+  g.append("g").selectAll("text").data(words).join("text")
+    .attr("class","axis-label").style("cursor","pointer")
+    .attr("x",-8).attr("y",(d,i)=>y(i)+y.bandwidth()/2).attr("dy","0.35em")
+    .attr("text-anchor","end").text(d=>d)
+    .on("click",(e,d)=>highlightRow(words.indexOf(d)));
+
+  // cells
+  g.append("g").selectAll("rect").data(data).join("rect")
+    .attr("class","cell")
+    .attr("x",d=>x(d.col)).attr("y",d=>y(d.row))
+    .attr("width",x.bandwidth()).attr("height",y.bandwidth())
+    .attr("fill",d=>d.value>0 ? color(d.value) : "#fafbff")
+    .on("mouseover",function(e,d){
+      d3.select(this).attr("stroke","var(--v)").attr("stroke-width",2.5).raise();
+      tooltip.style("visibility","visible")
+        .html(`<b>${words[d.row]}</b> → <b>${words[d.col]}</b><br/>weight = ${d.value.toFixed(2)}`);
+    })
+    .on("mousemove",e=>tooltip.style("top",(e.pageY-10)+"px").style("left",(e.pageX+14)+"px"))
+    .on("mouseout",function(){
+      const sel = d3.select(this);
+      sel.attr("stroke","#fff").attr("stroke-width",1.5);
+      if(sel.classed("row-hi")) sel.attr("stroke","var(--accent)").attr("stroke-width",2.5);
+      tooltip.style("visibility","hidden");
+    })
+    .on("click",(e,d)=>highlightRow(d.row));
+
+  // value text on stronger cells
+  g.append("g").selectAll("text").data(data.filter(d=>d.value>=0.3)).join("text")
+    .attr("x",d=>x(d.col)+x.bandwidth()/2).attr("y",d=>y(d.row)+y.bandwidth()/2)
+    .attr("dy","0.35em").attr("text-anchor","middle")
+    .style("font-family","var(--mono)").style("font-size","10px")
+    .style("fill",d=>d.value>0.5?"#fff":"var(--ink)").style("pointer-events","none")
+    .text(d=>d.value.toFixed(1));
+
+  function highlightRow(idx){
+    g.selectAll("rect.cell").classed("row-hi",d=>d.row===idx)
+      .attr("stroke",d=>d.row===idx?"var(--accent)":"#fff")
+      .attr("stroke-width",d=>d.row===idx?2.5:1.5);
+    d3.select("#caption").html(caps[idx]);
+  }
+  highlightRow(7); // start on "it" → "cat"
+}
+draw();
+</script>
+</body>
+</html>

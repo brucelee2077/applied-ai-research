@@ -8,6 +8,19 @@
 > - 💡 Architecture choices: kernel sizes, strides, and why the DQN CNN looks the way it does
 > - 🏭 Stable-Baselines3 usage, hyperparameter selection, and training diagnostics for Atari
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | φ(s) | Preprocessed state — stacked grayscale frames (4 × 84 × 84) |
+> | Conv(in, out, kernel, stride) | Convolutional layer specification |
+> | Parameters per layer | (kernel × kernel × in_channels + 1) × out_channels |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Full DQN pipeline** — experience replay + target network + CNN Q-network
+> - **Frame stacking** — stack 4 frames to capture motion (restores Markov property)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ## Brief Restatement
 
 DQN on Atari demonstrated that a single algorithm could learn to play 49 different video games from raw pixels with no game-specific engineering. The key innovation beyond the core DQN algorithm was the preprocessing pipeline: converting 210×160 RGB frames to 84×84 grayscale, stacking 4 consecutive frames to provide motion information, and feeding the result through a CNN that extracts spatial features hierarchically. This end-to-end approach — raw pixels in, actions out — eliminated the need for hand-crafted features and proved that deep learning and reinforcement learning could work together at scale.

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashAttention: Tiling to Beat the Memory Wall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);
+  padding-bottom:4rem;min-height:100vh}
+
+/* top bar */
+.nav{position:sticky;top:0;z-index:100;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);height:54px}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-link{font-family:var(--mono);font-size:.78rem;color:var(--accent);text-decoration:none;white-space:nowrap}
+.nav-link:hover{color:var(--accent-d);text-decoration:underline}
+
+.wrap{max-width:860px;margin:0 auto;padding:2rem 1.25rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.15;margin-bottom:.7rem}
+.intro{color:var(--text2);font-size:1.02rem;max-width:640px;margin-bottom:1.6rem}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.25rem 1.35rem;margin-bottom:1.4rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:.9rem}
+
+/* mode toggle */
+.modes{display:flex;gap:.5rem;margin-bottom:1.1rem}
+.mode-btn{flex:1;font-family:var(--body);font-size:.9rem;font-weight:600;color:var(--text2);
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:.6rem .8rem;cursor:pointer;transition:all .15s var(--ease)}
+.mode-btn:hover{border-color:var(--accent)}
+.mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:var(--sh-sm)}
+
+/* sliders */
+.ctrl{margin-bottom:1rem}
+.ctrl:last-child{margin-bottom:0}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);padding:.1rem .5rem;border-radius:var(--r-sm)}
+.ctrl-hint{font-size:.8rem;color:var(--muted);margin-top:.25rem}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:999px;
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;
+  border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);
+  border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.btn-row{display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap}
+.btn{font-family:var(--body);font-size:.85rem;font-weight:600;color:#fff;background:var(--accent);
+  border:none;border-radius:var(--r-md);padding:.5rem 1rem;cursor:pointer;transition:background .15s}
+.btn:hover{background:var(--accent-d)}
+.btn.ghost{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.btn.ghost:hover{background:var(--bg);color:var(--text)}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* figure */
+.figwrap{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;margin-bottom:.5rem}
+svg{width:100%;height:auto;display:block}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-family:var(--mono);font-size:.85rem}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.4rem;font-size:.8rem;color:var(--text2)}
+.legend span{display:inline-flex;align-items:center;gap:.4rem}
+.sw{width:13px;height:13px;border-radius:3px;flex-shrink:0;border:1px solid rgba(0,0,0,.08)}
+
+/* readout stats */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:1.1rem}
+.stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.stat.std{border-left:3px solid var(--bad)}
+.stat.flash{border-left:3px solid var(--ok)}
+.stat .k{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.stat .v{font-family:var(--mono);font-size:1.25rem;font-weight:600;margin-top:.15rem}
+.stat.std .v{color:var(--bad)}
+.stat.flash .v{color:var(--ok)}
+.stat .sub{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.15rem}
+.saved{grid-column:1/-1;background:var(--accent-l);border:1px solid var(--accent);border-left:3px solid var(--accent);
+  border-radius:var(--r-md);padding:.8rem .9rem}
+.saved .k{color:var(--accent-d)}
+.saved .v{color:var(--accent-d)}
+
+/* running softmax state */
+.softmax-state{margin-top:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.softmax-state .title{font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:.5rem}
+.ss-row{display:flex;gap:1.2rem;font-family:var(--mono);font-size:.82rem}
+.ss-row b{color:var(--accent-d)}
+.ss-note{font-size:.78rem;color:var(--muted);margin-top:.5rem;font-style:italic}
+
+/* exact note */
+.exact{display:flex;gap:.6rem;align-items:flex-start;background:var(--surface2);
+  border:1px solid var(--border);border-left:3px solid var(--warn);border-radius:var(--r-md);
+  padding:.75rem .9rem;margin-top:1rem;font-size:.86rem;color:var(--text2)}
+.exact b{color:var(--text)}
+
+/* takeaway */
+.takeaway{background:var(--accent-l);border:1px solid var(--accent);border-radius:var(--r-lg);padding:1.1rem 1.35rem}
+.takeaway h2{font-family:var(--display);font-size:1.05rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.takeaway ul{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.takeaway li{position:relative;padding-left:1.4rem;font-size:.92rem;color:var(--text)}
+.takeaway li::before{content:"→";position:absolute;left:0;color:var(--accent);font-weight:700}
+.takeaway li b{color:var(--accent-d)}
+
+@media (max-width:560px){
+  h1{font-size:1.6rem}
+  .stats{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">FlashAttention · Tiling</span>
+    <a class="nav-link" href="../index.html">← All lessons</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <span class="eyebrow">JAX / ML Systems · IO-Aware Kernels</span>
+  <h1>FlashAttention: Tiling to Beat the Memory Wall</h1>
+  <p class="intro">
+    Attention normally builds a full <b>N&times;N</b> score matrix and parks it in slow GPU memory (HBM).
+    FlashAttention never writes that matrix down: it walks the scores in small <b>tiles</b> kept in fast
+    on-chip memory (SRAM) and keeps a running softmax. Same math, far less memory traffic.
+    Flip between the two modes below and watch the memory cost change.
+  </p>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h2>Controls</h2>
+
+    <div class="modes" role="tablist" aria-label="attention mode">
+      <button class="mode-btn active" id="btnStd" role="tab" aria-selected="true">Standard attention</button>
+      <button class="mode-btn" id="btnFlash" role="tab" aria-selected="false">FlashAttention (tiled)</button>
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-label">Sequence length&nbsp;<span style="font-family:var(--mono)">N</span></span>
+        <span class="ctrl-val" id="valN">1024 tokens</span>
+      </div>
+      <input type="range" id="sliderN" min="256" max="8192" step="256" value="1024" aria-label="sequence length N">
+      <div class="ctrl-hint">How many tokens attend to each other. The score matrix is N&times;N.</div>
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-top">
+        <span class="ctrl-label">Block size&nbsp;<span style="font-family:var(--mono)">Br = Bc = B</span></span>
+        <span class="ctrl-val" id="valB">64 rows/cols</span>
+      </div>
+      <input type="range" id="sliderB" min="32" max="256" step="32" value="64" aria-label="block size B">
+      <div class="ctrl-hint">Tile height (Br) and width (Bc). Bigger tiles &rarr; fewer passes over K,V, but must fit in SRAM. Used only in Flash mode.</div>
+    </div>
+
+    <div class="btn-row" id="flashBtns" style="display:none">
+      <button class="btn" id="btnPlay">▶ Sweep tiles</button>
+      <button class="btn ghost" id="btnStep">Step one tile</button>
+      <button class="btn ghost" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <!-- FIGURE -->
+  <div class="card">
+    <h2 id="figTitle">The N&times;N score matrix in HBM</h2>
+    <div class="figwrap">
+      <svg id="fig" viewBox="0 0 640 400" role="img"
+        aria-label="Grid of the N by N attention score matrix. In standard mode the whole grid is highlighted red as living in slow HBM memory. In flash mode a small green tile sweeps across the grid, representing a block held in fast SRAM.">
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:#F3D6CE"></span> N&times;N scores in HBM (slow, quadratic)</span>
+      <span><span class="sw" style="background:#CDE9D7"></span> current tile in SRAM (fast)</span>
+      <span><span class="sw" style="background:#EFEAE1"></span> not yet visited</span>
+    </div>
+
+    <!-- running softmax state (flash only) -->
+    <div class="softmax-state" id="softmaxState" style="display:none">
+      <div class="title">Online softmax state (updated per tile, kept in SRAM)</div>
+      <div class="ss-row">
+        <span>row block <b id="ssRow">0</b></span>
+        <span>m = running max = <b id="ssM">−∞</b></span>
+        <span>ℓ = running sum = <b id="ssL">0</b></span>
+      </div>
+      <div class="ss-note">On each new K/V tile: rescale the old sum by e^(m_old − m_new), add the new tile's contribution. This makes softmax exact without ever storing a full row of scores.</div>
+    </div>
+
+    <!-- readouts -->
+    <div class="stats">
+      <div class="stat std">
+        <div class="k">Standard · HBM moved</div>
+        <div class="v" id="stdBytes">–</div>
+        <div class="sub" id="stdFormula">≈ 4·N²·b (scores + probs round-trip)</div>
+      </div>
+      <div class="stat flash">
+        <div class="k">Flash · HBM moved</div>
+        <div class="v" id="flashBytes">–</div>
+        <div class="sub" id="flashFormula">≈ (2·N/B + 2)·N·d·b (K,V re-reads + Q,O)</div>
+      </div>
+      <div class="saved stat">
+        <div class="k">Peak memory saved · the N&times;N matrix never stored</div>
+        <div class="v" id="savedBytes">–</div>
+        <div class="sub" id="savedSub">Standard also allocates an N×N buffer; Flash allocates none.</div>
+      </div>
+    </div>
+
+    <div class="exact">
+      <span style="color:var(--warn);font-weight:700;flex-shrink:0">note</span>
+      <span><b>FlashAttention is exact, not an approximation.</b> It computes the identical softmax·V
+      output as standard attention. It only <b>reorders</b> the work to be IO-aware — the online softmax
+      lets it fuse the whole computation into one pass over tiles, so the N&times;N matrix is never
+      materialized.</span>
+    </div>
+  </div>
+
+  <!-- TAKEAWAY -->
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>The <b>N&times;N matrix is the villain</b>: standard attention pays <b>O(N²)</b> HBM traffic and
+        allocates an N&times;N buffer, so cost explodes as N grows.</li>
+      <li><b>Tiling + online softmax</b> keeps every intermediate in SRAM. Flash reads K and V about
+        <b>N/B times</b> but never writes the score matrix — traffic drops toward the
+        <b>O(N·d)</b> cost of just moving Q, K, V, O.</li>
+      <li><b>Same exact result</b>, far less HBM traffic and memory. The win comes from being
+        <b>IO-aware</b>, not from dropping any computation.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById("fig");
+
+  // ---- graceful degradation ----
+  if (typeof window.d3 === "undefined") {
+    console.warn("FlashAttention viz: d3 is undefined (expected ./d3.v7.min.js). Showing fallback.");
+    svgEl.outerHTML = '<div class="fallback">Could not load D3 (./d3.v7.min.js).<br>The interactive figure needs it. Everything else on the page still works.</div>';
+    return;
+  }
+
+  var d3 = window.d3;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- state ----
+  var state = {
+    mode: "std",     // "std" | "flash"
+    N: 1024,
+    B: 64,
+    tileIndex: 0,    // which tile in the sweep (row-major over blocks)
+    playing: false,
+    timer: null,
+    m: -Infinity,    // running max (illustrative)
+    l: 0             // running sum (illustrative)
+  };
+
+  // constants for the memory model
+  var DTYPE_BYTES = 2;   // fp16
+  var HEAD_DIM = 64;     // d per head (typical)
+
+  // literal font stacks — SVG presentation attributes do NOT resolve CSS var()
+  var FONT_MONO = "'JetBrains Mono','Fira Code',Consolas,monospace";
+  var FONT_DISPLAY = "'Bricolage Grotesque',Georgia,serif";
+
+  // For display we draw a fixed GRID of cells representing the N x N matrix
+  // (visual blocks), independent of the true N. The number of visual blocks
+  // per side follows N/B but is clamped so the grid stays readable.
+  var VIEW_W = 640, VIEW_H = 400;
+  var PAD = 30;
+  var GRID_MIN = 4, GRID_MAX = 16;
+
+  // ---------- helpers ----------
+  function fmtBytes(bytes){
+    if (bytes < 1024) return bytes.toFixed(0) + " B";
+    var units = ["KB","MB","GB","TB"];
+    var v = bytes / 1024, i = 0;
+    while (v >= 1024 && i < units.length - 1){ v /= 1024; i++; }
+    return v.toFixed(v < 10 ? 2 : (v < 100 ? 1 : 0)) + " " + units[i];
+  }
+
+  // number of visual blocks per side (kept readable, tracks N/B trend)
+  function blocksPerSide(){
+    var b = Math.round(state.N / state.B);
+    if (b < GRID_MIN) b = GRID_MIN;
+    if (b > GRID_MAX) b = GRID_MAX;
+    return b;
+  }
+
+  // ---------- memory model (correct scaling) ----------
+  function computeMemory(){
+    var N = state.N, B = state.B, b = DTYPE_BYTES, d = HEAD_DIM;
+
+    // Standard: dominant HBM cost is the score/probability matrices going to HBM
+    // and back — write S, read S for softmax, write P, read P for P·V = ~4*N^2*b,
+    // plus loading Q,K,V and writing O (~4*N*d*b). Peak extra buffer = N^2 * b.
+    var stdHBM = 4 * N * N * b + 4 * N * d * b;
+    var stdMatrix = N * N * b;
+
+    // Flash: outer loop over N/B query blocks; each K,V block re-read once per
+    // query block -> K,V traffic ~ 2 * (N/B) * (N*d) * b. Q read once, O written
+    // once -> + 2 * N * d * b. The N x N matrix is never written to HBM.
+    var passes = N / B;
+    var flashHBM = (2 * passes + 2) * N * d * b;
+
+    // Peak memory saved = the N x N buffer Flash never allocates.
+    var saved = stdMatrix;
+
+    return {
+      stdHBM: stdHBM,
+      flashHBM: flashHBM,
+      saved: saved,
+      passes: passes
+    };
+  }
+
+  function updateReadouts(){
+    var mem = computeMemory();
+    d3.select("#stdBytes").text(fmtBytes(mem.stdHBM));
+    d3.select("#flashBytes").text(fmtBytes(mem.flashHBM));
+    d3.select("#savedBytes").text(fmtBytes(mem.saved));
+
+    var ratio = mem.stdHBM / mem.flashHBM;
+    d3.select("#flashFormula").text(
+      "≈ (2·N/B + 2)·N·d·b  ·  " + mem.passes.toFixed(0) + " K,V passes"
+    );
+    d3.select("#stdFormula").text(
+      "≈ 4·N²·b  ·  " + ratio.toFixed(1) + "× the Flash traffic"
+    );
+    d3.select("#savedSub").text(
+      "N×N buffer = " + fmtBytes(mem.saved) + " (d=" + HEAD_DIM + ", fp16). Flash allocates none."
+    );
+  }
+
+  // ---------- figure ----------
+  var svg = d3.select("#fig");
+
+  function cellGeom(){
+    var n = blocksPerSide();
+    var w = VIEW_W - 2*PAD;
+    var h = VIEW_H - 2*PAD;
+    var side = Math.min(w, h);
+    var cell = side / n;
+    var ox = PAD + (w - side)/2;
+    var oy = PAD + (h - side)/2;
+    return { n:n, cell:cell, ox:ox, oy:oy, side:side };
+  }
+
+  function totalTiles(){
+    var n = blocksPerSide();
+    return n * n;
+  }
+
+  function drawGrid(){
+    var g = cellGeom();
+    var n = g.n;
+    svg.selectAll("*").remove();
+
+    // outer label: this is the N x N matrix
+    svg.append("text")
+      .attr("x", g.ox + g.side/2).attr("y", g.oy - 12)
+      .attr("text-anchor","middle")
+      .attr("font-family",FONT_MONO).attr("font-size",12).attr("fill","#6B645E")
+      .text("Attention scores  S = QKᵀ   (" + state.N + " × " + state.N + ")");
+
+    // axis labels
+    svg.append("text")
+      .attr("x", g.ox - 10).attr("y", g.oy + g.side/2)
+      .attr("text-anchor","middle").attr("transform","rotate(-90 " + (g.ox-10) + " " + (g.oy+g.side/2) + ")")
+      .attr("font-family",FONT_MONO).attr("font-size",11).attr("fill","#6B645E")
+      .text("query rows  (N)");
+    svg.append("text")
+      .attr("x", g.ox + g.side/2).attr("y", g.oy + g.side + 20)
+      .attr("text-anchor","middle")
+      .attr("font-family",FONT_MONO).attr("font-size",11).attr("fill","#6B645E")
+      .text("key columns  (N)");
+
+    // build cell data
+    var cells = [];
+    for (var r = 0; r < n; r++){
+      for (var c = 0; c < n; c++){
+        cells.push({ r:r, c:c, idx: r*n + c });
+      }
+    }
+
+    svg.append("g").attr("class","cells")
+      .selectAll("rect").data(cells).enter()
+      .append("rect")
+        .attr("class","cell")
+        .attr("x", function(d){ return g.ox + d.c*g.cell; })
+        .attr("y", function(d){ return g.oy + d.r*g.cell; })
+        .attr("width", g.cell - 1.5)
+        .attr("height", g.cell - 1.5)
+        .attr("rx", 2)
+        .attr("data-idx", function(d){ return d.idx; })
+        .attr("fill", "#EFEAE1")
+        .attr("stroke", "#E5DFD6")
+        .attr("stroke-width", 0.5);
+
+    paintCells();
+  }
+
+  // color the cells according to mode + sweep progress
+  function paintCells(){
+    var g = cellGeom();
+    var n = g.n;
+    var t = reduceMotion ? 0 : 200;
+
+    svg.selectAll("rect.cell")
+      .transition().duration(t)
+      .attr("fill", function(d){
+        if (state.mode === "std"){
+          // whole matrix lives in HBM -> red tint
+          return "#F3D6CE";
+        }
+        // flash mode
+        if (d.idx < state.tileIndex) return "#DDEFE4";      // already streamed (done)
+        if (d.idx === state.tileIndex) return "#8DCFA6";    // current tile in SRAM (bright green)
+        return "#EFEAE1";                                    // not yet visited
+      })
+      .attr("stroke", function(d){
+        if (state.mode === "flash" && d.idx === state.tileIndex) return "#2D8B55";
+        if (state.mode === "std") return "#E0B4A8";
+        return "#E5DFD6";
+      })
+      .attr("stroke-width", function(d){
+        return (state.mode === "flash" && d.idx === state.tileIndex) ? 2 : 0.5;
+      });
+
+    // overlay: in std mode, a big "HBM" banner across the matrix
+    svg.select(".hbm-banner").remove();
+    if (state.mode === "std"){
+      svg.append("text").attr("class","hbm-banner")
+        .attr("x", g.ox + g.side/2).attr("y", g.oy + g.side/2 + 5)
+        .attr("text-anchor","middle")
+        .attr("font-family",FONT_DISPLAY).attr("font-size",22).attr("font-weight",800)
+        .attr("fill","#BE3E26").attr("opacity",0.85)
+        .text("all N×N in HBM");
+    }
+  }
+
+  // update the running softmax readout for the current row block
+  function updateSoftmaxState(){
+    var n = blocksPerSide();
+    var rowBlock = Math.floor(state.tileIndex / n);
+    var colBlock = state.tileIndex % n;
+
+    // Illustrative running max/sum: as we stream K/V blocks across one row block,
+    // m grows (running max of seen scores) and l accumulates the rescaled sum.
+    // We reset m,l when we move to a new row block (a new set of query rows).
+    // Deterministic pseudo-scores so the demo is stable and reproducible.
+    if (colBlock === 0){
+      state.m = -Infinity;
+      state.l = 0;
+    }
+    // pseudo tile max score in [0.5, 3.0]
+    var tileMax = 0.5 + ((Math.sin((rowBlock+1)*1.7 + (colBlock+1)*0.9) + 1) / 2) * 2.5;
+    var prevM = state.m;
+    var newM = Math.max(prevM, tileMax);
+    // rescale old sum, add new (a few entries in the tile)
+    var rescale = (prevM === -Infinity) ? 1 : Math.exp(prevM - newM);
+    var tileContribution = Math.exp(tileMax - newM) * state.B; // ~Bc entries
+    state.l = state.l * rescale + tileContribution;
+    state.m = newM;
+
+    d3.select("#ssRow").text(rowBlock);
+    d3.select("#ssM").text(state.m === -Infinity ? "−∞" : state.m.toFixed(3));
+    d3.select("#ssL").text(state.l.toFixed(1));
+  }
+
+  // ---------- sweep control ----------
+  function stepTile(){
+    var total = totalTiles();
+    if (state.tileIndex >= total - 1){
+      // reached the end
+      stopPlay();
+      return false;
+    }
+    state.tileIndex += 1;
+    updateSoftmaxState();
+    paintCells();
+    return true;
+  }
+
+  function playSweep(){
+    if (state.playing) return;
+    state.playing = true;
+    d3.select("#btnPlay").text("⏸ Pause");
+    var interval = reduceMotion ? 120 : 260;
+    state.timer = setInterval(function(){
+      var ok = stepTile();
+      if (!ok) stopPlay();
+    }, interval);
+  }
+
+  function stopPlay(){
+    state.playing = false;
+    if (state.timer){ clearInterval(state.timer); state.timer = null; }
+    d3.select("#btnPlay").text("▶ Sweep tiles");
+  }
+
+  function resetSweep(){
+    stopPlay();
+    state.tileIndex = 0;
+    state.m = -Infinity;
+    state.l = 0;
+    updateSoftmaxState();
+    paintCells();
+  }
+
+  // ---------- mode switching ----------
+  function setMode(mode){
+    state.mode = mode;
+    var isFlash = (mode === "flash");
+    d3.select("#btnStd").classed("active", !isFlash).attr("aria-selected", !isFlash);
+    d3.select("#btnFlash").classed("active", isFlash).attr("aria-selected", isFlash);
+    document.getElementById("flashBtns").style.display = isFlash ? "flex" : "none";
+    document.getElementById("softmaxState").style.display = isFlash ? "block" : "none";
+    document.getElementById("figTitle").innerHTML = isFlash
+      ? "Sweeping Br×Bc tiles through SRAM (no N×N matrix)"
+      : "The N×N score matrix in HBM";
+
+    if (isFlash){
+      resetSweep();
+    } else {
+      stopPlay();
+      paintCells();
+    }
+  }
+
+  // ---------- wiring ----------
+  d3.select("#btnStd").on("click", function(){ setMode("std"); });
+  d3.select("#btnFlash").on("click", function(){ setMode("flash"); });
+
+  d3.select("#sliderN").on("input", function(){
+    state.N = +this.value;
+    d3.select("#valN").text(state.N.toLocaleString() + " tokens");
+    resetSweep();          // sweep position invalid after grid change
+    drawGrid();
+    updateReadouts();
+  });
+
+  d3.select("#sliderB").on("input", function(){
+    state.B = +this.value;
+    d3.select("#valB").text(state.B + " rows/cols");
+    resetSweep();
+    drawGrid();
+    updateReadouts();
+  });
+
+  d3.select("#btnPlay").on("click", function(){
+    if (state.playing) stopPlay(); else playSweep();
+  });
+  d3.select("#btnStep").on("click", function(){ stopPlay(); stepTile(); });
+  d3.select("#btnReset").on("click", function(){ resetSweep(); });
+
+  // ---------- init ----------
+  drawGrid();
+  updateReadouts();
+  setMode("std");
+})();
+</script>
+</body>
+</html>

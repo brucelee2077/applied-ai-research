@@ -8,6 +8,23 @@
 > - 💡 TRPO vs PPO: theoretical guarantee vs practical simplicity
 > - 🏭 PPO as industry standard for RLHF and language model alignment
 
+> **Math you will need for this file**
+>
+> | Symbol | Meaning |
+> |--------|---------|
+> | KL(π_old \|\| π_new) | KL divergence — how different two policies are |
+> | r(θ) = π_new/π_old | Probability ratio (importance weight) |
+> | Â_t | Advantage estimate at time t |
+> | δ (trust region) | Maximum allowed KL divergence per update |
+> | F | Fisher Information Matrix — curvature of policy space |
+> | ∇_θ | Gradient with respect to network weights |
+>
+> **RL concepts used here** (defined in earlier files):
+> - **Policy gradient theorem** — ∇J = E[∇log π × advantage]
+> - **GAE** — Generalized Advantage Estimation: Â = Σ (γλ)^l δ_{t+l}
+> - **Actor-critic** — actor (policy) and critic (value function)
+> - [Full reference → math-refresher.md](../math-refresher.md)
+
 ---
 
 ## Brief restatement

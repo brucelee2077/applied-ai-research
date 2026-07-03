@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 3 · Day 4 — Production Code Review: Anatomy of a Training Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w03-d04-prodcode">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 3 Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-03-kv-cache.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The KV Cache</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-pretraining-logic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Advanced Pretraining Logic</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 1 · Week 3 · Day 4 (Thu)</span>
+    <h1>Production Code Review<br>Anatomy of a Training Loop</h1>
+    <p class="lead">A production framework like <code>nanotron</code> does not hide training behind one magic <code>.fit()</code> button. It shows you every step: load a batch, forward, loss, backward, sync gradients across devices, update the weights, and now and then save. Today: trace that loop with the abstractions stripped away.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> name the stages of one training step in order, point to exactly where cross-device gradient sync (all-reduce) happens, explain where checkpointing fits, and say why reading code without abstractions is worth the effort.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is a training loop, and what does "no abstractions" mean?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python, and you know that training a model means adjusting its numbers (weights) so its answers get better. From Week 2 you have also seen <span class="term">all-reduce</span>: a collective operation that sums a value across many devices and gives every device the same total. <b>No prior framework-reading experience needed.</b></div></div>
+
+      <h4>What a training loop is</h4>
+      <p>Training a model is repeating one small routine over and over. Each repeat is called a <span class="term">training step</span>. In one step you take a chunk of data, run it through the model, measure how wrong the model was, figure out how to nudge the weights, and nudge them. Do that millions of times and the model learns.</p>
+      <p>One training step, spelled out, is six stages in a fixed order:</p>
+      <ol>
+        <li><strong>Load + shard a batch</strong> — grab a <span class="term">batch</span> (a chunk of examples) and, on many devices, split it so each device holds a slice.</li>
+        <li><strong>Forward pass</strong> — run the batch through the model to get its outputs (the <span class="term">logits</span>, the raw scores before turning them into a prediction).</li>
+        <li><strong>Compute loss</strong> — one number that says how wrong those outputs were.</li>
+        <li><strong>Backward pass</strong> — work out the <span class="term">gradients</span>: for each weight, which direction lowers the loss.</li>
+        <li><strong>Synchronize gradients</strong> — on many devices, <strong>all-reduce</strong> the gradients so every device agrees on the same average gradient.</li>
+        <li><strong>Optimizer step</strong> — use those gradients to update the weights.</li>
+      </ol>
+      <p>And once in a while — not every step — a seventh action: <strong>checkpoint</strong>, meaning save the weights to disk so you can resume if something crashes.</p>
+
+      <h4>What "no abstractions" means, and why read it</h4>
+      <p>A high-level library lets you write <code>model.fit(data)</code> and hides all six stages inside. That is convenient, but you cannot see where the time and money go. A production framework like <span class="term">nanotron</span> (and its tiny teaching cousin <span class="term">picotron</span>) does the opposite on purpose: it writes out every stage as plain code you can read line by line.</p>
+      <p>Why bother? Because at scale, <strong>every stage is a cost you may need to see and control</strong> — the forward pass, the gradient sync across devices, the optimizer memory. You cannot tune what a <code>.fit()</code> call hides from you. Reading the loop without abstractions is how you learn where the real work happens.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://github.com/huggingface/nanotron" target="_blank" rel="noopener">nanotron (production framework)</a> · <a href="https://github.com/huggingface/picotron" target="_blank" rel="noopener">picotron (minimal teaching version)</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Read the factory blueprint, not the big button</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a factory. There is one big button on the wall that says <strong>MAKE PRODUCT</strong>. Press it and finished goods come out the other end. Easy — but you have no idea what happens inside, so you cannot see which machine is slow or where material is wasted.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🔘</span><h5>.fit() = press the big button</h5><p>One call, product comes out. Convenient, but the pipes and gears are hidden. If it is slow or wrong, you cannot point to the stage that caused it.</p></div>
+        <div class="card"><span class="big">📐</span><h5>nanotron = read the blueprint</h5><p>You trace every pipe and gear in order: data in → forward → loss → backward → sync → update → (save). Now each stage is visible, so each cost is visible too.</p></div>
+      </div>
+      <p><strong>In one line:</strong> reading a no-abstraction training loop is walking the factory floor and following the material through every machine, instead of trusting one button.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a factory line runs its stages at the same time on different products. One training step runs its stages <em>in order</em> on the <em>same</em> batch — forward must finish before loss, loss before backward, and so on.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through one training step, three views</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated console that traces one distributed training step. First see all six stages in order, then zoom in on where gradient sync happens, then see where saving fits. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="stages" type="button">① the 6 stages, in order</button>
+          <button class="play-btn" data-demo="sync" type="button">② where does all-reduce go?</button>
+          <button class="play-btn" data-demo="ckpt" type="button">③ where does checkpoint fit?</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The order of the stages, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>The six stages run in a fixed order: <strong>load/shard → forward → loss → backward → sync → update</strong>. Each stage needs the output of the one before it.</li>
+        <li><strong>Gradient sync happens between backward and the optimizer step</strong> — never before. You must have the gradients before you can all-reduce them, and every device must agree on the averaged gradient before it updates its weights. Sync in the wrong place means devices drift apart.</li>
+        <li><strong>Checkpointing is periodic, not every step.</strong> Saving to disk is slow, so you do it every N steps. Its only job is to let you resume after a crash.</li>
+        <li>On a single device you can skip stage 5 (sync) — there is nothing to synchronize. It exists only because training is spread across many devices (Week 2).</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>grads = backward(loss)</code> → <code>grads = all_reduce(grads) / world_size</code> → <code>optimizer.step(grads)</code><br><span style="font-size:.85rem;color:var(--text2)">"Compute local gradients, average them across all devices, then everyone updates with the same averaged gradient." That middle line is the sync.</span></div></div>
+
+      <h4>Why read the loop without abstractions</h4>
+      <ul>
+        <li><strong>See every cost</strong> — at scale the forward pass, the gradient sync, and the optimizer memory each cost real time and money. A <code>.fit()</code> call hides all of it; the open loop shows you where to look.</li>
+        <li><strong>Control every cost</strong> — once a stage is visible you can change it: shard differently, overlap sync with compute, or save checkpoints less often.</li>
+        <li><strong>Survive crashes</strong> — a long training run <em>will</em> crash. Checkpointing turns a lost week into a lost hour.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> many devices (Week 2) → gradients must be synced with all-reduce → that sync sits between backward and the optimizer step → reading the open loop is how you see and place it correctly.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a training loop with every stage in the open</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task: write a minimal single-file training loop with <strong>no framework</strong>, and label each stage with a comment — or trace nanotron's step and write the mapping. The point is to see all six stages as your own code, not hidden inside a <code>.fit()</code>.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A tiny model (a couple of linear layers is fine) and a loop over a handful of steps.</li>
+        <li>Each of the six stages is a separate, clearly commented line: <strong>load batch → forward → loss → backward → sync → optimizer step</strong>.</li>
+        <li>A comment marks <strong>exactly where</strong> a cross-device all-reduce would go (between backward and the optimizer step) — even in a single-device version, mark the spot.</li>
+        <li>A periodic <code>save()</code> / checkpoint line every N steps, with a comment saying it protects against crashes.</li>
+        <li>Print the loss each step so you can watch it fall.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/week03/training_loop.py</code> with the six commented stages above, then run it and confirm the loss goes down.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 3 Day 4 artifact.
+
+Create experiments/week03/training_loop.py: a minimal single-file training loop with NO framework, where every stage of one training step is a separate, clearly commented line.
+1. A tiny model (2 small linear layers) and synthetic data.
+2. A loop over ~50 steps. Inside each step, one commented line per stage:
+   # 1 load batch, # 2 forward, # 3 loss, # 4 backward,
+   # 5 sync (all-reduce) — mark the exact spot between backward and optimizer.step,
+   # 6 optimizer step (+ zero_grad).
+3. A periodic checkpoint: save the model every 10 steps, with a comment saying it lets you resume after a crash.
+4. Print the loss each step so I can see it fall.
+Then run it and show the falling loss. Add a short notes block mapping each of my lines to the matching stage in nanotron's training step.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-03/day-04-log.md</code>: why must the gradient all-reduce happen <em>after</em> backward but <em>before</em> the optimizer step, and never the other way around?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 4 complete!</h3>
+    <p>You can trace one distributed training step with no abstractions: load → forward → loss → backward → <strong>sync</strong> → update, and checkpoint now and then. You know exactly where the cross-device all-reduce sits and why.<br>Next: <code>start today</code> → Day 5 is <code>advanced pretraining logic</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-03-kv-cache.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The KV Cache</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-pretraining-logic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Advanced Pretraining Logic</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  stages:{html:'<span class="prompt"># one training step, all six stages</span>\n'+
+    '<span class="num">1</span> batch  = <span class="fn">next</span>(data)              <span class="dim"># load + shard</span>\n'+
+    '<span class="num">2</span> logits = <span class="fn">model</span>(batch.inputs)     <span class="dim"># forward pass</span>\n'+
+    '<span class="num">3</span> loss   = <span class="fn">loss_fn</span>(logits, labels)  <span class="dim"># how wrong</span>\n'+
+    '<span class="num">4</span> loss.<span class="fn">backward</span>()               <span class="dim"># gradients</span>\n'+
+    '<span class="num">5</span> <span class="fn">all_reduce</span>(grads)             <span class="hl"># sync across devices</span>\n'+
+    '<span class="num">6</span> optimizer.<span class="fn">step</span>()             <span class="dim"># update weights</span>\n'+
+    '<span class="ok"># loss: 2.71 → 2.44 → 2.19 → ...   (it falls)</span>',
+    take:'<b>①  The six stages, in order.</b> load → forward → loss → backward → sync → update. Each one needs the output of the stage before it, so the order is fixed.'},
+  sync:{html:'<span class="prompt"># zoom in: where does the cross-device sync go?</span>\n'+
+    '   loss.<span class="fn">backward</span>()            <span class="dim"># each device now has LOCAL grads</span>\n'+
+    '<span class="bad"># device 0 grad: 0.12   device 1 grad: 0.20   (they differ!)</span>\n'+
+    '<span class="hl">&gt;&gt;&gt;</span> <span class="fn">all_reduce</span>(grads)      <span class="hl"># sum across devices</span>\n'+
+    '<span class="hl">&gt;&gt;&gt;</span> grads /= world_size    <span class="dim"># average</span>\n'+
+    '<span class="ok"># both devices now: 0.16   (they AGREE)</span>\n'+
+    '   optimizer.<span class="fn">step</span>()          <span class="dim"># safe to update now</span>',
+    take:'<b>②  Sync goes between backward and the optimizer step.</b> You need the gradients first (so after backward), and every device must agree before updating (so before optimizer.step).'},
+  ckpt:{html:'<span class="prompt"># where does saving fit? not every step.</span>\n'+
+    '<span class="kw">for</span> step <span class="kw">in</span> range(num_steps):\n'+
+    '    ... forward, loss, backward, sync, update ...\n'+
+    '    <span class="kw">if</span> step % <span class="num">1000</span> == <span class="num">0</span>:      <span class="dim"># every 1000 steps</span>\n'+
+    '        <span class="fn">save</span>(model)           <span class="hl"># checkpoint to disk</span>\n'+
+    '<span class="bad"># crash at step 4200 ...</span>\n'+
+    '<span class="ok"># restart from step 4000 checkpoint — lost 200 steps, not 4200</span>',
+    take:'<b>③  Checkpoint periodically, to survive crashes.</b> Saving is slow, so you do it every N steps. If the run dies, you resume from the last save instead of starting over.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Two devices, each holding one shard of the same batch\"><rect x=\"30\" y=\"20\" width=\"200\" height=\"70\" rx=\"10\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"130\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">Device 0</text><rect x=\"48\" y=\"55\" width=\"70\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"83\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">batch[0:16]</text><rect x=\"290\" y=\"20\" width=\"200\" height=\"70\" rx=\"10\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"390\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">Device 1</text><rect x=\"308\" y=\"55\" width=\"70\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"343\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">batch[16:32]</text><text x=\"260\" y=\"115\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\">one batch, sharded — same step, different data on each device</text><line x1=\"230\" y1=\"55\" x2=\"290\" y2=\"55\" stroke=\"#6B645E\" stroke-width=\"1.5\" stroke-dasharray=\"3,3\"/></svg>", "note": "<b>Setup: one training step, sharded across devices.</b> A <b>batch</b> is a chunk of examples. Each device holds only its slice of the same batch — nothing has run yet."}, {"viz": "<svg viewBox=\"0 0 520 140\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Fixed order of six pipeline stages as connected boxes\"><g font-family=\"monospace\" font-size=\"11\" font-weight=\"600\"><rect x=\"5\" y=\"50\" width=\"78\" height=\"40\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"44\" y=\"73\" text-anchor=\"middle\" fill=\"#1F6280\">load</text><rect x=\"93\" y=\"50\" width=\"78\" height=\"40\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"132\" y=\"73\" text-anchor=\"middle\" fill=\"#1F6280\">forward</text><rect x=\"181\" y=\"50\" width=\"78\" height=\"40\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"220\" y=\"73\" text-anchor=\"middle\" fill=\"#1F6280\">loss</text><rect x=\"269\" y=\"50\" width=\"78\" height=\"40\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"308\" y=\"73\" text-anchor=\"middle\" fill=\"#1F6280\">backward</text><rect x=\"357\" y=\"50\" width=\"78\" height=\"40\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"396\" y=\"73\" text-anchor=\"middle\" fill=\"#9A7208\">sync</text><rect x=\"445\" y=\"50\" width=\"70\" height=\"40\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"480\" y=\"73\" text-anchor=\"middle\" fill=\"#1a5c38\">update</text></g><g stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#arr1)\"><line x1=\"83\" y1=\"70\" x2=\"91\" y2=\"70\"/><line x1=\"171\" y1=\"70\" x2=\"179\" y2=\"70\"/><line x1=\"259\" y1=\"70\" x2=\"267\" y2=\"70\"/><line x1=\"347\" y1=\"70\" x2=\"355\" y2=\"70\"/><line x1=\"435\" y1=\"70\" x2=\"443\" y2=\"70\"/></g><defs><marker id=\"arr1\" markerWidth=\"6\" markerHeight=\"6\" refX=\"5\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"#6B645E\"/></marker></defs><text x=\"260\" y=\"120\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\">each stage needs the output of the one before it — the order cannot change</text></svg>", "note": "<b>Mechanism, piece 1: the fixed pipeline.</b> load &#8594; forward &#8594; loss &#8594; backward &#8594; sync &#8594; update. Sync (yellow) is the one stage that only exists because you are on many devices."}, {"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Forward pass turning input into logits, then loss into a single number\"><rect x=\"20\" y=\"20\" width=\"90\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"65\" y=\"43\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\">batch.inputs</text><line x1=\"110\" y1=\"38\" x2=\"150\" y2=\"38\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><rect x=\"150\" y=\"15\" width=\"100\" height=\"46\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"200\" y=\"33\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F6280\">model()</text><text x=\"200\" y=\"48\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\">forward pass</text><line x1=\"250\" y1=\"38\" x2=\"290\" y2=\"38\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><rect x=\"290\" y=\"20\" width=\"80\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"330\" y=\"43\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\">logits</text><line x1=\"330\" y1=\"56\" x2=\"330\" y2=\"90\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><rect x=\"260\" y=\"90\" width=\"140\" height=\"36\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"330\" y=\"113\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#C93B3B\">loss_fn(logits, labels)</text><line x1=\"330\" y1=\"126\" x2=\"330\" y2=\"148\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"330\" y=\"148\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#C93B3B\">loss = 2.71</text><text x=\"130\" y=\"140\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\">many numbers in</text><text x=\"130\" y=\"153\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\">&#8594; one number out</text></svg>", "note": "<b>Mechanism, piece 2: forward + loss collapse everything into one number.</b> <b>Logits</b> are the model's raw scores. The loss function squashes those scores against the true labels into a single scalar &mdash; how wrong the model was on this batch."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Backward pass produces different local gradients on each device\"><rect x=\"270\" y=\"15\" width=\"90\" height=\"32\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"315\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#C93B3B\">loss.backward()</text><line x1=\"280\" y1=\"47\" x2=\"90\" y2=\"75\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"350\" y1=\"47\" x2=\"430\" y2=\"75\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><rect x=\"20\" y=\"75\" width=\"160\" height=\"55\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"100\" y=\"95\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F6280\">Device 0 gradient</text><text x=\"100\" y=\"115\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#C93B3B\">0.12</text><rect x=\"340\" y=\"75\" width=\"160\" height=\"55\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"420\" y=\"95\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F6280\">Device 1 gradient</text><text x=\"420\" y=\"115\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#C93B3B\">0.20</text><text x=\"260\" y=\"155\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">they disagree — different shards, different local gradients</text></svg>", "note": "<b>Mechanism, piece 3: backward gives each device its own gradient.</b> A <b>gradient</b> is the direction that lowers the loss. Because each device saw a different shard of the batch, its local gradient differs from every other device's."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"All-reduce sums the two local gradients and divides by world size to get the average\"><rect x=\"30\" y=\"15\" width=\"120\" height=\"40\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\"/><text x=\"90\" y=\"39\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\">device 0: 0.12</text><rect x=\"370\" y=\"15\" width=\"120\" height=\"40\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\"/><text x=\"430\" y=\"39\" text-anchor=\"middle\" font-size=\"12\" fill=\"#1F6280\">device 1: 0.20</text><line x1=\"90\" y1=\"55\" x2=\"250\" y2=\"85\" stroke=\"#C99A12\" stroke-width=\"2\"/><line x1=\"430\" y1=\"55\" x2=\"270\" y2=\"85\" stroke=\"#C99A12\" stroke-width=\"2\"/><rect x=\"180\" y=\"85\" width=\"160\" height=\"44\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"2\"/><text x=\"260\" y=\"104\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#9A7208\">all_reduce: sum = 0.32</text><text x=\"260\" y=\"120\" text-anchor=\"middle\" font-size=\"11\" fill=\"#9A7208\">/ world_size(2) = 0.16</text><line x1=\"180\" y1=\"129\" x2=\"90\" y2=\"160\" stroke=\"#2D8B55\" stroke-width=\"2\"/><line x1=\"340\" y1=\"129\" x2=\"430\" y2=\"160\" stroke=\"#2D8B55\" stroke-width=\"2\"/><rect x=\"30\" y=\"160\" width=\"120\" height=\"28\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"90\" y=\"179\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1a5c38\">device 0: 0.16</text><rect x=\"370\" y=\"160\" width=\"120\" height=\"28\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"430\" y=\"179\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1a5c38\">device 1: 0.16</text></svg>", "note": "<b>Mechanism, piece 4: all-reduce forces agreement.</b> <b>All-reduce</b> sums every device's gradient, then divides by <code>world_size</code> (the device count) so every device ends up holding the exact same averaged gradient."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Timeline showing the only legal window for the sync stage, between backward and optimizer step\"><line x1=\"20\" y1=\"75\" x2=\"500\" y2=\"75\" stroke=\"#E5DFD6\" stroke-width=\"2\"/><circle cx=\"60\" cy=\"75\" r=\"5\" fill=\"#2A7B9B\"/><text x=\"60\" y=\"60\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\">backward</text><circle cx=\"460\" cy=\"75\" r=\"5\" fill=\"#2D8B55\"/><text x=\"460\" y=\"60\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2C2A28\">optimizer.step</text><rect x=\"60\" y=\"66\" width=\"400\" height=\"18\" fill=\"#FCF3DC\" opacity=\"0.6\"/><rect x=\"150\" y=\"88\" width=\"220\" height=\"32\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"2\"/><text x=\"260\" y=\"109\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#9A7208\">only legal spot for sync</text><line x1=\"30\" y1=\"75\" x2=\"90\" y2=\"120\" stroke=\"#C93B3B\" stroke-width=\"2\" stroke-dasharray=\"4,3\"/><text x=\"60\" y=\"135\" text-anchor=\"middle\" font-size=\"10\" fill=\"#C93B3B\">sync before backward: no gradients exist yet</text></svg>", "note": "<b>Key relationship: sync must sit exactly between backward and optimizer.step.</b> You cannot all-reduce gradients that do not exist yet, and you cannot update weights before every device agrees &mdash; the window is not a choice, it is forced by data dependencies."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Failure mode: syncing before backward or after optimizer.step causes devices to drift apart over many steps\"><text x=\"260\" y=\"20\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">failure mode: sync in the wrong place</text><line x1=\"40\" y1=\"170\" x2=\"480\" y2=\"170\" stroke=\"#E5DFD6\" stroke-width=\"1.5\"/><line x1=\"40\" y1=\"170\" x2=\"40\" y2=\"40\" stroke=\"#E5DFD6\" stroke-width=\"1.5\"/><text x=\"20\" y=\"45\" font-size=\"9\" fill=\"#6B645E\">weight</text><text x=\"20\" y=\"55\" font-size=\"9\" fill=\"#6B645E\">drift</text><text x=\"460\" y=\"185\" font-size=\"9\" fill=\"#6B645E\">step</text><polyline points=\"40,168 100,160 160,145 220,120 280,90 340,70 400,55 460,45\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"2.5\"/><text x=\"420\" y=\"38\" font-size=\"10\" fill=\"#C93B3B\" font-weight=\"700\">no sync / wrong order</text><polyline points=\"40,168 100,166 160,164 220,163 280,161 340,160 400,159 460,158\" fill=\"none\" stroke=\"#2D8B55\" stroke-width=\"2.5\"/><text x=\"420\" y=\"148\" font-size=\"10\" fill=\"#2D8B55\" font-weight=\"700\">correct sync order</text></svg>", "note": "<b>Failure mode: skip or misplace the sync and devices silently diverge.</b> Without a correctly placed all-reduce, each device updates with its own local gradient. Over thousands of steps the copies of the model on each device drift apart &mdash; a bug that shows up as training instability, not a crash."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Checkpoint timeline showing periodic saves and the recovery gap after a crash\"><line x1=\"20\" y1=\"90\" x2=\"500\" y2=\"90\" stroke=\"#E5DFD6\" stroke-width=\"2\"/><g><circle cx=\"70\" cy=\"90\" r=\"5\" fill=\"#2D8B55\"/><text x=\"70\" y=\"75\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">save@1000</text><circle cx=\"220\" cy=\"90\" r=\"5\" fill=\"#2D8B55\"/><text x=\"220\" y=\"75\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">save@2000</text><circle cx=\"370\" cy=\"90\" r=\"5\" fill=\"#2D8B55\"/><text x=\"370\" y=\"75\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">save@3000</text></g><circle cx=\"430\" cy=\"90\" r=\"6\" fill=\"#C93B3B\"/><text x=\"430\" y=\"110\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"700\" fill=\"#C93B3B\">crash @3600</text><rect x=\"370\" y=\"82\" width=\"60\" height=\"16\" fill=\"#FDE8E8\" opacity=\"0.7\"/><text x=\"400\" y=\"135\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#C93B3B\">lost: only 600 steps</text><text x=\"250\" y=\"155\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">resume from step 3000, not step 0 — checkpoint interval bounds your worst-case loss</text></svg>", "note": "<b>Punchline for production: the checkpoint interval is a cost trade-off you tune.</b> Saving is slow, so you checkpoint every N steps, not every step. That interval directly sets your worst-case loss on crash &mdash; too rare and a crash burns days; too frequent and disk I/O steals training throughput. This is exactly the kind of trade-off a `.fit()` call hides and a staff interviewer expects you to name."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. What are the stages of one training step, in order?',
+  opts:['loss, forward, backward, update, sync','forward, loss, backward, sync, update','backward, forward, sync, loss, update','forward, sync, loss, backward, update'],
+  ans:1, fb:'Right. Forward runs the batch through the model, loss measures how wrong it was, backward gives the gradients, sync averages them across devices, then the optimizer updates the weights.'},
+ {q:'2. Where does the cross-device gradient sync (all-reduce) happen?',
+  opts:['Before the forward pass','After backward, before the optimizer step','After the optimizer step','It happens during the loss computation'],
+  ans:1, fb:'Right. You need the gradients first (so after backward), and every device must agree on the averaged gradient before it updates (so before the optimizer step).'},
+ {q:'3. Why read a training loop with the abstractions stripped away?',
+  opts:['It runs faster than using a framework','To see and control every cost — forward, sync, optimizer — that a .fit() call hides','Because frameworks are always buggy','It uses less memory'],
+  ans:1, fb:'Right. A .fit() call hides where the time and money go. The open loop makes every stage visible, so you can see and control each cost.'},
+ {q:'4. What does checkpointing protect against?',
+  opts:['Slow forward passes','Crashes — it lets you resume from the last saved point instead of restarting','Gradients that are too large','Devices disagreeing on the gradient'],
+  ans:1, fb:'Right. Saving the weights periodically means a crash costs you the steps since the last checkpoint, not the whole run.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>

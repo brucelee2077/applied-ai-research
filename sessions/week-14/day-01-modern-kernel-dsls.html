@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 14 · Day 1 — Modern Kernel DSLs (ThunderKittens)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:780px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:780px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:780px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+</style>
+</head>
+
+<body data-quest-id="w14-d01-tkintro">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 14 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../week-13/day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 4 · Week 14 · Day 1 (Mon)</span>
+    <h1>Modern Kernel DSLs<br>(ThunderKittens)</h1>
+    <p class="lead">People picture a GPU as <em>one giant matrix multiplier</em>. That mental model is wrong, and it makes GPU code slow. Today you flip it: a GPU is a <em>swarm</em> of tiny cores tuned for small <code>16×16</code> tiles. <strong>ThunderKittens</strong> (TK), a C++ library from Stanford, is built around that truth.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> say what a <code>kernel DSL</code> is, explain why tensor cores are ~16× faster and eat <code>16×16</code> tiles, and describe TK's three abstractions — <code>tiles</code> (warp), a <code>producer-consumer</code> template (block), and a <code>persistent grid</code>.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is a GPU kernel, a kernel DSL, and ThunderKittens?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know what a GPU is (a chip with many cores). <b>No prior kernel, CUDA, or C++ experience needed.</b> Every term below is defined the first time it appears.</div></div>
+
+      <h4>Start from the words</h4>
+      <p>A <span class="term">GPU kernel</span> is a small program that runs on the graphics card. The CPU launches it, and thousands of tiny cores run it at the same time. A kernel is how you tell the GPU to do one specific piece of math — for example, multiply two matrices.</p>
+      <p>You can write a kernel by hand in <span class="term">CUDA</span> — NVIDIA's low-level language for the GPU. CUDA is powerful, but painful: you manage the memory, the threads, and the timing (synchronization) all by yourself. It is easy to get slow or wrong.</p>
+
+      <h4>What is a "kernel DSL"?</h4>
+      <p>A <span class="term">kernel DSL</span> (domain-specific language) is a smaller, opinionated language or library built on top of CUDA. "Domain-specific" means it is made for one job — here, AI math. It hides the painful parts and shows you only the pieces that matter. Three well-known ones:</p>
+      <ul>
+        <li><strong>Triton</strong> (from OpenAI) — a Python-like compiler for kernels.</li>
+        <li><strong>CUTLASS / CuTe</strong> (from NVIDIA) — a C++ template library.</li>
+        <li><strong>ThunderKittens (TK)</strong> — a C++ library from Stanford's Hazy Research group. This is the one we study today.</li>
+      </ul>
+
+      <h4>The one big idea behind TK</h4>
+      <p>People imagine a GPU as <strong>one enormous matrix multiplier</strong>. That picture is wrong, and it makes kernels slow. The truth: a modern GPU is a <strong>collection of many small cores</strong>. The fastest units on them are the <span class="term">tensor cores</span> — special hardware blocks that finish a small matrix-multiply in one shot. Tensor cores are built to chew on <span class="term">tiles</span>: small fixed-size blocks of a matrix, natively <code>16×16</code> numbers.</p>
+      <div class="callout c-info"><span class="ic">⚡</span><div>On A100 and H100 GPUs, tensor cores deliver about <b>16×</b> the math throughput of the general-purpose units.<br><span style="font-size:.85rem;color:var(--text2)">So the whole game is: keep the tensor cores fed with <code>16×16</code> tiles, and spend as little time as possible on everything else (memory loads, softmax, <code>exp</code>).</span></div></div>
+
+      <h4>TK's three abstractions — one per hardware level</h4>
+      <p>A GPU has a <span class="term">hierarchy</span>: nested layers of parallelism. TK gives one tool per layer.</p>
+      <ul>
+        <li><strong>Warp level.</strong> A <span class="term">warp</span> is a group of 32 threads that run in lockstep. TK's basic data structure is a <strong>tile</strong> living in <strong>registers</strong> (fastest, smallest on-chip memory) or <strong>shared memory</strong> (bigger, a step away). Over tiles you call PyTorch-like ops: <code>load</code>, <code>mma</code> (matrix-multiply-accumulate on tensor cores), <code>exp</code>, <code>mul</code>.</li>
+        <li><strong>Block level.</strong> A <span class="term">thread block</span> is a group of warps that share data fast. TK gives a <strong>producer-consumer template</strong>: some warps ("producers") only load the next tiles from slow memory while other warps ("consumers") crunch the current tiles on tensor cores. The load hides behind useful math.</li>
+        <li><strong>Grid level.</strong> The <span class="term">grid</span> is all the blocks launched at once. TK hides the cost of starting/ending blocks (<strong>pipeline bubbles</strong>) and reuses the L2 cache with a <strong>persistent grid</strong>.</li>
+      </ul>
+      <p>One more word you'll meet: <span class="term">swizzling</span> — a clever reordering of where tile elements sit in shared memory so the 32 memory <strong>banks</strong> (numbered 0–31) don't collide. TK does this reshuffling for you.</p>
+
+      <div class="callout c-info"><span class="ic">📚</span><div>Official sources (verbatim): <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">https://arxiv.org/abs/2410.20399</a> · <a href="https://github.com/HazyResearch/ThunderKittens" target="_blank" rel="noopener">https://github.com/HazyResearch/ThunderKittens</a> · <a href="https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk" target="_blank" rel="noopener">https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A GPU is a restaurant kitchen, not one robot chef</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a giant restaurant kitchen. The <strong>tensor cores</strong> are specialist line cooks who are unbelievably fast at exactly one thing: turning a standard <code>16×16</code> tray of ingredients into a finished dish. They are ~16× faster than the general helpers who chop and stir. The kitchen runs fast only if those specialists never stand idle waiting for trays.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🤖❌</span><h5>Wrong: one robot chef</h5><p>If you think the GPU is a single machine you feed whole matrices to, you write slow kernels — the specialists sit half-idle and the trays pile up wrong.</p></div>
+        <div class="card"><span class="big">👨‍🍳🍳</span><h5>Right: a swarm of tile cooks</h5><p>Many small cooks, each stamping <code>16×16</code> trays. Keep every specialist busy with trays and the kitchen hits peak speed. That is the TK mindset.</p></div>
+      </div>
+      <p><strong>Where the food lives (memory):</strong> registers are the cutting board right in front of the cook — tiny, instant. Shared memory is the counter the whole station shares — bigger, one step away. L2 cache is the walk-in fridge. HBM (global memory) is the delivery truck in the parking lot — huge, but slow to fetch from.</p>
+      <p><strong>TK's producer-consumer template</strong> is like assigning some staff to <em>only</em> run trays from the truck to the counter (producers) while the specialists keep cooking (consumers). The cooks never wait. <strong>Swizzling</strong> is arranging trays on the counter so two cooks never reach for the exact same shelf at the same instant.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real cooks improvise and handle odd-sized orders. Tensor cores are rigidly fixed to their <code>16×16</code> tray shape — feed them anything that doesn't tile cleanly and they refuse or waste effort. Also, kitchen staff chat freely; GPU warps must synchronize with strict, explicit barriers or they corrupt each other's data.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Three simulated runs — see why tiles win</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal for a TK-style kernel toolchain. It is not real hardware — it echoes the numbers from the ThunderKittens paper so you can feel the ideas. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="flops" type="button">① the 16× FLOP gap</button>
+          <button class="play-btn" data-demo="stages" type="button">② the pipeline-stages knob</button>
+          <button class="play-btn" data-demo="tiles" type="button">③ declare &amp; multiply tiles</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The three abstractions, and why they matter</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules, level by level</h4>
+      <ul>
+        <li><strong>Warp — tiles.</strong> A tile is a <code>16×16</code> (or a multiple) block of numbers. It lives in <strong>registers</strong> (~64KB, ~130 TB/s) or <strong>shared memory</strong> (~227KB, ~33 TB/s). You write PyTorch-like ops over tiles: <code>load</code>, <code>mma</code>, <code>exp</code>, <code>mul</code>, <code>cumsum</code>. The <code>mma</code> op is the one that runs on the fast tensor cores.</li>
+        <li><strong>Block — producer/consumer.</strong> Producer warps only <em>load</em> the next tiles from slow memory into buffers. Consumer warps only <em>compute</em> (<code>mma</code>) on tensor cores. Because the load and the math run at the same time, the slow load hides behind useful work.</li>
+        <li><strong>Grid — persistent.</strong> Launching and ending blocks costs time (a <strong>pipeline bubble</strong>). A persistent grid keeps blocks alive to hide those bubbles and to reuse the L2 cache across tiles.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div>The one number that dominates: tensor cores are <b>~16×</b> faster than general units.<br><span style="font-size:.85rem;color:var(--text2)">So every design choice in TK — tiles, producer/consumer, persistent grid — exists to keep those tensor cores busy and hide everything else.</span></div></div>
+
+      <h4>Why this is the whole game</h4>
+      <ul>
+        <li><strong>Feed the fast units.</strong> If tensor cores idle even a little, you leave most of the chip's speed on the table. Tiling into <code>16×16</code> is what lets you feed them.</li>
+        <li><strong>Hide the slow loads.</strong> Memory from HBM is far slower than compute. The producer-consumer overlap turns "load, then compute, then load" into "always computing."</li>
+        <li><strong>One tool per level.</strong> Tiles (warp), producer-consumer (block), persistent grid (grid). Three abstractions map onto the three layers of the GPU — that is the entire ThunderKittens philosophy.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> GPU is a swarm of cores → tensor cores are ~16× faster but only eat <code>16×16</code> tiles → tile the matrix and keep the tensor cores fed → overlap loads with producer/consumer → hide bubbles with a persistent grid → peak throughput.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole mental model — "GPU = a swarm of <code>16×16</code> tile cooks" — built one layer at a time, ending in the ThunderKittens producer-consumer flow. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Make the philosophy visible: a D3 explainer page</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today is a visual-intuition day about a <strong>mental model</strong>, not a code experiment. The curriculum's "Practical execution" for today is: internalize the TK philosophy. So your artifact is an interactive visualization — <strong>not</strong> a kernel.</p>
+      <p>Build an interactive D3 explainer page: <em>"ThunderKittens: the GPU is a swarm of 16×16 tile cooks."</em> It makes the philosophy clickable.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Single self-contained HTML file; opens with <code>open &lt;path&gt;</code>; no external CDN (D3 bundled locally per the CDN-blocked rule).</li>
+        <li>A "myth vs reality" toggle: one-giant-multiplier view flips to swarm-of-<code>16×16</code>-tiles view.</li>
+        <li>A tensor-core-vs-general-core bar showing the ~16× FLOP gap, labeled with real numbers.</li>
+        <li>A four-tier memory pyramid (Registers 64KB/130TB/s, Shared 227KB/33TB/s, L2 50MB/12TB/s, HBM 80GB/3TB/s) with a tile animating the climb.</li>
+        <li>A producer-consumer timeline with a "stages" slider (1→4) that shrinks the idle gaps and prints the paper's GEMM TFLOPS (260 / 484 / 683 / 760).</li>
+        <li>A final nested diagram: Warp (tiles) inside Block (producer-consumer) inside Grid (persistent). Captions define warp, tile, tensor core, and swizzling before use.</li>
+        <li>All numbers match the ThunderKittens paper (arXiv:2410.20399) — no invented figures.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>frontier-lab/visualizations/thunderkittens-tile-philosophy.html</code> covering all criteria above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-d3-visual-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-d3-visual-lab to build my Week 14 Day 1 artifact.
+
+Create frontier-lab/visualizations/thunderkittens-tile-philosophy.html — an interactive D3 explainer titled "ThunderKittens: the GPU is a swarm of 16x16 tile cooks". Requirements:
+1. Single self-contained HTML file; opens with `open <path>`; NO external CDN — bundle D3 locally (public CDNs are 403-blocked).
+2. A "myth vs reality" toggle: flip a one-giant-matrix-multiplier view to a swarm-of-16x16-tiles view.
+3. A tensor-core-vs-general-core bar chart showing the ~16x FLOP gap (general ~65 TFLOPS vs BF16 tensor cores ~1000 TFLOPS), labeled with the numbers.
+4. A four-tier memory pyramid — Registers 64KB/130TB/s, Shared 227KB/33TB/s, L2 50MB/12TB/s, HBM 80GB/3TB/s — with a tile animating the climb from HBM up to a register.
+5. A producer-consumer timeline with a "stages" slider (1->4) that shrinks the idle gaps and prints the paper's 4096-cube GEMM TFLOPS: 260 / 484 / 683 / 760.
+6. A final nested diagram: Warp (16x16 tiles) inside Block (producer-consumer template) inside Grid (persistent, hides bubbles + reuses L2).
+7. Ground-zero captions that define warp, tile, tensor core, and swizzling before using them.
+8. All performance numbers must match the ThunderKittens paper (arXiv:2410.20399) — do not invent figures.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After building it, write one line in <code>sessions/week-14/day-01-log.md</code>: why is TK <em>not</em> a magic autotuner? (Hint: what happens if your matmul dimension isn't a multiple of 16, or your op is memory-bound with almost no <code>mma</code>?)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete!</h3>
+    <p>You flipped the mental model: a GPU is a <strong>swarm of 16×16 tile cooks</strong>, not one giant multiplier. You can name a kernel DSL, explain why tensor cores are ~16× faster, and describe TK's three tools — tiles (warp), producer-consumer (block), persistent grid (grid).<br>Next: <code>start today</code> → Day 2 is <code>Tensor Memory Acceleration</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../week-13/day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  flops:{html:'<span class="prompt">tk$</span> <span class="fn">bench</span> <span class="kw">--op</span> <span class="str">matmul</span> <span class="kw">--size</span> <span class="num">4096</span>\n'+
+    '<span class="dim">general BF16/FP32 units ....</span> <span class="num">~65</span> <span class="dim">TFLOPS</span>\n'+
+    '<span class="hl">BF16 tensor cores (16x16) .</span> <span class="ok">~1000</span> <span class="dim">TFLOPS</span>  <span class="ok">(~16x faster)</span>\n'+
+    '<span class="dim"># lesson: whoever keeps the tensor cores busy wins</span>',
+    take:'<b>①  The 16× FLOP gap.</b> Tensor cores do far more math per second than the general units — but only on <code>16×16</code> tiles. Keeping them fed is the entire kernel game.'},
+  stages:{html:'<span class="prompt">tk$</span> <span class="fn">gemm</span> <span class="kw">--M</span> <span class="num">4096</span> <span class="kw">--N</span> <span class="num">4096</span> <span class="kw">--K</span> <span class="num">4096</span> <span class="kw">--stages</span> <span class="num">1</span>\n'+
+    '<span class="dim">stages=1</span>  <span class="num">260</span> <span class="dim">TFLOPS</span>  <span class="bad">[cooks wait for trays]</span>\n'+
+    '<span class="dim">stages=2</span>  <span class="num">484</span> <span class="dim">TFLOPS</span>\n'+
+    '<span class="dim">stages=3</span>  <span class="num">683</span> <span class="dim">TFLOPS</span>\n'+
+    '<span class="dim">stages=4</span>  <span class="ok">760</span> <span class="dim">TFLOPS</span>  <span class="ok">[overlap hides the load]</span>',
+    take:'<b>②  The pipeline-stages knob.</b> More producer-consumer buffering lets consumers work while the next tiles load. Deeper overlap climbs toward peak — one knob, big speedup.'},
+  tiles:{html:'<span class="prompt">tk$</span> <span class="fn">decl</span> <span class="kw">rt_fl</span><span class="num">&lt;16,64&gt;</span> <span class="hl">attn</span>   <span class="dim"># register tile, 16x64 float</span>\n'+
+    '<span class="ok">ok</span> <span class="dim">attn lives in REGISTERS (64KB, ~130 TB/s)</span>\n'+
+    '<span class="prompt">tk$</span> <span class="fn">mma_ABt</span> <span class="hl">attn</span> <span class="hl">q_smem</span> <span class="hl">k_smem</span>   <span class="dim"># tensor-core matmul Q·Kᵀ</span>\n'+
+    '<span class="ok">ok</span> <span class="dim">tensor core: [16x64]·[64x16]ᵀ accumulate → attn</span>\n'+
+    '<span class="prompt">tk$</span> <span class="fn">exp</span> <span class="hl">attn</span> <span class="hl">attn</span>   <span class="dim"># non-tensor-core op on ALU</span>\n'+
+    '<span class="bad">warn</span> <span class="dim">exp() uses slow units — keep tensor cores busy elsewhere</span>',
+    take:'<b>③  Declare tiles and multiply them.</b> A tile lives in registers or shared memory; <code>mma</code> runs it on tensor cores, while <code>exp</code> falls back to slow units. TK\'s job is to maximize the <code>mma</code>.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up. `viz` is inline HTML/SVG (use the .dgram/.node
+   diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
+   is the short explanation beside it. Engine below is fixed across all lessons. */
+var BUILD=[
+ {viz:'<div class="dgram">'+
+    '<span style="position:relative;display:inline-flex"><span class="node dim" style="width:88px;height:64px;font-size:.72rem;text-align:center">GPU = one giant matrix multiplier</span>'+
+    '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--err);font-size:2.4rem;font-weight:800">✕</span></span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="dgram" style="width:auto;gap:2px">'+
+      '<span style="display:grid;grid-template-columns:repeat(4,10px);grid-auto-rows:10px;gap:2px">'+
+      '<i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i>'+
+      '<i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i>'+
+      '<i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i>'+
+      '<i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i><i style="background:var(--accent);border-radius:2px"></i></span>'+
+      '<span class="node ok" style="font-size:.72rem">swarm of small cores</span></span></div>',
+  note:'<b>Bust the myth first.</b> Picturing the GPU as <em>one</em> giant multiplier is why hand-written kernels miss peak. The right model — a <b>swarm of small cores</b> — is where ThunderKittens starts.'},
+ {viz:'<div class="dgram col" style="align-items:flex-start;gap:.4rem">'+
+    '<span style="display:flex;align-items:center;gap:.5rem"><span style="height:14px;width:40px;background:var(--border);border-radius:4px"></span><span class="dim">general units · ~65 TFLOPS</span></span>'+
+    '<span style="display:flex;align-items:center;gap:.5rem"><span style="height:14px;width:280px;background:linear-gradient(90deg,var(--ok),#5fd39a);border-radius:4px;box-shadow:0 0 10px rgba(45,139,85,.5)"></span><span class="ok" style="font-weight:700">tensor cores · ~1000 TFLOPS (~16×)</span></span></div>',
+  note:'<b>The 16× bar.</b> A <span class="term">tensor core</span> is a hardware block that finishes a small matrix-multiply in one shot. It is ~16× faster than the general units — so the entire kernel\'s job is to keep it fed.'},
+ {viz:'<div class="dgram">'+
+    '<span style="display:grid;grid-template-columns:repeat(4,14px);grid-auto-rows:14px;gap:2px;border:1.5px solid var(--accent);padding:3px;border-radius:4px">'+
+      '<i style="background:var(--accent-l)"></i><i style="background:var(--accent-l)"></i><i style="background:var(--warn-l)"></i><i style="background:var(--warn-l)"></i>'+
+      '<i style="background:var(--accent-l)"></i><i style="background:var(--accent-l)"></i><i style="background:var(--warn-l)"></i><i style="background:var(--warn-l)"></i>'+
+      '<i style="background:#EDE9F8"></i><i style="background:#EDE9F8"></i><i style="background:var(--ok-l)"></i><i style="background:var(--ok-l)"></i>'+
+      '<i style="background:#EDE9F8"></i><i style="background:#EDE9F8"></i><i style="background:var(--ok-l)"></i><i style="background:var(--ok-l)"></i></span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="node v" style="font-size:.72rem">one 16×16 tile</span>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="node ok">tensor core</span></div>',
+  note:'<b>Tile the matrix.</b> A <span class="term">tile</span> is a small fixed <code>16×16</code> block. A big matmul is really thousands of <code>16×16</code> tensor-core ops. The tile is TK\'s atom — you write code in tiles.'},
+ {viz:'<div class="dgram col" style="gap:2px">'+
+    '<span class="node ok" style="width:120px">Registers · 64KB · 130 TB/s</span>'+
+    '<span class="node" style="width:180px">Shared · 227KB · 33 TB/s</span>'+
+    '<span class="node dim" style="width:240px">L2 · 50MB · 12 TB/s</span>'+
+    '<span class="node hot" style="width:300px">HBM · 80GB · 3 TB/s</span>'+
+    '<span class="dim" style="font-size:.72rem">▲ a tile climbs from HBM (slow) up to registers (fast)</span></div>',
+  note:'<b>The memory pyramid.</b> Narrow-fast at top, wide-slow at bottom. A tile is only fast when it sits <em>close</em> to the core. The long climb up from HBM is the enemy every kernel fights.'},
+ {viz:'<div class="dgram col" style="align-items:flex-start;gap:.3rem">'+
+    '<span class="dim" style="font-size:.72rem">one warp, over time →</span>'+
+    '<span style="display:flex;gap:2px;align-items:center">'+
+      '<span class="node" style="padding:.2rem .5rem">load</span>'+
+      '<span style="width:44px;height:20px;background:var(--err-l);border:1.5px dashed var(--err);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--err);font-size:.6rem">idle</span>'+
+      '<span class="node ok" style="padding:.2rem .5rem">compute</span>'+
+      '<span style="width:44px;height:20px;background:var(--err-l);border:1.5px dashed var(--err);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--err);font-size:.6rem">idle</span>'+
+      '<span class="node" style="padding:.2rem .5rem">load</span></span></div>',
+  note:'<b>The stall problem.</b> A <span class="term">warp</span> is a group of 32 threads. With one worker doing load-then-compute, the tensor core sits idle waiting on the slow HBM load. Those red gaps are the <em>bubble</em>.'},
+ {viz:'<div class="dgram col" style="align-items:flex-start;gap:.35rem">'+
+    '<span style="display:flex;gap:3px;align-items:center"><span class="node v" style="width:74px;font-size:.66rem">Producer</span>'+
+      '<span class="node" style="padding:.2rem .4rem;font-size:.66rem">load→buf0</span>'+
+      '<span class="node" style="padding:.2rem .4rem;font-size:.66rem">load→buf1</span>'+
+      '<span class="node" style="padding:.2rem .4rem;font-size:.66rem">load→buf2</span></span>'+
+    '<span class="arrow" style="align-self:center">↓ hand off filled buffers ↓</span>'+
+    '<span style="display:flex;gap:3px;align-items:center"><span class="node ok" style="width:74px;font-size:.66rem">Consumer</span>'+
+      '<span class="node ok" style="padding:.2rem .4rem;font-size:.66rem">mma</span>'+
+      '<span class="node ok" style="padding:.2rem .4rem;font-size:.66rem">mma</span>'+
+      '<span class="node ok" style="padding:.2rem .4rem;font-size:.66rem">mma</span></span></div>',
+  note:'<b>Split into producer + consumer.</b> One lane <em>only loads</em> the next tiles into buffers; the other <em>only computes</em> on tensor cores. The load hides behind the math — the red gaps vanish. This is TK\'s block template.'},
+ {viz:'<div class="dgram">'+
+    '<svg width="86" height="86" viewBox="0 0 86 86" aria-hidden="true">'+
+      '<circle cx="43" cy="14" r="9" fill="var(--accent-l)" stroke="var(--accent)" stroke-width="1.5"/>'+
+      '<circle cx="72" cy="43" r="9" fill="var(--warn-l)" stroke="#C99A12" stroke-width="1.5"/>'+
+      '<circle cx="43" cy="72" r="9" fill="var(--ok-l)" stroke="var(--ok)" stroke-width="1.5"/>'+
+      '<circle cx="14" cy="43" r="9" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.5"/>'+
+      '<path d="M43 23 A20 20 0 0 1 63 43" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#a)"/>'+
+      '<defs><marker id="a" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="var(--muted)"/></marker></defs>'+
+      '<text x="43" y="47" text-anchor="middle" font-size="8" fill="var(--muted)">buffers</text></svg>'+
+    '<span class="arrow">▶</span>'+
+    '<span class="dgram col" style="width:auto;gap:1px"><span class="dim" style="font-size:.66rem">stages dial 1→4</span>'+
+      '<span style="display:flex;gap:2px;align-items:flex-end;height:40px">'+
+      '<span style="width:22px;height:14px;background:var(--border);border-radius:2px" title="260"></span>'+
+      '<span style="width:22px;height:24px;background:#9dc4d3;border-radius:2px" title="484"></span>'+
+      '<span style="width:22px;height:33px;background:#5fa3bd;border-radius:2px" title="683"></span>'+
+      '<span style="width:22px;height:40px;background:var(--ok);border-radius:2px" title="760"></span></span>'+
+      '<span class="ok" style="font-size:.62rem">260→484→683→760 TFLOPS</span></span></div>',
+  note:'<b>Ring of buffers + the stages dial.</b> Deeper buffering (more <code>stages</code>) lets consumers work on different tiles at once. Turning the dial 1→4 climbs the throughput bar — one knob, huge speedup.'},
+ {viz:'<div class="dgram" style="width:100%">'+
+    '<div style="border:2px solid var(--accent);border-radius:10px;padding:.5rem;width:100%">'+
+      '<div class="dim" style="font-size:.66rem;margin-bottom:.3rem">GRID · persistent · hides bubbles + reuses L2</div>'+
+      '<div style="border:2px solid #C99A12;border-radius:8px;padding:.45rem;background:var(--warn-l)">'+
+        '<div style="font-size:.66rem;color:#9A7208;margin-bottom:.3rem">BLOCK · producer-consumer template</div>'+
+        '<div style="border:2px solid var(--ok);border-radius:6px;padding:.4rem;background:var(--surface)">'+
+          '<div style="font-size:.66rem;color:#1a5c38;margin-bottom:.3rem">WARP · 16×16 tiles · load · mma · exp</div>'+
+          '<div style="display:flex;gap:2px">'+
+            '<i style="width:10px;height:10px;background:var(--accent);border-radius:1px"></i>'+
+            '<i style="width:10px;height:10px;background:var(--warn-l);border-radius:1px"></i>'+
+            '<i style="width:10px;height:10px;background:var(--accent);border-radius:1px"></i>'+
+            '<i style="width:10px;height:10px;background:var(--warn-l);border-radius:1px"></i>'+
+            '<i style="width:10px;height:10px;background:var(--accent);border-radius:1px"></i>'+
+            '<span class="dim" style="font-size:.6rem;margin-left:.3rem">swizzled banks 0–31, no collisions</span></div>'+
+        '</div></div></div></div>',
+  note:'<b>The whole TK stack.</b> Three nested frames — <b>Grid</b> wraps <b>Block</b> wraps <b>Warp</b> — one abstraction per hardware level. <span class="term">Swizzling</span> reorders tile cells across the 32 banks so threads never collide. That is the entire ThunderKittens philosophy.'}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What is the core mental shift ThunderKittens asks you to make about GPUs?',
+  opts:['Treat the GPU as one big matrix multiplier that you feed whole matrices','Treat the GPU as a collection of small cores optimized for 16×16 tile operations','Treat the GPU as a CPU with more cache','Treat the GPU as a pure memory-bandwidth device with no compute units'],
+  ans:1, fb:'Right. TK\'s philosophy: GPUs are swarms of cores whose tensor cores natively process 16×16 tiles, so kernels should be written in tiles.'},
+ {q:'2. Roughly how much faster are BF16 tensor cores than general-purpose BF16/FP32 units on A100/H100, per the paper?',
+  opts:['About 2×','About 16×','About 100×','They are the same speed'],
+  ans:1, fb:'Right. The paper states tensor cores offer ~16× the FLOPs of general compute, which is why keeping them busy dominates kernel design.'},
+ {q:'3. In TK\'s block-level template, what is the job of the "producer" warps?',
+  opts:['Run the tensor-core matrix multiplies','Compute the softmax and exp','Load the next tiles from slow memory into shared buffers while consumers compute','Launch the grid and manage the CPU'],
+  ans:2, fb:'Right. Producers only fetch upcoming tiles into pipeline buffers so consumers (tensor cores) never stall waiting on HBM.'},
+ {q:'4. Why does TK "swizzle" the layout of tiles in shared memory?',
+  opts:['To compress the data and save HBM space','To reorder elements across the 32 memory banks and avoid bank conflicts','To encrypt the tiles for security','To convert BF16 into FP32 automatically'],
+  ans:1, fb:'Right. Swizzling spreads elements across banks 0–31 so many threads don\'t collide on the same bank, keeping shared-memory access fast.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+</body>
+</html>
