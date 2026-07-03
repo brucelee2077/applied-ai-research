@@ -67,13 +67,14 @@ ls -d training && ls -d sessions 2>&1 || echo "sessions gone (good)"
 ```
 Expected: `training` exists; `sessions` no longer exists.
 
-- [ ] **Step 2: Update the 4 refs in root `index.html`**
+- [ ] **Step 2: Update the 5 refs in root `index.html`** (4 functional + 1 comment)
 
-Apply these four exact replacements in `/Users/ruifengli/Desktop/applied-ai-research/index.html`:
+Apply these five exact replacements in `/Users/ruifengli/Desktop/applied-ai-research/index.html`:
 - `content="0; url=sessions/index.html"` → `content="0; url=training/index.html"`
 - `<link rel="canonical" href="sessions/index.html">` → `<link rel="canonical" href="training/index.html">`
 - `<a href="sessions/index.html">24-Week Curriculum →</a>` → `<a href="training/index.html">24-Week Curriculum →</a>`
 - `location.replace('sessions/index.html');` → `location.replace('training/index.html');`
+- In the HTML comment (line ~8): `Relative path (not /sessions/...)` → `Relative path (not /training/...)` (so the Phase 6 grep is a clean zero)
 
 - [ ] **Step 3: Verify no `sessions/` left in root index.html**
 
@@ -391,6 +392,40 @@ with:
 ```
 (Step-cache JSON filenames in `_quiz_steps/`/`_viz_steps/` stay unchanged — they are keys, not paths.)
 
+### Task 8b: Update `apply_scroll_format.py` (spec §4 — silent breakage otherwise)
+
+**Files:** Modify `training/apply_scroll_format.py`
+
+This one-off formatter has no literal `sessions/` string, so the Phase 6 grep will NOT catch it — but its `TEMPLATE` path and glob both break after the move (template file gone; glob matches zero files). Fix both.
+
+- [ ] **Step 1: Update the template path (line ~22)**
+
+Replace:
+```python
+TEMPLATE = os.path.join(BASE, "week-01", "day-03-vmap.html")
+```
+with:
+```python
+TEMPLATE = os.path.join(BASE, "week-01", "day-03-vmap", "lesson", "lesson.html")
+```
+
+- [ ] **Step 2: Update the lesson glob (line ~104)**
+
+Replace:
+```python
+    files = sorted(glob.glob(os.path.join(BASE, "week-*", "day-*.html")))
+```
+with:
+```python
+    files = sorted(glob.glob(os.path.join(BASE, "week-*", "day-*", "lesson", "lesson.html")))
+```
+(Docstring `Usage:` line ~17 `sessions/apply_scroll_format.py` may be updated to `training/…` for accuracy.)
+
+- [ ] **Step 3: Smoke-check it loads its template**
+
+Run: `cd /Users/ruifengli/Desktop/applied-ai-research/training && python3 -c "import apply_scroll_format" 2>&1 | head -3; python3 apply_scroll_format.py --dry week-01/day-03-vmap/lesson/lesson.html`
+Expected: no `TEMPLATE`-not-found / markers-not-found crash; prints an `OK`/`SKIP` line (SKIP is fine — the lesson is already new-format).
+
 ### Task 9: Update the workflow `.js` scripts
 
 **Files:** Modify `training/_gapfill_workflow.js`, `training/_quiz_workflow.js`, `training/_visualize_workflow.js`
@@ -405,8 +440,10 @@ for name in ("_gapfill_workflow.js", "_quiz_workflow.js", "_visualize_workflow.j
     f = os.path.join(base, name)
     t = open(f, encoding="utf-8").read(); orig = t
     t = t.replace("sessions/_quiz_steps", "training/_quiz_steps").replace("sessions/_viz_steps", "training/_viz_steps")
-    # lesson page paths (with or without a sessions/ prefix) -> nested lesson.html
-    t = re.sub(r'(?:sessions/)?(week-\d{2})/(day-[a-z0-9-]+)\.html',
+    # ONLY rewrite sessions/-prefixed lesson paths -> nested lesson.html (anchored on the
+    # prefix so we never touch bare/relative refs like ../week-06/... which would become
+    # a malformed ../training/... — those nav links are a Phase 7 follow-up).
+    t = re.sub(r'sessions/(week-\d{2})/(day-[a-z0-9-]+)\.html',
                r'training/\1/\2/lesson/lesson.html', t)
     t = t.replace("sessions/", "training/")   # any remaining sessions/ refs
     if t != orig:
@@ -432,9 +469,9 @@ git commit -m "refactor: repair progress.json, build scripts, and workflow paths
 
 ## Phase 5 — Update skills & generators (future builds)
 
-### Task 10: `frontier-session-coach` SKILL.md (active copy)
+### Task 10: `frontier-session-coach` skill (active copy)
 
-**Files:** Modify `.claude/skills/frontier-session-coach/SKILL.md`
+**Files:** Modify `.claude/skills/frontier-session-coach/SKILL.md` **and** `.claude/skills/frontier-session-coach/SESSION_TEMPLATE.md`
 
 - [ ] **Step 1: Apply these exact replacements**
 
@@ -450,12 +487,21 @@ git commit -m "refactor: repair progress.json, build scripts, and workflow paths
 - `open sessions/...html` → `open training/...html`; `open sessions/index.html` → `open training/index.html`
 - Any remaining `sessions/index.html` mention (line ~58) → `training/index.html`
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 2: Update `SESSION_TEMPLATE.md`** (same skill dir)
 
-Run: `grep -c "sessions/" .claude/skills/frontier-session-coach/SKILL.md`
-Expected: `0`.
+- Line ~9: `sessions/week-01/day-01-jax-immutability.html` → `training/week-01/day-01-jax-immutability/lesson/lesson.html`
+- Line ~36: `` advance `sessions/progress.json` `` → `` advance `training/progress.json` ``
 
-### Task 11: `frontier-experiment-lab` SKILL.md (active copy)
+- [ ] **Step 3: Verify the whole skill dir is clean**
+
+Run: `grep -rc "sessions/" .claude/skills/frontier-session-coach/`
+Expected: every file reports `0`.
+
+### Task 10b: `frontier-review-quiz` skill (advances the ledger — spec §7)
+
+**Files:** Modify `.claude/skills/frontier-review-quiz/SKILL.md`
+
+- [ ] **Step 1:** Line ~46 `` update `sessions/progress.json`: `` → `` update `training/progress.json`: `` (this skill marks a day complete and advances `cursor`; leaving the old path breaks that write and trips the Phase 6 grep).
 
 **Files:** Modify `.claude/skills/frontier-experiment-lab/SKILL.md`
 
@@ -588,11 +634,14 @@ Expected: it prints "Cited in >=1 lesson" with a non-zero count (it must find th
 
 ```bash
 cd /Users/ruifengli/Desktop/applied-ai-research
-grep -rn "sessions/" index.html .claude/ frontier_lab_claude_skills/ training/ \
-  --include=*.py --include=*.js --include=*.json --include=*.md --include=*.html \
-  | grep -v "docs/superpowers/specs/" || echo "no stale functional sessions/ refs"
+# Functional code/config + skill/bundle docs — must be clean.
+# Nested lesson HTML under training/week-*/ is deliberately NOT grepped here: its inline
+# teaching-text sessions/ refs are the Phase 7 / spec-D5 deferred follow-up.
+grep -rn "sessions/" index.html .claude/ frontier_lab_claude_skills/ \
+    training/*.py training/*.js training/*.json \
+  || echo "no stale functional sessions/ refs"
 ```
-Expected: `no stale functional sessions/ refs`. (If lesson **HTML** teaching text still says `sessions/…`, that is the deferred D5 follow-up — note it, do not block.)
+Expected: `no stale functional sessions/ refs`. (Scoping to `training/*.py|*.js|*.json` covers the root-level tooling but excludes the `training/week-*/**/lesson.html` teaching text on purpose.)
 
 - [ ] **Step 5: Confirm structure invariants**
 
@@ -624,6 +673,7 @@ git commit -m "refactor: re-wire training/index.html and record audit state" || 
 Not executed here — a separate scripted follow-up:
 
 - Rewrite the ~100 **inline instructional path strings** inside lesson HTMLs (teaching text like "create `experiments/week01_jax/mlp_prng.py`" or "write to `sessions/week-01/day-04-log.md`") to the new `training/…/lesson/` and `…/experiments/<slug>/` convention. These are non-breaking (they render as prose) and the old experiment naming is irregular, so a careful scripted pass with per-file review is warranted rather than a blanket replace.
+- **Rework the prev/next nav-link logic in the workflow generators** (`training/_*.js`, `.claude/workflows/phase1-lessons.js`). Their bare/relative sibling links (`../week-NN/day-slug.html`, or bare `day-XX.html`) are intentionally left untouched by Tasks 9/13 (a naive rewrite would produce a malformed `../training/…`). Under the nested layout a sibling lesson is now two levels up (e.g. `../../day-02-prng-keys/lesson/lesson.html`), so the generators' link construction needs a logic change, not a string swap. Only affects *future*-generated lessons' nav; existing lessons are unaffected.
 
 ---
 
