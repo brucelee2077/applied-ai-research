@@ -39,7 +39,7 @@ Three problems to fix:
 ```
 training/
 ├── index.html                 ← dashboard (moved as-is)
-├── progress.json              ← 144-day ledger; every `page` path rewritten
+├── progress.json              ← ledger (110 entries; nominal 24×6=144); every `page` path rewritten
 ├── viz/                       ← shared prebuilt visualizations (moved as-is)
 ├── wire_index.py, inject_quiz.py, inject_viz.py,
 │   lesson_audit.py, coverage_audit.py, apply_scroll_format.py   ← build scripts (moved; path logic updated)
@@ -75,7 +75,7 @@ training/
 
 ## 5. Migration mapping
 
-All existing files move via `git mv` (history preserved).
+All existing files move via `git mv` (history preserved). **Exception — untracked files:** `experiments/week01_jax/mlp_prng.py`, `experiments/week01_jax/results/mlp_prng_output.txt`, and `sessions/week-01/day-02-log.md` are currently untracked, so `git mv` will fail on them. The plan must `git add` these first, or move them with plain `mv`. (Also note `experiments/week01_jax/EXPERIMENT_LOG.md` and `README.md` have uncommitted modifications — tracked, so `git mv` works.)
 
 ### 5.1 Lessons and logs (all 22 populated weeks)
 
@@ -100,12 +100,17 @@ Weeks present: 01–17, 19–21, 23–24 (missing 18, 22). Partial weeks (08, 12
 
 Day assignments are derived from the lesson slug that each experiment's topic matches (verified against `frontier_ai_24_week_link_companion.md` and the path each day's lesson HTML already cites).
 
+**Shape notes:**
+- `gqa_parameter_surgery/` is a single file (`gqa_checkpoint_surgery.py`, no `results/`) — it migrates as a flat experiment folder, not the full `README/src/tests/results` template.
+- **`experiments/week07_jax/`** holds only an empty, untracked placeholder `thu_moe_alltoall_overhead/` (nothing to migrate). Disposition: **delete it**. Future week-07 experiments will land under `training/week-07/day-04-distributed-moe-routing/experiments/`.
+- After all moves, the top-level `experiments/` folder must be **empty and removed** (verified in §9).
+
 ## 6. Reference updates (functional — breaks if skipped)
 
 | Target | Change |
 |---|---|
 | root `index.html` | 4 refs `sessions/index.html` → `training/index.html` |
-| `training/progress.json` | 144 `page` values → `training/week-NN/<day-slug>/lesson/lesson.html` |
+| `training/progress.json` | all `page` values (currently 110) → `training/week-NN/<day-slug>/lesson/lesson.html` |
 | `wire_index.py`, `lesson_audit.py`, `coverage_audit.py` | `BASE` dir `sessions` → `training`; globs `week-*/day-*.html` → `week-*/day-*/lesson/lesson.html` |
 | `inject_quiz.py`, `inject_viz.py` | resolve `_{quiz,viz}_steps/week-NN_day-<slug>_html.json` to the nested `week-NN/<day-slug>/lesson/lesson.html` target |
 | `_gapfill_workflow.js`, `_quiz_workflow.js`, `_visualize_workflow.js` | relative day paths → `week-NN/<day-slug>/lesson/lesson.html` |
@@ -120,14 +125,14 @@ Step-cache JSON *filenames* in `_quiz_steps/` / `_viz_steps/` stay as-is (they a
 | `.claude/skills/frontier-experiment-lab/SKILL.md` | output becomes day-scoped: `training/week-NN/<day-slug>/experiments/<exp-slug>/…` |
 | `.claude/skills/frontier-paper-course/SKILL.md` | experiment references → new day-scoped convention |
 | `.claude/workflows/phase1-lessons.js` | ~17 hardcoded `sessions/week-*/day-*.html` → new nested `lesson.html` paths |
-| `frontier_lab_claude_skills/**` + its `CLAUDE.md` | mirror bundle updated to the new convention for internal consistency (decision D2) |
+| `frontier_lab_claude_skills/**` + its `CLAUDE.md` | mirror bundle: its skills use *generic* path templates (no hardcoded `sessions/week` strings), so this is a **convention/wording** update to describe the new day-scoped layout — not a hardcoded-path fix (decision D2) |
 
 "Schedule" = the `progress.json` ledger (§6) plus these day-build skills; both are updated so the next generated day lands in the new layout.
 
 ## 8. Decisions
 
 - **D1 — Root tooling stays flat** under `training/` (pure rename), not moved into a `training/_build/` subfolder, to keep the scripts' relative-path logic intact.
-- **D2 — The distributable bundle** `frontier_lab_claude_skills/` is updated to the new convention (not left generic), so the repo is internally consistent.
+- **D2 — The distributable bundle** `frontier_lab_claude_skills/` is updated to describe the new convention (a wording-only change to its docs/templates — it holds no hardcoded `sessions/week` paths, per §7), so the repo's documented conventions stay internally consistent.
 - **D3 — Inner folder names** are `lesson/` and `experiments/`. `lesson/` (not `session/`) avoids doubling the word "session" since the day folder itself is the training session.
 - **D4 — Experiments layout** is one subfolder per experiment (`experiments/<slug>/`), supporting multiple experiments per day and matching the `frontier-experiment-lab` template.
 - **D5 — Inline instructional path strings** inside the ~100 lesson HTMLs (teaching text such as "create `experiments/week01_jax/mlp_prng.py`") are **deferred** to an optional scripted follow-up pass. They are stale but non-breaking; blanket find/replace is risky given the irregular old experiment naming.
@@ -139,8 +144,9 @@ After migration:
 1. `git status` shows the moves tracked as renames (history preserved).
 2. Run `wire_index.py`, `lesson_audit.py`, `coverage_audit.py` from `training/` — all succeed with no missing-file errors.
 3. Open `training/index.html` in a browser — every week/day link resolves to a `lesson/lesson.html`.
-4. `grep -rn "sessions/" index.html .claude/ training/*.py training/*.js` returns no stale functional references.
+4. `grep -rn "sessions/" index.html .claude/ frontier_lab_claude_skills/ training/` returns no stale functional references (widened to cover the bundle and every script/workflow under `training/`).
 5. Confirm module-internal `*/experiments/` dirs are untouched.
+6. Confirm the top-level `experiments/` folder is **empty and removed** (no stale `week07_jax/` or parent left behind).
 
 ## 10. Risks & mitigations
 
