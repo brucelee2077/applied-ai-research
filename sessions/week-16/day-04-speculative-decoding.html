@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,12 +220,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> basic Python/NumPy, and a rough sense that big language models generate text token by token. <b>No prior decoding-systems knowledge needed</b> — we define every term as it appears.</div></div>
 
       <h4>The problem: generating text is stubbornly sequential</h4>
-      <p>A large language model (LLM) generates text one <span class="term">token</span> (roughly, one word-piece) at a time. To predict token number <code>t+1</code>, the model needs tokens <code>1</code> through <code>t</code> already decided. Then it must wait for that new token before it can even start predicting <code>t+2</code>. This is called <span class="term">autoregressive generation</span> — each step depends on the one before it, so you cannot skip ahead.</p>
-      <p>Each one of those steps is a full forward pass through every layer of the model — for a large model, that can mean streaming tens of billions of parameters. Here's the part almost nobody guesses correctly: on modern GPUs and TPUs, a single decode step is usually <span class="term">memory-bandwidth-bound</span>, not compute-bound. That means most of the time is spent moving the model's weights and its cached memory of past tokens (the <span class="term">KV cache</span>, "key-value cache") from <span class="term">HBM</span> (High Bandwidth Memory — the accelerator's main memory) into the fast on-chip memory where the actual math happens. The multiplications themselves are almost free by comparison; the wait is for data to arrive.</p>
+      <p>A large language model (LLM) generates text one <span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span> (roughly, one word-piece) at a time. To predict token number <code>t+1</code>, the model needs tokens <code>1</code> through <code>t</code> already decided. Then it must wait for that new token before it can even start predicting <code>t+2</code>. This is called <span class="term" data-tip="Making text one token at a time, where each new token needs all the tokens chosen before it.">autoregressive generation</span> — each step depends on the one before it, so you cannot skip ahead.</p>
+      <p>Each one of those steps is a full forward pass through every layer of the model — for a large model, that can mean streaming tens of billions of parameters. Here's the part almost nobody guesses correctly: on modern GPUs and TPUs, a single decode step is usually <span class="term" data-tip="When the slow part is moving numbers from memory, not the math itself. Speed depends on memory, not computing.">memory-bandwidth-bound</span>, not compute-bound. That means most of the time is spent moving the model's weights and its cached memory of past tokens (the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>, "key-value cache") from <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory — the accelerator's main memory) into the fast on-chip memory where the actual math happens. The multiplications themselves are almost free by comparison; the wait is for data to arrive.</p>
 
       <h4>The insight that unlocks the whole trick</h4>
-      <p>If a decode step is bottlenecked by <em>streaming weights</em>, not by <em>doing the math</em>, then something surprising follows: running that same step on 5 candidate token positions costs almost the same wall-clock time as running it on just 1 position. You pay the weight-streaming cost once either way, and the extra multiplications for the other 4 positions are nearly free. <span class="term">Speculative decoding</span> exploits exactly this asymmetry.</p>
-      <p>The recipe: a small, fast <span class="term">draft model</span> guesses several tokens ahead, cheaply and sequentially (it's small, so each of its steps is fast). Then the large <span class="term">target model</span> — the one whose output you actually want — checks all of those guesses in <strong>one single forward pass</strong>, because a transformer can compute its output for every position in a sequence simultaneously in one pass. This is exactly what makes <em>training</em> parallel across a whole sequence; decoding is normally the odd one out because it's usually done one token at a time. Speculative decoding brings that same parallelism to decoding, just for verification instead of generation.</p>
+      <p>If a decode step is bottlenecked by <em>streaming weights</em>, not by <em>doing the math</em>, then something surprising follows: running that same step on 5 candidate token positions costs almost the same wall-clock time as running it on just 1 position. You pay the weight-streaming cost once either way, and the extra multiplications for the other 4 positions are nearly free. <span class="term" data-tip="A trick to speed up generation: a small model guesses tokens, then the big model checks many at once.">Speculative decoding</span> exploits exactly this asymmetry.</p>
+      <p>The recipe: a small, fast <span class="term" data-tip="A small, fast model that quickly guesses several next tokens for the big model to check.">draft model</span> guesses several tokens ahead, cheaply and sequentially (it's small, so each of its steps is fast). Then the large <span class="term" data-tip="The large model whose output you really want; it checks the draft model's guesses all at once.">target model</span> — the one whose output you actually want — checks all of those guesses in <strong>one single forward pass</strong>, because a transformer can compute its output for every position in a sequence simultaneously in one pass. This is exactly what makes <em>training</em> parallel across a whole sequence; decoding is normally the odd one out because it's usually done one token at a time. Speculative decoding brings that same parallelism to decoding, just for verification instead of generation.</p>
 
       <h4>How this connects to what you've already studied</h4>
       <p>This closes out the Phase 4 arc. Pallas kernels attacked the bandwidth bottleneck by writing faster memory-access patterns. Quantization attacked it by shrinking the weights so there's less to stream. GQA/MQA (grouped/multi-query attention) attacked it by shrinking the KV cache. Speculative decoding attacks the <em>same</em> bottleneck from a completely different angle: instead of moving less data, it makes each expensive data movement produce more than one token's worth of progress.</p>
@@ -480,6 +493,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

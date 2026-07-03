@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -194,7 +207,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <header class="hero">
     <span class="eyebrow">Phase 2 · Week 7 · Day 1 (Mon)</span>
     <h1>Mixture-of-Experts<br>Fundamentals</h1>
-    <p class="lead">A dense transformer's feed-forward block makes <em>every</em> token pay the full compute cost of <em>every</em> weight. What if a token only needed to visit a handful of specialists out of hundreds? Today: how <span class="term">Mixture-of-Experts (MoE)</span> decouples how much a model knows from how expensive each token is.</p>
+    <p class="lead">A dense transformer's feed-forward block makes <em>every</em> token pay the full compute cost of <em>every</em> weight. What if a token only needed to visit a handful of specialists out of hundreds? Today: how <span class="term" data-tip="A layer that replaces one feed-forward network with many, plus a router that sends each token to only a few of them.">Mixture-of-Experts (MoE)</span> decouples how much a model knows from how expensive each token is.</p>
     <div class="goal">
       <b>🎯 By the end, you'll be able to:</b> explain the router/expert/top-k mechanism, work the noisy top-k gating math by hand, explain why load-balancing loss exists, and describe the capacity-overflow failure mode from Switch Transformer.
     </div>
@@ -208,10 +221,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 
       <h4>The problem: dense models couple "how much it knows" to "how much it costs"</h4>
       <p>A standard ("dense") transformer feed-forward block (FFN) uses the <strong>exact same weight matrices</strong> for every single token that passes through it. If you want the model to know more things, your only lever is to make those weight matrices bigger. But then <strong>every</strong> token pays the full compute cost of that bigger matrix, in every layer, on every forward pass. Capacity and cost are locked together.</p>
-      <p>This matters even more once you know Week 6's framing: bigger dense models push you further into being <span class="term">compute-bound</span> per token, since every parameter you add gets multiplied against every token. What if you could add far more parameters <strong>without</strong> paying for them on every token?</p>
+      <p>This matters even more once you know Week 6's framing: bigger dense models push you further into being <span class="term" data-tip="When doing the math is the slow part, so the chip's arithmetic units are the bottleneck, not memory.">compute-bound</span> per token, since every parameter you add gets multiplied against every token. What if you could add far more parameters <strong>without</strong> paying for them on every token?</p>
 
       <h4>The answer: Mixture-of-Experts (MoE)</h4>
-      <p>A <span class="term">Mixture-of-Experts (MoE)</span> layer replaces one dense FFN with <code>N</code> separate small FFNs, called <span class="term">experts</span> — each one is just a normal FFN with its own independent weights, nothing exotic. Sitting in front of the experts is a small learned network called the <span class="term">gating network</span> (or <span class="term">router</span>) — usually one linear layer plus a softmax. For each token, the router picks the <span class="term">top k</span> experts (often k=1 or k=2, far smaller than N, which can be hundreds) and sends the token <strong>only</strong> to those. Every other expert does zero work for that token.</p>
+      <p>A <span class="term" data-tip="A layer that replaces one feed-forward network with many, plus a router that sends each token to only a few of them.">Mixture-of-Experts (MoE)</span> layer replaces one dense FFN with <code>N</code> separate small FFNs, called <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span> — each one is just a normal FFN with its own independent weights, nothing exotic. Sitting in front of the experts is a small learned network called the <span class="term" data-tip="A small learned network in front of the experts that decides which expert handles each token.">gating network</span> (or <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span>) — usually one linear layer plus a softmax. For each token, the router picks the <span class="term" data-tip="The few best experts the router picks for each token, often just 1 or 2 out of many.">top k</span> experts (often k=1 or k=2, far smaller than N, which can be hundreds) and sends the token <strong>only</strong> to those. Every other expert does zero work for that token.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>This is called <b>conditional computation</b> or <b>sparse activation</b>: which parameters get used depends on the input itself, instead of being fixed.<br><span style="font-size:.85rem;color:var(--text2)">Result: total parameters scale with <code>N</code> (you can have thousands of experts), but compute (FLOPs) per token scales only with <code>k</code>. Capacity and per-token cost are decoupled.</span></div></div>
 
       <h4>Where this came from</h4>
@@ -485,6 +498,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

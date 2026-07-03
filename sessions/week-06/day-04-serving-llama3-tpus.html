@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,17 +220,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the roofline math from earlier this week (compute-bound vs. memory-bound, FLOPs/s, HBM bandwidth). <b>No prior serving-systems experience needed.</b></div></div>
 
       <h4>The problem: a trained model is not a product yet</h4>
-      <p>Training gives you a big pile of weights that can predict the next word. <span class="term">Serving</span> is the separate engineering job of taking those weights and running them in production so <strong>many people at once</strong> can chat with the model, cheaply and fast. This is called <span class="term">LLM serving architecture</span>. It is where scaling-law theory meets real chips, real memory limits, and real angry users waiting for a reply.</p>
+      <p>Training gives you a big pile of weights that can predict the next word. <span class="term" data-tip="The job of running a trained model in real use, so many people can use it at the same time, cheaply and fast.">Serving</span> is the separate engineering job of taking those weights and running them in production so <strong>many people at once</strong> can chat with the model, cheaply and fast. This is called <span class="term" data-tip="The full design for running a big language model in real use, handling chips, memory, and many waiting users.">LLM serving architecture</span>. It is where scaling-law theory meets real chips, real memory limits, and real angry users waiting for a reply.</p>
 
       <h4>Term 1 — the KV cache</h4>
-      <p>A transformer generates text one word (<span class="term">token</span>) at a time. Each new token needs to "look back" at every earlier token using attention. Recomputing that look-back from scratch at every step would be wastefully slow. So instead, the model saves each token's <span class="term">key</span> and <span class="term">value</span> vectors — small number lists produced by attention — the first time it computes them, into a buffer called the <span class="term">KV cache</span>. Every later token just reads this cache instead of recomputing it.</p>
+      <p>A transformer generates text one word (<span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span>) at a time. Each new token needs to "look back" at every earlier token using attention. Recomputing that look-back from scratch at every step would be wastefully slow. So instead, the model saves each token's <span class="term" data-tip="A tiny array in JAX that controls randomness. You pass it into random calls so results are explicit and repeatable.">key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">value</span> vectors — small number lists produced by attention — the first time it computes them, into a buffer called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>. Every later token just reads this cache instead of recomputing it.</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>KV cache size = 2 × bytes_per_element × H × K × L × T</code><br><span style="font-size:.85rem;color:var(--text2)">H = size of one attention head, K = number of KV heads, L = number of layers, T = tokens cached so far, and the 2 is because you store both keys AND values.</span></div></div>
 
       <h4>Term 2 — prefill vs. decode</h4>
-      <p>Answering one request has two phases. <span class="term">Prefill</span> reads your whole typed-in prompt at once, in one parallel pass, and fills the KV cache — this reuses the same weights across many tokens, so it is <strong>compute-bound</strong> (limited by how many FLOPs/second the chip can do). <span class="term">Decode</span> (generation) then produces one new word at a time; each step touches only 1 new token of real work but still has to reload the parameters and the whole KV cache from memory — so decode is <strong>memory-bandwidth-bound</strong> (limited by how fast data moves from HBM, the chip's fast on-package memory).</p>
+      <p>Answering one request has two phases. <span class="term" data-tip="The first step of inference, where the model reads your whole prompt at once and computes hidden states for every layer.">Prefill</span> reads your whole typed-in prompt at once, in one parallel pass, and fills the KV cache — this reuses the same weights across many tokens, so it is <strong>compute-bound</strong> (limited by how many FLOPs/second the chip can do). <span class="term" data-tip="Making output one token at a time, feeding each new token back in to produce the next one.">Decode</span> (generation) then produces one new word at a time; each step touches only 1 new token of real work but still has to reload the parameters and the whole KV cache from memory — so decode is <strong>memory-bandwidth-bound</strong> (limited by how fast data moves from HBM, the chip's fast on-package memory).</p>
 
       <h4>Term 3 — memory fragmentation</h4>
-      <p>Different users type prompts of different lengths and get replies of different lengths. A naive server reserves one fixed, worst-case-sized memory block per user — space that mostly goes unused. That wasted, scattered, unusable memory is <span class="term">fragmentation</span>, and since a TPU v5e chip has only 16GB of HBM, fragmentation directly caps how many users you can serve at once.</p>
+      <p>Different users type prompts of different lengths and get replies of different lengths. A naive server reserves one fixed, worst-case-sized memory block per user — space that mostly goes unused. That wasted, scattered, unusable memory is <span class="term" data-tip="Wasted, scattered memory that is set aside but never used, leaving less room for other users.">fragmentation</span>, and since a TPU v5e chip has only 16GB of HBM, fragmentation directly caps how many users you can serve at once.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs: <a href="https://jax-ml.github.io/scaling-book/serving/" target="_blank" rel="noopener">Scaling Book — Serving LLMs</a> · <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">Scaling Book — All About LLM Inference</a></div></div>
       <p>Today's puzzle: LLaMA 3-70B, real TPU v5e numbers, and the three ideas — <strong>PagedAttention</strong>, <strong>continuous batching</strong>, and <strong>disaggregated serving</strong> — that every modern serving stack (vLLM, JetStream, TensorRT-LLM) is built on.</p>
@@ -500,6 +513,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

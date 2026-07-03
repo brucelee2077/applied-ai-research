@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,17 +220,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's prefill/decode split and Tuesday's memory wall. You know that decode generates one token at a time and that this is slow. <b>No prior batching-theory experience needed.</b></div></div>
 
       <h4>Quick recap: the two phases</h4>
-      <p><span class="term">Prefill</span> is the first step of inference: the model reads your whole prompt at once and is <strong>compute-bound</strong> — it's basically one big matrix multiply, and the accelerator's math units are kept busy. <span class="term">Decode</span> is every step after that: the model generates <strong>one new token per step</strong>, feeding the last token back in as input. This is the phase you learned Tuesday is <strong>memory-bandwidth-bound</strong>: the accelerator spends most of its time waiting, not computing.</p>
+      <p><span class="term" data-tip="The first step of inference, where the model reads your whole prompt at once and computes hidden states for every layer.">Prefill</span> is the first step of inference: the model reads your whole prompt at once and is <strong>compute-bound</strong> — it's basically one big matrix multiply, and the accelerator's math units are kept busy. <span class="term" data-tip="Making output one token at a time, feeding each new token back in to produce the next one.">Decode</span> is every step after that: the model generates <strong>one new token per step</strong>, feeding the last token back in as input. This is the phase you learned Tuesday is <strong>memory-bandwidth-bound</strong>: the accelerator spends most of its time waiting, not computing.</p>
 
       <h4>Why decode waits on memory</h4>
-      <p>Here is the fact that drives this whole lesson: before the accelerator can do <em>any</em> math for a decode step, it must pull every weight of the model out of <span class="term">HBM</span> (High Bandwidth Memory — the big memory chip sitting next to the compute cores, as opposed to the tiny, much faster on-chip memory) into that fast on-chip memory. It has to do this <strong>on every single step</strong>, just to produce one token per sequence. Loading all those weights takes far longer than the matrix multiply itself when you're only generating for one sequence — so most of the step's time budget is spent on the memory trip, not the math. This is the <span class="term">memory-bandwidth-bound</span> regime you saw Tuesday.</p>
+      <p>Here is the fact that drives this whole lesson: before the accelerator can do <em>any</em> math for a decode step, it must pull every weight of the model out of <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory — the big memory chip sitting next to the compute cores, as opposed to the tiny, much faster on-chip memory) into that fast on-chip memory. It has to do this <strong>on every single step</strong>, just to produce one token per sequence. Loading all those weights takes far longer than the matrix multiply itself when you're only generating for one sequence — so most of the step's time budget is spent on the memory trip, not the math. This is the <span class="term" data-tip="When the slow part is moving numbers from memory, not the math itself. Speed depends on memory, not computing.">memory-bandwidth-bound</span> regime you saw Tuesday.</p>
 
       <h4>The answer: <code>batching</code></h4>
-      <p><span class="term">Batching</span> means processing several independent requests' tokens through the model in the <strong>same</strong> forward pass — as one bigger matrix multiply — instead of one request at a time. The trick that makes this powerful: the weights only need to be loaded from HBM <strong>once per step</strong>, no matter how many sequences you cram into that step. So if you stack <code>B</code> sequences together, you pay the identical weight-loading cost but walk away with <code>B</code> tokens of useful work. This is called <strong>amortizing</strong> the weight-loading penalty — spreading one fixed cost over more output.</p>
+      <p><span class="term" data-tip="Running several users' requests through the model together in one big math step, instead of one at a time.">Batching</span> means processing several independent requests' tokens through the model in the <strong>same</strong> forward pass — as one bigger matrix multiply — instead of one request at a time. The trick that makes this powerful: the weights only need to be loaded from HBM <strong>once per step</strong>, no matter how many sequences you cram into that step. So if you stack <code>B</code> sequences together, you pay the identical weight-loading cost but walk away with <code>B</code> tokens of useful work. This is called <strong>amortizing</strong> the weight-loading penalty — spreading one fixed cost over more output.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Same weight-load trip, more tokens out the door: <code>batch=1</code> → 1 token per trip. <code>batch=128</code> → 128 tokens per <em>the same</em> trip.<br><span style="font-size:.85rem;color:var(--text2)">This ratio of useful work done per byte loaded has a name: <b>arithmetic intensity</b>. Bigger batches raise it — up to a point. That "up to a point" is today's second half.</span></div></div>
 
       <h4>The catch: batching is not free</h4>
-      <p>Every sequence in the batch needs its own memory of what it has attended to so far — a <span class="term">KV cache</span> (short for Key/Value cache), which we define fully in the walkthrough. That cache grows with batch size <em>and</em> with how long the conversation gets, and it competes for the exact same HBM the weights live in. Batching helps throughput, but it eats memory. Today you'll compute exactly where the trade-off breaks, using the same roofline idea from Pope et al. (2022) that you met this week.</p>
+      <p>Every sequence in the batch needs its own memory of what it has attended to so far — a <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span> (short for Key/Value cache), which we define fully in the walkthrough. That cache grows with batch size <em>and</em> with how long the conversation gets, and it competes for the exact same HBM the weights live in. Batching helps throughput, but it eats memory. Today you'll compute exactly where the trade-off breaks, using the same roofline idea from Pope et al. (2022) that you met this week.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs / papers (optional): <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">Scaling Book — Inference</a> · <a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Pope et al. 2022, Efficiently Scaling Transformer Inference</a> · <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noopener">Shazeer 2019, Multi-Query Attention</a> · <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">Ainslie et al. 2023, GQA</a> · <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">Scaling Book — Transformers</a> · <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook" target="_blank" rel="noopener">Ultrascale Playbook</a> · <a href="https://docs.jax.dev/en/latest/gradient-checkpointing.html" target="_blank" rel="noopener">JAX Gradient Checkpointing</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -472,6 +485,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a transformer reads text and predicts the next word, and you have seen the word "attention." <b>No prior knowledge of caching, HBM, or MHA needed</b> — we define every term the first time it appears.</div></div>
 
       <h4>How a transformer writes text: one token at a time</h4>
-      <p>A <strong>transformer</strong> is the model behind tools like ChatGPT. A <span class="term">token</span> is a small chunk of text — roughly a word or part of a word. The model writes by predicting one token, adding it to the text, then predicting the next. To pick token number N, its <strong>attention</strong> step needs to look back at every earlier token 1 through N-1.</p>
+      <p>A <strong>transformer</strong> is the model behind tools like ChatGPT. A <span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span> is a small chunk of text — roughly a word or part of a word. The model writes by predicting one token, adding it to the text, then predicting the next. To pick token number N, its <strong>attention</strong> step needs to look back at every earlier token 1 through N-1.</p>
 
       <h4>What attention looks back at: Keys and Values</h4>
-      <p>For each token, the model computes two small lists of numbers. The <span class="term">Key (K)</span> vector is "what I can be matched against." The <span class="term">Value (V)</span> vector is "what I contribute if I get matched." Both are just simple linear projections (a matrix multiply) of the token's internal state. When the model writes a new token, it compares that token's Query against every earlier token's Key, then mixes together the matching Values.</p>
+      <p>For each token, the model computes two small lists of numbers. The <span class="term" data-tip="A small list of numbers for a token that says 'what I can be matched against' when attention looks for connections.">Key (K)</span> vector is "what I can be matched against." The <span class="term" data-tip="A small list of numbers for a token that says 'what I give if I get matched' during attention.">Value (V)</span> vector is "what I contribute if I get matched." Both are just simple linear projections (a matrix multiply) of the token's internal state. When the model writes a new token, it compares that token's Query against every earlier token's Key, then mixes together the matching Values.</p>
 
       <h4>The waste, and the fix: store K and V once</h4>
-      <p>Here is the problem. To write each new token, the model needs the K and V of all earlier tokens. If it recomputed them every step, the work would grow like N² — a huge waste. So instead it computes each token's K and V <strong>once</strong> and saves them. That saved table is the <span class="term">KV cache</span>: a big array holding the K and V of every token seen so far. It lives on <span class="term">HBM</span> (high-bandwidth memory — the roughly 80 GB of very fast RAM sitting right next to the GPU chip).</p>
+      <p>Here is the problem. To write each new token, the model needs the K and V of all earlier tokens. If it recomputed them every step, the work would grow like N² — a huge waste. So instead it computes each token's K and V <strong>once</strong> and saves them. That saved table is the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>: a big array holding the K and V of every token seen so far. It lives on <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (high-bandwidth memory — the roughly 80 GB of very fast RAM sitting right next to the GPU chip).</p>
 
       <h4>Two phases, and the growing problem</h4>
       <ul>
-        <li><span class="term">Prefill</span> — the one-shot pass over your input prompt that fills the cache.</li>
-        <li><span class="term">Decode</span> — the per-token loop that reads the whole cache and appends one new (K, V) row.</li>
+        <li><span class="term" data-tip="The first step of inference, where the model reads your whole prompt at once and computes hidden states for every layer.">Prefill</span> — the one-shot pass over your input prompt that fills the cache.</li>
+        <li><span class="term" data-tip="Making output one token at a time, feeding each new token back in to produce the next one.">Decode</span> — the per-token loop that reads the whole cache and appends one new (K, V) row.</li>
       </ul>
       <p>The catch: the cache grows <strong>linearly</strong> with the number of tokens and <strong>never shrinks</strong>. Its exact size in bytes is:</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>bytes = 2 × n_layers × n_kv_heads × head_dim × seq_len × dtype_bytes</code><br><span style="font-size:.85rem;color:var(--text2)">The <b>2</b> is for K <em>and</em> V. <code>n_kv_heads</code> is how many separate K/V "heads" each layer keeps. In classic <b>Multi-Head Attention (MHA)</b> that equals the full head count — which is what makes the cache enormous. The rest of Week 16 attacks each factor: MQA/GQA shrink <code>n_kv_heads</code>, SnapKV shrinks <code>seq_len</code>, quantization shrinks <code>dtype_bytes</code>.</span></div></div>
@@ -268,7 +281,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ul>
         <li><code>2</code> — one Key tensor <em>and</em> one Value tensor per token.</li>
         <li><code>n_layers</code> — every layer keeps its <strong>own</strong> full cache. A 70B model has ~80 layers.</li>
-        <li><code>n_kv_heads</code> — how many separate K/V heads each layer stores. In <span class="term">MHA</span> this equals the query-head count (e.g. 64); GQA/MQA cut it down (e.g. 8).</li>
+        <li><code>n_kv_heads</code> — how many separate K/V heads each layer stores. In <span class="term" data-tip="Multi-head attention: each attention head keeps its own separate keys and values, one set per head.">MHA</span> this equals the query-head count (e.g. 64); GQA/MQA cut it down (e.g. 8).</li>
         <li><code>head_dim</code> — the width of each head's K and V vector (e.g. 128).</li>
         <li><code>seq_len</code> — the number of tokens so far. This is what grows during decode and never shrinks.</li>
         <li><code>dtype_bytes</code> — bytes per number: 2 for fp16, 1 for fp8. Quantization shrinks this.</li>
@@ -540,6 +553,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

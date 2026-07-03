@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -213,9 +226,9 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>The four memory tenants</h4>
       <ul>
         <li><strong>Weights</strong> — the parameters themselves, the numbers the model learned. This is what you think of as "the model." Cost in fp32: <code>4N</code>.</li>
-        <li><strong>Gradients</strong> — for every weight, training computes one number saying "nudge this weight up or down." So gradients are a same-size mirror of the weights. A <span class="term">gradient</span> is the slope of the loss with respect to one weight. Cost: another <code>4N</code>.</li>
-        <li><strong>Optimizer state</strong> — extra bookkeeping the optimizer keeps <em>per weight</em>. The <span class="term">optimizer</span> is the rule that turns gradients into weight updates. The popular <strong>Adam</strong> optimizer keeps <em>two</em> running averages per weight (called the first moment <code>m</code> and second moment <code>v</code>). That is the famous <strong>Adam 2x</strong>: two full copies of the weights. Cost: <code>2 × 4N = 8N</code>.</li>
-        <li><strong>Activations</strong> — the intermediate outputs of each layer, saved during the forward pass so the backward pass can compute gradients. An <span class="term">activation</span> is a layer's output that must be kept around until backprop uses it. This term does <em>not</em> scale with <code>N</code> — it scales with <strong>batch size × sequence length × number of layers</strong>, and it is often the <em>biggest</em> term of all.</li>
+        <li><strong>Gradients</strong> — for every weight, training computes one number saying "nudge this weight up or down." So gradients are a same-size mirror of the weights. A <span class="term" data-tip="One number for a weight that says which way to change it, up or down, to make the model less wrong.">gradient</span> is the slope of the loss with respect to one weight. Cost: another <code>4N</code>.</li>
+        <li><strong>Optimizer state</strong> — extra bookkeeping the optimizer keeps <em>per weight</em>. The <span class="term" data-tip="The rule that takes gradients and decides how to change each weight during training.">optimizer</span> is the rule that turns gradients into weight updates. The popular <strong>Adam</strong> optimizer keeps <em>two</em> running averages per weight (called the first moment <code>m</code> and second moment <code>v</code>). That is the famous <strong>Adam 2x</strong>: two full copies of the weights. Cost: <code>2 × 4N = 8N</code>.</li>
+        <li><strong>Activations</strong> — the intermediate outputs of each layer, saved during the forward pass so the backward pass can compute gradients. An <span class="term" data-tip="The output of a layer, kept in memory during the forward pass so the backward pass can use it later.">activation</span> is a layer's output that must be kept around until backprop uses it. This term does <em>not</em> scale with <code>N</code> — it scales with <strong>batch size × sequence length × number of layers</strong>, and it is often the <em>biggest</em> term of all.</li>
       </ul>
 
       <div class="callout c-info"><span class="ic">📦</span><div><b>The static budget (before activations):</b> weights <code>4N</code> + gradients <code>4N</code> + Adam state <code>8N</code> = <code>16N</code> bytes.<br><span style="font-size:.85rem;color:var(--text2)">For 1B params in fp32 that is <code>16 GB</code> — already at the limit of a 16 GB card, and we haven't stored a single activation yet.</span></div></div>
@@ -478,6 +491,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

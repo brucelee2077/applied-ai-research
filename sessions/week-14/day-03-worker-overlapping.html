@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,13 +220,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Pallas from earlier this phase — the idea of tiling a big matrix into small blocks and moving one block at a time. <b>No prior CUDA experience needed.</b></div></div>
 
       <h4>The problem: math units waiting for data</h4>
-      <p>A modern GPU has two very different kinds of hardware. <span class="term">HBM</span> (High-Bandwidth Memory) is the GPU's big off-chip memory — a few tens of gigabytes, but relatively slow to reach, around 2-3 TB/s. <span class="term">SRAM</span> is the small on-chip memory sitting right next to the compute cores — tiny (roughly 228 KB per chip region on an H100), but extremely fast, nanosecond latency.</p>
-      <p>The math units (including <span class="term">tensor cores</span> — specialized circuits that do matrix-multiply-accumulate) are almost never the slow part. The slow part is getting the next chunk of data from HBM into SRAM fast enough to keep those math units fed. Write a kernel where "fetch data" and "do math" happen one after another, and the math units sit idle half the time.</p>
+      <p>A modern GPU has two very different kinds of hardware. <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High-Bandwidth Memory) is the GPU's big off-chip memory — a few tens of gigabytes, but relatively slow to reach, around 2-3 TB/s. <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> is the small on-chip memory sitting right next to the compute cores — tiny (roughly 228 KB per chip region on an H100), but extremely fast, nanosecond latency.</p>
+      <p>The math units (including <span class="term" data-tip="Special parts inside a GPU that finish a small matrix multiply very fast, in one shot.">tensor cores</span> — specialized circuits that do matrix-multiply-accumulate) are almost never the slow part. The slow part is getting the next chunk of data from HBM into SRAM fast enough to keep those math units fed. Write a kernel where "fetch data" and "do math" happen one after another, and the math units sit idle half the time.</p>
 
       <h4>The answer: ThunderKittens and worker overlapping</h4>
-      <p><span class="term">ThunderKittens (TK)</span> is a header-only C++/CUDA library (<code>kittens.cuh</code>) that gives kernel authors pre-built tools for overlapping "fetch" and "compute" — so you get near-peak hardware use without hand-writing the low-level synchronization every time. Its central pattern at the thread-block level is called <span class="term">Load-Store-Compute-Finish (LCF)</span>.</p>
-      <p>LCF works by <span class="term">warp specialization</span>: a <span class="term">warp</span> is a group of 32 CUDA threads that execute in lockstep, the smallest scheduling unit on an NVIDIA GPU. Instead of every warp doing the same job, some warps become <strong>producers</strong> (they only fetch data) and some become <strong>consumers</strong> (they only do math). Producers for tile N+1 run <em>at the same time</em> as consumers still computing on tile N — that simultaneous running is <span class="term">worker overlapping</span>.</p>
-      <div class="callout c-info"><span class="ic">📦</span><div>Producer warps run <code>load()</code>: fetch the next tile into shared memory. Consumer warps run <code>compute()</code>: do tensor-core math on the tile that's already there. They never wait on each other with a global stop-the-world sync — only small handshake signals called <span class="term">barriers</span>.</div></div>
+      <p><span class="term" data-tip="A small C++/CUDA code library from Stanford that helps you write fast GPU kernels by working with tiles instead of single threads.">ThunderKittens (TK)</span> is a header-only C++/CUDA library (<code>kittens.cuh</code>) that gives kernel authors pre-built tools for overlapping "fetch" and "compute" — so you get near-peak hardware use without hand-writing the low-level synchronization every time. Its central pattern at the thread-block level is called <span class="term" data-tip="A repeating plan for a group of GPU workers: fetch data, store it, do math, then finish, with steps overlapping to stay fast.">Load-Store-Compute-Finish (LCF)</span>.</p>
+      <p>LCF works by <span class="term" data-tip="Giving each group of 32 GPU threads one job: some only fetch data, others only do math, instead of all doing everything.">warp specialization</span>: a <span class="term" data-tip="A group of 32 threads on a GPU that all run the same instruction at the exact same moment.">warp</span> is a group of 32 CUDA threads that execute in lockstep, the smallest scheduling unit on an NVIDIA GPU. Instead of every warp doing the same job, some warps become <strong>producers</strong> (they only fetch data) and some become <strong>consumers</strong> (they only do math). Producers for tile N+1 run <em>at the same time</em> as consumers still computing on tile N — that simultaneous running is <span class="term" data-tip="Running fetch and math at the same time, so one group loads the next data block while another still computes on the current one.">worker overlapping</span>.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>Producer warps run <code>load()</code>: fetch the next tile into shared memory. Consumer warps run <code>compute()</code>: do tensor-core math on the tile that's already there. They never wait on each other with a global stop-the-world sync — only small handshake signals called <span class="term" data-tip="Small signals that let GPU workers tell each other when data is ready, instead of stopping everyone at once.">barriers</span>.</div></div>
 
       <h4>So what's today's catch?</h4>
       <p>The mechanism is concrete, not a vague scheduling idea: it is warp-specialized code, a register-budget trick, asynchronous memory copies, and barrier handshakes, all wrapped into one reusable template. We'll build the intuition with a kitchen analogy, then walk the real template line by line.</p>
@@ -261,10 +274,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <div class="sec-body">
       <h4>The rules</h4>
       <ul>
-        <li>TK gives you tools at three levels: <strong>warp level</strong> (16x16 tiles, the native size tensor cores operate on, with PyTorch-like ops like <code>add</code>, <code>mma</code>, <code>exp</code>), <strong>thread-block level</strong> (the LCF template — today's focus), and <strong>grid level</strong> (a <span class="term">persistent kernel</span> pattern that launches exactly as many blocks as there are SMs, so blocks loop internally instead of paying launch/teardown cost thousands of times).</li>
+        <li>TK gives you tools at three levels: <strong>warp level</strong> (16x16 tiles, the native size tensor cores operate on, with PyTorch-like ops like <code>add</code>, <code>mma</code>, <code>exp</code>), <strong>thread-block level</strong> (the LCF template — today's focus), and <strong>grid level</strong> (a <span class="term" data-tip="A GPU program that starts just enough blocks to fill the chip once, then loops inside, avoiding the cost of starting many times.">persistent kernel</span> pattern that launches exactly as many blocks as there are SMs, so blocks loop internally instead of paying launch/teardown cost thousands of times).</li>
         <li>Warp specialization is a <strong>static</strong> role split, decided once for the whole kernel — a warp is either a producer or a consumer the entire time, not switching per instruction.</li>
-        <li>Producers use <span class="term">TMA (Tensor Memory Accelerator)</span> — a Hopper-generation hardware unit that computes source/destination addresses and moves a whole tile from HBM to shared memory in one instruction, freeing the requesting thread immediately.</li>
-        <li>Producers and consumers signal each other with hardware <span class="term">barriers</span> (<code>arrive</code>/<code>wait</code>) instead of a blocking global sync — so producer warp N+1 can already be fetching tile N+2 while consumer warps are still chewing on tile N.</li>
+        <li>Producers use <span class="term" data-tip="A hardware unit on newer NVIDIA GPUs that moves tiles from slow to fast memory on its own, so cores never wait.">TMA (Tensor Memory Accelerator)</span> — a Hopper-generation hardware unit that computes source/destination addresses and moves a whole tile from HBM to shared memory in one instruction, freeing the requesting thread immediately.</li>
+        <li>Producers and consumers signal each other with hardware <span class="term" data-tip="Small signals that let GPU workers tell each other when data is ready, instead of stopping everyone at once.">barriers</span> (<code>arrive</code>/<code>wait</code>) instead of a blocking global sync — so producer warp N+1 can already be fetching tile N+2 while consumer warps are still chewing on tile N.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>warpgroup::decrease_registers&lt;40&gt;()</code> for producers, <code>warpgroup::increase_registers&lt;232&gt;()</code> for consumers<br><span style="font-size:.85rem;color:var(--text2)">"Producers barely compute, so shrink their register footprint and hand the freed registers to consumers." Consumers can then hold bigger accumulator tiles.</span></div></div>
 
@@ -493,6 +506,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

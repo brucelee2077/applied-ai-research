@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,11 +220,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Tuesday–Thursday's tokenizer, data generator, and padding logic for the addition task. You've also touched Flax briefly back in Week 1 Friday. <b>No prior deep Flax experience needed.</b></div></div>
 
       <h4>The problem: raw JAX has no idea of "a layer"</h4>
-      <p>Raw JAX functions are <span class="term">stateless</span> — they take inputs, return outputs, and hold no memory of their own. That's great for <code>jit</code>, <code>grad</code>, and <code>vmap</code>. But a neural network layer needs a weight matrix that <strong>persists</strong> between calls. Someone has to decide how that weight array gets created, named, stored, and threaded through <code>jax.jit</code>/<code>jax.grad</code> without breaking JAX's purity rules.</p>
+      <p>Raw JAX functions are <span class="term" data-tip="Holding no memory of its own. It takes inputs, returns outputs, and remembers nothing between calls.">stateless</span> — they take inputs, return outputs, and hold no memory of their own. That's great for <code>jit</code>, <code>grad</code>, and <code>vmap</code>. But a neural network layer needs a weight matrix that <strong>persists</strong> between calls. Someone has to decide how that weight array gets created, named, stored, and threaded through <code>jax.jit</code>/<code>jax.grad</code> without breaking JAX's purity rules.</p>
 
       <h4>The answer: Flax Linen and the Module</h4>
-      <p><span class="term">Flax Linen</span> (<code>flax.linen</code>, imported as <code>nn</code>) is the neural-network layer library built on top of raw JAX. Its answer to "where do weights live?" is the <span class="term">Module</span> — a class you subclass. Decorate its call method with <code>@nn.compact</code>, and when you write <code>nn.Dense(features=352)</code> inside it, Linen <strong>lazily</strong> creates a weight matrix of the right shape the first time the module runs on real data.</p>
-      <p>Linen then hands that array back to you as an explicit <span class="term">parameter pytree</span> — a nested dict of arrays, conventionally called <code>params</code> — instead of hiding it inside the object. You never hold "the model's weights" as secret internal state. You hold <code>params</code>, and you call <code>model.apply({"params": params}, x)</code> to run a forward pass.</p>
+      <p><span class="term" data-tip="A library built on JAX for making neural-network layers. It handles where the model's weights live for you.">Flax Linen</span> (<code>flax.linen</code>, imported as <code>nn</code>) is the neural-network layer library built on top of raw JAX. Its answer to "where do weights live?" is the <span class="term" data-tip="A class in Flax you build on to make a layer. It knows how to create and use its own weights.">Module</span> — a class you subclass. Decorate its call method with <code>@nn.compact</code>, and when you write <code>nn.Dense(features=352)</code> inside it, Linen <strong>lazily</strong> creates a weight matrix of the right shape the first time the module runs on real data.</p>
+      <p>Linen then hands that array back to you as an explicit <span class="term" data-tip="A nested set of dicts holding your model's weight arrays, usually called params, given to you openly instead of hidden.">parameter pytree</span> — a nested dict of arrays, conventionally called <code>params</code> — instead of hiding it inside the object. You never hold "the model's weights" as secret internal state. You hold <code>params</code>, and you call <code>model.apply({"params": params}, x)</code> to run a forward pass.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>params = model.init(rng, dummy_x)["params"]</code> &nbsp;→&nbsp; <code>logits = model.apply({"params": params}, x)</code><br><span style="font-size:.85rem;color:var(--text2)"><code>params</code> is just a pytree, so <code>jax.grad</code>, <code>jax.jit</code>, and <code>jax.vmap</code> already know how to differentiate, compile, and batch it — zero special-casing.</span></div></div>
 
       <h4>The second new idea: parameter budgeting</h4>
@@ -489,6 +502,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

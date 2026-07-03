@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Week 5's FLOPs-counting and memory-accounting work (you know how to count floating point operations and bytes for a transformer forward pass). <b>No prior serving/inference knowledge needed.</b></div></div>
 
       <h4>The question changes: from "how much to train" to "how fast to serve"</h4>
-      <p>In Week 5 you counted <strong>FLOPs</strong> (floating point operations — the additions and multiplications a chip does) to answer "how much compute do I need to train this model?" Today you take the exact same counting skill and point it at a new question: "once the model is trained, how fast can it generate text for a user?" This is called <span class="term">inference</span> — running a trained model forward to produce outputs, as opposed to training it.</p>
+      <p>In Week 5 you counted <strong>FLOPs</strong> (floating point operations — the additions and multiplications a chip does) to answer "how much compute do I need to train this model?" Today you take the exact same counting skill and point it at a new question: "once the model is trained, how fast can it generate text for a user?" This is called <span class="term" data-tip="The work of using an already-trained model to make predictions or outputs. This is different from training the model.">inference</span> — running a trained model forward to produce outputs, as opposed to training it.</p>
 
       <h4>The two numbers that decide everything</h4>
-      <p>A <span class="term">roofline model</span> predicts the maximum possible speed of a computation on a given chip, using only two numbers about that chip:</p>
+      <p>A <span class="term" data-tip="A picture that predicts a computation's top speed on a chip, using its math speed and its memory speed.">roofline model</span> predicts the maximum possible speed of a computation on a given chip, using only two numbers about that chip:</p>
       <ul>
-        <li><strong>Peak compute throughput</strong> — measured in <span class="term">FLOPs/s</span> (floating point operations per second): how much arithmetic the chip's math units can do.</li>
-        <li><strong>Peak memory bandwidth</strong> — measured in <span class="term">bytes/s</span>: how fast the chip can move data between <span class="term">HBM</span> (High Bandwidth Memory — the chip's main data storage) and the compute units that actually do the arithmetic.</li>
+        <li><strong>Peak compute throughput</strong> — measured in <span class="term" data-tip="How much math a chip can do each second. It measures the top speed of a chip's math units.">FLOPs/s</span> (floating point operations per second): how much arithmetic the chip's math units can do.</li>
+        <li><strong>Peak memory bandwidth</strong> — measured in <span class="term" data-tip="How fast a chip can move data between its memory and its math units, counted in bytes each second.">bytes/s</span>: how fast the chip can move data between <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory — the chip's main data storage) and the compute units that actually do the arithmetic.</li>
       </ul>
-      <p>Every workload hits one of these two ceilings first. If it hits the compute ceiling, it's <span class="term">compute-bound</span> — the arithmetic units are the bottleneck. If it hits the memory ceiling, it's <span class="term">memory-bound</span> — moving data is the bottleneck. Which one you hit depends on a single ratio called <span class="term">arithmetic intensity</span>: FLOPs performed divided by bytes moved. High arithmetic intensity → compute-bound. Low arithmetic intensity → memory-bound.</p>
+      <p>Every workload hits one of these two ceilings first. If it hits the compute ceiling, it's <span class="term" data-tip="When doing the math is the slow part, so the chip's arithmetic units are the bottleneck, not memory.">compute-bound</span> — the arithmetic units are the bottleneck. If it hits the memory ceiling, it's <span class="term" data-tip="When moving data is the slow part, so the chip waits on memory instead of on math.">memory-bound</span> — moving data is the bottleneck. Which one you hit depends on a single ratio called <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">arithmetic intensity</span>: FLOPs performed divided by bytes moved. High arithmetic intensity → compute-bound. Low arithmetic intensity → memory-bound.</p>
 
       <h4>Why transformer inference cares — a lot</h4>
       <p>Generating text with a transformer has two phases, and they sit in <strong>different regimes</strong>:</p>
@@ -223,7 +236,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <li><strong>Prefill</strong> — processing the input prompt, all tokens at once, in parallel. Usually <strong>compute-bound</strong>.</li>
         <li><strong>Decode</strong> — generating one new token at a time, one after another. Usually <strong>memory-bound</strong>, because every single token requires reloading the entire model's weights from HBM, while the actual arithmetic per token is tiny.</li>
       </ul>
-      <p>Pope et al. (2022), "Efficiently Scaling Transformer Inference," formalized this analysis for huge models on TPU pods. With careful partitioning and int8 weight quantization (storing weights in 8-bit numbers instead of 16 or 32-bit, to cut memory traffic), they hit 29ms per-token latency at low batch size and 76% <span class="term">MFU</span> (model FLOPs utilization — the fraction of the chip's peak compute you actually use) at large batch size, on a 540-billion-parameter model.</p>
+      <p>Pope et al. (2022), "Efficiently Scaling Transformer Inference," formalized this analysis for huge models on TPU pods. With careful partitioning and int8 weight quantization (storing weights in 8-bit numbers instead of 16 or 32-bit, to cut memory traffic), they hit 29ms per-token latency at low batch size and 76% <span class="term" data-tip="Model FLOPs utilization: the part of a chip's top math speed you actually use, shown as a fraction.">MFU</span> (model FLOPs utilization — the fraction of the chip's peak compute you actually use) at large batch size, on a 540-billion-parameter model.</p>
 
       <h4>Today's artifact: turn the math into a program</h4>
       <p>An <strong>inference calculator</strong> is just this roofline math turned into code. Feed it a model size, a hardware spec (bandwidth + FLOPs/s), and a batch size — it predicts tokens-per-second before you run anything on real hardware.</p>
@@ -494,6 +507,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

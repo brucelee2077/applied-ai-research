@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -194,7 +207,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <header class="hero">
     <span class="eyebrow">Phase 5 · Week 20 · Day 5 (Fri)</span>
     <h1>Agentic Scaffolding<br>for ADRS</h1>
-    <p class="lead">You've studied the <em>idea</em> of ADRS and the <em>research results</em> behind it. But a raw LLM API call is not a system that can run unattended for 12 hours. Today: the ordinary, defensive Python code — <span class="term">orchestration</span>, <span class="term">context window management</span>, and <span class="term">reliable output parsing</span> — that turns a single API call into a real generate-evaluate-select loop.</p>
+    <p class="lead">You've studied the <em>idea</em> of ADRS and the <em>research results</em> behind it. But a raw LLM API call is not a system that can run unattended for 12 hours. Today: the ordinary, defensive Python code — <span class="term" data-tip="The plain code that decides when to call the model, when to check results, and when to stop.">orchestration</span>, <span class="term" data-tip="Choosing what old information to keep, shorten, or drop so it fits in the limited space the model can read.">context window management</span>, and <span class="term" data-tip="Code that reads the model's text answer carefully and pulls out the useful parts, even when the format is messy.">reliable output parsing</span> — that turns a single API call into a real generate-evaluate-select loop.</p>
     <div class="goal">
       <b>🎯 By the end, you'll be able to:</b> explain what an orchestration loop decides on every iteration, explain why naive prompt growth crashes long runs and how to manage it, and build a parser that never lets malformed LLM output crash an unattended job.
     </div>
@@ -208,12 +221,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 
       <h4>The problem: an LLM API call is not a system</h4>
       <p>Up to now you've studied the <strong>idea</strong> of ADRS (AI-Driven Research for Systems) and the <strong>research results</strong> behind it — FunSearch, AlphaEvolve, EvoPrompt. All of them depend on running a generate→evaluate→select loop <strong>thousands of times, unattended, for hours</strong>. A single call to an LLM API is not that. It is one request, one response, done.</p>
-      <p>Today's new concept is <span class="term">agentic scaffolding</span>: the ordinary, non-ML software layer of code that wraps a raw LLM API call into something that can run in a loop, all night, without a human babysitting it.</p>
+      <p>Today's new concept is <span class="term" data-tip="The ordinary code that wraps a model call so it can run in a loop for hours without a person watching.">agentic scaffolding</span>: the ordinary, non-ML software layer of code that wraps a raw LLM API call into something that can run in a loop, all night, without a human babysitting it.</p>
 
       <h4>Three new terms, defined now</h4>
       <ul>
         <li><strong>Orchestration</strong> — the control-flow code that decides, every iteration: which past solutions to show the LLM next, when to call the API, when to call the evaluator, when to write results to storage, and when to stop.</li>
-        <li><strong>Context window management</strong> — an LLM's <span class="term">context window</span> is the fixed budget of tokens it can read in one call. As solution history grows every generation, you must decide what to keep, summarize, or drop so the prompt never exceeds that budget.</li>
+        <li><strong>Context window management</strong> — an LLM's <span class="term" data-tip="The fixed amount of text (tokens) a model can read in one call. Anything more must be left out.">context window</span> is the fixed budget of tokens it can read in one call. As solution history grows every generation, you must decide what to keep, summarize, or drop so the prompt never exceeds that budget.</li>
         <li><strong>Reliable output parsing</strong> — the code that deterministically extracts a runnable candidate from an LLM's unstructured text reply (which may have stray prose, a missing code fence, or broken syntax), with a defined fallback when it fails.</li>
       </ul>
 
@@ -503,6 +516,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

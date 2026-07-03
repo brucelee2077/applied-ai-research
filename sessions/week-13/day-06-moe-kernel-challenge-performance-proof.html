@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can write <code>x @ w</code> in JAX and you built an MoE layer in Week 12. <b>No prior kernel-writing experience needed.</b> We start from the word "kernel".</div></div>
 
       <h4>What is a kernel?</h4>
-      <p>A <span class="term">kernel</span> is one small program that runs on the accelerator (GPU or TPU) and does one chunk of math. When you write <code>x @ w</code> in JAX, the compiler quietly picks a pre-made kernel for you. You never see it.</p>
-      <p><span class="term">Pallas</span> is a JAX extension that lets you write your <strong>own</strong> kernel in Python. You decide exactly which slices of the big matrices get loaded from slow memory into fast on-chip memory, what math runs on them, and where the results get written back.</p>
+      <p>A <span class="term" data-tip="A small program that runs directly on the GPU or TPU and does one chunk of math, launched many times at once.">kernel</span> is one small program that runs on the accelerator (GPU or TPU) and does one chunk of math. When you write <code>x @ w</code> in JAX, the compiler quietly picks a pre-made kernel for you. You never see it.</p>
+      <p><span class="term" data-tip="A JAX add-on that lets you write the fast accelerator code yourself in Python, instead of letting the compiler choose everything.">Pallas</span> is a JAX extension that lets you write your <strong>own</strong> kernel in Python. You decide exactly which slices of the big matrices get loaded from slow memory into fast on-chip memory, what math runs on them, and where the results get written back.</p>
 
       <h4>Two memory speeds matter</h4>
-      <p><span class="term">HBM</span> (High Bandwidth Memory) is the large, slow, off-chip memory where your arrays live — gigabytes, but far away. <span class="term">SRAM</span> (on TPU this is VMEM/registers) is tiny, on-chip, and roughly ~100× faster to reach.</p>
+      <p><span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory) is the large, slow, off-chip memory where your arrays live — gigabytes, but far away. <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> (on TPU this is VMEM/registers) is tiny, on-chip, and roughly ~100× faster to reach.</p>
       <p>Every kernel is really a story about moving data from HBM into SRAM, computing, and writing back. <strong>Reading and writing HBM is the expensive part.</strong></p>
 
       <h4>What is MoE?</h4>
-      <p><span class="term">MoE (Mixture of Experts)</span>: instead of one big feed-forward network (FFN), the layer holds many small FFNs called <span class="term">experts</span>. A <span class="term">router</span> sends each token to just one or a few experts. Most experts are skipped per token — that is what "sparse" means. Each expert FFN has two matrices: an <strong>up-projection</strong> <code>W_up</code> that maps a token vector of size D (model dimension) up to a larger hidden size F (feature dimension, often F = 4·D), then an activation like GELU, then a <strong>down-projection</strong> <code>W_down</code> that maps F back to D.</p>
+      <p><span class="term" data-tip="A layer with many small networks called experts. A router picks a few experts for each input.">MoE (Mixture of Experts)</span>: instead of one big feed-forward network (FFN), the layer holds many small FFNs called <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span>. A <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> sends each token to just one or a few experts. Most experts are skipped per token — that is what "sparse" means. Each expert FFN has two matrices: an <strong>up-projection</strong> <code>W_up</code> that maps a token vector of size D (model dimension) up to a larger hidden size F (feature dimension, often F = 4·D), then an activation like GELU, then a <strong>down-projection</strong> <code>W_down</code> that maps F back to D.</p>
 
       <h4>The ragged matmul problem</h4>
       <p>After routing, expert 0 got maybe 30 tokens, expert 1 got 12, expert 2 got 51 — uneven ("ragged") group sizes that change every step. <code>jax.lax.ragged_dot(lhs, rhs, group_sizes)</code> is JAX's built-in primitive for exactly this: <code>lhs</code> is all tokens stacked <code>(M, K)</code>, <code>rhs</code> is the stacked per-expert weights <code>(G, K, N)</code> for G experts, and <code>group_sizes</code> is an int array of length G saying how many consecutive rows of <code>lhs</code> belong to each expert. It does G independent matmuls in one call. It is great — but it is <strong>ONE</strong> matmul. An MoE FFN is <strong>TWO</strong> (up then down), so calling <code>ragged_dot</code> twice writes the giant <code>(M, F)</code> hidden activation all the way out to HBM and reads it back in.</p>
@@ -564,6 +577,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

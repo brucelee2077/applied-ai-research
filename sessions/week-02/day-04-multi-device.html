@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -196,7 +209,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <h1>Multi-Device Execution<br>pmap &amp; SPMD</h1>
     <p class="lead">Yesterday you split one big array across many devices (sharding). Today you run the <em>same</em> program on every device at once, each over its own shard. The tool is <code>jax.pmap</code> — think of it as <code>vmap</code>'s cousin that maps across real machines instead of a batch dimension.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> explain <span class="term">SPMD</span> (Single Program, Multiple Data), run a function across devices with <code>jax.pmap</code>, and average values across devices with <code>jax.lax.pmean</code> to keep replicas in sync.
+      <b>🎯 By the end, you'll be able to:</b> explain <span class="term" data-tip="Single Program, Multiple Data: you write one function, and every device runs it on its own slice of the data.">SPMD</span> (Single Program, Multiple Data), run a function across devices with <code>jax.pmap</code>, and average values across devices with <code>jax.lax.pmean</code> to keep replicas in sync.
     </div>
   </header>
 
@@ -207,17 +220,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> basic Python/NumPy, Day 3 (<code>jax.vmap</code>) from this week, and Day 3's Sharding lesson (splitting an array across devices). <b>No prior multi-device experience needed.</b></div></div>
 
       <h4>The problem: one program, many machines</h4>
-      <p>You have several <span class="term">devices</span> — a device is one piece of hardware that does the math, like a single GPU or TPU chip. You want each device to do work at the same time, not one after another. But how do you run your code on all of them together without writing a different program for each?</p>
+      <p>You have several <span class="term" data-tip="One piece of hardware that does math, like a single GPU or TPU chip, with its own memory.">devices</span> — a device is one piece of hardware that does the math, like a single GPU or TPU chip. You want each device to do work at the same time, not one after another. But how do you run your code on all of them together without writing a different program for each?</p>
 
       <h4>The idea: SPMD</h4>
-      <p><span class="term">SPMD</span> stands for <strong>Single Program, Multiple Data</strong>. It means one thing: you write <em>one</em> function, and every device runs that <em>same</em> function — but each device runs it on its <em>own</em> slice of the data (its <span class="term">shard</span>, from Day 3). Same recipe, different ingredients on each stove.</p>
+      <p><span class="term" data-tip="Single Program, Multiple Data: you write one function, and every device runs it on its own slice of the data.">SPMD</span> stands for <strong>Single Program, Multiple Data</strong>. It means one thing: you write <em>one</em> function, and every device runs that <em>same</em> function — but each device runs it on its <em>own</em> slice of the data (its <span class="term" data-tip="One piece of a big array after you cut it up. Each device usually holds one shard.">shard</span>, from Day 3). Same recipe, different ingredients on each stove.</p>
 
       <h4>The tool: <code>jax.pmap</code></h4>
-      <p><span class="term">pmap</span> (short for "parallel map") takes your function and maps it <strong>across physical devices</strong>. It is <code>vmap</code>'s cousin: <code>vmap</code> maps a function over a batch axis inside one device; <code>pmap</code> maps a function over the <em>devices themselves</em>, so each device gets one slice and they all run at once.</p>
+      <p><span class="term" data-tip="A JAX tool that runs your function on many chips at once, giving each chip its own piece of the data.">pmap</span> (short for "parallel map") takes your function and maps it <strong>across physical devices</strong>. It is <code>vmap</code>'s cousin: <code>vmap</code> maps a function over a batch axis inside one device; <code>pmap</code> maps a function over the <em>devices themselves</em>, so each device gets one slice and they all run at once.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>p = jax.pmap(f)</code> &nbsp;→&nbsp; give it an array whose <strong>first axis has one entry per device</strong>, and <code>p(X)</code> runs <code>f</code> on each device's slice in parallel.<br><span style="font-size:.85rem;color:var(--text2)">Same mental model as <code>vmap</code> — leading axis is "the thing we map over" — but now that axis maps to real hardware.</span></div></div>
 
       <h4>Keeping devices in agreement: <code>jax.lax.pmean</code></h4>
-      <p>When each device computes its own number (say a gradient on its own shard), the devices need to <strong>agree</strong> on one shared value. <span class="term">jax.lax.pmean</span> averages a value <em>across all devices</em> and gives every device the same mean back. In data-parallel training this is how all replicas average their gradients so they all take the identical update step.</p>
+      <p>When each device computes its own number (say a gradient on its own shard), the devices need to <strong>agree</strong> on one shared value. <span class="term" data-tip="A JAX tool that averages one number across all chips and gives every chip the same average back.">jax.lax.pmean</span> averages a value <em>across all devices</em> and gives every device the same mean back. In data-parallel training this is how all replicas average their gradients so they all take the identical update step.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/_autosummary/jax.pmap.html" target="_blank" rel="noopener">jax.pmap API</a> · <a href="https://docs.jax.dev/en/latest/_autosummary/jax.lax.pmean.html" target="_blank" rel="noopener">jax.lax.pmean API</a> · <a href="https://docs.jax.dev/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html" target="_blank" rel="noopener">Distributed arrays &amp; automatic parallelization in JAX</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -482,6 +495,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

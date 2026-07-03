@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -208,14 +221,14 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 
       <h4>The question nobody answered yet</h4>
       <p>Days 3 and 4 this week showed you <em>how</em> to shrink a weight matrix to 2-3 bits per number — lattice codebooks, additive codebooks, trellises. Every one of those methods costs something: you have to <strong>decompress</strong> (dequantize) the packed bits back into real numbers before you can multiply them, which burns extra math on top of the matmul itself. Nobody yet asked the economics question: <strong>is that trade worth it?</strong> You are spending compute to save memory traffic — but only if compute is the thing you have to spare.</p>
-      <p><span class="term">Memory economics</span>, as used today, means exactly that trade: on real hardware, is a given operation sitting in a place where extra compute is nearly free and bytes-moved is expensive — or the reverse? If it is the first case, quantization is a strict win. If it is the second, all that codebook cleverness could actually make things slower.</p>
+      <p><span class="term" data-tip="The question of whether spending extra computing to move fewer bytes is actually worth it on real hardware.">Memory economics</span>, as used today, means exactly that trade: on real hardware, is a given operation sitting in a place where extra compute is nearly free and bytes-moved is expensive — or the reverse? If it is the first case, quantization is a strict win. If it is the second, all that codebook cleverness could actually make things slower.</p>
 
       <h4>The tool you already own: the roofline model</h4>
-      <p>Week 2 gave you the answer key. Every operation has an <span class="term">arithmetic intensity</span> (AI) — FLOPs done divided by bytes moved to and from memory — and every chip has a <span class="term">ridge point</span> — the AI at which its peak compute and its peak memory bandwidth are equally the bottleneck. Below the ridge point, you are <span class="term">memory-bound</span>: the chip's math units sit mostly idle, waiting on bytes. Above it, you are <span class="term">compute-bound</span>: bytes arrive faster than the chip can chew through them.</p>
+      <p>Week 2 gave you the answer key. Every operation has an <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">arithmetic intensity</span> (AI) — FLOPs done divided by bytes moved to and from memory — and every chip has a <span class="term" data-tip="The point where a chip's math speed and its memory speed limit you equally. Below it, memory is the slow part.">ridge point</span> — the AI at which its peak compute and its peak memory bandwidth are equally the bottleneck. Below the ridge point, you are <span class="term" data-tip="When moving data is the slow part, so the chip waits on memory instead of on math.">memory-bound</span>: the chip's math units sit mostly idle, waiting on bytes. Above it, you are <span class="term" data-tip="When doing the math is the slow part, so the chip's arithmetic units are the bottleneck, not memory.">compute-bound</span>: bytes arrive faster than the chip can chew through them.</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>AI = FLOPs / bytes_moved</code> &nbsp;·&nbsp; <code>ridge = peak_FLOP/s / bandwidth</code><br><span style="font-size:.85rem;color:var(--text2)">Same formulas as Week 2, Day 1. Today you plug in the numbers for one specific, extremely common operation: a single decode-step matmul, at three different weight precisions.</span></div></div>
 
       <h4>Today's specific target: one decode step</h4>
-      <p>When an LLM generates text one token at a time (<span class="term">autoregressive decoding</span>), each step multiplies a single activation row against a big weight matrix, say shape <code>[d_model, d_ff]</code>. That matmul does very little math per byte of weight it reads — each weight is read once, used in one multiply-add, and discarded. Compressing the weights doesn't change the FLOPs. It changes the <strong>bytes moved</strong>, which changes the AI, which — since decode already lives far below the ridge point — barely matters for the "am I memory-bound" verdict, but massively changes how long the memory stall actually takes.</p>
+      <p>When an LLM generates text one token at a time (<span class="term" data-tip="Writing text one token at a time, where each new token depends on every token written before it.">autoregressive decoding</span>), each step multiplies a single activation row against a big weight matrix, say shape <code>[d_model, d_ff]</code>. That matmul does very little math per byte of weight it reads — each weight is read once, used in one multiply-add, and discarded. Compressing the weights doesn't change the FLOPs. It changes the <strong>bytes moved</strong>, which changes the AI, which — since decode already lives far below the ridge point — barely matters for the "am I memory-bound" verdict, but massively changes how long the memory stall actually takes.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">How To Scale Your Model — The Roofline</a> · <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How To Scale Your Model — Inference</a> · <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">How To Scale Your Model — full book</a> · <a href="https://arxiv.org/abs/2402.04396" target="_blank" rel="noopener">QuIP# (2402.04396)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -497,6 +510,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

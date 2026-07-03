@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -204,23 +217,23 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s1" data-sec="what">
     <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is a training loop, and what does "no abstractions" mean?</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python, and you know that training a model means adjusting its numbers (weights) so its answers get better. From Week 2 you have also seen <span class="term">all-reduce</span>: a collective operation that sums a value across many devices and gives every device the same total. <b>No prior framework-reading experience needed.</b></div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python, and you know that training a model means adjusting its numbers (weights) so its answers get better. From Week 2 you have also seen <span class="term" data-tip="An operation that sums a value across many devices and gives every device the same total back.">all-reduce</span>: a collective operation that sums a value across many devices and gives every device the same total. <b>No prior framework-reading experience needed.</b></div></div>
 
       <h4>What a training loop is</h4>
-      <p>Training a model is repeating one small routine over and over. Each repeat is called a <span class="term">training step</span>. In one step you take a chunk of data, run it through the model, measure how wrong the model was, figure out how to nudge the weights, and nudge them. Do that millions of times and the model learns.</p>
+      <p>Training a model is repeating one small routine over and over. Each repeat is called a <span class="term" data-tip="One turn of the training routine: run data through the model, see how wrong it is, and nudge the weights a little.">training step</span>. In one step you take a chunk of data, run it through the model, measure how wrong the model was, figure out how to nudge the weights, and nudge them. Do that millions of times and the model learns.</p>
       <p>One training step, spelled out, is six stages in a fixed order:</p>
       <ol>
-        <li><strong>Load + shard a batch</strong> — grab a <span class="term">batch</span> (a chunk of examples) and, on many devices, split it so each device holds a slice.</li>
-        <li><strong>Forward pass</strong> — run the batch through the model to get its outputs (the <span class="term">logits</span>, the raw scores before turning them into a prediction).</li>
+        <li><strong>Load + shard a batch</strong> — grab a <span class="term" data-tip="A group of many examples stacked together and run through a computation at the same time, instead of one at a time.">batch</span> (a chunk of examples) and, on many devices, split it so each device holds a slice.</li>
+        <li><strong>Forward pass</strong> — run the batch through the model to get its outputs (the <span class="term" data-tip="The raw scores a model outputs for each choice, before they are turned into probabilities or a final prediction.">logits</span>, the raw scores before turning them into a prediction).</li>
         <li><strong>Compute loss</strong> — one number that says how wrong those outputs were.</li>
-        <li><strong>Backward pass</strong> — work out the <span class="term">gradients</span>: for each weight, which direction lowers the loss.</li>
+        <li><strong>Backward pass</strong> — work out the <span class="term" data-tip="A set of numbers, one per weight, each telling which direction to change that weight to lower the loss.">gradients</span>: for each weight, which direction lowers the loss.</li>
         <li><strong>Synchronize gradients</strong> — on many devices, <strong>all-reduce</strong> the gradients so every device agrees on the same average gradient.</li>
         <li><strong>Optimizer step</strong> — use those gradients to update the weights.</li>
       </ol>
       <p>And once in a while — not every step — a seventh action: <strong>checkpoint</strong>, meaning save the weights to disk so you can resume if something crashes.</p>
 
       <h4>What "no abstractions" means, and why read it</h4>
-      <p>A high-level library lets you write <code>model.fit(data)</code> and hides all six stages inside. That is convenient, but you cannot see where the time and money go. A production framework like <span class="term">nanotron</span> (and its tiny teaching cousin <span class="term">picotron</span>) does the opposite on purpose: it writes out every stage as plain code you can read line by line.</p>
+      <p>A high-level library lets you write <code>model.fit(data)</code> and hides all six stages inside. That is convenient, but you cannot see where the time and money go. A production framework like <span class="term" data-tip="A training library that writes out every training stage as plain code you can read, instead of hiding it.">nanotron</span> (and its tiny teaching cousin <span class="term" data-tip="A tiny, easy-to-read program from Hugging Face that shows how the main ways of splitting training across devices work.">picotron</span>) does the opposite on purpose: it writes out every stage as plain code you can read line by line.</p>
       <p>Why bother? Because at scale, <strong>every stage is a cost you may need to see and control</strong> — the forward pass, the gradient sync across devices, the optimizer memory. You cannot tune what a <code>.fit()</code> call hides from you. Reading the loop without abstractions is how you learn where the real work happens.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://github.com/huggingface/nanotron" target="_blank" rel="noopener">nanotron (production framework)</a> · <a href="https://github.com/huggingface/picotron" target="_blank" rel="noopener">picotron (minimal teaching version)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -501,6 +514,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

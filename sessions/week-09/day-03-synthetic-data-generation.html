@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,13 +220,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Tuesday's 13-symbol tokenizer, and basic Python/NumPy. <b>No prior data-generation experience needed.</b></div></div>
 
       <h4>The problem: your model needs to see millions of examples</h4>
-      <p>To learn that <code>"127+45="</code> maps to <code>"172"</code>, the Addition Transformer needs to see a huge number of addition problems, each labeled with the exact correct sum. There is no dataset of "addition problems" sitting on the internet in the shape you need — with the digit range you want, the exact length you want, and zero labeling mistakes. So you have to make the data yourself. Data you make with code, instead of collecting from the real world, is called <span class="term">synthetic data</span>.</p>
+      <p>To learn that <code>"127+45="</code> maps to <code>"172"</code>, the Addition Transformer needs to see a huge number of addition problems, each labeled with the exact correct sum. There is no dataset of "addition problems" sitting on the internet in the shape you need — with the digit range you want, the exact length you want, and zero labeling mistakes. So you have to make the data yourself. Data you make with code, instead of collecting from the real world, is called <span class="term" data-tip="Data you make with code instead of collecting from the real world.">synthetic data</span>.</p>
 
       <h4>Why not just write real addition problems by hand?</h4>
       <p>Because you need millions of them, and a computer can check its own arithmetic perfectly. If you wrote <code>a + b = c</code> for a million pairs by hand, you would make mistakes. But if you write a program that picks random numbers <code>a</code> and <code>b</code> and then computes <code>c = a + b</code> with the same <code>+</code> operator Python already trusts, every single label is guaranteed correct. This is the entire appeal of synthetic data for tasks like arithmetic: the "ground truth" comes for free from the generator itself, with zero human labeling effort and zero labeling error.</p>
 
       <h4>Why the generator has to be fast, not just correct</h4>
-      <p>A generator that is correct but slow is still a problem. If you generate one example at a time in a plain Python <code>for</code> loop, calling Python's random number functions one at a time, producing 10 million rows can take minutes to hours. Today's real skill is not "can you produce a correct addition example" — it's "can you produce <strong>millions</strong> of them by asking NumPy to create whole arrays of random numbers at once," a technique called <span class="term">vectorization</span>. You ask NumPy once for a million random numbers, not a million times for one random number.</p>
+      <p>A generator that is correct but slow is still a problem. If you generate one example at a time in a plain Python <code>for</code> loop, calling Python's random number functions one at a time, producing 10 million rows can take minutes to hours. Today's real skill is not "can you produce a correct addition example" — it's "can you produce <strong>millions</strong> of them by asking NumPy to create whole arrays of random numbers at once," a technique called <span class="term" data-tip="Asking a tool to work on a whole array at once, instead of doing one number at a time.">vectorization</span>. You ask NumPy once for a million random numbers, not a million times for one random number.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Slow way: <code>for i in range(1_000_000): a = random.randint(...)</code> — a million round-trips through the Python interpreter.<br><span style="font-size:.85rem;color:var(--text2)">Fast way: <code>rng.integers(0, 1000, size=1_000_000)</code> — one call, one array, computed inside NumPy's compiled C code.</span></div></div>
 
       <h4>Why this matters for the whole capstone, not just today</h4>
@@ -492,6 +505,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

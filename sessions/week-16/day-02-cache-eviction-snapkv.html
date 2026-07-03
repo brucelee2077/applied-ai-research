@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,13 +220,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's lesson on GQA/MQA (sharing K/V heads to shrink the cache). <b>No prior knowledge of eviction needed.</b></div></div>
 
       <h4>The problem: re-reading everything, every single step</h4>
-      <p>When a transformer generates text one token at a time, it must look back at every earlier token to decide what comes next. To avoid recomputing each earlier token's <span class="term">Key</span> and <span class="term">Value</span> vectors (the two things attention needs to "look back"), the model stores them the first time it computes them. This storage is called the <span class="term">KV cache</span>.</p>
+      <p>When a transformer generates text one token at a time, it must look back at every earlier token to decide what comes next. To avoid recomputing each earlier token's <span class="term" data-tip="A tiny array in JAX that controls randomness. You pass it into random calls so results are explicit and repeatable.">Key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">Value</span> vectors (the two things attention needs to "look back"), the model stores them the first time it computes them. This storage is called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>.</p>
       <p>The KV cache's size is:</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>cache size = 2 × num_layers × num_kv_heads × head_dim × seq_len × bytes_per_element</code><br><span style="font-size:.85rem;color:var(--text2)">The <code>2</code> is for K and V. Every other factor is fixed by the model — except <code>seq_len</code>, which grows with how much text you feed in.</span></div></div>
-      <p>That last factor is the problem. Feed the model 100,000+ tokens of context, and the cache can become <strong>many times larger than the model's own weights</strong>. And on every single decode step, the chip must read the <em>entire</em> cache from GPU memory (HBM) before it can produce the next token. Reading data, not doing math, becomes the bottleneck — this is why decoding is called <span class="term">memory-bandwidth bound</span>, a bottleneck formalized in Pope et al.'s inference-scaling analysis (linked below).</p>
+      <p>That last factor is the problem. Feed the model 100,000+ tokens of context, and the cache can become <strong>many times larger than the model's own weights</strong>. And on every single decode step, the chip must read the <em>entire</em> cache from GPU memory (HBM) before it can produce the next token. Reading data, not doing math, becomes the bottleneck — this is why decoding is called <span class="term" data-tip="When a program is slow because it spends most time moving data from memory, not doing math.">memory-bandwidth bound</span>, a bottleneck formalized in Pope et al.'s inference-scaling analysis (linked below).</p>
 
       <h4>The idea: throw away tokens you don't need</h4>
-      <p><span class="term">Cache eviction</span> means deciding, at some point, "we don't need every token's K/V anymore — keep only some of them, and delete the rest." You trade a small amount of retrieval accuracy for a large amount of memory and speed. <strong>SnapKV</strong> is one specific, training-free way to decide what to keep.</p>
+      <p><span class="term" data-tip="Deciding to throw away the stored keys and values of tokens you no longer need, to save memory.">Cache eviction</span> means deciding, at some point, "we don't need every token's K/V anymore — keep only some of them, and delete the rest." You trade a small amount of retrieval accuracy for a large amount of memory and speed. <strong>SnapKV</strong> is one specific, training-free way to decide what to keep.</p>
 
       <h4>Wait — didn't Monday's GQA/MQA already fix this?</h4>
       <p>GQA and MQA shrink the cache by sharing K/V <strong>heads</strong> across multiple query heads (e.g. 32 query heads but only 8 or even 1 K/V heads) — a fixed structural shrink, baked in at <strong>training</strong> time, applied uniformly to <em>every</em> token. SnapKV attacks a <strong>different axis</strong>: it drops specific <strong>token positions</strong> that turn out not to matter, and it does this <strong>after</strong> training, at inference time, on top of whatever head-sharing scheme the model already uses. The two techniques stack.</p>
@@ -497,6 +510,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

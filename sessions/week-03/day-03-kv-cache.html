@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -204,17 +217,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s1" data-sec="what">
     <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is the KV cache, and why does it exist?</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know that a transformer has <span class="term">attention</span> — for each token, the model builds three vectors: a <strong>Query (Q)</strong>, a <strong>Key (K)</strong>, and a <strong>Value (V)</strong> — and that a token "attends" by comparing its Q against every earlier token's K, then mixing the matching V vectors. That was Day 2. <b>No prior KV-cache knowledge needed.</b></div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know that a transformer has <span class="term" data-tip="The part of a transformer where each token looks at other tokens, using Query, Key, and Value vectors, to decide what matters.">attention</span> — for each token, the model builds three vectors: a <strong>Query (Q)</strong>, a <strong>Key (K)</strong>, and a <strong>Value (V)</strong> — and that a token "attends" by comparing its Q against every earlier token's K, then mixing the matching V vectors. That was Day 2. <b>No prior KV-cache knowledge needed.</b></div></div>
 
       <h4>First, what is autoregressive decoding?</h4>
-      <p>When a model writes text, it does not produce the whole answer at once. It produces <strong>one token at a time</strong>. (A <span class="term">token</span> is a small chunk of text — roughly a word or piece of a word.) It writes a token, adds it to the end of what it has so far, then writes the next one, using everything written before as context. This one-at-a-time, "each new token depends on all previous tokens" process is called <span class="term">autoregressive decoding</span>.</p>
+      <p>When a model writes text, it does not produce the whole answer at once. It produces <strong>one token at a time</strong>. (A <span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span> is a small chunk of text — roughly a word or piece of a word.) It writes a token, adds it to the end of what it has so far, then writes the next one, using everything written before as context. This one-at-a-time, "each new token depends on all previous tokens" process is called <span class="term" data-tip="Writing text one token at a time, where each new token depends on every token written before it.">autoregressive decoding</span>.</p>
 
       <h4>The problem: the same work, over and over</h4>
       <p>Here is the catch. To write the next token, attention needs the <strong>K</strong> and <strong>V</strong> vectors of <em>every</em> token so far. Those K and V vectors only depend on the tokens that already exist — they do not change when you add a new token.</p>
-      <p>But the naive way recomputes them anyway. At step 1 you compute K,V for 1 token. At step 2, for 2 tokens. At step 3, for 3 tokens. By the time you have written <code>n</code> tokens, you have recomputed the early tokens' K,V about <code>n</code> times. The total work grows like <span class="term">O(n²)</span> — most of it repeated work you already did.</p>
+      <p>But the naive way recomputes them anyway. At step 1 you compute K,V for 1 token. At step 2, for 2 tokens. At step 3, for 3 tokens. By the time you have written <code>n</code> tokens, you have recomputed the early tokens' K,V about <code>n</code> times. The total work grows like <span class="term" data-tip="A way to say work grows very fast: with n items, effort rises about n times n. Doubling n makes work four times bigger.">O(n²)</span> — most of it repeated work you already did.</p>
 
       <h4>The answer: cache K and V</h4>
-      <p>The fix is simple: <strong>store the past Keys and Values</strong> so you never recompute them. This store is the <span class="term">KV cache</span>. After each step you compute K,V for only the <em>one new</em> token and <strong>append</strong> them to the cache. The next step reads all the old K,V straight from the cache. Work per step becomes roughly constant, so total work drops from <code>O(n²)</code> to <span class="term">O(n)</span>.</p>
+      <p>The fix is simple: <strong>store the past Keys and Values</strong> so you never recompute them. This store is the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>. After each step you compute K,V for only the <em>one new</em> token and <strong>append</strong> them to the cache. The next step reads all the old K,V straight from the cache. Work per step becomes roughly constant, so total work drops from <code>O(n²)</code> to <span class="term" data-tip="A way to say work grows in step with the number of items: twice as many items means about twice the work.">O(n)</span>.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><b>The KV cache</b> = the stored Keys and Values of all tokens written so far.<br><span style="font-size:.85rem;color:var(--text2)">Each decode step: compute Q, K, V for the <em>new</em> token → append its K,V to the cache → attend using the new Q against the <em>whole</em> cache. No recompute of old tokens.</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -482,6 +495,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

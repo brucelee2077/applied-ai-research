@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you already know how to write and run one JAX training loop (Weeks 1–9), and how JAX allocates device memory and caches JIT-compiled shapes. <b>No prior pandas or MLOps experience needed.</b></div></div>
 
       <h4>The problem: one run is easy, sixty runs is a different job</h4>
-      <p>All week you tuned <strong>one</strong> training run to be fast. But your Chinchilla-style scaling-law study does not need one run — it needs a whole grid of them: several model sizes <code>N</code> crossed with several data budgets <code>D</code>, maybe crossed with a couple of learning rates too. That grid of jobs is called a <span class="term">run matrix</span> (also called a training-run grid or sweep): one row per job, one column per hyperparameter you are varying. Sweep 6 model sizes × 5 data budgets × 2 learning rates and you get <code>6×5×2 = 60</code> separate training runs.</p>
+      <p>All week you tuned <strong>one</strong> training run to be fast. But your Chinchilla-style scaling-law study does not need one run — it needs a whole grid of them: several model sizes <code>N</code> crossed with several data budgets <code>D</code>, maybe crossed with a couple of learning rates too. That grid of jobs is called a <span class="term" data-tip="A grid of training jobs, one per combination of settings like model size, data amount, and learning rate.">run matrix</span> (also called a training-run grid or sweep): one row per job, one column per hyperparameter you are varying. Sweep 6 model sizes × 5 data budgets × 2 learning rates and you get <code>6×5×2 = 60</code> separate training runs.</p>
       <p>Two new problems show up only at this scale, and neither is new math — both are new <strong>engineering discipline</strong>:</p>
       <ul>
-        <li><strong>Saturday — execute the matrix.</strong> At 60 runs, some will crash: out-of-memory (<span class="term">OOM</span>, when a job asks the accelerator for more memory than it has), a diverging loss, or a cloud instance getting preempted mid-run. You cannot afford to restart a whole 6-hour run from step 0 every time one of these happens.</li>
+        <li><strong>Saturday — execute the matrix.</strong> At 60 runs, some will crash: out-of-memory (<span class="term" data-tip="Out-of-memory: when a job asks the accelerator for more memory than it actually has, so it crashes.">OOM</span>, when a job asks the accelerator for more memory than it has), a diverging loss, or a cloud instance getting preempted mid-run. You cannot afford to restart a whole 6-hour run from step 0 every time one of these happens.</li>
         <li><strong>Sunday — aggregate the results.</strong> Each finished run leaves behind one number you actually care about (its final loss) plus the metadata that produced it (<code>N</code>, <code>D</code>, maybe compute <code>C = 6ND</code>). Right now that is scattered across 60 separate files. You need it in one clean table.</li>
       </ul>
 
       <h4>The answer, part 1: checkpointing for resumability</h4>
-      <p><span class="term">Checkpointing for resumability</span> means each run periodically writes its optimizer and model state to disk, so a crashed run restarts from its <em>last saved point</em> instead of from scratch. Pair that with <span class="term">memory-usage monitoring</span> — watching the live number of bytes allocated on the accelerator — so you catch a memory leak or an OOM-prone config before it kills an instance and burns cloud budget.</p>
+      <p><span class="term" data-tip="Saving a run's state to disk now and then, so if it crashes it can continue from the last save.">Checkpointing for resumability</span> means each run periodically writes its optimizer and model state to disk, so a crashed run restarts from its <em>last saved point</em> instead of from scratch. Pair that with <span class="term" data-tip="Watching how much memory a run uses on the accelerator, so you spot problems before they crash the job.">memory-usage monitoring</span> — watching the live number of bytes allocated on the accelerator — so you catch a memory leak or an OOM-prone config before it kills an instance and burns cloud budget.</p>
 
       <h4>The answer, part 2: pandas and the DataFrame</h4>
-      <p><span class="term">pandas</span> is a Python library for tabular data — think of it as programmable spreadsheet software. Its core object is the <span class="term">DataFrame</span>: a 2D table with named columns (like <code>N</code>, <code>D</code>, <code>final_loss</code>) and a row index, where each column is backed by a NumPy array so column math vectorizes just like NumPy. <span class="term">Aggregation</span> means reading every run's raw JSON output into one row per run; <span class="term">cleaning</span> means handling the ugly reality — some rows have <code>NaN</code> (Not a Number, logged when a run's loss diverges to infinity), some rows are exact duplicates from reruns, some columns arrive as strings that should be floats.</p>
+      <p><span class="term" data-tip="A Python library for tables of rows and columns, like a spreadsheet you control with code.">pandas</span> is a Python library for tabular data — think of it as programmable spreadsheet software. Its core object is the <span class="term" data-tip="The main pandas object: a table with named columns and rows, like a spreadsheet you can control with code.">DataFrame</span>: a 2D table with named columns (like <code>N</code>, <code>D</code>, <code>final_loss</code>) and a row index, where each column is backed by a NumPy array so column math vectorizes just like NumPy. <span class="term" data-tip="Collecting each run's raw output and putting it together into one big table, one row per run.">Aggregation</span> means reading every run's raw JSON output into one row per run; <span class="term" data-tip="Fixing messy data in your table, like removing duplicate rows or handling missing or broken values.">cleaning</span> means handling the ugly reality — some rows have <code>NaN</code> (Not a Number, logged when a run's loss diverges to infinity), some rows are exact duplicates from reruns, some columns arrive as strings that should be floats.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>records = [json.load(open(f)) for f in glob.glob("results/*.json")]</code><br><code>df = pd.DataFrame(records)</code> &nbsp;→&nbsp; one row per run, columns <code>run_id, N, D, final_loss</code>.<br><span style="font-size:.85rem;color:var(--text2)">This is the entire shape of Sunday's job: 60 scattered JSON files become 1 table.</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -516,6 +529,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

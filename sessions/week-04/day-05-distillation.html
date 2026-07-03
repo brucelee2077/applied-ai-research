@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -194,7 +207,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <header class="hero">
     <span class="eyebrow">Phase 1 · Week 4 · Day 5 (Fri)</span>
     <h1>Distillation<br>A Small Model That Learned From a Big One</h1>
-    <p class="lead">A big model is smart but slow and expensive to run. What if a tiny model could copy most of its skill? <span class="term">Knowledge distillation</span> trains a small <em>student</em> to imitate a large <em>teacher</em> — not just its answers, but its whole way of being unsure. Today: how, and why it keeps inference cheap.</p>
+    <p class="lead">A big model is smart but slow and expensive to run. What if a tiny model could copy most of its skill? <span class="term" data-tip="Training a small model (the student) to copy a big model (the teacher), keeping most of its skill but running cheaper.">Knowledge distillation</span> trains a small <em>student</em> to imitate a large <em>teacher</em> — not just its answers, but its whole way of being unsure. Today: how, and why it keeps inference cheap.</p>
     <div class="goal">
       <b>🎯 By the end, you'll be able to:</b> explain what a teacher, a student, and soft targets are; use a <code>temperature</code> to soften a teacher's outputs and reveal its "dark knowledge"; and write the distillation loss that pulls a student toward the teacher.
     </div>
@@ -204,17 +217,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s1" data-sec="what">
     <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is knowledge distillation?</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python/NumPy, and you know a classifier outputs a probability for each class (a <span class="term">softmax</span>: a list of numbers between 0 and 1 that add up to 1). <b>No prior distillation experience needed.</b></div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python/NumPy, and you know a classifier outputs a probability for each class (a <span class="term" data-tip="A step that turns raw scores into a list of numbers between 0 and 1 that add up to 1.">softmax</span>: a list of numbers between 0 and 1 that add up to 1). <b>No prior distillation experience needed.</b></div></div>
 
       <h4>The problem: the best model is often too big to run</h4>
-      <p>A large model can be very accurate, but it is slow and costs a lot to run on every request. This cost is called <span class="term">inference</span> — the work of using a trained model to make predictions. You want that accuracy, but at a fraction of the cost.</p>
+      <p>A large model can be very accurate, but it is slow and costs a lot to run on every request. This cost is called <span class="term" data-tip="The work of using an already-trained model to make predictions or outputs. This is different from training the model.">inference</span> — the work of using a trained model to make predictions. You want that accuracy, but at a fraction of the cost.</p>
 
       <h4>The idea: train a small model to copy a big one</h4>
-      <p>You keep the big accurate model — call it the <span class="term">teacher</span>. You build a much smaller model — the <span class="term">student</span>. Then you train the student to <strong>imitate the teacher's outputs</strong>. This copying process is called <span class="term">knowledge distillation</span>. The result is a small, cheap model that keeps a lot of the teacher's quality.</p>
+      <p>You keep the big accurate model — call it the <span class="term" data-tip="The big, accurate model whose outputs a smaller model tries to copy.">teacher</span>. You build a much smaller model — the <span class="term" data-tip="The small, cheap model trained to imitate the bigger teacher model.">student</span>. Then you train the student to <strong>imitate the teacher's outputs</strong>. This copying process is called <span class="term" data-tip="Training a small model (the student) to copy a big model (the teacher), keeping most of its skill but running cheaper.">knowledge distillation</span>. The result is a small, cheap model that keeps a lot of the teacher's quality.</p>
 
       <h4>The twist: copy the <em>whole</em> answer, not just the top one</h4>
-      <p>A normal training label is a <span class="term">hard label</span>: a single correct class, like "this image is a 3." That throws away a lot of information. The teacher knows more than that. When it looks at a handwritten "3", it might also think it looks a little like an "8" and not at all like a "1". That relative nuance across the wrong answers is called <span class="term">dark knowledge</span>.</p>
-      <p>To let the student learn this nuance, you train it on <span class="term">soft targets</span>: the teacher's full probability list, not just its single top pick. To spread those probabilities out and make the nuance visible, you divide the teacher's raw scores by a number called the <span class="term">temperature</span> (written <code>T</code>) before the softmax. A higher <code>T</code> makes the probabilities softer and more spread out.</p>
+      <p>A normal training label is a <span class="term" data-tip="A single correct answer, like 'this image is a 3', with no extra detail.">hard label</span>: a single correct class, like "this image is a 3." That throws away a lot of information. The teacher knows more than that. When it looks at a handwritten "3", it might also think it looks a little like an "8" and not at all like a "1". That relative nuance across the wrong answers is called <span class="term" data-tip="The extra hints in a teacher's answer showing how much wrong choices still resemble the right one.">dark knowledge</span>.</p>
+      <p>To let the student learn this nuance, you train it on <span class="term" data-tip="The teacher's full list of probabilities for every class, used to teach the student, not just its top pick.">soft targets</span>: the teacher's full probability list, not just its single top pick. To spread those probabilities out and make the nuance visible, you divide the teacher's raw scores by a number called the <span class="term" data-tip="A number you divide scores by before softmax. Higher values spread the probabilities out and make small differences visible.">temperature</span> (written <code>T</code>) before the softmax. A higher <code>T</code> makes the probabilities softer and more spread out.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>student learns from → teacher's soft probabilities (temperature T)</code><br><span style="font-size:.85rem;color:var(--text2)">The student trains to match these soft targets — and, if you want, the true hard label too. Then you deploy only the small student.</span></div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">Distilling the Knowledge in a Neural Network (Hinton, Vinyals, Dean, 2015)</a> · <a href="https://vladfeinberg.com/2024/02/04/distillation-walkthrough.html" target="_blank" rel="noopener">Vlad Feinberg — Distillation Walkthrough</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -241,7 +254,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s3" data-sec="play">
     <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through hard labels, soft targets, and the loss</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>A simulated terminal. A teacher classifies one image of a digit. Its raw scores (called <span class="term">logits</span>) are <code>[2.0, 0.5, 3.5]</code> for classes <code>[cat, dog, 3]</code>. Watch what "hard" and "soft" look like. <strong>Click all three</strong> to finish.</p>
+      <p>A simulated terminal. A teacher classifies one image of a digit. Its raw scores (called <span class="term" data-tip="The raw scores a model outputs for each choice, before they are turned into probabilities or a final prediction.">logits</span>) are <code>[2.0, 0.5, 3.5]</code> for classes <code>[cat, dog, 3]</code>. Watch what "hard" and "soft" look like. <strong>Click all three</strong> to finish.</p>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="hard" type="button">① hard label (one-hot)</button>
@@ -263,7 +276,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ul>
         <li><strong>Soften with temperature.</strong> Take the teacher's logits <code>z</code>, divide by <code>T</code>, then softmax: <code>softmax(z / T)</code>. Bigger <code>T</code> → softer, more spread-out probabilities that expose the near-misses. <code>T = 1</code> is the normal softmax.</li>
         <li><strong>Soften the student the same way.</strong> The student produces its own logits, softened by the <em>same</em> <code>T</code>, so the two are comparable.</li>
-        <li><strong>Match the two distributions.</strong> The distillation loss is <code>KL(teacher_soft ‖ student_soft)</code>. <span class="term">KL divergence</span> is a number that measures how far apart two probability distributions are; it is 0 when they match. Minimizing it pulls the student's soft output toward the teacher's.</li>
+        <li><strong>Match the two distributions.</strong> The distillation loss is <code>KL(teacher_soft ‖ student_soft)</code>. <span class="term" data-tip="A number that tells how far apart two probability distributions are. It is 0 when they match exactly.">KL divergence</span> is a number that measures how far apart two probability distributions are; it is 0 when they match. Minimizing it pulls the student's soft output toward the teacher's.</li>
         <li><strong>Optionally add the true label.</strong> You can also add the normal cross-entropy on the real hard label: <code>total = α · KL(...) + (1 − α) · CE(student, true_label)</code>. This keeps the student honest about the ground truth.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>loss = KL(softmax(z_teacher / T) ‖ softmax(z_student / T))</code><br><span style="font-size:.85rem;color:var(--text2)">"Soften both with the same T, then measure the gap." Add cross-entropy on the true label if you want a mix of teacher hints and ground truth.</span></div></div>
@@ -481,6 +494,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

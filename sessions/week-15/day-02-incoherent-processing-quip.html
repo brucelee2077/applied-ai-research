@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,17 +220,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a matrix is just a grid of numbers, and that a model's weights are millions of such numbers. <b>No prior quantization knowledge needed. We start from zero.</b></div></div>
 
       <h4>First: what is quantization?</h4>
-      <p>An LLM stores each weight as a <strong>16-bit floating-point number</strong>. A "bit" is one 0-or-1 digit, so 16 bits per weight is a lot of memory across billions of weights. <span class="term">Quantization</span> means: replace each weight with a value picked from a small <em>menu</em> of allowed numbers, then store only <em>which menu item</em> you chose.</p>
+      <p>An LLM stores each weight as a <strong>16-bit floating-point number</strong>. A "bit" is one 0-or-1 digit, so 16 bits per weight is a lot of memory across billions of weights. <span class="term" data-tip="Replacing each large number, like a 16-bit float, with a smaller one from a limited set, so the model uses less memory.">Quantization</span> means: replace each weight with a value picked from a small <em>menu</em> of allowed numbers, then store only <em>which menu item</em> you chose.</p>
       <p>If the menu has 4 items, you need only <strong>2 bits</strong> per weight — 2 bits can label 4 things (00, 01, 10, 11). That is 8× less memory than 16 bits. The cost is <strong>error</strong>: the stored value is not exactly the original, and if the error is big enough it wrecks the model.</p>
 
       <h4>Why is 2-bit so hard? Outliers.</h4>
-      <p>Real weight matrices have <span class="term">outliers</span>: most weights are tiny (like 0.01) but a few are huge (like 4.5). A 4-item menu now has to stretch from −4.5 to +4.5, so the gaps between menu items are wide (say 3 apart). Every tiny weight then snaps to the wrong place with a big error. <strong>One giant number ruins the grid for everyone.</strong></p>
+      <p>Real weight matrices have <span class="term" data-tip="A few numbers that are much bigger than the rest, which makes fitting them all onto a small grid hard.">outliers</span>: most weights are tiny (like 0.01) but a few are huge (like 4.5). A 4-item menu now has to stretch from −4.5 to +4.5, so the gaps between menu items are wide (say 3 apart). Every tiny weight then snaps to the wrong place with a big error. <strong>One giant number ruins the grid for everyone.</strong></p>
 
       <h4>The new word: incoherent</h4>
-      <p>A matrix is <span class="term">incoherent</span> when its energy is spread out evenly — no single entry is a spike sticking far above the rest, like a well-shuffled deck. <strong>Coherent</strong> (the bad case) means the energy is concentrated in a few entries or directions. Formally, a matrix is <em>μ-incoherent</em> if its largest entry is small relative to its overall size, so a <strong>lower μ means smoother</strong>.</p>
+      <p>A matrix is <span class="term" data-tip="A matrix where the values are spread out evenly, with no single number spiking far above the others.">incoherent</span> when its energy is spread out evenly — no single entry is a spike sticking far above the rest, like a well-shuffled deck. <strong>Coherent</strong> (the bad case) means the energy is concentrated in a few entries or directions. Formally, a matrix is <em>μ-incoherent</em> if its largest entry is small relative to its overall size, so a <strong>lower μ means smoother</strong>.</p>
 
       <h4>Incoherence processing: rotate, then round</h4>
-      <p><span class="term">Incoherence processing</span> is the operation that <em>makes</em> a matrix incoherent before you quantize it. Take an <span class="term">orthogonal matrix</span> Q — a square matrix whose rows are perpendicular unit vectors, so it only rotates/reflects space and never stretches it (Q · Qᵀ = I, the identity). Multiply your weight matrix W by one orthogonal matrix on the left and another on the right: <code>W' = U · W · V</code>. Rotation preserves length, so no information is lost, but it <strong>smears each big outlier across many entries</strong>. The outliers vanish into the crowd, the numbers become even in size, and a tight 4-item menu now fits them. At inference you undo the rotation by multiplying back — and that folds cheaply into the surrounding matrix multiplies, so it is nearly free.</p>
+      <p><span class="term" data-tip="A step that spreads out a matrix's values evenly, using rotation, so no single value is too big before shrinking.">Incoherence processing</span> is the operation that <em>makes</em> a matrix incoherent before you quantize it. Take an <span class="term" data-tip="A square grid of numbers that only rotates or flips space, never stretching it, so lengths stay the same.">orthogonal matrix</span> Q — a square matrix whose rows are perpendicular unit vectors, so it only rotates/reflects space and never stretches it (Q · Qᵀ = I, the identity). Multiply your weight matrix W by one orthogonal matrix on the left and another on the right: <code>W' = U · W · V</code>. Rotation preserves length, so no information is lost, but it <strong>smears each big outlier across many entries</strong>. The outliers vanish into the crowd, the numbers become even in size, and a tight 4-item menu now fits them. At inference you undo the rotation by multiplying back — and that folds cheaply into the surrounding matrix multiplies, so it is nearly free.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Two flavors: <b>QuIP</b> uses a <b>random</b> orthogonal matrix (great theory, but slow and memory-heavy — a dense n×n matrix). <b>QuIP# / QTIP</b> use the <b>Hadamard transform</b> — a structured orthogonal matrix of only +1/−1 entries that rotates just as well but runs in <code>n·log n</code> time with almost no extra memory. That speed is why the Hadamard version won.</div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official papers (optional): <a href="https://arxiv.org/abs/2307.13304" target="_blank" rel="noopener">QuIP (arXiv:2307.13304)</a> · <a href="https://arxiv.org/abs/2402.04396" target="_blank" rel="noopener">QuIP# (arXiv:2402.04396)</a> · <a href="https://arxiv.org/abs/2406.11235" target="_blank" rel="noopener">QTIP (arXiv:2406.11235)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -576,6 +589,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

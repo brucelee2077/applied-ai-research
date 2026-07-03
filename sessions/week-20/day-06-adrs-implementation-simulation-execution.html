@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,20 +220,20 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can write and run Python. You saw the ADRS paradigm and FunSearch earlier this week (Days 1–5). <b>No prior experience running an autonomous loop is needed — we build it from zero here.</b></div></div>
 
       <h4>Start with the words</h4>
-      <p>An <span class="term">LLM API</span> is a way to send text to a large language model over the internet and get text back. You POST a prompt — like "make this Python sort faster" — to a URL (OpenAI's or Anthropic's), and the model returns code as a plain string. You never run the model yourself. You rent it, one call at a time.</p>
-      <p><span class="term">ADRS</span> stands for <strong>AI-Driven Research for Systems</strong>. It is a loop that uses an LLM to <em>invent</em> code, then automatically <em>tests</em> that code, then feeds the best results back to the LLM to inspire the next attempt. It works because for many systems problems — sorting speed, cache eviction, bin packing — checking "is this solution good?" is <strong>mechanical</strong>: you just run it and time it. So a machine can do the whole research cycle without a human grading each try.</p>
+      <p>An <span class="term" data-tip="A way to send text to a large language model over the internet and get its text answer back.">LLM API</span> is a way to send text to a large language model over the internet and get text back. You POST a prompt — like "make this Python sort faster" — to a URL (OpenAI's or Anthropic's), and the model returns code as a plain string. You never run the model yourself. You rent it, one call at a time.</p>
+      <p><span class="term" data-tip="AI-Driven Research for Systems: a loop where an AI proposes ideas and a reliable metric measures and judges them automatically.">ADRS</span> stands for <strong>AI-Driven Research for Systems</strong>. It is a loop that uses an LLM to <em>invent</em> code, then automatically <em>tests</em> that code, then feeds the best results back to the LLM to inspire the next attempt. It works because for many systems problems — sorting speed, cache eviction, bin packing — checking "is this solution good?" is <strong>mechanical</strong>: you just run it and time it. So a machine can do the whole research cycle without a human grading each try.</p>
 
       <h4>The loop has exactly five components</h4>
       <ol>
         <li><strong>Prompt Generator</strong> — builds the text prompt. It usually pastes in a few of the best programs found so far and says "here are good solutions; write a new, faster one."</li>
         <li><strong>Solution Generator</strong> — this <em>is</em> the LLM API call. It reads the prompt and returns a new candidate program as a string.</li>
-        <li><strong>Evaluator</strong> — the mechanical judge. It safely runs the candidate on fixed test inputs, checks the output is <em>correct</em> (a broken sort scores zero), and measures <span class="term">fitness</span> — here, speed, e.g. median seconds over many runs. Fitness is just the score you optimize.</li>
-        <li><strong>Storage</strong> — a database of programs keyed by their score. Often split into <span class="term">islands</span>: separate sub-populations that evolve independently, so the search does not collapse onto one idea too early.</li>
+        <li><strong>Evaluator</strong> — the mechanical judge. It safely runs the candidate on fixed test inputs, checks the output is <em>correct</em> (a broken sort scores zero), and measures <span class="term" data-tip="One number that tells how good a candidate is. Higher usually means better.">fitness</span> — here, speed, e.g. median seconds over many runs. Fitness is just the score you optimize.</li>
+        <li><strong>Storage</strong> — a database of programs keyed by their score. Often split into <span class="term" data-tip="Separate groups of programs that improve on their own, so the search keeps many ideas and does not settle too fast.">islands</span>: separate sub-populations that evolve independently, so the search does not collapse onto one idea too early.</li>
         <li><strong>Solution Selector</strong> — picks which stored programs get shown to the LLM next, usually favoring high scorers but keeping some diversity.</li>
       </ol>
 
       <h4>Why we call it "evolutionary"</h4>
-      <p>The word <span class="term">evolutionary</span> means the loop borrows from biology. It keeps a <em>population</em> of programs, <strong>mutates</strong> them (the LLM edits or rewrites), scores them (<strong>fitness</strong>), keeps the winners (<strong>selection</strong>), and repeats over many <strong>generations</strong>. The <strong>sorting sandbox</strong> (built in Week 19) is your safe, self-contained test rig: a correct reference sort, a set of test arrays, and a timing harness — so the Evaluator has something concrete and <em>verifiable</em> to run every candidate against.</p>
+      <p>The word <span class="term" data-tip="Describes a loop that copies nature: it keeps many programs, changes them, scores them, and keeps the best.">evolutionary</span> means the loop borrows from biology. It keeps a <em>population</em> of programs, <strong>mutates</strong> them (the LLM edits or rewrites), scores them (<strong>fitness</strong>), keeps the winners (<strong>selection</strong>), and repeats over many <strong>generations</strong>. The <strong>sorting sandbox</strong> (built in Week 19) is your safe, self-contained test rig: a correct reference sort, a set of test arrays, and a timing harness — so the Evaluator has something concrete and <em>verifiable</em> to run every candidate against.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Two tools you use with the sandbox: <code>pytest-benchmark</code> times a function many times and reports stable statistics (median, min, standard deviation) instead of one noisy number. <code>pandas</code> is a table library you use afterward to load the run log and find the best generation.</div></div>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://platform.openai.com/docs" target="_blank" rel="noopener">OpenAI Docs</a> · <a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noopener">OpenAI API Reference</a> · <a href="https://cookbook.openai.com/" target="_blank" rel="noopener">OpenAI Cookbook</a> · <a href="https://docs.anthropic.com/" target="_blank" rel="noopener">Anthropic Docs</a> · <a href="https://docs.anthropic.com/en/docs/get-started" target="_blank" rel="noopener">Anthropic Get Started</a> · <a href="https://docs.anthropic.com/en/api/client-sdks" target="_blank" rel="noopener">Anthropic Client SDKs</a> · <a href="https://pytest-benchmark.readthedocs.io/" target="_blank" rel="noopener">pytest-benchmark</a> · <a href="https://pandas.pydata.org/docs/" target="_blank" rel="noopener">pandas</a></div></div>
@@ -277,7 +290,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>Why it matters</h4>
       <ul>
         <li><strong>Verifiable = automatable</strong> — because a benchmark can judge a sort with no human, the whole research cycle can run overnight without you in the loop.</li>
-        <li><strong>Diversity beats greed</strong> — <span class="term">islands</span> keep several independent sub-populations, so one early good-but-mediocre idea does not dominate and trap the search in a local optimum.</li>
+        <li><strong>Diversity beats greed</strong> — <span class="term" data-tip="Separate groups of programs that improve on their own, so the search keeps many ideas and does not settle too fast.">islands</span> keep several independent sub-populations, so one early good-but-mediocre idea does not dominate and trap the search in a local optimum.</li>
         <li><strong>Held-out inputs catch cheats</strong> — a fast score on the training arrays can be a memorized special-case; re-checking the champion on unseen arrays separates a real discovery from a trick.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> a mechanical benchmark → the Evaluator can judge code automatically → the LLM can mutate freely and be scored → keep winners, feed them back → over many generations fitness improves → re-verify on held-out inputs to confirm it is real.</div></div>
@@ -557,6 +570,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

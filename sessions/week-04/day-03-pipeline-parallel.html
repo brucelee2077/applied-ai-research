@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -204,11 +217,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s1" data-sec="what">
     <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is pipeline parallelism, and what is the bubble?</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network is a stack of <span class="term">layers</span> (layer 1 feeds layer 2, which feeds layer 3, and so on), and that a <span class="term">device</span> is one GPU or one TPU chip. <b>No prior parallelism experience needed.</b></div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network is a stack of <span class="term" data-tip="The stacked steps in a neural network, where each step feeds its result into the next one.">layers</span> (layer 1 feeds layer 2, which feeds layer 3, and so on), and that a <span class="term" data-tip="One chip that does math, like one GPU or one TPU. It has its own memory that can only hold so much.">device</span> is one GPU or one TPU chip. <b>No prior parallelism experience needed.</b></div></div>
 
       <h4>The problem: the model is bigger than one device</h4>
       <p>A large model can have hundreds of layers and billions of weights. Sometimes the whole model does not fit in the memory of a single device. You cannot run what you cannot store. So you must split the model across several devices.</p>
-      <p>One way to split is by <strong>layer</strong>. This is <span class="term">pipeline parallelism</span> (PP): you cut the stack of layers into groups and put each group on a different device.</p>
+      <p>One way to split is by <strong>layer</strong>. This is <span class="term" data-tip="A way to split a model by putting different groups of layers on different chips, like stations on an assembly line.">pipeline parallelism</span> (PP): you cut the stack of layers into groups and put each group on a different device.</p>
 
       <h4>The idea: layers become stages</h4>
       <p>Say the model has 8 layers and you have 4 devices. You could do:</p>
@@ -218,11 +231,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <li>Device 3 holds layers 5–6</li>
         <li>Device 4 holds layers 7–8</li>
       </ul>
-      <p>Each device now holds one <span class="term">stage</span>: a stage is just "the group of layers living on one device." A batch of data flows through the pipeline stage by stage. Device 1 does its layers, hands the result to Device 2, which hands its result to Device 3, and so on. This is exactly how work moves down an assembly line.</p>
+      <p>Each device now holds one <span class="term" data-tip="One group of layers that lives on a single chip in a pipeline.">stage</span>: a stage is just "the group of layers living on one device." A batch of data flows through the pipeline stage by stage. Device 1 does its layers, hands the result to Device 2, which hands its result to Device 3, and so on. This is exactly how work moves down an assembly line.</p>
 
       <h4>The catch: the bubble</h4>
-      <p>Here is the problem. When Device 1 is working on the first layers, Devices 2, 3, and 4 have nothing to do yet — the data has not reached them. They sit <strong>idle</strong>. This wasted idle time is called the <span class="term">bubble</span>. The same thing happens at the end: once the data has passed Device 1, it goes idle while the later devices finish.</p>
-      <p>So a naive pipeline wastes a lot of device time waiting. The fix — <span class="term">micro-batching</span> — is the heart of today's lesson, and we'll build it up in the playground.</p>
+      <p>Here is the problem. When Device 1 is working on the first layers, Devices 2, 3, and 4 have nothing to do yet — the data has not reached them. They sit <strong>idle</strong>. This wasted idle time is called the <span class="term" data-tip="Wasted idle time when a chip or device has nothing to do while it waits for data. You pay but get no work.">bubble</span>. The same thing happens at the end: once the data has passed Device 1, it goes idle while the later devices finish.</p>
+      <p>So a naive pipeline wastes a lot of device time waiting. The fix — <span class="term" data-tip="Splitting a batch into smaller pieces so chips can work at the same time instead of waiting.">micro-batching</span> — is the heart of today's lesson, and we'll build it up in the playground.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/1811.06965" target="_blank" rel="noopener">GPipe: Efficient Training of Giant Neural Networks (Huang et al., 2018)</a> — the paper that introduced pipeline micro-batching.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -237,7 +250,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <div class="card"><span class="big">🧍💤💤💤</span><h5>one product = huge bubble</h5><p>Send in a single product. Worker 1 builds their part, then workers 2, 3, 4 wait. When it reaches worker 4, workers 1, 2, 3 are done and idle. Most of the line stands still — that idle time is the bubble.</p></div>
         <div class="card"><span class="big">🧍🏗️🏗️🏗️</span><h5>many products = full line</h5><p>Now feed in many small products back-to-back. As soon as worker 1 passes product A to worker 2, worker 1 starts product B. Soon every worker is busy on a different product. The line stays full.</p></div>
       </div>
-      <p><strong>In one line:</strong> devices are the workers, layers are the work each worker does, and feeding many small <span class="term">micro-batches</span> (small pieces of the batch) back-to-back keeps every device busy — so the bubble shrinks.</p>
+      <p><strong>In one line:</strong> devices are the workers, layers are the work each worker does, and feeding many small <span class="term" data-tip="Small pieces of a batch, fed in one after another so different devices stay busy at the same time.">micro-batches</span> (small pieces of the batch) back-to-back keeps every device busy — so the bubble shrinks.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers can each build a whole product alone. Pipeline devices cannot — each device only holds <em>some</em> of the layers, so every micro-batch <em>must</em> pass through all stages in order. The dependency is strict.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -270,7 +283,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <li>Split the model's layers into <code>p</code> <strong>stages</strong>, one per device. A batch flows through stage 1, then stage 2, ..., then stage <code>p</code>.</li>
         <li>A stage can only start once the stage before it has passed along its result. This strict order is why early devices work first and later devices wait.</li>
         <li>The <strong>bubble</strong> is the total idle time. It has two parts: the <em>fill</em> (start-up, while later stages wait for data to arrive) and the <em>drain</em> (wind-down, while early stages wait for the last data to finish).</li>
-        <li><strong>Micro-batching:</strong> split the batch into <code>m</code> smaller <span class="term">micro-batches</span> and feed them in one after another. While stage 1 works on micro-batch 2, stage 2 can already work on micro-batch 1. The stages overlap, so idle time shrinks.</li>
+        <li><strong>Micro-batching:</strong> split the batch into <code>m</code> smaller <span class="term" data-tip="Small pieces of a batch, fed in one after another so different devices stay busy at the same time.">micro-batches</span> and feed them in one after another. While stage 1 works on micro-batch 2, stage 2 can already work on micro-batch 1. The stages overlap, so idle time shrinks.</li>
       </ul>
 
       <h4>The bubble fraction</h4>
@@ -483,6 +496,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

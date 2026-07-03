@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,13 +220,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's KV cache size formula and Tuesday's SnapKV eviction (both attack the same memory-bandwidth bottleneck). <b>No prior knowledge of GQA/MQA needed.</b></div></div>
 
       <h4>A quick reminder: what a "head" is</h4>
-      <p>In multi-head attention, the model does not compute attention once. It splits the work into several parallel <span class="term">heads</span> — think of each head as its own small attention calculation, looking at the input from a different angle (one head might track grammar, another might track "who is talking to whom"). Each head has its own three learned projection matrices: one that produces <span class="term">Queries</span> (Q — "what am I looking for?"), one that produces <span class="term">Keys</span> (K — "what do I contain?"), and one that produces <span class="term">Values</span> (V — "what do I actually offer if picked?"). A model with, say, 32 heads has 32 separate Q projections, 32 separate K projections, and 32 separate V projections.</p>
+      <p>In multi-head attention, the model does not compute attention once. It splits the work into several parallel <span class="term" data-tip="Separate small attention calculations working at the same time, each looking at the input from a different angle.">heads</span> — think of each head as its own small attention calculation, looking at the input from a different angle (one head might track grammar, another might track "who is talking to whom"). Each head has its own three learned projection matrices: one that produces <span class="term" data-tip="Small lists of numbers for a token that say 'what am I looking for?' when attention searches other tokens.">Queries</span> (Q — "what am I looking for?"), one that produces <span class="term" data-tip="Small lists of numbers saying what each token can be matched against during attention.">Keys</span> (K — "what do I contain?"), and one that produces <span class="term" data-tip="Small lists of numbers saying what each token gives if attention picks it.">Values</span> (V — "what do I actually offer if picked?"). A model with, say, 32 heads has 32 separate Q projections, 32 separate K projections, and 32 separate V projections.</p>
 
       <h4>The problem: every head's K and V get cached, and cache is what's expensive</h4>
       <p>Recall Monday's formula: the KV cache stores one K vector and one V vector <em>per head, per layer, per token</em>. If a model has 32 heads and 32 layers, every single token you feed in or generate adds 32 × 32 × 2 new vectors to the cache. The number of heads is a direct multiplier on cache size — and it was fixed the moment the model finished training. Nothing you do at inference time (like SnapKV) can change how many heads exist.</p>
 
       <h4>The idea: what if most heads didn't need their own K and V?</h4>
-      <p><span class="term">Multi-Query Attention</span> (<span class="term">MQA</span>) and <span class="term">Grouped-Query Attention</span> (<span class="term">GQA</span>) both ask the same question: does every query head really need its <em>own private</em> Key and Value projection? Their answer is no. Multiple query heads can <strong>share</strong> one K/V head between them — each query head still computes its own attention scores and its own output, but several query heads read from the <em>same</em> stored K and V vectors instead of each keeping a separate copy.</p>
+      <p><span class="term" data-tip="A design where all query heads share one single set of keys and values, saving lots of memory.">Multi-Query Attention</span> (<span class="term" data-tip="Short for Multi-Query Attention: all query heads share one set of keys and values.">MQA</span>) and <span class="term" data-tip="A design where groups of query heads share keys and values, between full separate heads and one shared set.">Grouped-Query Attention</span> (<span class="term" data-tip="Short for Grouped-Query Attention: query heads share keys and values in small groups to save memory.">GQA</span>) both ask the same question: does every query head really need its <em>own private</em> Key and Value projection? Their answer is no. Multiple query heads can <strong>share</strong> one K/V head between them — each query head still computes its own attention scores and its own output, but several query heads read from the <em>same</em> stored K and V vectors instead of each keeping a separate copy.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><strong>MQA</strong> (Shazeer, 2019): all query heads share <strong>one single</strong> K/V head. <strong>GQA</strong> (Ainslie et al., 2023): query heads are split into a handful of <strong>groups</strong>; heads within a group share one K/V head, but different groups have different K/V heads.<br><span style="font-size:.85rem;color:var(--text2)">Only the number of <em>K/V</em> heads shrinks. The number of <em>Query</em> heads never changes — queries are never cached, so shrinking them wouldn't save any memory.</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -497,6 +510,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

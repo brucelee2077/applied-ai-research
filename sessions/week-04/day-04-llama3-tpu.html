@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -213,15 +226,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>Quick recap: the four tools</h4>
       <p>Before we combine them, here is the one-line reminder of each. If any feels unfamiliar, revisit that day's lesson.</p>
       <ul>
-        <li><strong>Data parallel (DP)</strong> — copy the whole model onto many chips; give each a different slice of the batch. Fixes <span class="term">throughput</span>: more examples per second.</li>
-        <li><strong>FSDP</strong> (fully sharded data parallel) — like DP, but instead of copying the model, you <em>shard</em> (split up) the parameters and optimizer state across chips. Fixes <span class="term">memory</span>: no single chip has to hold the whole model.</li>
-        <li><strong>Tensor parallel (TP)</strong> — split one big matrix multiply across several chips, each doing part of the matmul. Fixes <span class="term">big-matmul latency</span>: one huge layer done faster by many chips together.</li>
-        <li><strong>Pipeline parallel (PP)</strong> — put different <em>layers</em> on different chips, like stations on an assembly line. Lets you <span class="term">fit a model too tall for one chip</span> by spreading its depth.</li>
+        <li><strong>Data parallel (DP)</strong> — copy the whole model onto many chips; give each a different slice of the batch. Fixes <span class="term" data-tip="How many examples a system can process per second. Higher throughput means more work done in the same time.">throughput</span>: more examples per second.</li>
+        <li><strong>FSDP</strong> (fully sharded data parallel) — like DP, but instead of copying the model, you <em>shard</em> (split up) the parameters and optimizer state across chips. Fixes <span class="term" data-tip="The space on a chip that holds numbers. Each chip has only so much, which limits how big a model can be.">memory</span>: no single chip has to hold the whole model.</li>
+        <li><strong>Tensor parallel (TP)</strong> — split one big matrix multiply across several chips, each doing part of the matmul. Fixes <span class="term" data-tip="The delay caused when one very large matrix multiply is too slow to finish on a single chip.">big-matmul latency</span>: one huge layer done faster by many chips together.</li>
+        <li><strong>Pipeline parallel (PP)</strong> — put different <em>layers</em> on different chips, like stations on an assembly line. Lets you <span class="term" data-tip="To spread a model's many layers across chips so it can run even when its depth is too big for one chip.">fit a model too tall for one chip</span> by spreading its depth.</li>
       </ul>
 
       <h4>The idea: assign each tool to the bottleneck it solves</h4>
-      <p>A <span class="term">bottleneck</span> is the one resource that runs out first and limits everything else. In training there are three big ones: <strong>memory</strong> (fitting the model), <strong>interconnect bandwidth</strong> (how fast chips talk), and <strong>compute</strong> (raw math speed). A good training config points each parallelism at a different bottleneck so none of them is left as the sole limit.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div>The <span class="term">training config</span> is just the set of choices that says how many chips go to DP vs. TP vs. PP, and how the model is sharded. It is the plan that blends all four tools into one working job.</div></div>
+      <p>A <span class="term" data-tip="The one resource that runs out first and slows down everything else.">bottleneck</span> is the one resource that runs out first and limits everything else. In training there are three big ones: <strong>memory</strong> (fitting the model), <strong>interconnect bandwidth</strong> (how fast chips talk), and <strong>compute</strong> (raw math speed). A good training config points each parallelism at a different bottleneck so none of them is left as the sole limit.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div>The <span class="term" data-tip="The plan that decides how many chips do each kind of splitting and how the model is spread across them.">training config</span> is just the set of choices that says how many chips go to DP vs. TP vs. PP, and how the model is sharded. It is the plan that blends all four tools into one working job.</div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/llama3/" target="_blank" rel="noopener">How to Scale Your Model — Training LLaMA 3 on TPUs (Scaling Book, ch. 6)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -496,6 +509,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

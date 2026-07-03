@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,11 +220,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 1's MoE fundamentals (experts, router, top-k, sparse activation) and basic transformer training vocabulary (parameters, tokens, FLOPs). <b>No prior scaling-law math needed.</b></div></div>
 
       <h4>Quick recap: what is a Mixture-of-Experts layer?</h4>
-      <p>A Mixture-of-Experts (<span class="term">MoE</span>) layer replaces one dense feed-forward network (FFN) with many parallel copies of that FFN, called <span class="term">experts</span>, plus a small <span class="term">router</span> (also called a gate) that picks which expert(s) handle each token. Only a handful of experts — often 1 or 2 out of dozens or hundreds — actually run for any given token. This is called <span class="term">conditional computation</span> or <span class="term">sparse activation</span>: total parameter count across all experts can be huge, but the FLOPs spent per token stay roughly fixed, because the experts that were not picked simply never get multiplied into that forward pass.</p>
+      <p>A Mixture-of-Experts (<span class="term" data-tip="Mixture-of-Experts: a layer with many parallel copies of a network, where only a few run for each input.">MoE</span>) layer replaces one dense feed-forward network (FFN) with many parallel copies of that FFN, called <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span>, plus a small <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> (also called a gate) that picks which expert(s) handle each token. Only a handful of experts — often 1 or 2 out of dozens or hundreds — actually run for any given token. This is called <span class="term" data-tip="Running only a few chosen parts of a model for each token, so work stays small even with huge total size.">conditional computation</span> or <span class="term" data-tip="When only a small part of a model's many parameters run for each input, so the math stays cheap even if the model is huge.">sparse activation</span>: total parameter count across all experts can be huge, but the FLOPs spent per token stay roughly fixed, because the experts that were not picked simply never get multiplied into that forward pass.</p>
 
       <h4>What is a scaling law?</h4>
-      <p>A <span class="term">scaling law</span> is a fitted equation that predicts a model's loss (how wrong its predictions are, on average) from the resources you spend on it — mainly parameters <code>N</code>, training tokens <code>D</code>, and total compute <code>C</code>. The standard approximation is <code>C ≈ 6ND</code> FLOPs — this "6" comes from counting multiply-adds in a transformer's forward and backward pass, the same convention Kaplan et al. and the Chinchilla paper (Hoffmann et al. 2022) both use.</p>
-      <p><span class="term">Compute-optimal</span> means: for a fixed budget <code>C</code>, what is the best way to split it between <code>N</code> and <code>D</code> to get the lowest possible loss? For dense transformers, Chinchilla's answer was: split it <strong>roughly evenly</strong> — both <code>N</code> and <code>D</code> should grow as <code>C^0.5</code>. That is where the famous "~20 tokens per parameter" rule of thumb for dense models comes from.</p>
+      <p>A <span class="term" data-tip="A formula found from many experiments that predicts a model's loss from its size, data, or compute.">scaling law</span> is a fitted equation that predicts a model's loss (how wrong its predictions are, on average) from the resources you spend on it — mainly parameters <code>N</code>, training tokens <code>D</code>, and total compute <code>C</code>. The standard approximation is <code>C ≈ 6ND</code> FLOPs — this "6" comes from counting multiply-adds in a transformer's forward and backward pass, the same convention Kaplan et al. and the Chinchilla paper (Hoffmann et al. 2022) both use.</p>
+      <p><span class="term" data-tip="The best way to split a fixed compute budget between model size and training data to get the lowest error.">Compute-optimal</span> means: for a fixed budget <code>C</code>, what is the best way to split it between <code>N</code> and <code>D</code> to get the lowest possible loss? For dense transformers, Chinchilla's answer was: split it <strong>roughly evenly</strong> — both <code>N</code> and <code>D</code> should grow as <code>C^0.5</code>. That is where the famous "~20 tokens per parameter" rule of thumb for dense models comes from.</p>
 
       <h4>Today's catch: MoE breaks that even split</h4>
       <p>MoE models activate only a few experts per token, so most of an MoE model's total parameters sit idle for any single token. Krajewski et al. (2024, <em>Scaling Laws for Fine-Grained Mixture of Experts</em>) and Clark et al. (2022, DeepMind's <em>Unified Scaling Laws for Routed Language Models</em>) both found the same thing: adding more total parameters to an MoE model helps loss much less, per parameter, than it does for a dense model. To reach the same loss as a dense model, an MoE model needs relatively <strong>more training tokens per active parameter</strong> than the Chinchilla ratio predicts. This is why the curriculum calls MoE "significantly more data-hungry" — and why today's job is understanding exactly where that extra hunger comes from.</p>
@@ -262,7 +275,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ul>
         <li>The dense loss form is <code>L(N, D) = E + A/N^alpha + B/D^beta</code>: irreducible entropy <code>E</code>, a parameter-limited term, a data-limited term. For dense models, Chinchilla's fitted <code>alpha ≈ beta</code>, giving the balanced <code>N_opt ∝ C^0.5</code>, <code>D_opt ∝ C^0.5</code> split.</li>
         <li>In MoE, the router picks <code>k</code> experts out of <code>E_total</code> per token. Only the FLOPs of those <code>k</code> experts count toward <code>C ≈ 6ND</code> — so "N" in that formula must mean <strong>active</strong> parameters (<code>N_active = k × params-per-expert</code>), never <strong>total</strong> parameters (<code>N_total = E_total × params-per-expert</code>).</li>
-        <li><span class="term">Granularity</span> (<code>G_gran</code>, from Krajewski et al. 2024) splits each expert into more, smaller experts — same total expert-layer parameters, same active FLOPs, more distinct experts the router can choose among.</li>
+        <li><span class="term" data-tip="Splitting each expert into more, smaller experts, keeping the same total size but giving more choices.">Granularity</span> (<code>G_gran</code>, from Krajewski et al. 2024) splits each expert into more, smaller experts — same total expert-layer parameters, same active FLOPs, more distinct experts the router can choose among.</li>
         <li>Fitting <code>L(N, D, G_gran)</code> needs an extra granularity/interaction term beyond the plain dense form — a single global <code>beta</code> does not describe MoE. The fitted data exponent behaves as if it were steeper for MoE.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>D_opt / N_active_opt</code> for MoE grows faster with <code>C</code> than the dense ~20-tokens/param ratio.<br><span style="font-size:.85rem;color:var(--text2)">Same compute budget as a dense model, but the compute-optimal split calls for measurably more tokens relative to active parameters — not fewer parameters.</span></div></div>
@@ -489,6 +502,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

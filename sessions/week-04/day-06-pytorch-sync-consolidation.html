@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -210,14 +223,14 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>Frontier labs do not pick one framework and stay there. Some teams write JAX, some write PyTorch, and many people move between both across their career. If you only ever learn the JAX <em>words</em> for these ideas, you will freeze the first time a PyTorch codebase uses different words for the exact same thing.</p>
       <p>The good news: the underlying distributed-training <strong>ideas</strong> are framework-agnostic. Only the API vocabulary changes. There are four ideas, and you already know all four from Weeks 2–4:</p>
       <ul>
-        <li><strong>Shard the batch</strong> across devices — <span class="term">Data Parallelism (DP)</span>. Every device holds a full copy of the model, but sees a different slice of the data.</li>
-        <li><strong>Shard the weights themselves</strong> across devices — <span class="term">Fully Sharded Data Parallel (FSDP)</span>, also called <span class="term">ZeRO-3</span>. No device holds the full model at once.</li>
-        <li><strong>Shard within one layer's matmul</strong> — <span class="term">Tensor Parallelism (TP)</span>. One matrix multiply gets split across devices, and they talk to each other mid-layer.</li>
-        <li><strong>Split different layers</strong> across different devices — <span class="term">Pipeline Parallelism (PP)</span>. Device 1 holds layers 1–8, device 2 holds layers 9–16, and activations flow between them like a factory line.</li>
+        <li><strong>Shard the batch</strong> across devices — <span class="term" data-tip="A way to split work: every device keeps a full copy of the model but trains on a different slice of the data.">Data Parallelism (DP)</span>. Every device holds a full copy of the model, but sees a different slice of the data.</li>
+        <li><strong>Shard the weights themselves</strong> across devices — <span class="term" data-tip="A way to split a model's weights across devices, so no single device holds the whole model at once.">Fully Sharded Data Parallel (FSDP)</span>, also called <span class="term" data-tip="Another name for FSDP: splitting the model's parameters, gradients, and optimizer state across devices so no chip holds it all.">ZeRO-3</span>. No device holds the full model at once.</li>
+        <li><strong>Shard within one layer's matmul</strong> — <span class="term" data-tip="A way to split one matrix multiply across several devices, which share results while computing a single layer.">Tensor Parallelism (TP)</span>. One matrix multiply gets split across devices, and they talk to each other mid-layer.</li>
+        <li><strong>Split different layers</strong> across different devices — <span class="term" data-tip="A way to put different layers on different devices, passing results along like stations on a factory line.">Pipeline Parallelism (PP)</span>. Device 1 holds layers 1–8, device 2 holds layers 9–16, and activations flow between them like a factory line.</li>
       </ul>
 
       <h4>Enter <code>picotron</code></h4>
-      <p><span class="term">picotron</span> is a small reference implementation of exactly these four ideas in PyTorch, written by Hugging Face to be readable start to finish in one sitting — no framework magic hidden behind a giant library. Today you read it and draw a straight line from each of its primitives back to the JAX sharding concepts you already built by hand.</p>
+      <p><span class="term" data-tip="A tiny, easy-to-read program from Hugging Face that shows how the main ways of splitting training across devices work.">picotron</span> is a small reference implementation of exactly these four ideas in PyTorch, written by Hugging Face to be readable start to finish in one sitting — no framework magic hidden behind a giant library. Today you read it and draw a straight line from each of its primitives back to the JAX sharding concepts you already built by hand.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Same four ideas, two spellings: <code>jax.sharding.NamedSharding</code> + <code>PartitionSpec</code> (JAX) vs. picotron's DP/FSDP/TP/PP wrapper classes (PyTorch).<br><span style="font-size:.85rem;color:var(--text2)">You are not learning new distributed-training theory today — you are learning to recognize the same theory wearing a different outfit.</span></div></div>
 
       <h4>Then: consolidate into one artifact</h4>
@@ -517,6 +530,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

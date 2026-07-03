@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–5 (immutability, PRNG keys, vmap, jit, Flax/Optax). You should already be comfortable writing a small Flax module and training it with Optax. <b>No prior transformer or computer-vision experience needed — this section starts from zero on that part.</b></div></div>
 
       <h4>The problem: transformers read sequences, images are grids</h4>
-      <p>A normal Transformer (the architecture behind most modern language models) reads a <span class="term">sequence</span> of <span class="term">tokens</span> — think of a token as one "unit" the model looks at, like one word in a sentence. It never looks at "an image" natively — it only knows how to process a list of vectors, one after another.</p>
+      <p>A normal Transformer (the architecture behind most modern language models) reads a <span class="term" data-tip="An ordered list of items the model reads one by one, like the words in a sentence.">sequence</span> of <span class="term" data-tip="Small pieces of text or data that a model reads one by one, each turned into a list of numbers.">tokens</span> — think of a token as one "unit" the model looks at, like one word in a sentence. It never looks at "an image" natively — it only knows how to process a list of vectors, one after another.</p>
       <p>An image is not a list. It's a grid: a CIFAR-10 image is <code>32×32</code> pixels, each pixel with 3 color numbers (red, green, blue), so shape <code>(32, 32, 3)</code>. So how do we feed a grid into something built for lists?</p>
 
       <h4>The answer: cut the image into patches, treat each patch as a token</h4>
-      <p>A <span class="term">patch</span> is a small square cut out of the image — for example a <code>4×4</code> pixel square. Cut a <code>32×32</code> image into <code>4×4</code> patches and you get an <code>8×8</code> grid of patches, which is <strong>64 patches total</strong>. Each patch has <code>4×4×3 = 48</code> numbers in it (4 pixels wide, 4 pixels tall, 3 color channels). <span class="term">Flatten</span> each patch — unroll its 48 numbers into one long list — and now that patch is just a vector of length 48. That vector is one "token," exactly the kind of thing a Transformer already knows how to read.</p>
+      <p>A <span class="term" data-tip="A small square piece cut out of an image, for example a 4x4 block of pixels.">patch</span> is a small square cut out of the image — for example a <code>4×4</code> pixel square. Cut a <code>32×32</code> image into <code>4×4</code> patches and you get an <code>8×8</code> grid of patches, which is <strong>64 patches total</strong>. Each patch has <code>4×4×3 = 48</code> numbers in it (4 pixels wide, 4 pixels tall, 3 color channels). <span class="term" data-tip="To unroll numbers from a grid or box into one long single list, or vector.">Flatten</span> each patch — unroll its 48 numbers into one long list — and now that patch is just a vector of length 48. That vector is one "token," exactly the kind of thing a Transformer already knows how to read.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>One <code>32×32×3</code> image &nbsp;→&nbsp; cut into 64 patches of <code>4×4×3</code> &nbsp;→&nbsp; flatten each &nbsp;→&nbsp; a sequence of 64 vectors, each length 48.<br><span style="font-size:.85rem;color:var(--text2)">This is exactly what a sentence looks like to a language model: a sequence of vectors. The image just became "a sentence made of patches."</span></div></div>
 
       <h4>Two extra ingredients: the [class] token and positional embeddings</h4>
       <p>Once you have 64 patch tokens, a plain ViT (Vision Transformer) adds two more things before running the Transformer:</p>
       <ul>
-        <li><strong>A learnable <code>[class]</code> token.</strong> This is one extra vector, not tied to any patch, that gets <span class="term">prepended</span> (glued to the front) of the sequence. After the whole model runs, this token's final output is what gets used to decide the image's class. Think of it as a dedicated "note-taking" slot that gathers information from every patch.</li>
-        <li><strong><span class="term">Positional embeddings</span>.</strong> Attention (the mechanism inside a Transformer block) treats the sequence as a bag — it does not know which patch came from the top-left vs. the bottom-right of the image. Positional embeddings are extra learned numbers added to each token that encode <em>where</em> that patch sat in the grid, so the model can still use position when it's useful.</li>
+        <li><strong>A learnable <code>[class]</code> token.</strong> This is one extra vector, not tied to any patch, that gets <span class="term" data-tip="Added to the very front of a list, before all the other items.">prepended</span> (glued to the front) of the sequence. After the whole model runs, this token's final output is what gets used to decide the image's class. Think of it as a dedicated "note-taking" slot that gathers information from every patch.</li>
+        <li><strong><span class="term" data-tip="Extra numbers added to each item so the model knows its place in the sequence, since it otherwise ignores order.">Positional embeddings</span>.</strong> Attention (the mechanism inside a Transformer block) treats the sequence as a bag — it does not know which patch came from the top-left vs. the bottom-right of the image. Positional embeddings are extra learned numbers added to each token that encode <em>where</em> that patch sat in the grid, so the model can still use position when it's useful.</li>
       </ul>
 
       <h4>So what's today's catch?</h4>
@@ -268,7 +281,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>The full pipeline, in order</h4>
       <ul>
         <li><strong>Patchify:</strong> cut <code>(32,32,3)</code> into 64 patches of <code>4×4×3=48</code> numbers each → <code>(64, 48)</code>.</li>
-        <li><strong>Linear projection:</strong> a <code>Dense</code> layer maps each 48-length patch vector into the model's <span class="term">embedding dimension</span> (say 128) → <code>(64, 128)</code>.</li>
+        <li><strong>Linear projection:</strong> a <code>Dense</code> layer maps each 48-length patch vector into the model's <span class="term" data-tip="The length of the number list the model uses for each token, for example 128 numbers.">embedding dimension</span> (say 128) → <code>(64, 128)</code>.</li>
         <li><strong>Prepend <code>[class]</code> token:</strong> concatenate one learnable vector of shape <code>(1, 128)</code> in front → <code>(65, 128)</code>.</li>
         <li><strong>Add positional embeddings:</strong> a learned table of shape <code>(65, 128)</code> — one row per position, including the class token — added elementwise. Shape stays <code>(65, 128)</code>.</li>
         <li><strong>N Transformer encoder blocks</strong> (LayerNorm → attention → residual → LayerNorm → MLP → residual): shape stays <code>(65, 128)</code> the whole way through. These blocks only mix information between tokens — they don't change the sequence length or embedding size.</li>
@@ -517,6 +530,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -204,22 +217,22 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <section class="sec" id="s1" data-sec="what">
     <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two kinds of memory, and the unit that moves data between them</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> normal programming fluency and this week's earlier lessons on tiles and warp-level compute. You know a <span class="term">GPU kernel</span> is just the program that runs on the GPU. <b>No hardware background needed — we start from the machine.</b></div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> normal programming fluency and this week's earlier lessons on tiles and warp-level compute. You know a <span class="term" data-tip="A small program that runs on the graphics card, where thousands of tiny cores run it at the same time.">GPU kernel</span> is just the program that runs on the GPU. <b>No hardware background needed — we start from the machine.</b></div></div>
 
       <h4>Start with the machine: two memories that matter</h4>
       <p>A GPU has two kinds of memory we care about here.</p>
       <ul>
-        <li><span class="term">HBM</span> (High Bandwidth Memory) is the large, slow, off-chip "global" memory. On an H100 it holds about <strong>80 GB</strong> and runs near <strong>3 TB/s</strong>.</li>
-        <li><span class="term">SMEM</span> (shared memory) is a tiny, fast scratchpad on each <span class="term">SM</span> (Streaming Multiprocessor — one of the ~132 compute clusters on the chip). It holds about <strong>227 KB</strong> and runs near <strong>33 TB/s</strong>, more than 10× faster than HBM.</li>
+        <li><span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory) is the large, slow, off-chip "global" memory. On an H100 it holds about <strong>80 GB</strong> and runs near <strong>3 TB/s</strong>.</li>
+        <li><span class="term" data-tip="Shared memory: a tiny, very fast scratchpad on each GPU compute cluster, close to the workers.">SMEM</span> (shared memory) is a tiny, fast scratchpad on each <span class="term" data-tip="One of the many small compute units inside a GPU. Each one can run almost any kind of math on its own.">SM</span> (Streaming Multiprocessor — one of the ~132 compute clusters on the chip). It holds about <strong>227 KB</strong> and runs near <strong>33 TB/s</strong>, more than 10× faster than HBM.</li>
       </ul>
-      <p>To do math on data, you must first <strong>copy it from slow HBM into fast SMEM</strong>. The math only runs on data that is already sitting in SMEM. A <span class="term">tile</span> is a small rectangular block of a matrix — ThunderKittens' basic tile is 16×16.</p>
+      <p>To do math on data, you must first <strong>copy it from slow HBM into fast SMEM</strong>. The math only runs on data that is already sitting in SMEM. A <span class="term" data-tip="A small fixed-size block of data brought from slow memory into fast memory so you can do lots of math on it.">tile</span> is a small rectangular block of a matrix — ThunderKittens' basic tile is 16×16.</p>
 
       <h4>The problem: the old way to copy wastes the expensive cores</h4>
-      <p>In the old way, every <span class="term">thread</span> (one worker lane) computes the exact HBM byte address of the element it wants, issues a load, and waits. Computing those addresses — called <span class="term">address generation</span> — burns registers and instructions. Worse, threads then sit idle during the slow HBM round-trip. That waiting is the bottleneck: the tensor cores are the fast, expensive part of the chip, and they stall.</p>
+      <p>In the old way, every <span class="term" data-tip="One tiny worker on the GPU. Many threads run at the same time to do work in parallel.">thread</span> (one worker lane) computes the exact HBM byte address of the element it wants, issues a load, and waits. Computing those addresses — called <span class="term" data-tip="The work of figuring out the exact memory location of each data piece a thread wants to read. It uses time and space.">address generation</span> — burns registers and instructions. Worse, threads then sit idle during the slow HBM round-trip. That waiting is the bottleneck: the tensor cores are the fast, expensive part of the chip, and they stall.</p>
 
       <h4>The answer: TMA (Tensor Memory Accelerator)</h4>
-      <p><span class="term">TMA</span> is a piece of dedicated silicon introduced on the NVIDIA <strong>Hopper</strong> architecture (H100) whose only job is bulk tensor copies. You describe the tensor <em>once</em> in a small data structure called a <span class="term">tensor map descriptor</span> — base pointer, the tensor's shape and strides, the tile size, and how bytes are laid out (<span class="term">swizzled</span>) to avoid bank conflicts. Then you issue <strong>one</strong> instruction: "copy tile (i, j) from HBM into this SMEM slot." TMA itself computes every element address from the descriptor and streams the whole tile over.</p>
-      <div class="callout c-info"><span class="ic">📦</span><div><b>The copy is asynchronous.</b> Your compute threads do NOT wait. They fire the copy and immediately keep working on a tile they loaded earlier. To know when the incoming tile has actually arrived, TMA signals an <span class="term">mbarrier</span> (a memory-barrier object in SMEM that counts arriving bytes); a consumer warp waits on that barrier before touching the new tile.<br><span style="font-size:.85rem;color:var(--text2)">This split lets you overlap "load next tile" with "compute on current tile" — the producer/consumer pipeline.</span></div></div>
+      <p><span class="term" data-tip="Special hardware on newer NVIDIA GPUs whose only job is to copy blocks of memory quickly in the background.">TMA</span> is a piece of dedicated silicon introduced on the NVIDIA <strong>Hopper</strong> architecture (H100) whose only job is bulk tensor copies. You describe the tensor <em>once</em> in a small data structure called a <span class="term" data-tip="A small note describing a tensor: where it starts, its shape, tile size, and how bytes sit in memory for fast copying.">tensor map descriptor</span> — base pointer, the tensor's shape and strides, the tile size, and how bytes are laid out (<span class="term" data-tip="Bytes arranged in a special order in memory so many workers can read at once without clashing over the same slots.">swizzled</span>) to avoid bank conflicts. Then you issue <strong>one</strong> instruction: "copy tile (i, j) from HBM into this SMEM slot." TMA itself computes every element address from the descriptor and streams the whole tile over.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div><b>The copy is asynchronous.</b> Your compute threads do NOT wait. They fire the copy and immediately keep working on a tile they loaded earlier. To know when the incoming tile has actually arrived, TMA signals an <span class="term" data-tip="A small counter in shared memory that tells workers when a memory copy has finished arriving, so they can safely use the data.">mbarrier</span> (a memory-barrier object in SMEM that counts arriving bytes); a consumer warp waits on that barrier before touching the new tile.<br><span style="font-size:.85rem;color:var(--text2)">This split lets you overlap "load next tile" with "compute on current tile" — the producer/consumer pipeline.</span></div></div>
 
       <h4>How ThunderKittens uses it</h4>
       <p>TK exposes a global layout descriptor called a <code>gl</code> — a 4D view of your tensor, like <code>{batch, head, length, embed}</code> in PyTorch. From that <code>gl</code>, TK <strong>automatically builds the TMA tensor map descriptor for you</strong>; you never write the fiddly descriptor code. It wraps both synchronous copies (<code>cp.async</code>) and async TMA copies behind one interface: <code>tma::load_async(smem_dst, global_src, tile_index, barrier)</code> to bring a tile in, and <code>tma::store_async(global_dst, smem_src, tile_index)</code> to write one out. So TK gives you the speed of TMA with a one-line, PyTorch-flavored call.</p>
@@ -570,6 +583,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

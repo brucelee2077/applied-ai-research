@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -196,7 +209,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <h1>The Memory Wall<br>Why Decode Is Bandwidth-Bound</h1>
     <p class="lead">A chip can multiply numbers at blinding speed. So why does generating text one token at a time feel slow — and cost the same no matter how fast the math runs? Because the real bottleneck is not the math. It is <em>moving the weights</em> out of memory. Today you meet the wall that every inference trick is trying to climb over.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> explain <span class="term">arithmetic intensity</span>, find a chip's <span class="term">ridge point</span>, prove that single-token decode is <span class="term">memory-bound</span> (≈1 FLOP/byte), and estimate tokens-per-second from weight bytes alone.
+      <b>🎯 By the end, you'll be able to:</b> explain <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">arithmetic intensity</span>, find a chip's <span class="term" data-tip="The point where a chip's math speed and its memory speed limit you equally. Below it, memory is the slow part.">ridge point</span>, prove that single-token decode is <span class="term" data-tip="When moving data is the slow part, so the chip waits on memory instead of on math.">memory-bound</span> (≈1 FLOP/byte), and estimate tokens-per-second from weight bytes alone.
     </div>
   </header>
 
@@ -207,22 +220,22 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network multiplies inputs by <em>weight matrices</em>, and you have met the transformer forward pass and the KV cache earlier this week. <b>No hardware knowledge needed — we build it from zero.</b></div></div>
 
       <h4>Fact 1 — an accelerator has TWO kinds of memory</h4>
-      <p>An <span class="term">accelerator</span> is a chip built for matrix math — a GPU (from NVIDIA) or a TPU (from Google). It stores numbers in two very different places:</p>
+      <p>An <span class="term" data-tip="A computer chip, like a GPU or TPU, built to do very large amounts of math very fast.">accelerator</span> is a chip built for matrix math — a GPU (from NVIDIA) or a TPU (from Google). It stores numbers in two very different places:</p>
       <ul>
-        <li><strong>HBM</strong> (<span class="term">High-Bandwidth Memory</span>) is the big pool. It holds <em>all</em> the model weights — tens of gigabytes — sitting a few millimeters off the compute chip.</li>
-        <li><strong>SRAM</strong> (<span class="term">on-chip memory</span>, also called the on-chip cache or "scratchpad") is tiny — kilobytes to a few megabytes — and lives right next to the arithmetic units.</li>
+        <li><strong>HBM</strong> (<span class="term" data-tip="A large, fast memory pool (HBM) on an accelerator that holds all the model's weights, near the compute chip.">High-Bandwidth Memory</span>) is the big pool. It holds <em>all</em> the model weights — tens of gigabytes — sitting a few millimeters off the compute chip.</li>
+        <li><strong>SRAM</strong> (<span class="term" data-tip="A tiny, very fast memory (SRAM) sitting right next to the math units, used as a scratchpad.">on-chip memory</span>, also called the on-chip cache or "scratchpad") is tiny — kilobytes to a few megabytes — and lives right next to the arithmetic units.</li>
       </ul>
-      <p>Here is the key rule: <strong>the chip can only multiply numbers that are already in SRAM.</strong> So every weight must first be <em>moved</em> from HBM into SRAM before it can be used. That move has a speed limit called <span class="term">memory bandwidth</span> — bytes moved per second. An NVIDIA A100 moves about <strong>2,000 GB/s (2 TB/s)</strong> out of HBM.</p>
+      <p>Here is the key rule: <strong>the chip can only multiply numbers that are already in SRAM.</strong> So every weight must first be <em>moved</em> from HBM into SRAM before it can be used. That move has a speed limit called <span class="term" data-tip="How many bytes of data a chip can move between its memory and its math engine each second.">memory bandwidth</span> — bytes moved per second. An NVIDIA A100 moves about <strong>2,000 GB/s (2 TB/s)</strong> out of HBM.</p>
 
       <h4>Fact 2 — the chip also has a math speed limit</h4>
-      <p>The chip can do a huge number of multiply-adds per second. That limit is <span class="term">compute throughput</span>, measured in <span class="term">FLOP/s</span> (floating-point operations per second). One <span class="term">FLOP</span> is one floating-point operation — a single multiply or a single add. An A100 does about <strong>3.1×10¹⁴ FLOP/s (≈312 TFLOP/s)</strong> in bf16.</p>
+      <p>The chip can do a huge number of multiply-adds per second. That limit is <span class="term" data-tip="How fast a chip can do math, counted as floating-point operations per second (FLOP/s).">compute throughput</span>, measured in <span class="term" data-tip="How much math a chip can do each second. One FLOP is one add or one multiply of decimal numbers.">FLOP/s</span> (floating-point operations per second). One <span class="term" data-tip="One floating-point operation: a single multiply or add on decimal numbers.">FLOP</span> is one floating-point operation — a single multiply or a single add. An A100 does about <strong>3.1×10¹⁴ FLOP/s (≈312 TFLOP/s)</strong> in bf16.</p>
 
       <h4>The one number that decides everything: arithmetic intensity</h4>
-      <p>A matrix-times-vector product over <code>N</code> numbers does about <code>2N</code> FLOPs but must read all <code>N</code> weights (2 bytes each in bf16). Define <span class="term">arithmetic intensity</span> = FLOPs done ÷ bytes read from HBM. It answers one question: <em>"for every byte I drag out of HBM, how much math do I get to do?"</em></p>
+      <p>A matrix-times-vector product over <code>N</code> numbers does about <code>2N</code> FLOPs but must read all <code>N</code> weights (2 bytes each in bf16). Define <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">arithmetic intensity</span> = FLOPs done ÷ bytes read from HBM. It answers one question: <em>"for every byte I drag out of HBM, how much math do I get to do?"</em></p>
       <div class="callout c-info"><span class="ic">📦</span><div><b>Memory-bound vs compute-bound.</b> If intensity is <em>low</em>, the math units sit idle waiting for bytes → you are <b>memory-bound</b> (bandwidth wins). If it is <em>high</em>, bytes arrive faster than you can use them → you are <b>compute-bound</b> (the multipliers win). The dividing line is the chip's <b>ridge point</b> = compute throughput ÷ memory bandwidth. A100: 312e12 / 2.0e12 ≈ <b>156 FLOPs per byte</b>.</div></div>
 
       <h4>The punchline this lesson proves</h4>
-      <p><span class="term">Decode</span> (autoregressive generation) means producing text one token at a time, feeding each output back in to get the next. When you generate <strong>one</strong> token, every weight matrix touches only a single vector. A weight matrix <code>W</code> of shape <code>[d_out, d_in]</code> does <code>~2·d_out·d_in</code> FLOPs but reads <code>d_out·d_in</code> weights (×2 bytes). So intensity ≈ <code>2·d·d / (2·d·d)</code> = <strong>about 1 FLOP per byte</strong> — roughly 156× below the ridge point. The multipliers starve. Token time is set entirely by how long it takes to <em>stream all the weights out of HBM</em>. That is <strong>the memory wall</strong>.</p>
+      <p><span class="term" data-tip="Making output one token at a time, feeding each new token back in to produce the next one.">Decode</span> (autoregressive generation) means producing text one token at a time, feeding each output back in to get the next. When you generate <strong>one</strong> token, every weight matrix touches only a single vector. A weight matrix <code>W</code> of shape <code>[d_out, d_in]</code> does <code>~2·d_out·d_in</code> FLOPs but reads <code>d_out·d_in</code> weights (×2 bytes). So intensity ≈ <code>2·d·d / (2·d·d)</code> = <strong>about 1 FLOP per byte</strong> — roughly 156× below the ridge point. The multipliers starve. Token time is set entirely by how long it takes to <em>stream all the weights out of HBM</em>. That is <strong>the memory wall</strong>.</p>
       <div class="callout c-ok"><span class="ic">✅</span><div>A 14 GB model on 2 TB/s HBM needs ~7 ms <em>just to read its weights once</em> — no matter how fast the chip multiplies. And you pay that on <b>every single token</b>.</div></div>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs &amp; sources (optional): <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">Scaling Book — Inference</a> · <a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Pope et al., "Efficiently Scaling Transformer Inference" (2022)</a> · <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">Scaling Book — Roofline</a></div></div>
@@ -524,6 +537,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,21 +220,21 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can write <code>a @ b</code> in NumPy/JAX and you know a matrix multiply loops over a shared dimension. <b>No prior kernel-writing experience needed.</b> We start from the words.</div></div>
 
       <h4>First, the words</h4>
-      <p>A <span class="term">kernel</span> here is a small function that runs directly on the accelerator — the GPU or TPU — and gets launched many times in parallel, once per chunk of the output. (This is not the operating-system kernel. Same word, different world.)</p>
-      <p>Normally in JAX you write <code>a @ b</code> and the <strong>XLA compiler</strong> decides how that runs on the hardware. <span class="term">Pallas</span> is a JAX extension that lets you skip the compiler's automatic choice and write the kernel body yourself, in Python-like code, while still getting fast compiled code (JIT). You reach for it when the automatic version is not fast enough and you want manual control.</p>
+      <p>A <span class="term" data-tip="A small program that runs directly on the GPU or TPU and does one chunk of math, launched many times at once.">kernel</span> here is a small function that runs directly on the accelerator — the GPU or TPU — and gets launched many times in parallel, once per chunk of the output. (This is not the operating-system kernel. Same word, different world.)</p>
+      <p>Normally in JAX you write <code>a @ b</code> and the <strong>XLA compiler</strong> decides how that runs on the hardware. <span class="term" data-tip="A JAX add-on that lets you write the fast accelerator code yourself in Python, instead of letting the compiler choose everything.">Pallas</span> is a JAX extension that lets you skip the compiler's automatic choice and write the kernel body yourself, in Python-like code, while still getting fast compiled code (JIT). You reach for it when the automatic version is not fast enough and you want manual control.</p>
 
       <h4>Why would writing it by hand ever help?</h4>
-      <p>Because of the <span class="term">memory hierarchy</span>. An accelerator has two very different kinds of memory:</p>
+      <p>Because of the <span class="term" data-tip="The different kinds of memory in a chip, from small and fast to large and slow, arranged in layers.">memory hierarchy</span>. An accelerator has two very different kinds of memory:</p>
       <ul>
-        <li><span class="term">HBM</span> (high-bandwidth memory) — huge but slow. Tens of gigabytes. This is where your big matrices live.</li>
-        <li><span class="term">SRAM</span> — tiny but very fast, right next to the compute units. Only tens to a few hundred kilobytes each. On NVIDIA GPUs this is called <em>shared memory</em>.</li>
+        <li><span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (high-bandwidth memory) — huge but slow. Tens of gigabytes. This is where your big matrices live.</li>
+        <li><span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> — tiny but very fast, right next to the compute units. Only tens to a few hundred kilobytes each. On NVIDIA GPUs this is called <em>shared memory</em>.</li>
       </ul>
-      <p>Reading from HBM is roughly 10–100× slower than reading from SRAM. So the whole game is: bring a small chunk of data from HBM into SRAM <strong>once</strong>, do lots of math on it there, then write the result back. That chunk is called a <span class="term">tile</span> or <span class="term">block</span>.</p>
+      <p>Reading from HBM is roughly 10–100× slower than reading from SRAM. So the whole game is: bring a small chunk of data from HBM into SRAM <strong>once</strong>, do lots of math on it there, then write the result back. That chunk is called a <span class="term" data-tip="A small fixed-size block of data brought from slow memory into fast memory so you can do lots of math on it.">tile</span> or <span class="term" data-tip="A small chunk of data copied from slow memory into fast memory so you can do lots of math on it.">block</span>.</p>
 
       <h4>The task today: pick the block sizes</h4>
-      <p>For a matrix multiply <code>C = A @ B</code>, large <code>A</code> and <code>B</code> do not fit in SRAM at once. So you cut the output <code>C</code> into rectangular <span class="term">blocks</span> of size <code>(block_m × block_n)</code>. To fill one block you loop over the shared dimension <code>K</code> in steps of <code>block_k</code>, loading a small slice of <code>A</code> and a small slice of <code>B</code> into SRAM, multiplying, and adding into an accumulator. Choosing <code>block_m</code>, <code>block_n</code>, <code>block_k</code> is <span class="term">block-size configuration</span> — the practical task for today.</p>
+      <p>For a matrix multiply <code>C = A @ B</code>, large <code>A</code> and <code>B</code> do not fit in SRAM at once. So you cut the output <code>C</code> into rectangular <span class="term" data-tip="The repeated layers a model stacks, each made of weight matrices. Also small rectangular pieces of a matrix cut for computing.">blocks</span> of size <code>(block_m × block_n)</code>. To fill one block you loop over the shared dimension <code>K</code> in steps of <code>block_k</code>, loading a small slice of <code>A</code> and a small slice of <code>B</code> into SRAM, multiplying, and adding into an accumulator. Choosing <code>block_m</code>, <code>block_n</code>, <code>block_k</code> is <span class="term" data-tip="Choosing how big each chunk of data is when you split a matrix multiply for the fast memory.">block-size configuration</span> — the practical task for today.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The one rule that decides everything:</b> the bytes for the A tile + the B tile + the C accumulator must fit inside the SRAM limit. If they don't, the kernel will not launch (or it "spills" and slows way down).</div></div>
-      <p>One more word: the <span class="term">roofline model</span> is a chart that tells you whether a kernel is limited by <em>compute</em> (multiply-adds per second) or by <em>memory bandwidth</em> (bytes moved per second). <span class="term">Arithmetic intensity</span> = FLOPs done per byte moved. Bigger blocks reuse data more, so intensity goes up, pushing you from memory-bound toward compute-bound — usually what you want.</p>
+      <p>One more word: the <span class="term" data-tip="A picture that predicts a computation's top speed on a chip, using its math speed and its memory speed.">roofline model</span> is a chart that tells you whether a kernel is limited by <em>compute</em> (multiply-adds per second) or by <em>memory bandwidth</em> (bytes moved per second). <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">Arithmetic intensity</span> = FLOPs done per byte moved. Bigger blocks reuse data more, so intensity goes up, pushing you from memory-bound toward compute-bound — usually what you want.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/pallas/index.html" target="_blank" rel="noopener">Pallas index</a> · <a href="https://docs.jax.dev/en/latest/pallas/quickstart.html" target="_blank" rel="noopener">Pallas quickstart</a> · <a href="https://www.youtube.com/watch?v=jyaxuWae2QU" target="_blank" rel="noopener">Pallas talk (video)</a> · <a href="https://docs.nvidia.com/cutlass/media/docs/cpp/cute/00_quickstart.html" target="_blank" rel="noopener">CUTLASS CuTe quickstart</a> · <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">Roofline chapter</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -571,6 +584,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

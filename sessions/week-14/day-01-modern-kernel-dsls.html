@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,11 +220,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know what a GPU is (a chip with many cores). <b>No prior kernel, CUDA, or C++ experience needed.</b> Every term below is defined the first time it appears.</div></div>
 
       <h4>Start from the words</h4>
-      <p>A <span class="term">GPU kernel</span> is a small program that runs on the graphics card. The CPU launches it, and thousands of tiny cores run it at the same time. A kernel is how you tell the GPU to do one specific piece of math — for example, multiply two matrices.</p>
-      <p>You can write a kernel by hand in <span class="term">CUDA</span> — NVIDIA's low-level language for the GPU. CUDA is powerful, but painful: you manage the memory, the threads, and the timing (synchronization) all by yourself. It is easy to get slow or wrong.</p>
+      <p>A <span class="term" data-tip="A small program that runs on the graphics card, where thousands of tiny cores run it at the same time.">GPU kernel</span> is a small program that runs on the graphics card. The CPU launches it, and thousands of tiny cores run it at the same time. A kernel is how you tell the GPU to do one specific piece of math — for example, multiply two matrices.</p>
+      <p>You can write a kernel by hand in <span class="term" data-tip="NVIDIA's low-level language for writing GPU programs. Powerful, but you manage memory, threads, and timing yourself.">CUDA</span> — NVIDIA's low-level language for the GPU. CUDA is powerful, but painful: you manage the memory, the threads, and the timing (synchronization) all by yourself. It is easy to get slow or wrong.</p>
 
       <h4>What is a "kernel DSL"?</h4>
-      <p>A <span class="term">kernel DSL</span> (domain-specific language) is a smaller, opinionated language or library built on top of CUDA. "Domain-specific" means it is made for one job — here, AI math. It hides the painful parts and shows you only the pieces that matter. Three well-known ones:</p>
+      <p>A <span class="term" data-tip="A smaller, focused language built on top of CUDA, made for one job like AI math, easier than raw CUDA.">kernel DSL</span> (domain-specific language) is a smaller, opinionated language or library built on top of CUDA. "Domain-specific" means it is made for one job — here, AI math. It hides the painful parts and shows you only the pieces that matter. Three well-known ones:</p>
       <ul>
         <li><strong>Triton</strong> (from OpenAI) — a Python-like compiler for kernels.</li>
         <li><strong>CUTLASS / CuTe</strong> (from NVIDIA) — a C++ template library.</li>
@@ -219,17 +232,17 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       </ul>
 
       <h4>The one big idea behind TK</h4>
-      <p>People imagine a GPU as <strong>one enormous matrix multiplier</strong>. That picture is wrong, and it makes kernels slow. The truth: a modern GPU is a <strong>collection of many small cores</strong>. The fastest units on them are the <span class="term">tensor cores</span> — special hardware blocks that finish a small matrix-multiply in one shot. Tensor cores are built to chew on <span class="term">tiles</span>: small fixed-size blocks of a matrix, natively <code>16×16</code> numbers.</p>
+      <p>People imagine a GPU as <strong>one enormous matrix multiplier</strong>. That picture is wrong, and it makes kernels slow. The truth: a modern GPU is a <strong>collection of many small cores</strong>. The fastest units on them are the <span class="term" data-tip="Special parts inside a GPU that finish a small matrix multiply very fast, in one shot.">tensor cores</span> — special hardware blocks that finish a small matrix-multiply in one shot. Tensor cores are built to chew on <span class="term" data-tip="Small fixed-size blocks of a matrix, often 16x16 numbers, that the GPU loads and works on together.">tiles</span>: small fixed-size blocks of a matrix, natively <code>16×16</code> numbers.</p>
       <div class="callout c-info"><span class="ic">⚡</span><div>On A100 and H100 GPUs, tensor cores deliver about <b>16×</b> the math throughput of the general-purpose units.<br><span style="font-size:.85rem;color:var(--text2)">So the whole game is: keep the tensor cores fed with <code>16×16</code> tiles, and spend as little time as possible on everything else (memory loads, softmax, <code>exp</code>).</span></div></div>
 
       <h4>TK's three abstractions — one per hardware level</h4>
-      <p>A GPU has a <span class="term">hierarchy</span>: nested layers of parallelism. TK gives one tool per layer.</p>
+      <p>A GPU has a <span class="term" data-tip="Layers stacked inside each other. A GPU has nested levels of parallel workers.">hierarchy</span>: nested layers of parallelism. TK gives one tool per layer.</p>
       <ul>
-        <li><strong>Warp level.</strong> A <span class="term">warp</span> is a group of 32 threads that run in lockstep. TK's basic data structure is a <strong>tile</strong> living in <strong>registers</strong> (fastest, smallest on-chip memory) or <strong>shared memory</strong> (bigger, a step away). Over tiles you call PyTorch-like ops: <code>load</code>, <code>mma</code> (matrix-multiply-accumulate on tensor cores), <code>exp</code>, <code>mul</code>.</li>
-        <li><strong>Block level.</strong> A <span class="term">thread block</span> is a group of warps that share data fast. TK gives a <strong>producer-consumer template</strong>: some warps ("producers") only load the next tiles from slow memory while other warps ("consumers") crunch the current tiles on tensor cores. The load hides behind useful math.</li>
-        <li><strong>Grid level.</strong> The <span class="term">grid</span> is all the blocks launched at once. TK hides the cost of starting/ending blocks (<strong>pipeline bubbles</strong>) and reuses the L2 cache with a <strong>persistent grid</strong>.</li>
+        <li><strong>Warp level.</strong> A <span class="term" data-tip="A group of 32 threads on a GPU that all run the same instruction at the exact same moment.">warp</span> is a group of 32 threads that run in lockstep. TK's basic data structure is a <strong>tile</strong> living in <strong>registers</strong> (fastest, smallest on-chip memory) or <strong>shared memory</strong> (bigger, a step away). Over tiles you call PyTorch-like ops: <code>load</code>, <code>mma</code> (matrix-multiply-accumulate on tensor cores), <code>exp</code>, <code>mul</code>.</li>
+        <li><strong>Block level.</strong> A <span class="term" data-tip="A group of warps that run on one GPU core and share fast memory to swap data quickly.">thread block</span> is a group of warps that share data fast. TK gives a <strong>producer-consumer template</strong>: some warps ("producers") only load the next tiles from slow memory while other warps ("consumers") crunch the current tiles on tensor cores. The load hides behind useful math.</li>
+        <li><strong>Grid level.</strong> The <span class="term" data-tip="All the blocks of work a GPU starts at once. The work is spread across the chip's many small workshops.">grid</span> is all the blocks launched at once. TK hides the cost of starting/ending blocks (<strong>pipeline bubbles</strong>) and reuses the L2 cache with a <strong>persistent grid</strong>.</li>
       </ul>
-      <p>One more word you'll meet: <span class="term">swizzling</span> — a clever reordering of where tile elements sit in shared memory so the 32 memory <strong>banks</strong> (numbered 0–31) don't collide. TK does this reshuffling for you.</p>
+      <p>One more word you'll meet: <span class="term" data-tip="Cleverly reordering where tile numbers sit in fast memory so many threads never fight over the same memory bank.">swizzling</span> — a clever reordering of where tile elements sit in shared memory so the 32 memory <strong>banks</strong> (numbered 0–31) don't collide. TK does this reshuffling for you.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official sources (verbatim): <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">https://arxiv.org/abs/2410.20399</a> · <a href="https://github.com/HazyResearch/ThunderKittens" target="_blank" rel="noopener">https://github.com/HazyResearch/ThunderKittens</a> · <a href="https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk" target="_blank" rel="noopener">https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -454,7 +467,7 @@ var BUILD=[
  {viz:'<div class="dgram col" style="align-items:flex-start;gap:.4rem">'+
     '<span style="display:flex;align-items:center;gap:.5rem"><span style="height:14px;width:40px;background:var(--border);border-radius:4px"></span><span class="dim">general units · ~65 TFLOPS</span></span>'+
     '<span style="display:flex;align-items:center;gap:.5rem"><span style="height:14px;width:280px;background:linear-gradient(90deg,var(--ok),#5fd39a);border-radius:4px;box-shadow:0 0 10px rgba(45,139,85,.5)"></span><span class="ok" style="font-weight:700">tensor cores · ~1000 TFLOPS (~16×)</span></span></div>',
-  note:'<b>The 16× bar.</b> A <span class="term">tensor core</span> is a hardware block that finishes a small matrix-multiply in one shot. It is ~16× faster than the general units — so the entire kernel\'s job is to keep it fed.'},
+  note:'<b>The 16× bar.</b> A <span class="term" data-tip="A hardware part that does a small matrix multiply in one step, much faster than the general units.">tensor core</span> is a hardware block that finishes a small matrix-multiply in one shot. It is ~16× faster than the general units — so the entire kernel\'s job is to keep it fed.'},
  {viz:'<div class="dgram">'+
     '<span style="display:grid;grid-template-columns:repeat(4,14px);grid-auto-rows:14px;gap:2px;border:1.5px solid var(--accent);padding:3px;border-radius:4px">'+
       '<i style="background:var(--accent-l)"></i><i style="background:var(--accent-l)"></i><i style="background:var(--warn-l)"></i><i style="background:var(--warn-l)"></i>'+
@@ -465,7 +478,7 @@ var BUILD=[
     '<span class="node v" style="font-size:.72rem">one 16×16 tile</span>'+
     '<span class="arrow">▶</span>'+
     '<span class="node ok">tensor core</span></div>',
-  note:'<b>Tile the matrix.</b> A <span class="term">tile</span> is a small fixed <code>16×16</code> block. A big matmul is really thousands of <code>16×16</code> tensor-core ops. The tile is TK\'s atom — you write code in tiles.'},
+  note:'<b>Tile the matrix.</b> A <span class="term" data-tip="A small fixed-size block of data brought from slow memory into fast memory so you can do lots of math on it.">tile</span> is a small fixed <code>16×16</code> block. A big matmul is really thousands of <code>16×16</code> tensor-core ops. The tile is TK\'s atom — you write code in tiles.'},
  {viz:'<div class="dgram col" style="gap:2px">'+
     '<span class="node ok" style="width:120px">Registers · 64KB · 130 TB/s</span>'+
     '<span class="node" style="width:180px">Shared · 227KB · 33 TB/s</span>'+
@@ -481,7 +494,7 @@ var BUILD=[
       '<span class="node ok" style="padding:.2rem .5rem">compute</span>'+
       '<span style="width:44px;height:20px;background:var(--err-l);border:1.5px dashed var(--err);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--err);font-size:.6rem">idle</span>'+
       '<span class="node" style="padding:.2rem .5rem">load</span></span></div>',
-  note:'<b>The stall problem.</b> A <span class="term">warp</span> is a group of 32 threads. With one worker doing load-then-compute, the tensor core sits idle waiting on the slow HBM load. Those red gaps are the <em>bubble</em>.'},
+  note:'<b>The stall problem.</b> A <span class="term" data-tip="A group of 32 threads on a GPU that all run the same instruction at the exact same moment.">warp</span> is a group of 32 threads. With one worker doing load-then-compute, the tensor core sits idle waiting on the slow HBM load. Those red gaps are the <em>bubble</em>.'},
  {viz:'<div class="dgram col" style="align-items:flex-start;gap:.35rem">'+
     '<span style="display:flex;gap:3px;align-items:center"><span class="node v" style="width:74px;font-size:.66rem">Producer</span>'+
       '<span class="node" style="padding:.2rem .4rem;font-size:.66rem">load→buf0</span>'+
@@ -526,7 +539,7 @@ var BUILD=[
             '<i style="width:10px;height:10px;background:var(--accent);border-radius:1px"></i>'+
             '<span class="dim" style="font-size:.6rem;margin-left:.3rem">swizzled banks 0–31, no collisions</span></div>'+
         '</div></div></div></div>',
-  note:'<b>The whole TK stack.</b> Three nested frames — <b>Grid</b> wraps <b>Block</b> wraps <b>Warp</b> — one abstraction per hardware level. <span class="term">Swizzling</span> reorders tile cells across the 32 banks so threads never collide. That is the entire ThunderKittens philosophy.'}
+  note:'<b>The whole TK stack.</b> Three nested frames — <b>Grid</b> wraps <b>Block</b> wraps <b>Warp</b> — one abstraction per hardware level. <span class="term" data-tip="Cleverly reordering where tile numbers sit in fast memory so many threads never fight over the same memory bank.">Swizzling</span> reorders tile cells across the 32 banks so threads never collide. That is the entire ThunderKittens philosophy.'}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -595,6 +608,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

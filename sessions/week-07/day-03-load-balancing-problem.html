@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,13 +220,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–2's MoE fundamentals (experts, router, top-k, sparse activation) and the idea of active vs. total parameters. <b>No prior load-balancing math needed.</b></div></div>
 
       <h4>Quick recap: what does the router actually do?</h4>
-      <p>Each Mixture-of-Experts (<span class="term">MoE</span>) layer has a small <span class="term">router</span> network. For every token, the router outputs a score for each expert, turns those scores into probabilities with a softmax, and then sends the token to the top-<code>k</code> highest-scoring experts (Switch Transformer uses <code>k=1</code>, GShard uses <code>k=2</code>). Only the chosen experts do any work on that token — this is what keeps MoE's per-token compute cheap even though the total parameter count across all experts is huge.</p>
+      <p>Each Mixture-of-Experts (<span class="term" data-tip="Mixture-of-Experts: a layer with many parallel copies of a network, where only a few run for each input.">MoE</span>) layer has a small <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> network. For every token, the router outputs a score for each expert, turns those scores into probabilities with a softmax, and then sends the token to the top-<code>k</code> highest-scoring experts (Switch Transformer uses <code>k=1</code>, GShard uses <code>k=2</code>). Only the chosen experts do any work on that token — this is what keeps MoE's per-token compute cheap even though the total parameter count across all experts is huge.</p>
 
       <h4>What is "load balancing," and why is it a problem at all?</h4>
-      <p><span class="term">Load balancing</span> means making sure tokens get spread out roughly evenly across all the available experts, instead of piling up on just a few. You might assume a trained router would naturally learn to do this — after all, spreading load seems like the "smart" thing to do. It does not happen by default. Left to train with only the language-modeling loss, routers tend to fall into <span class="term">routing collapse</span>: a small number of experts start getting picked slightly more often (maybe just by random initialization), those experts then get more gradient updates and become slightly better at handling whatever tokens they see, which makes the router even more likely to pick them next time. Within a few thousand steps, most of the expert capacity can end up unused while 1 or 2 experts absorb the majority of tokens.</p>
+      <p><span class="term" data-tip="Spreading tokens roughly evenly across all experts, so no few experts get overloaded while others sit idle.">Load balancing</span> means making sure tokens get spread out roughly evenly across all the available experts, instead of piling up on just a few. You might assume a trained router would naturally learn to do this — after all, spreading load seems like the "smart" thing to do. It does not happen by default. Left to train with only the language-modeling loss, routers tend to fall into <span class="term" data-tip="When the router keeps picking the same few experts, so most experts never get used or trained.">routing collapse</span>: a small number of experts start getting picked slightly more often (maybe just by random initialization), those experts then get more gradient updates and become slightly better at handling whatever tokens they see, which makes the router even more likely to pick them next time. Within a few thousand steps, most of the expert capacity can end up unused while 1 or 2 experts absorb the majority of tokens.</p>
 
       <h4>So what's today's catch?</h4>
-      <p>The fix is not "hope harder." Fedus et al.'s Switch Transformer paper (2021) and Lepikhin et al.'s GShard paper (2020) both add a second loss term — an <span class="term">auxiliary load-balancing loss</span> — that is added to the ordinary language-modeling loss during training. It directly penalizes uneven routing, so the optimizer is pushed to spread tokens across experts even though nothing about next-token prediction alone would ask for that. There's a second, complementary piece too: even with the auxiliary loss nudging things toward balance, real batches are never perfectly even, so systems also give each expert a hard <span class="term">capacity</span> limit and simply <em>drop</em> tokens that arrive after an expert is full. We'll build both pieces today.</p>
+      <p>The fix is not "hope harder." Fedus et al.'s Switch Transformer paper (2021) and Lepikhin et al.'s GShard paper (2020) both add a second loss term — an <span class="term" data-tip="An extra penalty added during training that pushes the router to spread tokens evenly across experts.">auxiliary load-balancing loss</span> — that is added to the ordinary language-modeling loss during training. It directly penalizes uneven routing, so the optimizer is pushed to spread tokens across experts even though nothing about next-token prediction alone would ask for that. There's a second, complementary piece too: even with the auxiliary loss nudging things toward balance, real batches are never perfectly even, so systems also give each expert a hard <span class="term" data-tip="A hard limit on how many tokens one expert can take. Extra tokens after it is full get dropped.">capacity</span> limit and simply <em>drop</em> tokens that arrive after an expert is full. We'll build both pieces today.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Primary sources (optional): <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Fedus et al. — Switch Transformer (arXiv:2101.03961)</a> · <a href="https://arxiv.org/abs/2006.16668" target="_blank" rel="noopener">Lepikhin et al. — GShard (arXiv:2006.16668)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -469,6 +482,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

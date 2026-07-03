@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,10 +220,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Switch Transformer's sparse-routing idea and Chinchilla's scaling-law intuition from earlier this week. <b>No prior benchmarking experience needed.</b></div></div>
 
       <h4>Dense: one number does both jobs</h4>
-      <p>A <span class="term">dense</span> transformer is the "normal" kind: every parameter in the model touches every token that passes through it. If the model has 70 billion parameters, processing one token means doing math with (<span class="term">activating</span>) all 70 billion of them. There is only one number that matters: <strong>total parameters</strong>, and it is also the <strong>active parameters</strong>.</p>
+      <p>A <span class="term" data-tip="The normal kind of model where every parameter is used for every token that passes through.">dense</span> transformer is the "normal" kind: every parameter in the model touches every token that passes through it. If the model has 70 billion parameters, processing one token means doing math with (<span class="term" data-tip="Using a parameter in the math for a token, so it does real work on that token.">activating</span>) all 70 billion of them. There is only one number that matters: <strong>total parameters</strong>, and it is also the <strong>active parameters</strong>.</p>
 
       <h4>MoE: the same layer, arranged differently</h4>
-      <p>A <span class="term">Mixture-of-Experts (MoE)</span> model rearranges the feed-forward layers you already know. Instead of one feed-forward block per layer, you build several parallel copies of it — called <span class="term">experts</span> — plus a tiny extra network called the <span class="term">router</span> (or gate). The router looks at each token and sends it to a small subset of experts (often just 1 or 2 out of dozens). The other experts sit idle for that token.</p>
+      <p>A <span class="term" data-tip="A layer that replaces one feed-forward network with many, plus a router that sends each token to only a few of them.">Mixture-of-Experts (MoE)</span> model rearranges the feed-forward layers you already know. Instead of one feed-forward block per layer, you build several parallel copies of it — called <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span> — plus a tiny extra network called the <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> (or gate). The router looks at each token and sends it to a small subset of experts (often just 1 or 2 out of dozens). The other experts sit idle for that token.</p>
       <p>This splits one number into two:</p>
       <ul>
         <li><strong>Total parameters</strong> — every weight that exists, summed across every expert. This is what you need enough GPU/TPU memory (HBM) to <em>store</em>.</li>
@@ -490,6 +503,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -211,11 +224,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>Now ask a different question: which parts of that loop could a machine do instead of a human? To answer that, you need to know when a machine can even tell whether an idea worked.</p>
 
       <h4>The one fact that makes this possible: a reliable verifier</h4>
-      <p>A <span class="term">verifier</span> is anything that can look at a candidate solution and say, correctly, whether it solved the problem. For most creative or open-ended tasks — write a good essay, design a good user interface — there is no reliable verifier. A machine cannot check "is this essay good?" the way it checks "did this test pass?" That is why AI has been slower to automate those fields.</p>
+      <p>A <span class="term" data-tip="A program or test that looks at a possible answer and honestly says whether, or how well, it solved the problem.">verifier</span> is anything that can look at a candidate solution and say, correctly, whether it solved the problem. For most creative or open-ended tasks — write a good essay, design a good user interface — there is no reliable verifier. A machine cannot check "is this essay good?" the way it checks "did this test pass?" That is why AI has been slower to automate those fields.</p>
       <p>Systems performance research is different, and this is the whole point of today's paper. If your candidate solution is a scheduling algorithm, you do not need a human to judge whether it is good. You run it — in a real system or a simulator — against a fixed set of workloads, and you measure a number: latency, cost, throughput, makespan. That measurement <strong>is</strong> the verifier. It is deterministic (run it twice, get the same answer) and reliable (the number is exactly what you care about, not a proxy for it). Runnable code plus a scoreboard is a far easier thing for a machine to use than "is this a good idea," and that gap is why systems research is unusually well-suited to AI-driven automation — not because "AI is good at writing code" in some vague sense, but specifically because the performance metric you already cared about doubles as an automatic, trustworthy judge.</p>
 
       <h4>The answer: ADRS</h4>
-      <p><span class="term">ADRS</span> (AI-Driven Research for Systems) is the name a 2025 UC Berkeley paper gives to this approach: use that reliable verifier to close a loop where an LLM proposes candidate algorithms, an automated evaluator scores them by actually running them, and the best-scoring candidates get fed back to the LLM to inspire the next round. Repeat hundreds of times. The paper's own framing: a typical AI-driven discovery approach is (i) generate a set of diverse solutions, then (ii) verify them and select the best — and systems research is an unusually good fit for that pattern because it naturally has a reliable verifier already built in.</p>
+      <p><span class="term" data-tip="AI-Driven Research for Systems: a loop where an AI proposes ideas and a reliable metric measures and judges them automatically.">ADRS</span> (AI-Driven Research for Systems) is the name a 2025 UC Berkeley paper gives to this approach: use that reliable verifier to close a loop where an LLM proposes candidate algorithms, an automated evaluator scores them by actually running them, and the best-scoring candidates get fed back to the LLM to inspire the next round. Repeat hundreds of times. The paper's own framing: a typical AI-driven discovery approach is (i) generate a set of diverse solutions, then (ii) verify them and select the best — and systems research is an unusually good fit for that pattern because it naturally has a reliable verifier already built in.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Two of the four stages of ordinary research — <strong>Solution</strong> (write the code) and <strong>Evaluation</strong> (measure whether it worked) — are exactly the two stages ADRS automates. Problem selection and writing up the results stay with the human.<br><span style="font-size:.85rem;color:var(--text2)">Together those two stages account for roughly 40% of a systems researcher's time, based on the paper's own survey of graduate students.</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -487,6 +500,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,14 +220,14 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network layer is a big matrix of numbers (weights), and that a matrix multiply turns inputs into outputs. That is all. <b>No prior quantization experience needed.</b></div></div>
 
       <h4>First, the words</h4>
-      <p>A trained model stores each weight as a <span class="term">16-bit float</span>: a number picked from 65,536 possible values. <span class="term">Quantization</span> means replacing those high-precision numbers with a small set of low-precision <span class="term">codes</span> to shrink memory. <strong>"2-bit"</strong> means each weight is stored using only 2 bits on average — so instead of 65,536 choices, each number effectively picks from about <strong>4 states</strong>. That is roughly an <strong>8× memory cut</strong>.</p>
-      <p><span class="term">Post-training quantization (PTQ)</span> means you compress an already-trained model <em>without</em> retraining it from scratch. You only look at the weights, plus a small <span class="term">calibration dataset</span> (a few example inputs), and never run full training again.</p>
+      <p>A trained model stores each weight as a <span class="term" data-tip="A fraction-holding number stored in 16 bits, able to be one of 65,536 possible values.">16-bit float</span>: a number picked from 65,536 possible values. <span class="term" data-tip="Replacing each large number, like a 16-bit float, with a smaller one from a limited set, so the model uses less memory.">Quantization</span> means replacing those high-precision numbers with a small set of low-precision <span class="term" data-tip="Small low-precision numbers used to stand in for bigger high-precision ones, so the model needs less memory.">codes</span> to shrink memory. <strong>"2-bit"</strong> means each weight is stored using only 2 bits on average — so instead of 65,536 choices, each number effectively picks from about <strong>4 states</strong>. That is roughly an <strong>8× memory cut</strong>.</p>
+      <p><span class="term" data-tip="Shrinking an already-trained model to smaller numbers without training it again, using only its weights and a little sample data.">Post-training quantization (PTQ)</span> means you compress an already-trained model <em>without</em> retraining it from scratch. You only look at the weights, plus a small <span class="term" data-tip="A few example inputs you feed a trained model to help set good numbers while shrinking it.">calibration dataset</span> (a few example inputs), and never run full training again.</p>
 
       <h4>Why do we even want this?</h4>
       <p>Serving an LLM is <strong>memory-bound</strong>: the slow part is moving billions of weights from memory to the compute units. Fewer bits per weight means the whole model fits in less memory, more of it fits on one GPU, and each token is generated faster. That is the prize.</p>
 
       <h4>The problem that makes today hard</h4>
-      <p>At 2 bits, the obvious idea — round each weight to the nearest of 4 levels (called <span class="term">round-to-nearest</span>, RTN) — <strong>destroys the model</strong>. The errors are large and they line up in bad ways, so accuracy collapses and <span class="term">perplexity</span> (a "how confused is the model" score, lower is better) explodes to huge numbers or NaN.</p>
+      <p>At 2 bits, the obvious idea — round each weight to the nearest of 4 levels (called <span class="term" data-tip="The simple idea of changing each number to the closest allowed value in a small set.">round-to-nearest</span>, RTN) — <strong>destroys the model</strong>. The errors are large and they line up in bad ways, so accuracy collapses and <span class="term" data-tip="A score showing how confused a model is when guessing text. Lower is better.">perplexity</span> (a "how confused is the model" score, lower is better) explodes to huge numbers or NaN.</p>
       <p>Chris De Sa's group (QuIP, QuIP#, QTIP at Cornell) built most of the fix, with four building blocks that are the whole lesson: <strong>(1)</strong> measure error the right way (the Hessian proxy loss), <strong>(2)</strong> <strong>incoherence processing</strong> to flatten outliers, <strong>(3)</strong> <strong>lattice codebooks</strong> (the E₈ lattice) to round groups of weights together, and <strong>(4)</strong> ways to beat the codebook-size wall — <strong>QTIP</strong>'s trellis coding and, from a separate group (Egiazarian, Alistarh et al.), <strong>AQLM</strong>'s additive codebooks.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official papers (optional): <a href="https://arxiv.org/abs/2307.13304" target="_blank" rel="noopener">QuIP</a> · <a href="https://arxiv.org/abs/2402.04396" target="_blank" rel="noopener">QuIP#</a> · <a href="https://arxiv.org/abs/2406.11235" target="_blank" rel="noopener">QTIP</a> · <a href="https://arxiv.org/abs/2401.06118" target="_blank" rel="noopener">AQLM — Additive Quantization of Language Models</a></div></div>
@@ -263,10 +276,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <div class="sec-body">
       <h4>The four building blocks</h4>
       <ul>
-        <li><strong>(1) Measure error correctly.</strong> When you round weight <code>W</code> to <code>Ŵ</code>, the error is <code>ΔW = Ŵ − W</code>. What matters is not <code>‖ΔW‖</code> itself but how that error interacts with the layer's inputs, captured by the <span class="term">Hessian</span> <code>H = E[xxᵀ]</code> (from calibration activations <code>x</code>). The real objective is <code>tr(ΔW·H·ΔWᵀ)</code>: errors aligned with high-variance input directions hurt most.</li>
-        <li><strong>(2) Incoherence processing.</strong> A matrix is <span class="term">incoherent</span> when no single entry is huge relative to the rest — no outliers. QuIP multiplies <code>W' = U·W·Vᵀ</code> with random orthogonal matrices (undone at inference). QuIP# uses the <span class="term">Randomized Hadamard Transform</span> (a ±1 matrix with a fast O(n log n) transform), so it is nearly free at runtime and flattens outliers into a smooth sub-Gaussian ball.</li>
-        <li><strong>(3) Vector quantization on a lattice.</strong> Instead of rounding one weight at a time, round a group of <code>d</code> weights together to the nearest point in a fixed <span class="term">codebook</span>. A <span class="term">lattice</span> is a regular repeating grid; QuIP# uses the <strong>E₈ lattice</strong> — the optimal packing of balls in 8 dimensions — for less error per bit. QuIP# then briefly fine-tunes to match the original outputs.</li>
-        <li><strong>(4) Beat the codebook wall.</strong> A VQ codebook has size <code>2^(bits·d)</code>, so it caps out near <code>d≈8</code>. <strong>QTIP</strong> uses <span class="term">trellis coded quantization</span>: a stateful decoder generates values from the current state plus incoming bits, separating stored bits from effective dimension. <strong>AQLM</strong> takes a different route: represent each group as a <em>sum</em> of vectors <code>Ŵ = c₁ + c₂ + …</code> from several small codebooks, giving <code>Kᴹ</code> combinations from <code>M·log₂K</code> bits.</li>
+        <li><strong>(1) Measure error correctly.</strong> When you round weight <code>W</code> to <code>Ŵ</code>, the error is <code>ΔW = Ŵ − W</code>. What matters is not <code>‖ΔW‖</code> itself but how that error interacts with the layer's inputs, captured by the <span class="term" data-tip="A table of numbers showing how much each small weight error hurts the model's output, based on typical inputs.">Hessian</span> <code>H = E[xxᵀ]</code> (from calibration activations <code>x</code>). The real objective is <code>tr(ΔW·H·ΔWᵀ)</code>: errors aligned with high-variance input directions hurt most.</li>
+        <li><strong>(2) Incoherence processing.</strong> A matrix is <span class="term" data-tip="A matrix where the values are spread out evenly, with no single number spiking far above the others.">incoherent</span> when no single entry is huge relative to the rest — no outliers. QuIP multiplies <code>W' = U·W·Vᵀ</code> with random orthogonal matrices (undone at inference). QuIP# uses the <span class="term" data-tip="A quick trick using a grid of +1 and -1 that spreads out extreme values so they become smooth and even.">Randomized Hadamard Transform</span> (a ±1 matrix with a fast O(n log n) transform), so it is nearly free at runtime and flattens outliers into a smooth sub-Gaussian ball.</li>
+        <li><strong>(3) Vector quantization on a lattice.</strong> Instead of rounding one weight at a time, round a group of <code>d</code> weights together to the nearest point in a fixed <span class="term" data-tip="A fixed list of allowed number-groups. You store just the position in the list instead of the full numbers.">codebook</span>. A <span class="term" data-tip="A regular repeating pattern of points in space, used as the set of allowed values when rounding groups of weights.">lattice</span> is a regular repeating grid; QuIP# uses the <strong>E₈ lattice</strong> — the optimal packing of balls in 8 dimensions — for less error per bit. QuIP# then briefly fine-tunes to match the original outputs.</li>
+        <li><strong>(4) Beat the codebook wall.</strong> A VQ codebook has size <code>2^(bits·d)</code>, so it caps out near <code>d≈8</code>. <strong>QTIP</strong> uses <span class="term" data-tip="A method where a decoder builds values step by step from its current state plus new bits, giving many choices from little storage.">trellis coded quantization</span>: a stateful decoder generates values from the current state plus incoming bits, separating stored bits from effective dimension. <strong>AQLM</strong> takes a different route: represent each group as a <em>sum</em> of vectors <code>Ŵ = c₁ + c₂ + …</code> from several small codebooks, giving <code>Kᴹ</code> combinations from <code>M·log₂K</code> bits.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>minimize tr(ΔW·H·ΔWᵀ)</code> &nbsp;— not&nbsp; <code>minimize ‖ΔW‖</code><br><span style="font-size:.85rem;color:var(--text2)">"Penalize error along the input directions the layer actually uses." This is what greedy/adaptive rounding (QuIP's LDLQ) targets — direction matters, not raw magnitude.</span></div></div>
 
@@ -560,6 +573,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

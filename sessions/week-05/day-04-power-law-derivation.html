@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,7 +220,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's Kaplan scaling laws, Tuesday's Chinchilla correction, and Wednesday's IsoFLOP methodology (fix compute <code>C</code>, sweep model size <code>N</code>, fit one parabola per budget). <b>No prior regression experience needed.</b></div></div>
 
       <h4>A power law, in plain words</h4>
-      <p>A <span class="term">power law</span> is a relationship of the form <code>y = k · x^p</code>: <code>y</code> equals some constant <code>k</code> times <code>x</code> raised to a fixed power <code>p</code>. The special trick of a power law is this: if you plot <code>log(y)</code> against <code>log(x)</code> instead of the raw numbers, the curve becomes a perfectly <strong>straight line</strong>, and its slope is exactly <code>p</code>.</p>
+      <p>A <span class="term" data-tip="A relationship where y equals a constant times x raised to a fixed power. It looks like a straight line on a log-log plot.">power law</span> is a relationship of the form <code>y = k · x^p</code>: <code>y</code> equals some constant <code>k</code> times <code>x</code> raised to a fixed power <code>p</code>. The special trick of a power law is this: if you plot <code>log(y)</code> against <code>log(x)</code> instead of the raw numbers, the curve becomes a perfectly <strong>straight line</strong>, and its slope is exactly <code>p</code>.</p>
       <p>Chinchilla needs one specific power law: <code>N_opt(C) ∝ C^a</code> — "the best model size to train, given a fixed compute budget <code>C</code>, grows as <code>C</code> raised to some fixed exponent <code>a</code>." There's a matching one for data too: <code>D_opt(C) ∝ C^b</code>. Getting <code>a</code> and <code>b</code> right is the entire point of the paper.</p>
 
       <h4>Why this matters: Kaplan got the exponent wrong</h4>
@@ -217,7 +230,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>For each of 9 fixed FLOP budgets <code>C_i</code> (from 6×10^18 to 3×10^21 FLOPs in the paper), Wednesday's method trains several model sizes, fits a parabola to loss vs. <code>log(N)</code>, and reads off the minimum — that minimum's <code>N</code>-coordinate is <code>N_opt</code> for that one budget. Doing this once per budget gives a small table of 9 points: <code>(C_1, N_opt at C_1), ..., (C_9, N_opt at C_9)</code>.</p>
 
       <h4>Today's step: chaining</h4>
-      <p><span class="term">Chaining the parabolas</span> means taking exactly these 9 <code>(C, N_opt)</code> vertex points — throwing away everything else about each parabola except its minimum — and fitting a <strong>new</strong> curve through just those 9 points, in log-log space, using linear regression. The slope of that regression line is the exponent <code>a</code>. Repeat with the 9 <code>(C, D_opt)</code> points to get <code>b</code>.</p>
+      <p><span class="term" data-tip="Taking the lowest point of each budget's curve and drawing one trend line through all those best points.">Chaining the parabolas</span> means taking exactly these 9 <code>(C, N_opt)</code> vertex points — throwing away everything else about each parabola except its minimum — and fitting a <strong>new</strong> curve through just those 9 points, in log-log space, using linear regression. The slope of that regression line is the exponent <code>a</code>. Repeat with the 9 <code>(C, D_opt)</code> points to get <code>b</code>.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Two stages, two very different jobs: <strong>many local parabolas first</strong> (Wednesday — "what's best for this one budget?"), then <strong>one global power law second</strong> (today — "what's the formula for any budget?").</div></div>
 
       <h4>So what's today's catch?</h4>
@@ -495,6 +508,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

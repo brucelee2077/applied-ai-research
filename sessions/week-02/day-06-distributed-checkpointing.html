@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,11 +220,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Week 2's <code>jax.grad</code> and the sharded ViT from Days 1–5. You know that training needs a forward pass and a backward pass. <b>No prior checkpointing experience needed.</b></div></div>
 
       <h4>The problem: the backward pass needs to remember everything</h4>
-      <p>When you run a forward pass through a network, every layer produces an <span class="term">activation</span> — the output tensor of that layer, sitting in memory. Normally JAX keeps <strong>all</strong> of them around, because the backward pass (the part that computes gradients) needs them: the gradient of layer 5 depends on the activation that layer 5 saw.</p>
+      <p>When you run a forward pass through a network, every layer produces an <span class="term" data-tip="The output of a layer, kept in memory during the forward pass so the backward pass can use it later.">activation</span> — the output tensor of that layer, sitting in memory. Normally JAX keeps <strong>all</strong> of them around, because the backward pass (the part that computes gradients) needs them: the gradient of layer 5 depends on the activation that layer 5 saw.</p>
       <p>For a small MLP, that's fine. For a deep transformer with dozens of layers and huge batches, storing every activation from every layer can eat more memory than the weights themselves — and memory is exactly what you spent Day 5 measuring and worrying about.</p>
 
       <h4>The answer: throw activations away, recompute them later</h4>
-      <p><span class="term">Activation checkpointing</span> (also called <span class="term">remat</span>, short for "rematerialization") is a deliberate trade: instead of keeping every intermediate activation in memory, you throw some of them away right after using them in the forward pass. Then, during the backward pass, when you need one of those thrown-away activations, you just <strong>recompute it</strong> by re-running that piece of the forward pass.</p>
+      <p><span class="term" data-tip="A memory trick: throw away some middle results and compute them again later, saving space but doing extra work.">Activation checkpointing</span> (also called <span class="term" data-tip="Short for rematerialization; another name for activation checkpointing. You recompute middle results later instead of storing them.">remat</span>, short for "rematerialization") is a deliberate trade: instead of keeping every intermediate activation in memory, you throw some of them away right after using them in the forward pass. Then, during the backward pass, when you need one of those thrown-away activations, you just <strong>recompute it</strong> by re-running that piece of the forward pass.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>ckpt_fn = jax.checkpoint(fn)</code> &nbsp;→&nbsp; only <code>fn</code>'s <strong>inputs</strong> are saved; everything <code>fn</code> computes <strong>inside</strong> itself gets recomputed during the backward pass instead of stored.<br><span style="font-size:.85rem;color:var(--text2)">You spend extra compute (re-running forward math) to buy back memory (fewer stored activations).</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -490,6 +503,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

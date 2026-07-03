@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,16 +220,16 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a transformer has layers of matrix multiplications, and you can multiply and divide big numbers. <b>No prior "systems math" needed — we start from two words.</b></div></div>
 
       <h4>Two words first</h4>
-      <p>A <span class="term">FLOP</span> is one <strong>fl</strong>oating-point <strong>op</strong>eration — a single multiply, or a single add, on decimal numbers. When someone says a model "costs 10²⁴ FLOPs to train," they mean the hardware performed that many multiplies and adds. A <strong>multiply-add</strong> (one multiply then one add) is therefore <strong>2 FLOPs</strong>.</p>
-      <p><span class="term">Bandwidth</span> is how fast a chip can move numbers between its big slow memory — called <span class="term">HBM</span> (High-Bandwidth Memory, the RAM sitting right next to the compute chip) — and the tiny fast registers where the math actually happens. It is measured in <strong>bytes per second</strong>.</p>
+      <p>A <span class="term" data-tip="One floating-point operation: a single multiply or add on decimal numbers.">FLOP</span> is one <strong>fl</strong>oating-point <strong>op</strong>eration — a single multiply, or a single add, on decimal numbers. When someone says a model "costs 10²⁴ FLOPs to train," they mean the hardware performed that many multiplies and adds. A <strong>multiply-add</strong> (one multiply then one add) is therefore <strong>2 FLOPs</strong>.</p>
+      <p><span class="term" data-tip="How fast a chip can move numbers between its parts, like from big slow memory to the compute units.">Bandwidth</span> is how fast a chip can move numbers between its big slow memory — called <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High-Bandwidth Memory, the RAM sitting right next to the compute chip) — and the tiny fast registers where the math actually happens. It is measured in <strong>bytes per second</strong>.</p>
 
       <h4>Why count FLOPs at all?</h4>
       <p>Because before you launch a training run that costs millions of dollars, you want to predict how long it takes. Two numbers give you that.</p>
       <p><strong>First — the compute cost.</strong> The near-universal rule from the Scaling Book is that training a dense transformer takes about <strong>6 × N × D FLOPs</strong>, where <code>N</code> is the number of <em>tokens</em> you train on and <code>D</code> is the number of <em>model parameters</em>. Where does the 6 come from? The forward pass uses every parameter in one multiply-add: 2 FLOPs per parameter per token. The backward pass (computing gradients) costs about twice that: 4 more. So <strong>2 forward + 4 backward = 6</strong>.</p>
-      <p><strong>Second — the memory cost.</strong> To do any operation the chip must first <em>load</em> the input numbers from HBM, then later <em>store</em> the result. If an operation does very few FLOPs per byte it loads, the chip finishes the math and sits idle waiting for more data — it is <span class="term">memory-bound</span>. If it does many FLOPs per byte, the memory keeps up and the math units stay busy — it is <span class="term">compute-bound</span>.</p>
+      <p><strong>Second — the memory cost.</strong> To do any operation the chip must first <em>load</em> the input numbers from HBM, then later <em>store</em> the result. If an operation does very few FLOPs per byte it loads, the chip finishes the math and sits idle waiting for more data — it is <span class="term" data-tip="When moving data is the slow part, so the chip waits on memory instead of on math.">memory-bound</span>. If it does many FLOPs per byte, the memory keeps up and the math units stay busy — it is <span class="term" data-tip="When doing the math is the slow part, so the chip's arithmetic units are the bottleneck, not memory.">compute-bound</span>.</p>
 
       <h4>The tool that decides which case you are in</h4>
-      <p>The <span class="term">roofline model</span>. Define <span class="term">arithmetic intensity</span> = (FLOPs done) ÷ (bytes moved). Compare it to the hardware's <span class="term">ridge point</span> = (peak FLOP/s) ÷ (peak bandwidth in bytes/s). Above the ridge → compute-bound (good, the expensive math units are busy). Below → memory-bound (the chip starves).</p>
+      <p>The <span class="term" data-tip="A picture that predicts a computation's top speed on a chip, using its math speed and its memory speed.">roofline model</span>. Define <span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">arithmetic intensity</span> = (FLOPs done) ÷ (bytes moved). Compare it to the hardware's <span class="term" data-tip="The point where a chip's math speed and its memory speed limit you equally. Below it, memory is the slow part.">ridge point</span> = (peak FLOP/s) ÷ (peak bandwidth in bytes/s). Above the ridge → compute-bound (good, the expensive math units are busy). Below → memory-bound (the chip starves).</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Same idea in one line: <code>compute time = FLOPs ÷ peak FLOP/s</code>, <code>memory time = bytes ÷ bandwidth</code>, and your real runtime is the <b>larger</b> of the two.<br><span style="font-size:.85rem;color:var(--text2)">That is the whole mental model: count FLOPs, count bytes, take the max.</span></div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The one trap to remember:</b> the training constant is 6, but a single inference forward-pass token costs only <b>~2·D</b> FLOPs. Do not use 6 for serving-cost estimates or you overstate cost by 3×.</div></div>
 
@@ -533,6 +546,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

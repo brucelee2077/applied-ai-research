@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -206,11 +219,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <div class="sec-body">
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Tuesday's roofline result — at batch size 1, decode time per token is roughly <code>bytes_of_weights_read / HBM_bandwidth</code>, and compute time barely matters. <b>No prior quantization experience needed.</b></div></div>
 
-      <h4>The word: <span class="term">weights</span>, <span class="term">precision</span></h4>
-      <p>A trained model stores millions or billions of learned numbers inside its matrices. Those numbers are called <strong>weights</strong>. <span class="term">Precision</span> means how many bits (binary digits) are used to store each number. Most models are trained and stored in <strong>FP16</strong> or <strong>BF16</strong> — 16-bit floating point, 16 bits per weight.</p>
+      <h4>The word: <span class="term" data-tip="The millions or billions of learned numbers stored inside a model that let it predict the next word.">weights</span>, <span class="term" data-tip="How many bits are used to store each number in a model. More bits means finer detail but more memory.">precision</span></h4>
+      <p>A trained model stores millions or billions of learned numbers inside its matrices. Those numbers are called <strong>weights</strong>. <span class="term" data-tip="How many bits are used to store each number in a model. More bits means finer detail but more memory.">Precision</span> means how many bits (binary digits) are used to store each number. Most models are trained and stored in <strong>FP16</strong> or <strong>BF16</strong> — 16-bit floating point, 16 bits per weight.</p>
 
       <h4>The idea: shrink the numbers, not the math</h4>
-      <p><span class="term">Post-training quantization</span> (PTQ) takes a model that is <strong>already fully trained</strong> and converts its weights to a lower-precision format — usually <strong>INT8</strong>, 8-bit integers — <strong>without retraining it</strong>. No gradient updates. It just repacks numbers that already exist. INT8 storage is exactly half the size of FP16 storage, weight for weight.</p>
+      <p><span class="term" data-tip="Shrinking an already trained model's numbers to a smaller format, like 8-bit, to save memory and run faster.">Post-training quantization</span> (PTQ) takes a model that is <strong>already fully trained</strong> and converts its weights to a lower-precision format — usually <strong>INT8</strong>, 8-bit integers — <strong>without retraining it</strong>. No gradient updates. It just repacks numbers that already exist. INT8 storage is exactly half the size of FP16 storage, weight for weight.</p>
 
       <h4>Why this is the right lever</h4>
       <p>Tuesday proved single-token decoding is <strong>memory-bandwidth-bound</strong>: the GPU's compute cores sit mostly idle, waiting for weights to travel from <strong>HBM</strong> (High Bandwidth Memory — the GPU's large but relatively slow main memory) into <strong>SRAM</strong> (the tiny, very fast memory next to the compute cores) over a wire of fixed bandwidth (bytes/second). Time per token ≈ total weight bytes ÷ HBM bandwidth. You cannot change the physical bandwidth of that wire. But you <em>can</em> change the numerator — make the weights take fewer bytes. Store each weight in 8 bits instead of 16, and you halve the bytes crossing the bus per token. Since decoding is bandwidth-bound, that translates almost directly into roughly <strong>2x more tokens/second</strong> — with no change to the silicon at all.</p>
@@ -484,6 +497,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -208,16 +221,16 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 
       <h4>The problem: why did some ideas win and others lose?</h4>
       <p>Over the last four weeks you learned a pile of separate-seeming tricks: tile Q/K/V into SRAM, write kernels with a tile-shaped DSL, shrink the KV cache, batch decode requests. Each one felt like its own clever idea. Today's essay asks a harder question: <strong>is there one underlying reason all of these tricks exist, and one reason certain "smarter" ideas never got adopted at all?</strong></p>
-      <p>The answer has a name: the <span class="term">hardware lottery</span>, a term coined by researcher Sara Hooker in 2021. It says an algorithm's success depends heavily on how well it fits the hardware and software stack available <em>at the time</em> — almost independent of how elegant the idea is on paper.</p>
+      <p>The answer has a name: the <span class="term" data-tip="The idea that an algorithm wins mainly because it fits current hardware well, not because it is the smartest.">hardware lottery</span>, a term coined by researcher Sara Hooker in 2021. It says an algorithm's success depends heavily on how well it fits the hardware and software stack available <em>at the time</em> — almost independent of how elegant the idea is on paper.</p>
 
       <h4>The shared variable: arithmetic intensity</h4>
-      <p><span class="term">Arithmetic intensity</span> is the ratio of math done per byte moved from memory:</p>
+      <p><span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">Arithmetic intensity</span> is the ratio of math done per byte moved from memory:</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>Intensity = Total FLOPs / Total Bytes moved from HBM</code><br><span style="font-size:.85rem;color:var(--text2)">FLOPs = floating-point operations (the "math"). Bytes = data read from or written to memory. Every paper on this week's reading list is really one more data point on the same plot of this one ratio.</span></div></div>
 
       <h4>The two memories that matter</h4>
       <ul>
-        <li><span class="term">HBM (High Bandwidth Memory)</span> — the off-chip memory stacked next to the GPU/TPU chip. Huge bandwidth (~3 TB/s on an H100) but still 10–100x slower to reach than on-chip memory. Every byte moved here costs real time and energy.</li>
-        <li><span class="term">SRAM</span> — a tiny on-chip scratchpad (e.g. 192KB "shared memory" per H100 streaming multiprocessor, or a TPU's VMEM). Only megabytes total, but ~10–20x faster than HBM. The entire game of kernel-writing is keeping data in SRAM as long as possible.</li>
+        <li><span class="term" data-tip="Large memory stacked next to a GPU or TPU chip. Fast, but still much slower than the tiny memory inside the chip.">HBM (High Bandwidth Memory)</span> — the off-chip memory stacked next to the GPU/TPU chip. Huge bandwidth (~3 TB/s on an H100) but still 10–100x slower to reach than on-chip memory. Every byte moved here costs real time and energy.</li>
+        <li><span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> — a tiny on-chip scratchpad (e.g. 192KB "shared memory" per H100 streaming multiprocessor, or a TPU's VMEM). Only megabytes total, but ~10–20x faster than HBM. The entire game of kernel-writing is keeping data in SRAM as long as possible.</li>
       </ul>
 
       <h4>So what's today's "concept"?</h4>
@@ -513,6 +526,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

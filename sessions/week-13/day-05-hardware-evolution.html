@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -208,11 +221,11 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 
       <h4>The problem: one algorithm, three GPUs</h4>
       <p>Here is the twist for today: FlashAttention-1, FlashAttention-2, and FlashAttention-3 compute the <strong>exact same math</strong>. Tiled <code>QK^T</code>, online softmax, then multiply by <code>V</code> — never materializing the full score matrix. So why three papers, three years apart?</p>
-      <p>Because a GPU is not just "a fast calculator." It is a specific piece of hardware with specific parts: a huge slow memory called <span class="term">HBM</span> (High-Bandwidth Memory, about 80GB, sits off-chip), a tiny fast memory called <span class="term">SRAM</span> (about 20MB, sits on-chip, also called "shared memory" or SMEM), and units that do the actual math, called <span class="term">Tensor Cores</span>. Each new GPU generation changes what these parts can do. When the hardware changes, the <em>fastest way to run the same math</em> changes too — even though the math itself does not.</p>
+      <p>Because a GPU is not just "a fast calculator." It is a specific piece of hardware with specific parts: a huge slow memory called <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High-Bandwidth Memory, about 80GB, sits off-chip), a tiny fast memory called <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> (about 20MB, sits on-chip, also called "shared memory" or SMEM), and units that do the actual math, called <span class="term" data-tip="Special parts inside a GPU that finish a small matrix multiply very fast, in one shot.">Tensor Cores</span>. Each new GPU generation changes what these parts can do. When the hardware changes, the <em>fastest way to run the same math</em> changes too — even though the math itself does not.</p>
 
       <h4>The three rewrites, in one sentence each</h4>
       <ul>
-        <li><strong>FlashAttention-1 (2022, A100):</strong> stop making so many trips to slow HBM. Keep tiles in fast SRAM instead. This is called being <span class="term">IO-aware</span> — counting memory trips as the real cost, not raw math operations.</li>
+        <li><strong>FlashAttention-1 (2022, A100):</strong> stop making so many trips to slow HBM. Keep tiles in fast SRAM instead. This is called being <span class="term" data-tip="A design idea that counts trips to slow memory as the real cost, not the number of math steps.">IO-aware</span> — counting memory trips as the real cost, not raw math operations.</li>
         <li><strong>FlashAttention-2 (2023, A100):</strong> the memory problem is fixed, but now most of the GPU's parallel workers sit idle. Split the work better so more of them stay busy at once.</li>
         <li><strong>FlashAttention-3 (2024, H100):</strong> a brand new GPU (Hopper) arrives with parts that can work <em>without waiting on each other</em>. Redesign the kernel so loading data and doing math happen at the same time, on separate hardware units.</li>
       </ul>
@@ -265,8 +278,8 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>Three separate problems, not one</h4>
       <ul>
         <li><strong>Memory traffic (FA1's problem).</strong> Standard attention writes the full N×N score matrix to HBM, then reads it back for softmax, then reads it again for the final multiply. FA1's tiling and online softmax mean the score matrix is never fully written to HBM at all — traffic drops from O(N²) to roughly O(N²d/M), where <code>M</code> is SRAM size.</li>
-        <li><strong>Work partitioning (FA2's problem).</strong> Even with memory fixed, FA1 only reached 25–40% of the A100's peak FLOPs/s. The bottleneck was <span class="term">occupancy</span> — how many of the GPU's parallel workers (Streaming Multiprocessors, or SMs) have work at any instant — and wasted shared-memory traffic between <span class="term">warps</span> (a warp = 32 threads moving in lockstep). FA2 fixed this with better parallelization across sequence length and less redundant warp-to-warp traffic.</li>
-        <li><strong>Asynchrony (FA3's problem).</strong> FA2 is still <span class="term">synchronous</span>: one warp does load, then compute, then softmax, then the next load — one thing at a time, in order. Hopper (H100) gave software two new pieces of hardware that let load and compute happen simultaneously: TMA (Tensor Memory Accelerator, a dedicated async copy engine) and async WGMMA (a warpgroup-wide matmul instruction that frees the issuing warp immediately).</li>
+        <li><strong>Work partitioning (FA2's problem).</strong> Even with memory fixed, FA1 only reached 25–40% of the A100's peak FLOPs/s. The bottleneck was <span class="term" data-tip="How many of the GPU's parallel workers actually have work to do at a given moment.">occupancy</span> — how many of the GPU's parallel workers (Streaming Multiprocessors, or SMs) have work at any instant — and wasted shared-memory traffic between <span class="term" data-tip="A group of 32 GPU threads that all run the same instruction at the same moment.">warps</span> (a warp = 32 threads moving in lockstep). FA2 fixed this with better parallelization across sequence length and less redundant warp-to-warp traffic.</li>
+        <li><strong>Asynchrony (FA3's problem).</strong> FA2 is still <span class="term" data-tip="Doing one step at a time, in order, waiting for each step to finish before starting the next.">synchronous</span>: one warp does load, then compute, then softmax, then the next load — one thing at a time, in order. Hopper (H100) gave software two new pieces of hardware that let load and compute happen simultaneously: TMA (Tensor Memory Accelerator, a dedicated async copy engine) and async WGMMA (a warpgroup-wide matmul instruction that frees the issuing warp immediately).</li>
       </ul>
 
       <h4>Why this progression matters</h4>
@@ -491,6 +504,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,7 +220,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Weeks 1–4 — you know what a transformer's parameters (<code>N</code>) and training data (<code>D</code>) are, and roughly what a training run costs in compute. <b>No prior scaling-law experience needed.</b></div></div>
 
       <h4>The question this paper asks</h4>
-      <p>You've now built and understood a transformer. A natural next question: if you want a <span class="term">lower test loss</span> (the model predicts held-out text better), what should you spend your money on? Two knobs, both of which help:</p>
+      <p>You've now built and understood a transformer. A natural next question: if you want a <span class="term" data-tip="A smaller error score on text the model did not train on, meaning it predicts new text better.">lower test loss</span> (the model predicts held-out text better), what should you spend your money on? Two knobs, both of which help:</p>
       <ul>
         <li><strong>Model size <code>N</code></strong> — the number of parameters (weights) in the model. Bigger <code>N</code> means more capacity to represent patterns.</li>
         <li><strong>Dataset size <code>D</code></strong> — how many tokens (roughly, words/word-pieces) the model trains on.</li>
@@ -215,7 +228,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>In 2020, Jared Kaplan and collaborators at OpenAI trained hundreds of transformer language models — spanning more than <strong>6 orders of magnitude</strong> in parameter count and <strong>8 orders of magnitude</strong> in training compute — all on the same text corpus (WebText2), and measured the cross-entropy loss on held-out text for each one.</p>
 
       <h4>The answer: loss follows a power law</h4>
-      <p>A <span class="term">power law</span> means: if you plot loss against <code>N</code> (or <code>D</code>, or compute <code>C</code>) on a <strong>log-log plot</strong> (both axes stretched so each step multiplies by 10 instead of adding 1), the points fall on a nearly straight line. That's a very clean, very unusual finding — it held almost independent of architecture details like depth or width.</p>
+      <p>A <span class="term" data-tip="A relationship where y equals a constant times x raised to a fixed power. It looks like a straight line on a log-log plot.">power law</span> means: if you plot loss against <code>N</code> (or <code>D</code>, or compute <code>C</code>) on a <strong>log-log plot</strong> (both axes stretched so each step multiplies by 10 instead of adding 1), the points fall on a nearly straight line. That's a very clean, very unusual finding — it held almost independent of architecture details like depth or width.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>Because both <code>N</code> and <code>D</code> reduce loss, and because your total compute <code>C</code> is limited, the paper asks: for a <strong>fixed compute budget</strong>, how should you split it between "bigger model" and "more data"? <br><span style="font-size:.85rem;color:var(--text2)">Their headline answer is lopsided: grow <code>N</code> almost as fast as compute itself (<code>N ∝ C<sup>0.73</sup></code>), and grow <code>D</code> much more slowly (<code>D ∝ C<sup>0.27</sup></code>). This is the "Kaplan paradigm" — and it's part of the thinking that shaped GPT-3's design.</span></div></div>
 
       <h4>So what's today's catch?</h4>
@@ -489,6 +502,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

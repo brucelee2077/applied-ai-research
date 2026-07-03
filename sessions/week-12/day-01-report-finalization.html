@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -211,13 +224,13 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>Today's new "tool" is not a JAX API. It is the discipline of turning finished experiments into a document that could survive peer review. That discipline has three concrete parts:</p>
 
       <h4>1. Overlay two frontiers on one figure</h4>
-      <p>From Week 10–11 you have a <span class="term">compute-optimal frontier</span> for the Dense model: pairs of (compute <code>C</code>, best-possible loss <code>L*</code>) that came from fitting <code>L(C) = E + a·C^b</code> to the minima of your IsoFLOP parabolas. Week 11 repeated the exact same pipeline for the MoE model. Today you plot both frontiers as two lines on the <strong>same</strong> log-log axes. Whichever line sits lower at a given <code>C</code> is the more compute-efficient architecture at that budget.</p>
+      <p>From Week 10–11 you have a <span class="term" data-tip="A line of the best (lowest) loss reachable at each compute budget, found by fitting a curve to the best runs.">compute-optimal frontier</span> for the Dense model: pairs of (compute <code>C</code>, best-possible loss <code>L*</code>) that came from fitting <code>L(C) = E + a·C^b</code> to the minima of your IsoFLOP parabolas. Week 11 repeated the exact same pipeline for the MoE model. Today you plot both frontiers as two lines on the <strong>same</strong> log-log axes. Whichever line sits lower at a given <code>C</code> is the more compute-efficient architecture at that budget.</p>
 
       <h4>2. Make the figure report-grade, not screen-grade</h4>
-      <p><span class="term">High-fidelity</span> here means: log-log axes (a good power-law fit looks like a straight line), labeled axes with units, a legend distinguishing Dense vs. MoE, the fitted exponent annotated right on the plot, and 150+ DPI or vector output — not a quick <code>plt.plot()</code> you'd only ever see on your own screen.</p>
+      <p><span class="term" data-tip="Report quality: log-log axes, labeled axes with units, a clear legend, and shown numbers, not a quick screen picture.">High-fidelity</span> here means: log-log axes (a good power-law fit looks like a straight line), labeled axes with units, a legend distinguishing Dense vs. MoE, the fitted exponent annotated right on the plot, and 150+ DPI or vector output — not a quick <code>plt.plot()</code> you'd only ever see on your own screen.</p>
 
       <h4>3. Give the report a fixed skeleton, written in LaTeX</h4>
-      <p>A rigorous report has a shape: Abstract, Introduction, Methods, Results, Discussion, Conclusion. <span class="term">LaTeX</span> is a typesetting language that separates your content from the layout, and gives you automatically numbered equations, figures, and references — the same reason arXiv papers use it instead of a word processor. <span class="term">Overleaf</span> is a browser-based LaTeX editor, so there is nothing to install.</p>
+      <p>A rigorous report has a shape: Abstract, Introduction, Methods, Results, Discussion, Conclusion. <span class="term" data-tip="A system where you write text with commands, and it makes neat documents with numbered equations and figures.">LaTeX</span> is a typesetting language that separates your content from the layout, and gives you automatically numbered equations, figures, and references — the same reason arXiv papers use it instead of a word processor. <span class="term" data-tip="A website where you write LaTeX documents in your browser. Nothing to install; good for papers with math.">Overleaf</span> is a browser-based LaTeX editor, so there is nothing to install.</p>
 
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Nothing architecturally new gets built this week — no new model, no new JAX code. Every number you write in prose must trace back to a saved artifact (a JSON or CSV file) you can point to. A scaling-law report is judged on reproducibility, not on the plot looking pretty.</div></div>
 
@@ -514,6 +527,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

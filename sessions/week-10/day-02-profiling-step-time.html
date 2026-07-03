@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -211,12 +224,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>JAX's <code>jit</code> already does a lot of automatic optimization behind the scenes — merging small operations together, choosing good memory layouts, overlapping compute with communication. But it is not perfect, and your own code can accidentally defeat it. You need a way to look <strong>inside</strong> the compiled function.</p>
 
       <h4>The answer: a trace</h4>
-      <p>A <span class="term">trace</span> is a recording of every operation that ran on every device (and on the host CPU) during a time window, with a start time, a duration, and a name for each one. It is a very detailed receipt for one training step — not just the total, but every line item.</p>
-      <p>When JAX JIT-compiles your Python function, the XLA compiler breaks it into a graph of low-level operations: matrix multiplies, reshapes, elementwise adds, and "fusions" that merge several small operations into one hardware kernel. Each of these is called an <span class="term">XLA op</span>. The trace shows these XLA-level names, not your original Python line numbers — that is the first surprise for newcomers: you will not see <code>attention_block</code>, you will see something like <code>fusion.312</code>.</p>
+      <p>A <span class="term" data-tip="To run a function once with fake shape-only inputs and write down every operation, making one fast program to reuse.">trace</span> is a recording of every operation that ran on every device (and on the host CPU) during a time window, with a start time, a duration, and a name for each one. It is a very detailed receipt for one training step — not just the total, but every line item.</p>
+      <p>When JAX JIT-compiles your Python function, the XLA compiler breaks it into a graph of low-level operations: matrix multiplies, reshapes, elementwise adds, and "fusions" that merge several small operations into one hardware kernel. Each of these is called an <span class="term" data-tip="One low-level math operation in the compiled graph, like a matrix multiply, reshape, or add, run on the hardware.">XLA op</span>. The trace shows these XLA-level names, not your original Python line numbers — that is the first surprise for newcomers: you will not see <code>attention_block</code>, you will see something like <code>fusion.312</code>.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>with jax.profiler.trace(log_dir): ...</code> &nbsp;→&nbsp; writes a trace file recording exactly what every device and the host did, microsecond by microsecond.<br><span style="font-size:.85rem;color:var(--text2)">Think of wall-clock timing as a stopwatch on the whole race. A trace is the full slow-motion replay, with a timestamp on every single move.</span></div></div>
 
       <h4>So what's today's catch?</h4>
-      <p>You need a way to actually <em>view</em> a trace file. That is what a <span class="term">trace viewer</span> is: a timeline UI — either TensorBoard's Profile tab, or the standalone Perfetto UI — that renders the trace as horizontal tracks (one per device core, one for the host), where each operation is a colored rectangle whose width is its duration. Gaps between rectangles are idle time, and spotting those gaps is the single most useful skill in this whole exercise.</p>
+      <p>You need a way to actually <em>view</em> a trace file. That is what a <span class="term" data-tip="A timeline tool that shows a recorded run as horizontal rows, so you can see what each part was doing over time.">trace viewer</span> is: a timeline UI — either TensorBoard's Profile tab, or the standalone Perfetto UI — that renders the trace as horizontal tracks (one per device core, one for the host), where each operation is a colored rectangle whose width is its duration. Gaps between rectangles are idle time, and spotting those gaps is the single most useful skill in this whole exercise.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/profiling.html" target="_blank" rel="noopener">JAX Profiling Guide</a> · <a href="https://jax-ml.github.io/scaling-book/profiling/" target="_blank" rel="noopener">Scaling Book — Profiling</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -499,6 +512,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,12 +220,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Weeks 13–15 — you've seen the roofline model, FlashAttention's IO-awareness, and why decoding is bandwidth-bound. <b>No prior multi-device or distributed-systems knowledge needed</b> — we define every term as it appears.</div></div>
 
       <h4>The problem: attention memory grows with the square of sequence length</h4>
-      <p>Self-attention computes a score between every pair of tokens in a sequence. For a sequence of length <code>s</code>, that means an attention matrix with <code>s × s</code> entries. Double the sequence length and the attention matrix quadruples. This is the well-known <span class="term">quadratic memory</span> problem: memory for the naive attention matrix grows as <code>O(s²)</code>, while everything else in a transformer (embeddings, feedforward layers) grows only as <code>O(s)</code>.</p>
-      <p>FlashAttention (Week 13) already fixed the <em>worst</em> part of this: it never materializes the full <code>s × s</code> matrix in slow memory, instead streaming small blocks through fast on-chip SRAM. That's <span class="term">IO-awareness</span> — reordering the computation so the expensive part is moving data between memory tiers, not the arithmetic itself, and minimizing that data movement. But FlashAttention still assumes the query, key, and value tensors for the <em>whole</em> sequence fit somewhere in one device's HBM (the accelerator's main memory) at once, even if never all in SRAM simultaneously. When someone asks for a context of a million tokens, the <code>K</code> and <code>V</code> tensors alone can be far larger than any single chip's HBM, no matter how cleverly you stream them within that one chip.</p>
+      <p>Self-attention computes a score between every pair of tokens in a sequence. For a sequence of length <code>s</code>, that means an attention matrix with <code>s × s</code> entries. Double the sequence length and the attention matrix quadruples. This is the well-known <span class="term" data-tip="The problem where doubling the text length makes the attention table grow four times bigger.">quadratic memory</span> problem: memory for the naive attention matrix grows as <code>O(s²)</code>, while everything else in a transformer (embeddings, feedforward layers) grows only as <code>O(s)</code>.</p>
+      <p>FlashAttention (Week 13) already fixed the <em>worst</em> part of this: it never materializes the full <code>s × s</code> matrix in slow memory, instead streaming small blocks through fast on-chip SRAM. That's <span class="term" data-tip="Writing code that reduces moving data between slow and fast memory, since that movement is the costly part.">IO-awareness</span> — reordering the computation so the expensive part is moving data between memory tiers, not the arithmetic itself, and minimizing that data movement. But FlashAttention still assumes the query, key, and value tensors for the <em>whole</em> sequence fit somewhere in one device's HBM (the accelerator's main memory) at once, even if never all in SRAM simultaneously. When someone asks for a context of a million tokens, the <code>K</code> and <code>V</code> tensors alone can be far larger than any single chip's HBM, no matter how cleverly you stream them within that one chip.</p>
 
       <h4>The insight that unlocks the whole trick</h4>
       <p>If one device's memory is the hard limit, the fix is to stop trying to fit the sequence on one device. Split the sequence into <code>N</code> contiguous blocks and hand one block to each of <code>N</code> devices. Each device only ever holds a <code>1/N</code> slice of the queries, keys, and values. But attention needs every query to see every key and value in the sequence — so each device's slice of keys and values has to visit every other device eventually.</p>
-      <p><span class="term">Ring Attention</span> arranges the <code>N</code> devices in a logical ring (device 0 talks to device 1, device 1 to device 2, ..., device N-1 back to device 0) and rotates key/value blocks around that ring one step at a time. At each step, every device computes partial attention between its fixed query block and whichever key/value block has currently rotated into its hands, using the same blockwise <span class="term">online softmax</span> trick FlashAttention uses to combine partial results without ever seeing the full row at once. Critically, while a device computes on the current block, it simultaneously sends its old block to its neighbor and receives the next block — the communication and the computation <span class="term">overlap</span>, so the data transfer is (ideally) hidden entirely behind useful work instead of adding extra wall-clock time.</p>
+      <p><span class="term" data-tip="A way to split attention across many devices set in a circle, each passing keys and values to the next until all are seen.">Ring Attention</span> arranges the <code>N</code> devices in a logical ring (device 0 talks to device 1, device 1 to device 2, ..., device N-1 back to device 0) and rotates key/value blocks around that ring one step at a time. At each step, every device computes partial attention between its fixed query block and whichever key/value block has currently rotated into its hands, using the same blockwise <span class="term" data-tip="A trick to compute softmax over a long row while seeing only one small piece at a time, keeping a running max and sum.">online softmax</span> trick FlashAttention uses to combine partial results without ever seeing the full row at once. Critically, while a device computes on the current block, it simultaneously sends its old block to its neighbor and receives the next block — the communication and the computation <span class="term" data-tip="When a device sends or receives data at the same time it does math, so waiting time is hidden.">overlap</span>, so the data transfer is (ideally) hidden entirely behind useful work instead of adding extra wall-clock time.</p>
 
       <h4>How this connects to what you've already studied</h4>
       <p>This is the same physics as the rest of Phase 4, one level up the memory hierarchy. FlashAttention overlaps HBM-to-SRAM traffic with compute inside one chip. Ring Attention overlaps chip-to-chip network traffic with compute across many chips. Quantization and GQA/MQA shrink how much data needs to move; Ring Attention instead spreads the data across more devices and hides the movement behind computation. Same bottleneck — memory bandwidth, now at the interconnect level — attacked with the same core idea: never wait for data you could have been computing with.</p>
@@ -234,7 +247,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <div class="card"><span class="big">🔄🪑🔄</span><h5>Pass notes around the ring</h5><p>Instead, each student keeps their own notes and passes them to their neighbor on a fixed rhythm. Everyone updates their running answer to their own question a little more each time a new stack of notes reaches them — and while they read the current stack, the next stack is already being handed over.</p></div>
       </div>
       <p><strong>In one line:</strong> nobody ever holds the whole room's notes; the notes circulate, and reading the current batch happens at the same time as receiving the next one.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student "updating their running answer a little more" sounds approximate, like a rough draft that improves over time — but the math is exact. The <span class="term">online softmax</span> running totals are algebraically identical to computing the full softmax at the end; nothing is approximated. Also, real students can get confused about how much of the answer they've seen so far — the online-softmax bookkeeping (a running max and a running sum) removes that ambiguity completely and always gives the exact same answer as if all notes had been read at once.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student "updating their running answer a little more" sounds approximate, like a rough draft that improves over time — but the math is exact. The <span class="term" data-tip="A trick to compute softmax over a long row while seeing only one small piece at a time, keeping a running max and sum.">online softmax</span> running totals are algebraically identical to computing the full softmax at the end; nothing is approximated. Also, real students can get confused about how much of the answer they've seen so far — the online-softmax bookkeeping (a running max and a running sum) removes that ambiguity completely and always gives the exact same answer as if all notes had been read at once.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
   </section>
@@ -494,6 +507,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

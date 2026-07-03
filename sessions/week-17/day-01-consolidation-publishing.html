@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,10 +220,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Week 13 (Pallas MoE kernel, benchmarked vs. <code>jax.lax.ragged_dot</code>) and Week 14 (ThunderKittens linear-attention kernel, verified vs. a PyTorch baseline). <b>No new algorithm today</b> — this is a two-week polish sprint that closes Phase 4 before Phase 5 starts fresh in Week 19.</div></div>
 
       <h4>Quick recap: what each piece already is</h4>
-      <p><span class="term">Pallas</span> is a JAX sublanguage for hand-writing a GPU/TPU kernel instead of letting XLA auto-generate one. You write a function that runs once per "grid cell," and Pallas hands you <span class="term">Refs</span> — mutable pointers into fast on-chip memory (SRAM/VMEM) — instead of the slow, large off-chip memory (HBM/DRAM). You control the <span class="term">block size</span>: how big a tile of the input each grid cell chews on.</p>
-      <p>The <span class="term">MoE (Mixture of Experts) kernel</span> routes each token to one of many expert sub-networks, each doing an up-projection (D→F) then a down-projection (F→D). Naively that's two matmuls with an intermediate activation written to HBM in between. <strong>Fusing</strong> them means one kernel does both matmuls back-to-back while the intermediate tensor never leaves SRAM. <code>jax.lax.ragged_dot</code> is JAX's built-in primitive for this kind of variable-group-size matmul — the baseline your hand-written kernel needs to beat.</p>
-      <p><span class="term">ThunderKittens (TK)</span> is a CUDA C++ DSL (a mini language embedded in C++ via templates) from Stanford's Hazy Research lab. Its bet: GPUs are collections of tensor cores efficient at one thing — multiplying 16×16 tiles. TK gives you three layers matching three levels of GPU hardware, including a <span class="term">Load-Store-Compute-Finish template</span>: some warps fetch the next tile while others compute on the current one, so memory and compute overlap. <span class="term">TMA (Tensor Memory Accelerator)</span> is dedicated Hopper/Blackwell hardware that moves tiles from HBM to SRAM asynchronously, computing addresses itself so compute cores never pause for address arithmetic.</p>
-      <p><span class="term">Linear attention</span> reformulates softmax(QK^T)V to avoid materializing the full N×N attention matrix — O(N) instead of O(N²) in sequence length N. It's the case study TK's paper uses to show a <strong>14×</strong> speedup over the strongest prior baseline.</p>
+      <p><span class="term" data-tip="A JAX add-on that lets you write the fast accelerator code yourself in Python, instead of letting the compiler choose everything.">Pallas</span> is a JAX sublanguage for hand-writing a GPU/TPU kernel instead of letting XLA auto-generate one. You write a function that runs once per "grid cell," and Pallas hands you <span class="term" data-tip="In Pallas, changeable pointers to fast memory inside the chip, letting you read and write there directly.">Refs</span> — mutable pointers into fast on-chip memory (SRAM/VMEM) — instead of the slow, large off-chip memory (HBM/DRAM). You control the <span class="term" data-tip="How big a piece of the input one part of the program works on at a time.">block size</span>: how big a tile of the input each grid cell chews on.</p>
+      <p>The <span class="term" data-tip="Code that sends each token to one of many small expert networks, instead of running one big network on everything.">MoE (Mixture of Experts) kernel</span> routes each token to one of many expert sub-networks, each doing an up-projection (D→F) then a down-projection (F→D). Naively that's two matmuls with an intermediate activation written to HBM in between. <strong>Fusing</strong> them means one kernel does both matmuls back-to-back while the intermediate tensor never leaves SRAM. <code>jax.lax.ragged_dot</code> is JAX's built-in primitive for this kind of variable-group-size matmul — the baseline your hand-written kernel needs to beat.</p>
+      <p><span class="term" data-tip="A small C++/CUDA code library from Stanford that helps you write fast GPU kernels by working with tiles instead of single threads.">ThunderKittens (TK)</span> is a CUDA C++ DSL (a mini language embedded in C++ via templates) from Stanford's Hazy Research lab. Its bet: GPUs are collections of tensor cores efficient at one thing — multiplying 16×16 tiles. TK gives you three layers matching three levels of GPU hardware, including a <span class="term" data-tip="A GPU pattern where some groups fetch the next data piece while others do math, so memory and computing happen together.">Load-Store-Compute-Finish template</span>: some warps fetch the next tile while others compute on the current one, so memory and compute overlap. <span class="term" data-tip="A hardware unit on newer NVIDIA GPUs that moves tiles from slow to fast memory on its own, so cores never wait.">TMA (Tensor Memory Accelerator)</span> is dedicated Hopper/Blackwell hardware that moves tiles from HBM to SRAM asynchronously, computing addresses itself so compute cores never pause for address arithmetic.</p>
+      <p><span class="term" data-tip="A rewrite of attention whose cost grows in a straight line with length, by keeping a small running summary of past tokens.">Linear attention</span> reformulates softmax(QK^T)V to avoid materializing the full N×N attention matrix — O(N) instead of O(N²) in sequence length N. It's the case study TK's paper uses to show a <strong>14×</strong> speedup over the strongest prior baseline.</p>
 
       <h4>What "publish quality" adds on top of "it works"</h4>
       <p>Today's new discipline, not new algorithm: rerun both kernels' benchmarks and record exact numbers (not "it felt faster"), write out the correctness proof for each, document every non-obvious line of code with a one-line "why" comment, and push a clean commit history to GitHub.</p>
@@ -481,6 +494,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,26 +220,26 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read normal Python and C-style code, and you have seen tile programming from the JAX/Pallas side this week. <b>No CUDA experience needed — we start from what a GPU is.</b></div></div>
 
       <h4>Start with what a GPU actually is</h4>
-      <p>A <span class="term">GPU</span> (graphics processing unit) runs thousands of tiny workers at the same time. Each worker is a <span class="term">thread</span>. Threads are grouped into layers:</p>
+      <p>A <span class="term" data-tip="A computer chip with thousands of tiny workers that do lots of math at the same time. Good for graphics and neural networks.">GPU</span> (graphics processing unit) runs thousands of tiny workers at the same time. Each worker is a <span class="term" data-tip="One tiny worker on the GPU. Many threads run at the same time to do work in parallel.">thread</span>. Threads are grouped into layers:</p>
       <ul>
-        <li>A <span class="term">warp</span> = 32 threads that all run the <strong>same instruction at the same moment</strong> (in lockstep).</li>
-        <li>A <span class="term">thread block</span> = several warps that share a small, very fast scratchpad called <span class="term">shared memory</span>.</li>
-        <li>The <span class="term">grid</span> = all the blocks in one launch.</li>
-        <li>A <span class="term">kernel</span> = the function <em>you</em> write that runs on the GPU across this whole hierarchy.</li>
+        <li>A <span class="term" data-tip="A group of 32 threads on a GPU that all run the same instruction at the exact same moment.">warp</span> = 32 threads that all run the <strong>same instruction at the same moment</strong> (in lockstep).</li>
+        <li>A <span class="term" data-tip="A group of warps that run on one GPU core and share fast memory to swap data quickly.">thread block</span> = several warps that share a small, very fast scratchpad called <span class="term" data-tip="A small but very fast pool of memory inside a GPU chip. Threads in one block share it to swap data quickly.">shared memory</span>.</li>
+        <li>The <span class="term" data-tip="All the blocks of work a GPU starts at once. The work is spread across the chip's many small workshops.">grid</span> = all the blocks in one launch.</li>
+        <li>A <span class="term" data-tip="A small program that runs directly on the GPU or TPU and does one chunk of math, launched many times at once.">kernel</span> = the function <em>you</em> write that runs on the GPU across this whole hierarchy.</li>
       </ul>
 
       <h4>Why writing a fast kernel by hand hurts</h4>
-      <p>By hand you juggle raw thread indices, memory addresses, and hardware instructions like <span class="term">WGMMA</span> (the Hopper matrix-multiply instruction) and <span class="term">TMA</span> (Tensor Memory Accelerator — a hardware unit that copies tiles of memory in the background so compute and data movement overlap). Get one index wrong and you get garbage or a crash.</p>
+      <p>By hand you juggle raw thread indices, memory addresses, and hardware instructions like <span class="term" data-tip="A special GPU instruction on Hopper chips that multiplies matrices very fast.">WGMMA</span> (the Hopper matrix-multiply instruction) and <span class="term" data-tip="Special hardware on newer NVIDIA GPUs whose only job is to copy blocks of memory quickly in the background.">TMA</span> (Tensor Memory Accelerator — a hardware unit that copies tiles of memory in the background so compute and data movement overlap). Get one index wrong and you get garbage or a crash.</p>
 
       <h4>ThunderKittens: think in tiles, not threads</h4>
-      <p><span class="term">ThunderKittens (TK)</span> is a small header-only C++/CUDA library from Stanford Hazy Research. It hides the pain behind one idea: the <span class="term">tile</span> — a small fixed-size 2D block of numbers (the base is 16×16) that TK treats as a single value. Instead of "thread 137 loads element 4,092," you say "load this 16×16 tile, matrix-multiply it, exponentiate it, store it."</p>
+      <p><span class="term" data-tip="A small C++/CUDA code library from Stanford that helps you write fast GPU kernels by working with tiles instead of single threads.">ThunderKittens (TK)</span> is a small header-only C++/CUDA library from Stanford Hazy Research. It hides the pain behind one idea: the <span class="term" data-tip="A small fixed-size block of data brought from slow memory into fast memory so you can do lots of math on it.">tile</span> — a small fixed-size 2D block of numbers (the base is 16×16) that TK treats as a single value. Instead of "thread 137 loads element 4,092," you say "load this 16×16 tile, matrix-multiply it, exponentiate it, store it."</p>
       <div class="callout c-info"><span class="ic">📦</span><div><b>Why 16×16?</b> Because that is the shape the GPU's matrix-multiply hardware natively consumes, so tiles map straight onto the fast instructions — nothing is wasted.<br><span style="font-size:.85rem;color:var(--text2)">Two tile homes: a <b>register tile</b> (<code>rt</code>, ultra-fast per-thread registers, warp-level) and a <b>shared tile</b> (<code>st</code>, block-level shared memory). Ops read like PyTorch but the destination comes first, assembly-style: <code>mul(c,a,b)</code>, <code>mma_AB(d,a,b,d)</code>, <code>load</code>/<code>store</code>, <code>exp</code>, <code>sum</code>.</span></div></div>
 
       <h4>The kernel you build: linear attention</h4>
-      <p>Standard attention costs O(n²) in sequence length n because every token attends to every other token. <span class="term">Linear attention</span> rewrites the math so cost grows linearly (O(n)): it keeps a running <span class="term">state matrix</span> S that summarizes all past tokens; each new token updates S and reads from it. It is memory-bound and awkward — exactly why TK highlights it. The TK paper reports beating the strongest prior linear-attention kernel by <strong>14×</strong>.</p>
+      <p>Standard attention costs O(n²) in sequence length n because every token attends to every other token. <span class="term" data-tip="A rewrite of attention whose cost grows in a straight line with length, by keeping a small running summary of past tokens.">Linear attention</span> rewrites the math so cost grows linearly (O(n)): it keeps a running <span class="term" data-tip="A running summary that holds information about all past tokens. Each new token updates it and reads from it.">state matrix</span> S that summarizes all past tokens; each new token updates S and reads from it. It is memory-bound and awkward — exactly why TK highlights it. The TK paper reports beating the strongest prior linear-attention kernel by <strong>14×</strong>.</p>
 
       <h4>Why the strict toolchain?</h4>
-      <p>TK is bleeding-edge. It needs <span class="term">CUDA 12.8+</span> (the toolkit with the NVIDIA compiler, libraries, and drivers) and <span class="term">g++-11</span> (a C++ compiler new enough for <span class="term">C++20 concepts</span> — a language feature TK uses to type-check tiles at compile time). Wrong versions means it will not compile, so you pin them first.</p>
+      <p>TK is bleeding-edge. It needs <span class="term" data-tip="Version 12.8 or newer of NVIDIA's toolkit: the compiler, libraries, and drivers needed to build and run GPU code.">CUDA 12.8+</span> (the toolkit with the NVIDIA compiler, libraries, and drivers) and <span class="term" data-tip="Version 11 of the g++ C++ compiler, new enough to understand C++20 features that ThunderKittens needs.">g++-11</span> (a C++ compiler new enough for <span class="term" data-tip="A C++ language feature that lets the compiler check that types match certain rules before the program is built.">C++20 concepts</span> — a language feature TK uses to type-check tiles at compile time). Wrong versions means it will not compile, so you pin them first.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official sources: <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">ThunderKittens paper (arXiv 2410.20399)</a> · <a href="https://github.com/HazyResearch/ThunderKittens" target="_blank" rel="noopener">TK GitHub repo</a> · <a href="https://hazyresearch.stanford.edu/blog/2024-05-12-quick-tk" target="_blank" rel="noopener">TK blog post</a> · <a href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/" target="_blank" rel="noopener">CUDA install guide (Linux)</a> · <a href="https://docs.nvidia.com/cuda/" target="_blank" rel="noopener">CUDA docs</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -570,6 +583,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

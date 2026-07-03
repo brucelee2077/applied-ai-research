@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,10 +220,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can multiply matrices and read shapes like <code>(rows, cols)</code>. That's it. <b>No prior transformer knowledge needed.</b> We stay at the shape level — you will not re-derive the attention math today.</div></div>
 
       <h4>A token is just a vector</h4>
-      <p>A transformer works on <span class="term">tokens</span> — small pieces of text, each turned into a list of numbers called a vector. The length of that vector is one number you pick called <span class="term">d_model</span> (often written <code>d</code>). A common value is <code>d = 768</code>. So every token is a vector of 768 numbers.</p>
+      <p>A transformer works on <span class="term" data-tip="Small pieces of text or data that a model reads one by one, each turned into a list of numbers.">tokens</span> — small pieces of text, each turned into a list of numbers called a vector. The length of that vector is one number you pick called <span class="term" data-tip="The length of the list of numbers used to represent one token. A common value is 768.">d_model</span> (often written <code>d</code>). A common value is <code>d = 768</code>. So every token is a vector of 768 numbers.</p>
 
       <h4>A block is two sub-parts, made of weight matrices</h4>
-      <p>The model stacks many identical <span class="term">blocks</span> (also called layers). Each block has exactly two sub-parts, and each sub-part is really just a few <span class="term">weight matrices</span> — grids of learned numbers you multiply the token vector by.</p>
+      <p>The model stacks many identical <span class="term" data-tip="The repeated layers a model stacks, each made of weight matrices. Also small rectangular pieces of a matrix cut for computing.">blocks</span> (also called layers). Each block has exactly two sub-parts, and each sub-part is really just a few <span class="term" data-tip="Grids of learned numbers. You multiply a token's numbers by them to move data through the model.">weight matrices</span> — grids of learned numbers you multiply the token vector by.</p>
       <p><strong>Sub-part 1 — Attention.</strong> It has <strong>4</strong> matrices, each roughly <code>d × d</code>:</p>
       <ul>
         <li><code>Wq</code> (the <strong>Query</strong> matrix) — reshapes the token to ask "what am I looking for?"</li>
@@ -221,10 +234,10 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p><strong>Sub-part 2 — Feed-forward (FFN, also called MLP).</strong> It has <strong>2</strong> matrices: one that goes <em>wide</em> (<code>d × 4d</code>) and one that comes back <em>down</em> (<code>4d × d</code>).</p>
 
       <h4>Why this matters: you can count the parameters</h4>
-      <p>A <span class="term">parameter</span> is a single number the model learns. Counting them tells you how big and how expensive a model is. Because the shapes are so regular, the count per block is a tiny formula: <code>4·d²</code> from attention plus <code>8·d²</code> from the FFN, which is about <code>12·d²</code> per block (ignoring small bias terms). Multiply by the number of blocks and you have the whole model's size.</p>
+      <p>A <span class="term" data-tip="One single number that the model learns during training. Counting them shows how big a model is.">parameter</span> is a single number the model learns. Counting them tells you how big and how expensive a model is. Because the shapes are so regular, the count per block is a tiny formula: <code>4·d²</code> from attention plus <code>8·d²</code> from the FFN, which is about <code>12·d²</code> per block (ignoring small bias terms). Multiply by the number of blocks and you have the whole model's size.</p>
 
       <h4>One more detail: multi-head</h4>
-      <p><span class="term">Multi-head attention</span> splits the <code>d</code> numbers into <code>n_heads</code> smaller groups, each of size <code>head_dim</code>. The only rule you need today: <code>n_heads × head_dim = d_model</code>. The total matrix sizes stay the same, so the parameter count does not change.</p>
+      <p><span class="term" data-tip="It splits the token's numbers into several smaller groups, so attention can look at things in different ways at once.">Multi-head attention</span> splits the <code>d</code> numbers into <code>n_heads</code> smaller groups, each of size <code>head_dim</code>. The only rule you need today: <code>n_heads × head_dim = d_model</code>. The total matrix sizes stay the same, so the parameter count does not change.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">The Scaling Book — Transformers</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -498,6 +511,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

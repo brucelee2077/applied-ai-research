@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,8 +220,8 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know what a neural network is and that it has <em>parameters</em> (its adjustable numbers) and trains on <em>tokens</em> (chunks of text). This week's earlier days on Kaplan and Chinchilla scaling help, but are <b>not required.</b> No prior knowledge of compute budgets needed.</div></div>
 
       <h4>Start with the words</h4>
-      <p>A <span class="term">FLOP</span> is one floating-point operation — one multiply or one add on real numbers. Training a big model costs a huge number of them, so people count them in units like <code>1e18</code> or <code>1e21</code>.</p>
-      <p>Your <span class="term">compute budget</span> is the total number of FLOPs you are allowed to spend on one training run. Think of it as a fixed pile of money you must spend, no more and no less.</p>
+      <p>A <span class="term" data-tip="One floating-point operation: a single multiply or add on decimal numbers.">FLOP</span> is one floating-point operation — one multiply or one add on real numbers. Training a big model costs a huge number of them, so people count them in units like <code>1e18</code> or <code>1e21</code>.</p>
+      <p>Your <span class="term" data-tip="The total amount of math work (FLOPs) you are allowed to use for one training run.">compute budget</span> is the total number of FLOPs you are allowed to spend on one training run. Think of it as a fixed pile of money you must spend, no more and no less.</p>
       <p>There is a well-known rule of thumb: training a transformer on <code>D</code> tokens with <code>N</code> parameters costs about <code>C ≈ 6·N·D</code> FLOPs. The 6 comes from roughly 2 FLOPs per parameter in the forward pass and 4 in the backward pass, per token.</p>
 
       <h4>The tension</h4>
@@ -219,12 +232,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ol>
         <li>Choose a handful of fixed budgets, e.g. <code>C = 1e18, 3e18, 1e19, 3e19, 6e19</code> FLOPs.</li>
         <li>For each budget, pick several model sizes <code>N</code>, and for each set the token count <code>D = C / (6·N)</code> so every run spends the same FLOPs.</li>
-        <li>Train each run to completion and record its final <span class="term">loss</span> (a number measuring prediction error; lower is better).</li>
+        <li>Train each run to completion and record its final <span class="term" data-tip="One number that measures how wrong a model's predictions are. Lower means the model is doing better.">loss</span> (a number measuring prediction error; lower is better).</li>
         <li>Plot final loss (y) against model size <code>N</code> (x, log-scaled) — the points trace a <strong>U-shape</strong>: high on the left from underfitting, high on the right from undertraining, low in the middle.</li>
-        <li>Fit a <span class="term">parabola</span> (a quadratic <code>y = a·x² + b·x + c</code>) and read off its minimum. That minimum's x-value is the <strong>compute-optimal model size</strong> for that budget.</li>
+        <li>Fit a <span class="term" data-tip="A U-shaped curve from the equation y = a*x^2 + b*x + c. Its lowest point marks the best value.">parabola</span> (a quadratic <code>y = a·x² + b·x + c</code>) and read off its minimum. That minimum's x-value is the <strong>compute-optimal model size</strong> for that budget.</li>
         <li>Repeat for every budget, collect the (budget, optimal-size) pairs, and fit a line in log-log space — that line is your <strong>scaling law</strong>.</li>
       </ol>
-      <p>The Chinchilla paper (Hoffmann et al. 2022) did exactly this and found optimal <code>N</code> and <code>D</code> grow at roughly the same rate — about 20 training tokens per parameter. That is why a 70B "Chinchilla" model trained on ~1.4T tokens beat the larger 280B "Gopher" trained on fewer tokens. <span class="term">curve_fit</span> (from SciPy) is the tool that does the fitting: hand it your data points and a function shape, and it returns the coefficients that best match.</p>
+      <p>The Chinchilla paper (Hoffmann et al. 2022) did exactly this and found optimal <code>N</code> and <code>D</code> grow at roughly the same rate — about 20 training tokens per parameter. That is why a 70B "Chinchilla" model trained on ~1.4T tokens beat the larger 280B "Gopher" trained on fewer tokens. <span class="term" data-tip="A SciPy tool: you give it data points and a function shape, and it returns the numbers that fit best.">curve_fit</span> (from SciPy) is the tool that does the fitting: hand it your data points and a function shape, and it returns the coefficients that best match.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Feinberg — scaling laws talk (PDF)</a> · <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Chinchilla paper (Hoffmann et al. 2022)</a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html" target="_blank" rel="noopener">scipy.optimize.curve_fit</a> · <a href="https://matplotlib.org/stable/" target="_blank" rel="noopener">Matplotlib</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -572,6 +585,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

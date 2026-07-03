@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's Mixture-of-Experts fundamentals (experts, the router, top-<em>k</em>) and Wednesday's load-balancing problem (capacity factor, dropped tokens). <b>No prior distributed-systems or networking experience needed.</b></div></div>
 
       <h4>The setup: experts don't all fit on one chip</h4>
-      <p>Earlier this week you learned that a <span class="term">Mixture-of-Experts (MoE)</span> layer replaces one feed-forward block with many parallel copies — the <span class="term">experts</span> — plus a small <span class="term">router</span> network that sends each token to just one or two of them. A model with 64 or 128 experts, each the size of a full feed-forward layer, has far more total parameters than can fit in the memory of a single GPU or TPU chip.</p>
-      <p>The standard fix, used by <strong>GShard</strong> (Lepikhin et al., 2020) and the <strong>Switch Transformer</strong> (Fedus, Zoph, Shazeer, 2021), is called <span class="term">expert parallelism</span>: spread the experts across many chips, one or a few experts per chip. So far this sounds like ordinary model sharding. The twist is what happens to the <em>tokens</em>.</p>
+      <p>Earlier this week you learned that a <span class="term" data-tip="A layer that replaces one feed-forward network with many, plus a router that sends each token to only a few of them.">Mixture-of-Experts (MoE)</span> layer replaces one feed-forward block with many parallel copies — the <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span> — plus a small <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> network that sends each token to just one or two of them. A model with 64 or 128 experts, each the size of a full feed-forward layer, has far more total parameters than can fit in the memory of a single GPU or TPU chip.</p>
+      <p>The standard fix, used by <strong>GShard</strong> (Lepikhin et al., 2020) and the <strong>Switch Transformer</strong> (Fedus, Zoph, Shazeer, 2021), is called <span class="term" data-tip="Spreading the experts across many chips, with one or a few experts on each chip.">expert parallelism</span>: spread the experts across many chips, one or a few experts per chip. So far this sounds like ordinary model sharding. The twist is what happens to the <em>tokens</em>.</p>
 
       <h4>The problem: routing decisions cross chip boundaries</h4>
       <p>Training and inference process tokens in batches spread across chips (data parallelism). The router's decision for a token is made independently of where that token's data happens to sit. So on every forward pass, a huge number of tokens get routed to an expert that lives on a <em>different physical chip</em> than the one currently holding that token's activation vector.</p>
       <p>There is no way around this except one thing: physically move the token's data to the chip that owns the chosen expert, run the expert's math there, then move the result back. That movement is not a side detail — it is a full network communication step, once per MoE layer, on every forward and backward pass.</p>
 
       <h4>The mechanism: an AllToAll, not an AllReduce</h4>
-      <p>If you have used distributed training before, you likely know <span class="term">AllReduce</span>: every chip contributes a gradient, and every chip gets back the <em>same</em> summed result. MoE routing needs something different, called <span class="term">AllToAll</span>: every chip sends a <em>different</em>, custom-picked batch of tokens to every other chip — whichever tokens that chip's router decided belong to an expert living there. Nobody receives the same thing. This personalized, all-pairs exchange is what today's lesson is about.</p>
+      <p>If you have used distributed training before, you likely know <span class="term" data-tip="A way many chips share numbers: each adds its value, and all chips get back the same total.">AllReduce</span>: every chip contributes a gradient, and every chip gets back the <em>same</em> summed result. MoE routing needs something different, called <span class="term" data-tip="A way where every chip sends a different, chosen piece of data to every other chip.">AllToAll</span>: every chip sends a <em>different</em>, custom-picked batch of tokens to every other chip — whichever tokens that chip's router decided belong to an expert living there. Nobody receives the same thing. This personalized, all-pairs exchange is what today's lesson is about.</p>
       <p>The full round trip has three parts: a <strong>dispatch</strong> AllToAll (send each token to its expert's chip), the <strong>expert compute</strong> (a local matrix multiply, no network involved), and a <strong>combine</strong> AllToAll (send the expert's output back to the token's original chip so the rest of the model can continue). Two network hops for every MoE layer, every step.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Switch Transformer (arXiv:2101.03961)</a> · <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html" target="_blank" rel="noopener">NCCL collective operations guide</a> · <a href="https://docs.jax.dev/en/latest/_autosummary/jax.lax.ragged_dot.html" target="_blank" rel="noopener">jax.lax.ragged_dot API</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -264,7 +277,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <li><strong>Expert parallelism</strong> shards experts across <code>N</code> chips (usually a handful to a few dozen experts per chip). Each chip owns a fixed slice of experts and never moves them; tokens move instead.</li>
         <li><strong>AllToAll</strong> is a collective where every one of the <code>N</code> chips sends a distinct chunk of data to every other chip, and receives a distinct chunk back — an N×N personalized exchange, unlike AllReduce's "same answer to everyone."</li>
         <li>Each MoE layer needs <strong>two</strong> AllToAlls: <strong>dispatch</strong> (token activations → the chip holding the chosen expert) and <strong>combine</strong> (expert outputs → the chip the token came from). Both happen in the forward pass; the backward pass needs the mirror-image AllToAlls for gradients.</li>
-        <li>Every chip must first pad or truncate to a fixed <span class="term">expert capacity</span> (Wednesday's lesson) so the AllToAll message sizes are static and known ahead of time — a hard requirement of most distributed collectives, which expect fixed-size buffers, not a different size every step.</li>
+        <li>Every chip must first pad or truncate to a fixed <span class="term" data-tip="A fixed limit on how many tokens each expert can take. It keeps array shapes fixed so the code can compile.">expert capacity</span> (Wednesday's lesson) so the AllToAll message sizes are static and known ahead of time — a hard requirement of most distributed collectives, which expect fixed-size buffers, not a different size every step.</li>
         <li>The <strong>payload size</strong> scales directly with top-<em>k</em>: each token is dispatched once per chosen expert, so top-2 routing (GShard-style) sends roughly <strong>2x</strong> the token data across the network that top-1 routing (Switch-style) does, for the same batch.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>dispatched = jax.lax.all_to_all(x, axis_name='experts', split_axis=0, concat_axis=0)</code><br><span style="font-size:.85rem;color:var(--text2)">"Take the tokens each chip has sorted by destination expert-chip, and physically exchange them so every chip ends up holding the tokens routed <em>to</em> its own experts." One line hides a real network transfer.</span></div></div>
@@ -489,6 +502,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

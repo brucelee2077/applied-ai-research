@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -209,16 +222,16 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>First, three words</h4>
       <p>Let's define the words we'll use, because everything today rests on them.</p>
       <ul>
-        <li>A <span class="term">compiler</span> is a program that takes your code and turns it into a faster, lower-level version <em>before</em> it runs. Instead of reading your code line by line every time (like Python does), it prepares one optimized program once, then runs that.</li>
-        <li>To <span class="term">trace</span> a function means to run it once with fake stand-in inputs that only carry <em>shape</em> and <em>type</em> (not real numbers), and write down every operation it performs. The result is a recording of the math — not the answer.</li>
-        <li>To <span class="term">fuse</span> operations means to merge many small steps into one bigger step. Instead of "add, then multiply, then sum" as three separate trips to the hardware, fusion does them in a single pass, so the data is touched once.</li>
+        <li>A <span class="term" data-tip="A program that turns your code into a faster, lower-level version before it runs.">compiler</span> is a program that takes your code and turns it into a faster, lower-level version <em>before</em> it runs. Instead of reading your code line by line every time (like Python does), it prepares one optimized program once, then runs that.</li>
+        <li>To <span class="term" data-tip="To run a function once with fake shape-only inputs and write down every operation, making one fast program to reuse.">trace</span> a function means to run it once with fake stand-in inputs that only carry <em>shape</em> and <em>type</em> (not real numbers), and write down every operation it performs. The result is a recording of the math — not the answer.</li>
+        <li>To <span class="term" data-tip="To join many small math steps into one bigger step, so the hardware does less back-and-forth work.">fuse</span> operations means to merge many small steps into one bigger step. Instead of "add, then multiply, then sum" as three separate trips to the hardware, fusion does them in a single pass, so the data is touched once.</li>
       </ul>
 
       <h4>The problem: Python dispatches one op at a time</h4>
       <p>When you call <code>jnp.tanh(x @ x.T).sum()</code>, Python hands each operation to the accelerator (GPU/TPU) one at a time: first the matmul, then tanh, then the sum. Between each step, control comes back to Python. For big models with many small ops, all that back-and-forth wastes time, and the hardware sits idle waiting for the next instruction.</p>
 
       <h4>The answer: <code>jax.jit</code></h4>
-      <p><span class="term">jax.jit</span> ("jit" means <em>just-in-time</em> compilation) wraps your function and hands it to <span class="term">XLA</span> — JAX's compiler (the name stands for Accelerated Linear Algebra). Here is what happens:</p>
+      <p><span class="term" data-tip="A JAX tool that wraps your function and compiles it into a fast version just before it runs.">jax.jit</span> ("jit" means <em>just-in-time</em> compilation) wraps your function and hands it to <span class="term" data-tip="JAX's compiler: a program that turns your code into a fast version and can reorder, join, and split work across chips.">XLA</span> — JAX's compiler (the name stands for Accelerated Linear Algebra). Here is what happens:</p>
       <ol>
         <li><strong>First call:</strong> JAX <em>traces</em> your function on abstract inputs (shapes and dtypes only) to record the operations.</li>
         <li>XLA <em>compiles</em> that recording into one <em>fused</em>, optimized program for your hardware.</li>
@@ -500,6 +513,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -194,7 +207,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
   <header class="hero">
     <span class="eyebrow">Phase 2 · Week 7 · Day 6 (Sat)</span>
     <h1>Routing Design<br>&amp; Deep Synthesis</h1>
-    <p class="lead">Every token that hits an MoE (<em>Mixture-of-Experts</em>) layer needs an answer to one question: <em>which expert should handle you?</em> A tiny learned <span class="term">router</span> decides, in one forward pass, and that single decision is why labs can run trillion-parameter models without paying a trillion-parameter compute bill per token. Today: how routing actually works, the ragged-shape problem it creates, and the JAX primitive built to solve it.</p>
+    <p class="lead">Every token that hits an MoE (<em>Mixture-of-Experts</em>) layer needs an answer to one question: <em>which expert should handle you?</em> A tiny learned <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> decides, in one forward pass, and that single decision is why labs can run trillion-parameter models without paying a trillion-parameter compute bill per token. Today: how routing actually works, the ragged-shape problem it creates, and the JAX primitive built to solve it.</p>
     <div class="goal">
       <b>🎯 By the end, you'll be able to:</b> trace top-1/top-2 routing from raw logits to a dispatched expert, compute expert-capacity and dropped-token arithmetic by hand, explain why <code>jax.lax.ragged_dot</code> beats one-hot masking, and connect all of it to the inference-economics story you'll write up tomorrow.
     </div>
@@ -209,12 +222,12 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>The problem: dense models have a hard economic ceiling</h4>
       <p>A normal ("dense") transformer has one FFN per block, and <strong>every</strong> token must pass through it. That's simple, but it means every extra parameter you add to the model costs extra compute for <strong>every single token</strong>, forever. Want a bigger, smarter model? You pay for it on every token you ever generate. Compute cost and model size are welded together.</p>
 
-      <h4>The answer: a <span class="term">Mixture-of-Experts (MoE)</span> layer</h4>
-      <p>An MoE layer replaces that one dense FFN with <strong>N</strong> separate, smaller FFNs called <span class="term">experts</span>, plus a small learned <span class="term">router</span> — just a linear layer + softmax. For each token, the router looks at its hidden vector and decides which expert (or experts) should process it. Only the chosen expert(s) run their FFN on that token; the rest sit idle for that token.</p>
+      <h4>The answer: a <span class="term" data-tip="A layer that replaces one feed-forward network with many, plus a router that sends each token to only a few of them.">Mixture-of-Experts (MoE)</span> layer</h4>
+      <p>An MoE layer replaces that one dense FFN with <strong>N</strong> separate, smaller FFNs called <span class="term" data-tip="Separate small feed-forward networks in a Mixture-of-Experts layer. Only a few run for each token.">experts</span>, plus a small learned <span class="term" data-tip="A small learned network in a Mixture-of-Experts layer that picks which expert or experts handle each token.">router</span> — just a linear layer + softmax. For each token, the router looks at its hidden vector and decides which expert (or experts) should process it. Only the chosen expert(s) run their FFN on that token; the rest sit idle for that token.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>This makes the model <strong>sparsely activated</strong>: total parameter count can be enormous (hundreds of billions to trillions), while the FLOPs spent per token stay close to what a much smaller dense model would spend. MoE decouples "how much the model can know" from "how much compute one token costs."</div></div>
 
       <h4>So what's today's catch?</h4>
-      <p><span class="term">Routing</span> is the exact algorithm that makes the pick. The router computes <code>softmax(token @ W_router)</code> — a probability over experts — then picks the top-k. Shazeer et al.'s original Sparsely-Gated MoE and GShard used <strong>top-2</strong> (two experts per token); Switch Transformer simplified to <strong>top-1</strong> and showed it works just as well while halving compute and communication per token. Because different tokens pick different experts, the number of tokens landing on any one expert isn't known ahead of time — this is a <span class="term">ragged</span> (irregularly-shaped) computation problem, and JAX has a specific primitive, <code>jax.lax.ragged_dot</code>, built to handle exactly this. We'll build all of it today.</p>
+      <p><span class="term" data-tip="The step that decides which expert handles each token, by scoring experts and picking the best few.">Routing</span> is the exact algorithm that makes the pick. The router computes <code>softmax(token @ W_router)</code> — a probability over experts — then picks the top-k. Shazeer et al.'s original Sparsely-Gated MoE and GShard used <strong>top-2</strong> (two experts per token); Switch Transformer simplified to <strong>top-1</strong> and showed it works just as well while halving compute and communication per token. Because different tokens pick different experts, the number of tokens landing on any one expert isn't known ahead of time — this is a <span class="term" data-tip="A shape that is not a fixed rectangle: each group can have a different size, decided by the data.">ragged</span> (irregularly-shaped) computation problem, and JAX has a specific primitive, <code>jax.lax.ragged_dot</code>, built to handle exactly this. We'll build all of it today.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs/papers (optional): <a href="https://docs.jax.dev/en/latest/_autosummary/jax.lax.ragged_dot.html" target="_blank" rel="noopener">jax.lax.ragged_dot API</a> · <a href="https://docs.jax.dev/en/latest/_autosummary/jax.lax.ragged_dot_general.html" target="_blank" rel="noopener">jax.lax.ragged_dot_general API</a> · <a href="https://arxiv.org/abs/2101.03961" target="_blank" rel="noopener">Switch Transformer (Fedus et al.)</a> · <a href="https://arxiv.org/abs/2006.16668" target="_blank" rel="noopener">GShard (Lepikhin et al.)</a> · <a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Efficiently Scaling Transformer Inference (Pope et al.)</a> · <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Feinberg — MoE systems talk</a> · <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html" target="_blank" rel="noopener">NCCL collectives (all-to-all)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -230,7 +243,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
         <div class="card"><span class="big">🩺➡️👨‍⚕️</span><h5>MoE = the nurse sends you to the right one</h5><p>The triage nurse looks at each patient for a few seconds and sends them to the 1 or 2 doctors best suited to their case. The hospital can hire many more specialists without making any single visit longer.</p></div>
       </div>
       <p><strong>In one line:</strong> the hospital can grow its total "knowledge capacity" (more specialists) without growing how long any one patient's visit takes, because each patient only occupies 1-2 doctors' time, not all 8.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>The catch: patients arrive unpredictably. Some doctors get flooded on a busy day (load imbalance) while others sit idle. So the hospital sets a "max patients per doctor per hour" — a <span class="term">capacity limit</span>. Overflow patients for that hour get turned away untreated and sent straight to the exit — that's a <span class="term">dropped token</span> in Switch Transformer terms, passed through via the residual connection instead of being processed.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>The catch: patients arrive unpredictably. Some doctors get flooded on a busy day (load imbalance) while others sit idle. So the hospital sets a "max patients per doctor per hour" — a <span class="term" data-tip="The most tokens one expert may take in a step. Extra tokens over this amount get skipped.">capacity limit</span>. Overflow patients for that hour get turned away untreated and sent straight to the exit — that's a <span class="term" data-tip="A token no expert processed because its expert was full, so it passes through unchanged.">dropped token</span> in Switch Transformer terms, passed through via the residual connection instead of being processed.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Where the analogy breaks down:</b> real doctors keep learning between patients in ways that generalize. Experts in an MoE are just separately-parameterized weight matrices with no personal judgment — routing is a cold, learned linear-algebra decision made in one forward pass, not triage intuition. And the "capacity limit" isn't a flexible daily call — it's a hard, statically-declared array size fixed before the model even runs, because JAX needs shapes known at compile time.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -493,6 +506,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

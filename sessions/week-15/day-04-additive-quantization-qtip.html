@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,16 +220,16 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know what post-training quantization (PTQ) is — shrinking a trained model's weights from 16-bit floats to fewer bits, after training is done. You've also just written fast matmul kernels earlier this week. <b>No prior quantization-algorithm experience needed.</b></div></div>
 
       <h4>The problem: your fast kernel is only as good as its inputs</h4>
-      <p>Say you wrote a beautiful Pallas kernel that multiplies matrices at full GPU speed. If the weight matrix it reads is still stored as FP16 (16 bits per number), the kernel spends most of its time just <strong>moving those bytes from memory</strong>, not computing. This is called being <span class="term">memory-bandwidth bound</span>. The fix: make the weights smaller. That's what today is about — shrinking weights down to 2-3 bits per number, roughly <strong>8x smaller</strong> than FP16.</p>
+      <p>Say you wrote a beautiful Pallas kernel that multiplies matrices at full GPU speed. If the weight matrix it reads is still stored as FP16 (16 bits per number), the kernel spends most of its time just <strong>moving those bytes from memory</strong>, not computing. This is called being <span class="term" data-tip="When a program is slow because it spends most time moving data from memory, not doing math.">memory-bandwidth bound</span>. The fix: make the weights smaller. That's what today is about — shrinking weights down to 2-3 bits per number, roughly <strong>8x smaller</strong> than FP16.</p>
 
       <h4>The old way: scalar quantization</h4>
-      <p>The simplest PTQ method is <span class="term">round-to-nearest (RTN)</span>: pick a small grid of allowed numbers (say, 4 values for 2 bits), and snap each weight independently to the closest grid point. <span class="term">GPTQ</span>, a more careful cousin, does the same "one weight at a time" snapping but corrects for errors as it goes. Both are <strong>direct</strong> or <strong>scalar</strong> methods: each number's rounding decision does not know about its neighbors.</p>
+      <p>The simplest PTQ method is <span class="term" data-tip="The simplest way to shrink numbers: pick a small set of allowed values and snap each weight to the closest one.">round-to-nearest (RTN)</span>: pick a small grid of allowed numbers (say, 4 values for 2 bits), and snap each weight independently to the closest grid point. <span class="term" data-tip="A smarter rounding method that snaps weights one at a time but fixes the mistakes it makes as it goes.">GPTQ</span>, a more careful cousin, does the same "one weight at a time" snapping but corrects for errors as it goes. Both are <strong>direct</strong> or <strong>scalar</strong> methods: each number's rounding decision does not know about its neighbors.</p>
       <p>The waste: two weights sitting next to each other in a row are often correlated — their rounding errors could partly cancel if you quantized them <em>together</em> instead of alone. Scalar methods throw this opportunity away.</p>
 
       <h4>The new way: Additive Quantization (AQ)</h4>
-      <p><span class="term">Additive Quantization</span> comes from a 15-year-old field called <span class="term">Multi-Codebook Quantization (MCQ)</span>, originally built to compress databases of vectors for fast image search. Instead of quantizing one weight at a time, AQ groups a few weights together (say, g=8 in a row) and represents that whole group as a <strong>sum</strong> of entries picked from several small lookup tables, called <span class="term">codebooks</span>. Each codebook holds 2^B candidate vectors (B = bits per codebook). You pick one entry from codebook 1, one from codebook 2, and so on, and add them up to approximate the group.</p>
-      <p><span class="term">AQLM</span> (Additive Quantization for Language Models — today's first paper) adapts this specifically for LLM weights, with two twists: it uses real calibration text to optimize for actual output error (not abstract vector similarity), and it <strong>jointly fine-tunes codebooks across a whole transformer block</strong> after quantizing each layer, so errors in one layer's codebook can be corrected by adjustments in another's.</p>
-      <p><span class="term">QTIP</span> (Quantization with Trellises and Incoherence Processing — today's second paper) solves the same 2-3 bit problem a different way: instead of summed codebooks, it uses <span class="term">trellis-coded quantization</span>, an idea borrowed from 1970s-80s communications theory, which lets it represent a much bigger effective codebook while storing only a tiny lookup table.</p>
+      <p><span class="term" data-tip="A way to compress weights by adding together a few picked entries from small lookup tables to match a group of weights.">Additive Quantization</span> comes from a 15-year-old field called <span class="term" data-tip="An older method that stores a vector as a sum of entries from several small tables. First made for fast image search.">Multi-Codebook Quantization (MCQ)</span>, originally built to compress databases of vectors for fast image search. Instead of quantizing one weight at a time, AQ groups a few weights together (say, g=8 in a row) and represents that whole group as a <strong>sum</strong> of entries picked from several small lookup tables, called <span class="term" data-tip="Small lookup tables holding candidate number-groups. You pick one entry from each and add them to rebuild the original weights.">codebooks</span>. Each codebook holds 2^B candidate vectors (B = bits per codebook). You pick one entry from codebook 1, one from codebook 2, and so on, and add them up to approximate the group.</p>
+      <p><span class="term" data-tip="A method that fits Additive Quantization to language model weights, using real text and tuning tables across a whole block.">AQLM</span> (Additive Quantization for Language Models — today's first paper) adapts this specifically for LLM weights, with two twists: it uses real calibration text to optimize for actual output error (not abstract vector similarity), and it <strong>jointly fine-tunes codebooks across a whole transformer block</strong> after quantizing each layer, so errors in one layer's codebook can be corrected by adjustments in another's.</p>
+      <p><span class="term" data-tip="A method that squeezes weights to 2-3 bits using trellises instead of many stored tables, keeping storage tiny.">QTIP</span> (Quantization with Trellises and Incoherence Processing — today's second paper) solves the same 2-3 bit problem a different way: instead of summed codebooks, it uses <span class="term" data-tip="A way to represent a huge set of value-groups while storing only a tiny table, by generating values step by step from bits.">trellis-coded quantization</span>, an idea borrowed from 1970s-80s communications theory, which lets it represent a much bigger effective codebook while storing only a tiny lookup table.</p>
 
       <h4>So what's today's catch?</h4>
       <p>The catch is cost: finding the best combination of codebook entries is a hard combinatorial search, not a simple lookup. AQLM pays for this with beam search; QTIP pays for it with a cheaper trellis decoder. We'll unpack both in the playground and walkthrough.</p>
@@ -500,6 +513,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

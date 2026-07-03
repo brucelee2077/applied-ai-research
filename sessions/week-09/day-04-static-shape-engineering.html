@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Weeks 1-8 JAX basics (<code>jit</code>, <code>vmap</code>, pytrees) and Wednesday's synthetic addition-string generator. <b>No prior compiler knowledge needed.</b></div></div>
 
       <h4>The problem: variable-length data meets a compiler that hates variety</h4>
-      <p>Wednesday's generator makes addition problems like <code>"12+34=46"</code> and <code>"9999+1=10000"</code>. Those are different <span class="term">lengths</span> — 8 tokens vs. 12 tokens. If you tokenize each string as-is and hand it straight to a <code>jax.jit</code>-ted training step, almost every batch will look "new" to JAX.</p>
-      <p><code>jax.jit</code> does <strong>not</strong> compile your Python function once and reuse it forever. It compiles a specialized executable for <strong>one specific input signature</strong> — and silently compiles a brand-new executable the moment it sees a signature it hasn't seen before. Today's job is learning exactly what counts as "a new signature," and today's tool is <span class="term">deterministic padding</span>: a preprocessing step that makes every batch share the same signature, so <code>jit</code> only ever compiles once.</p>
+      <p>Wednesday's generator makes addition problems like <code>"12+34=46"</code> and <code>"9999+1=10000"</code>. Those are different <span class="term" data-tip="How many tokens a string turns into. Different strings can turn into different amounts of tokens.">lengths</span> — 8 tokens vs. 12 tokens. If you tokenize each string as-is and hand it straight to a <code>jax.jit</code>-ted training step, almost every batch will look "new" to JAX.</p>
+      <p><code>jax.jit</code> does <strong>not</strong> compile your Python function once and reuse it forever. It compiles a specialized executable for <strong>one specific input signature</strong> — and silently compiles a brand-new executable the moment it sees a signature it hasn't seen before. Today's job is learning exactly what counts as "a new signature," and today's tool is <span class="term" data-tip="Adding filler in a fixed, predictable way so every batch has the same shape, so the compiler builds the fast version once.">deterministic padding</span>: a preprocessing step that makes every batch share the same signature, so <code>jit</code> only ever compiles once.</p>
 
       <h4>Tracing: JAX runs your function with stand-ins, not real numbers</h4>
-      <p>The first time you call a <code>jit</code>-ted function, JAX doesn't run your code with real numbers. It runs it once with abstract stand-ins called <span class="term">Tracer</span> objects, which carry only two things: <code>shape</code> (e.g. <code>(32, 128)</code>) and <code>dtype</code> (e.g. <code>float32</code>). This one pass — a <span class="term">trace</span> — walks every line and records every array operation into a computation graph called a <span class="term">jaxpr</span> (JAX expression).</p>
+      <p>The first time you call a <code>jit</code>-ted function, JAX doesn't run your code with real numbers. It runs it once with abstract stand-ins called <span class="term" data-tip="A stand-in object JAX uses in place of real numbers. It carries only an array's shape and type.">Tracer</span> objects, which carry only two things: <code>shape</code> (e.g. <code>(32, 128)</code>) and <code>dtype</code> (e.g. <code>float32</code>). This one pass — a <span class="term" data-tip="To run a function once with fake shape-only inputs and write down every operation, making one fast program to reuse.">trace</span> — walks every line and records every array operation into a computation graph called a <span class="term" data-tip="A recorded list of every array operation in your function, made while JAX traces your code.">jaxpr</span> (JAX expression).</p>
       <p>Plain Python <code>if</code>/<code>for</code>/<code>while</code> still runs for real during tracing, using whatever concrete Python values are around. But branching on a <em>traced</em> value — an actual array element, not a shape — is illegal: JAX cannot resolve that branch and raises a <code>TracerBoolConversionError</code>.</p>
 
       <h4>Compilation: XLA turns the jaxpr into a real executable</h4>
-      <p>Once the jaxpr is captured, JAX hands it to <span class="term">XLA</span> (Accelerated Linear Algebra), Google's compiler for linear algebra programs. XLA fuses operators, plans memory layout, folds constants, and produces one compiled binary specialized for the exact shapes and dtypes it saw. That's why <code>jit</code> is fast: pay the trace-and-compile tax once, then every later call reuses the binary at hardware speed.</p>
+      <p>Once the jaxpr is captured, JAX hands it to <span class="term" data-tip="JAX's compiler: a program that turns your code into a fast version and can reorder, join, and split work across chips.">XLA</span> (Accelerated Linear Algebra), Google's compiler for linear algebra programs. XLA fuses operators, plans memory layout, folds constants, and produces one compiled binary specialized for the exact shapes and dtypes it saw. That's why <code>jit</code> is fast: pay the trace-and-compile tax once, then every later call reuses the binary at hardware speed.</p>
 
       <h4>The cache: one signature, one compiled executable</h4>
-      <p>JAX keeps a cache: <em>abstract input signature → compiled executable</em>. The signature bundles (1) the shape and dtype of every array argument, (2) the value of any argument marked <span class="term">static</span> (a literal baked into the trace, via <code>static_argnums</code>/<code>static_argnames</code>), and (3) the structure of any pytree argument (dict/list/NamedTuple). Same signature next time → instant cache hit, microseconds. New signature → a full recompile, often hundreds of milliseconds to seconds for a transformer-sized graph.</p>
+      <p>JAX keeps a cache: <em>abstract input signature → compiled executable</em>. The signature bundles (1) the shape and dtype of every array argument, (2) the value of any argument marked <span class="term" data-tip="An argument whose exact value gets built into the compiled code, not treated as changeable data.">static</span> (a literal baked into the trace, via <code>static_argnums</code>/<code>static_argnames</code>), and (3) the structure of any pytree argument (dict/list/NamedTuple). Same signature next time → instant cache hit, microseconds. New signature → a full recompile, often hundreds of milliseconds to seconds for a transformer-sized graph.</p>
       <p>The fix that unblocks the whole capstone: pick one constant <code>MAX_LEN</code> and right-pad every example up to it, so every batch has shape <code>(batch_size, MAX_LEN)</code> for the entire run — one shape, one trace, one compile.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/jit-compilation.html" target="_blank" rel="noopener">JIT compilation in JAX</a> · <a href="https://docs.jax.dev/en/latest/_autosummary/jax.jit.html" target="_blank" rel="noopener">jax.jit API</a> · <a href="https://openxla.org/xla" target="_blank" rel="noopener">OpenXLA / XLA</a> · <a href="https://docs.jax.dev/en/latest/notebooks/thinking_in_jax.html" target="_blank" rel="noopener">Thinking in JAX</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -275,7 +288,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <h4>Why it matters for the capstone</h4>
       <ul>
         <li><strong>One trace, one compile, thousands of cheap cache hits</strong> — instead of paying XLA's optimization passes (hundreds of ms to seconds) on almost every batch.</li>
-        <li><strong>The mask carries the real information</strong> — padding fixes the <em>shape</em>, and a same-shaped boolean <span class="term">attention/loss mask</span> (1 = real token, 0 = padding) keeps the model from being graded on or attending to filler.</li>
+        <li><strong>The mask carries the real information</strong> — padding fixes the <em>shape</em>, and a same-shaped boolean <span class="term" data-tip="An array marking which tokens are real (1) and which are filler (0), so filler is ignored during learning.">attention/loss mask</span> (1 = real token, 0 = padding) keeps the model from being graded on or attending to filler.</li>
         <li><strong>It must be end-to-end</strong> — every other shape-determining value derived from sequence length (position ids, mask builders, any <code>static_argnums</code> helper) has to use the fixed <code>MAX_LEN</code>, not a per-example dynamic length, or trigger #3 sneaks back in.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> variable-length addition strings (Wed) → naive tokenize-and-stack gives ragged shapes → <code>jit</code>'s cache keys on shape → new shape each batch → recompilation storm → fixed <code>MAX_LEN</code> + padding + mask → one shape forever → Sat's training loop and Weeks 11-12 scaling runs become computationally feasible.</div></div>
@@ -492,6 +505,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

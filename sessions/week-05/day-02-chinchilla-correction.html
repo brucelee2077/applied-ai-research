@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> last week's scaling-laws basics — loss falls as a power law when you scale compute, params, or data one at a time. <b>No prior Chinchilla knowledge needed.</b></div></div>
 
       <h4>The problem: you can't grow N and D for free</h4>
-      <p>Training a model costs <span class="term">compute</span> — measured in <span class="term">FLOPs</span> (floating point operations). That compute is roughly fixed by your budget <code>C</code>. There is a simple identity connecting it to the two things you control:</p>
+      <p>Training a model costs <span class="term" data-tip="The total amount of math a task needs, measured in FLOPs. More compute means more time and money.">compute</span> — measured in <span class="term" data-tip="The count of floating-point operations, where each one is a single multiply or add on decimal numbers.">FLOPs</span> (floating point operations). That compute is roughly fixed by your budget <code>C</code>. There is a simple identity connecting it to the two things you control:</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>C ≈ 6 · N · D</code><br><span style="font-size:.85rem;color:var(--text2)"><code>N</code> = number of parameters (model size). <code>D</code> = number of training tokens (dataset size). The 6 comes from roughly 2 FLOPs per parameter per token going forward, plus 4 more going backward during backprop.</span></div></div>
-      <p>This means <code>N</code> and <code>D</code> are in tension: if your compute budget <code>C</code> is fixed and you make the model bigger (<code>N</code> up), you are forced to train on fewer tokens (<code>D</code> down), and vice versa. A <span class="term">scaling law</span> here is an empirical formula — fit by actually training many models — that tells you the best split of a fixed <code>C</code> between <code>N</code> and <code>D</code> to get the lowest possible loss. That best split is what "<span class="term">compute-optimal</span>" means.</p>
+      <p>This means <code>N</code> and <code>D</code> are in tension: if your compute budget <code>C</code> is fixed and you make the model bigger (<code>N</code> up), you are forced to train on fewer tokens (<code>D</code> down), and vice versa. A <span class="term" data-tip="A formula found from many experiments that predicts a model's loss from its size, data, or compute.">scaling law</span> here is an empirical formula — fit by actually training many models — that tells you the best split of a fixed <code>C</code> between <code>N</code> and <code>D</code> to get the lowest possible loss. That best split is what "<span class="term" data-tip="The best way to split a fixed compute budget between model size and training data to get the lowest error.">compute-optimal</span>" means.</p>
 
       <h4>The bug: Kaplan et al. (2020) got the split wrong</h4>
       <p>OpenAI's Kaplan et al. paper (2020) fit this trade-off first and concluded model size should grow much faster than data as compute grows: <code>N ∝ C^0.73</code>, <code>D ∝ C^0.27</code>. That recipe is exactly what produced GPT-3: 175 billion parameters, but only about 300 billion training tokens — under 2 tokens per parameter. The field took this as gospel and built a generation of huge, data-starved models.</p>
 
       <h4>The fix: Chinchilla (2022)</h4>
-      <p>DeepMind's Hoffmann et al. paper (2022) — the <span class="term">Chinchilla</span> paper — reran the experiment far more carefully, training over 400 models from 70 million to 16 billion parameters, using three independent methods. All three agreed: <code>N</code> and <code>D</code> should scale <strong>equally</strong> (<code>N ∝ C^0.5</code>, <code>D ∝ C^0.5</code>), not 0.73/0.27. Every large model trained on the Kaplan recipe — GPT-3, Gopher, MT-NLG, Jurassic-1 — had too many parameters and too little data for its compute budget.</p>
+      <p>DeepMind's Hoffmann et al. paper (2022) — the <span class="term" data-tip="A 2022 DeepMind study that carefully found the best balance of model size and data amount for a fixed training budget.">Chinchilla</span> paper — reran the experiment far more carefully, training over 400 models from 70 million to 16 billion parameters, using three independent methods. All three agreed: <code>N</code> and <code>D</code> should scale <strong>equally</strong> (<code>N ∝ C^0.5</code>, <code>D ∝ C^0.5</code>), not 0.73/0.27. Every large model trained on the Kaplan recipe — GPT-3, Gopher, MT-NLG, Jurassic-1 — had too many parameters and too little data for its compute budget.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official links (optional): <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">Kaplan et al. 2020 (arXiv:2001.08361)</a> · <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Hoffmann et al. 2022, Chinchilla (arXiv:2203.15556)</a> · <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Feinberg, Princeton talk on scaling laws (PDF)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -473,6 +486,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

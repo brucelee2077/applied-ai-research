@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,20 +220,20 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read Python and you know a matrix multiply is lots of multiply-and-add. <b>No hardware or kernel experience needed — we start from the chip.</b></div></div>
 
       <h4>Start with the hardware: two kinds of memory</h4>
-      <p>A GPU or TPU has two very different memories. <span class="term">HBM</span> (High Bandwidth Memory) is large — tens of gigabytes — but it sits far from the compute units, so reaching it is slow. <span class="term">SRAM</span> (the on-chip scratchpad, called "shared memory" on GPUs) is tiny — tens to hundreds of kilobytes per core — but it is right next to the math units, so it is extremely fast.</p>
-      <p>The compute units do <span class="term">FLOPs</span> (Floating-Point Operations — the multiply-and-add math). One FLOP is one such operation. A chip is rated in <strong>FLOP/s</strong> (FLOPs per second).</p>
+      <p>A GPU or TPU has two very different memories. <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory) is large — tens of gigabytes — but it sits far from the compute units, so reaching it is slow. <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> (the on-chip scratchpad, called "shared memory" on GPUs) is tiny — tens to hundreds of kilobytes per core — but it is right next to the math units, so it is extremely fast.</p>
+      <p>The compute units do <span class="term" data-tip="The count of floating-point operations, where each one is a single multiply or add on decimal numbers.">FLOPs</span> (Floating-Point Operations — the multiply-and-add math). One FLOP is one such operation. A chip is rated in <strong>FLOP/s</strong> (FLOPs per second).</p>
 
       <h4>The key problem: math is way faster than memory</h4>
-      <p>Modern chips do math far faster than they can fetch data. An NVIDIA H100 does about <strong>990 TFLOP/s</strong> of bf16 math but only about <strong>3.35 TB/s</strong> of HBM bandwidth. That is roughly <strong>295 FLOPs of math budget for every byte</strong> you move from HBM. So if an operation reads a lot of data but does little math per byte, the compute units sit idle waiting for memory. We call that <span class="term">memory-bound</span>. If it does lots of math per byte, it is <span class="term">compute-bound</span>.</p>
-      <p><span class="term">Arithmetic intensity</span> is the ratio <code>(FLOPs done) / (bytes moved from HBM)</code>. It tells you which regime you are in.</p>
+      <p>Modern chips do math far faster than they can fetch data. An NVIDIA H100 does about <strong>990 TFLOP/s</strong> of bf16 math but only about <strong>3.35 TB/s</strong> of HBM bandwidth. That is roughly <strong>295 FLOPs of math budget for every byte</strong> you move from HBM. So if an operation reads a lot of data but does little math per byte, the compute units sit idle waiting for memory. We call that <span class="term" data-tip="When moving data is the slow part, so the chip waits on memory instead of on math.">memory-bound</span>. If it does lots of math per byte, it is <span class="term" data-tip="When doing the math is the slow part, so the chip's arithmetic units are the bottleneck, not memory.">compute-bound</span>.</p>
+      <p><span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">Arithmetic intensity</span> is the ratio <code>(FLOPs done) / (bytes moved from HBM)</code>. It tells you which regime you are in.</p>
 
       <h4>Kernels, Pallas, and fusion</h4>
-      <p>A <span class="term">kernel</span> is a single program that runs on the accelerator to compute one operation (a matmul, or attention). By default, frameworks run many small kernels back-to-back, and each one reads its inputs from HBM and writes its outputs back to HBM. That round-trip is the bottleneck for memory-bound work.</p>
-      <p><span class="term">Pallas</span> is a JAX extension that lets you write your own kernel in Python/JAX-like code. You decide which <span class="term">tiles</span> (blocks) of data to load into SRAM, do all the math on them there, and only write the final result back to HBM. Doing several math steps in one kernel so intermediate results never touch HBM is called <span class="term">kernel fusion</span>. Pallas runs on both GPU (via Triton / Mosaic-GPU) and TPU (via Mosaic).</p>
+      <p>A <span class="term" data-tip="A small program that runs directly on the GPU or TPU and does one chunk of math, launched many times at once.">kernel</span> is a single program that runs on the accelerator to compute one operation (a matmul, or attention). By default, frameworks run many small kernels back-to-back, and each one reads its inputs from HBM and writes its outputs back to HBM. That round-trip is the bottleneck for memory-bound work.</p>
+      <p><span class="term" data-tip="A JAX add-on that lets you write the fast accelerator code yourself in Python, instead of letting the compiler choose everything.">Pallas</span> is a JAX extension that lets you write your own kernel in Python/JAX-like code. You decide which <span class="term" data-tip="Small fixed-size blocks of a matrix, often 16x16 numbers, that the GPU loads and works on together.">tiles</span> (blocks) of data to load into SRAM, do all the math on them there, and only write the final result back to HBM. Doing several math steps in one kernel so intermediate results never touch HBM is called <span class="term" data-tip="Doing several math steps together so in-between results stay fast and never get saved to slow memory.">kernel fusion</span>. Pallas runs on both GPU (via Triton / Mosaic-GPU) and TPU (via Mosaic).</p>
       <p><strong>FlashAttention</strong> is the famous example: it fuses the whole attention computation into one tiled kernel, so the giant N×N score matrix is never written to HBM — exact attention with far fewer reads/writes and 2–4× wall-clock speedups. <strong>ThunderKittens</strong> is a newer framework showing a few tile-level abstractions can match or beat hand-written kernels.</p>
 
       <h4>Roofline: the tool that proves a kernel is good</h4>
-      <p>Plot achieved FLOP/s against arithmetic intensity. There is a sloped <strong>memory roof</strong> (bandwidth × intensity) and a flat <strong>compute roof</strong> (peak FLOP/s). Your kernel sits under both. On the sloped roof → bandwidth-limited (fix: move fewer bytes). On the flat roof → you are done. For a <span class="term">MoE</span> (Mixture of Experts — each token is routed to only a few of many expert sub-networks), the naive version wastes bandwidth on gather/scatter and small padded matmuls; a good Pallas kernel keeps expert weights and grouped tokens resident in SRAM, pushing intensity toward the compute roof.</p>
+      <p>Plot achieved FLOP/s against arithmetic intensity. There is a sloped <strong>memory roof</strong> (bandwidth × intensity) and a flat <strong>compute roof</strong> (peak FLOP/s). Your kernel sits under both. On the sloped roof → bandwidth-limited (fix: move fewer bytes). On the flat roof → you are done. For a <span class="term" data-tip="Mixture-of-Experts: a layer with many parallel copies of a network, where only a few run for each input.">MoE</span> (Mixture of Experts — each token is routed to only a few of many expert sub-networks), the naive version wastes bandwidth on gather/scatter and small padded matmuls; a good Pallas kernel keeps expert weights and grouped tokens resident in SRAM, pushing intensity toward the compute roof.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs &amp; sources: <a href="https://docs.jax.dev/en/latest/pallas/index.html" target="_blank" rel="noopener">Pallas index</a> · <a href="https://docs.jax.dev/en/latest/pallas/quickstart.html" target="_blank" rel="noopener">Pallas quickstart</a> · <a href="https://www.youtube.com/watch?v=jyaxuWae2QU" target="_blank" rel="noopener">Pallas talk (video)</a> · <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">Scaling Book: roofline</a> · <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention (2205.14135)</a> · <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">ThunderKittens (2410.20399)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -563,6 +576,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

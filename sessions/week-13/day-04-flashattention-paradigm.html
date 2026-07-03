@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know how attention works mathematically — <code>softmax(QK^T/√d)V</code> — and Mon–Wed's Pallas/kernel basics (writing a kernel body, HBM vs. SRAM, why memory trips cost more than math). <b>No prior FlashAttention knowledge needed — that's today's new concept.</b></div></div>
 
       <h4>The problem: attention has to look at every pair of tokens</h4>
-      <p>Attention compares every token in a sequence to every other token. For a sequence of length <code>N</code>, that means computing an <code>N × N</code> grid of numbers — the <span class="term">attention score matrix</span>, usually called <code>S</code>. If <code>N</code> is 1,024 tokens, <code>S</code> has about a million entries. If <code>N</code> is 100,000 tokens (a long document), <code>S</code> has 10 <em>billion</em> entries. This grid grows with the <strong>square</strong> of the sequence length — double the text, quadruple the grid.</p>
-      <p>Here is the twist: on modern GPUs, the actual multiplications needed to fill that grid are not the bottleneck. The bottleneck is <strong>moving that grid in and out of memory</strong>. A GPU has a huge, slow memory called <span class="term">HBM</span> (High-Bandwidth Memory — think of it as the GPU's "hard drive," tens of gigabytes, but slow to reach) and a tiny, fast memory called <span class="term">SRAM</span> (the GPU's "desk," only tens of megabytes, but roughly 10-20x faster to read and write). The standard way of computing attention writes the entire <code>N × N</code> matrix <code>S</code> out to HBM, reads it all back to run softmax, writes the softmax result <code>P</code> back to HBM, then reads <code>P</code> and <code>V</code> back in again for the final multiply. That is a lot of slow round trips for a matrix that is only ever used once and then thrown away.</p>
+      <p>Attention compares every token in a sequence to every other token. For a sequence of length <code>N</code>, that means computing an <code>N × N</code> grid of numbers — the <span class="term" data-tip="A grid of numbers showing how much each token relates to every other token in a sequence.">attention score matrix</span>, usually called <code>S</code>. If <code>N</code> is 1,024 tokens, <code>S</code> has about a million entries. If <code>N</code> is 100,000 tokens (a long document), <code>S</code> has 10 <em>billion</em> entries. This grid grows with the <strong>square</strong> of the sequence length — double the text, quadruple the grid.</p>
+      <p>Here is the twist: on modern GPUs, the actual multiplications needed to fill that grid are not the bottleneck. The bottleneck is <strong>moving that grid in and out of memory</strong>. A GPU has a huge, slow memory called <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High-Bandwidth Memory — think of it as the GPU's "hard drive," tens of gigabytes, but slow to reach) and a tiny, fast memory called <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span> (the GPU's "desk," only tens of megabytes, but roughly 10-20x faster to read and write). The standard way of computing attention writes the entire <code>N × N</code> matrix <code>S</code> out to HBM, reads it all back to run softmax, writes the softmax result <code>P</code> back to HBM, then reads <code>P</code> and <code>V</code> back in again for the final multiply. That is a lot of slow round trips for a matrix that is only ever used once and then thrown away.</p>
 
       <h4>The answer: never write the big matrix at all</h4>
-      <p><span class="term">FlashAttention</span> is an algorithm — and a hand-written GPU kernel — that computes the <strong>exact same attention output</strong> as the standard formula, but never materializes the full <code>N × N</code> matrix in HBM. It does this by being <span class="term">IO-aware</span>: instead of designing for fewest math operations, it is designed for <strong>fewest trips to slow memory</strong>. It works on small chunks ("tiles") of the sequence at a time, keeping each chunk in fast SRAM long enough to finish all the math on it, and only ever writing the small final output back to HBM.</p>
+      <p><span class="term" data-tip="A fast method and GPU program that computes attention without ever storing the full big matrix in slow memory.">FlashAttention</span> is an algorithm — and a hand-written GPU kernel — that computes the <strong>exact same attention output</strong> as the standard formula, but never materializes the full <code>N × N</code> matrix in HBM. It does this by being <span class="term" data-tip="A design idea that counts trips to slow memory as the real cost, not the number of math steps.">IO-aware</span>: instead of designing for fewest math operations, it is designed for <strong>fewest trips to slow memory</strong>. It works on small chunks ("tiles") of the sequence at a time, keeping each chunk in fast SRAM long enough to finish all the math on it, and only ever writing the small final output back to HBM.</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>flash_attention(Q, K, V)</code> &nbsp;→&nbsp; same output as <code>softmax(Q @ K.T / sqrt(d)) @ V</code>, computed tile by tile.<br><span style="font-size:.85rem;color:var(--text2)">Think of reading a huge spreadsheet a few rows at a time instead of loading the entire file into a tiny notepad app that keeps crashing — you get the same final answer, just without ever holding the whole thing in memory at once.</span></div></div>
 
       <h4>So what's today's catch?</h4>
-      <p>Softmax is a problem for chunking, because the normal softmax formula needs to see <strong>every</strong> value in a row before it can produce <strong>any</strong> output for that row — you divide by the sum of all of them. If you only have one small tile of the row in SRAM at a time, how do you compute softmax correctly without ever seeing the whole row at once? That puzzle — solved by something called <span class="term">online softmax</span> — is the one new idea for today. Two smaller pieces, tiling and online softmax, combine into one paradigm.</p>
+      <p>Softmax is a problem for chunking, because the normal softmax formula needs to see <strong>every</strong> value in a row before it can produce <strong>any</strong> output for that row — you divide by the sum of all of them. If you only have one small tile of the row in SRAM at a time, how do you compute softmax correctly without ever seeing the whole row at once? That puzzle — solved by something called <span class="term" data-tip="A trick to compute softmax over a long row while seeing only one small piece at a time, keeping a running max and sum.">online softmax</span> — is the one new idea for today. Two smaller pieces, tiling and online softmax, combine into one paradigm.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official papers (optional, cited exactly as published): <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention (2205.14135)</a> · <a href="https://github.com/dao-ailab/flash-attention" target="_blank" rel="noopener">flash-attention GitHub repo</a> · <a href="https://arxiv.org/abs/2307.08691" target="_blank" rel="noopener">FlashAttention-2 (2307.08691)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -262,7 +275,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ul>
         <li>Split <code>Q</code> into row blocks of size <code>Br</code>, and <code>K</code>/<code>V</code> into row blocks of size <code>Bc</code>. Loop over <code>K</code>/<code>V</code> blocks in the <strong>outer</strong> loop, and <code>Q</code> blocks in the <strong>inner</strong> loop (Algorithm 1 in the paper). Each <code>(Q</code> block, <code>K/V</code> block<code>)</code> pair is small enough to fit together in SRAM.</li>
         <li>For each pair, compute the small tile of scores <code>S_ij = Q_i @ K_j.T</code>, entirely in SRAM — this tile never touches HBM.</li>
-        <li>Because you haven't seen every <code>K/V</code> block yet, you cannot know the true softmax normalizer (the max and the sum over the <strong>whole</strong> row) when you process the first tile. <span class="term">Online softmax</span> fixes this: for every query row <code>i</code>, keep a running max <code>m_i</code> and running sum <code>l_i</code>, updated after every new tile.</li>
+        <li>Because you haven't seen every <code>K/V</code> block yet, you cannot know the true softmax normalizer (the max and the sum over the <strong>whole</strong> row) when you process the first tile. <span class="term" data-tip="A trick to compute softmax over a long row while seeing only one small piece at a time, keeping a running max and sum.">Online softmax</span> fixes this: for every query row <code>i</code>, keep a running max <code>m_i</code> and running sum <code>l_i</code>, updated after every new tile.</li>
         <li>Every time a new tile pushes the running max <code>m_i</code> higher, the output accumulated <strong>so far</strong> was computed against the old (too-small) max — so it must be <strong>rescaled</strong> before adding the new tile's contribution. This rescale step is what makes the tiled computation mathematically exact, not an approximation.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>m_new = max(m_old, rowmax(S_ij))</code><br><code>l_new = exp(m_old - m_new) * l_old + rowsum(exp(S_ij - m_new))</code><br><code>O_new = exp(m_old - m_new) * O_old + exp(S_ij - m_new) @ V_j</code><br><span style="font-size:.85rem;color:var(--text2)">Every quantity carries an <code>exp(m_old - m_new)</code> correction factor — this is the rescaling that keeps a partial result exact even though the true max wasn't known when it was first computed.</span></div></div>
@@ -475,6 +488,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

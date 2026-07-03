@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -210,7 +223,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>Over Weeks 9–11 you made dozens of small choices: how many tokens in your vocabulary, how you padded sequences, which optimizer and schedule you used, which parameter-count range you swept, and a two-stage curve-fitting procedure. Right now, all of that lives in scattered notebooks and your memory. If a labmate — or you, in six months — tried to redo your experiment, could they get your exact numbers back? Today you write that down, precisely, for the first time.</p>
 
       <h4>The answer: <code>LaTeX</code></h4>
-      <p><span class="term">LaTeX</span> (pronounced "lay-tek" or "lah-tek") is a markup-based typesetting system. You don't format text by clicking "bold" or dragging margins like in Word. You write plain-text commands — <code>\section{Methodology}</code>, <code>$L(N,D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta}$</code> — and a compiler turns that source into a professionally typeset PDF.</p>
+      <p><span class="term" data-tip="A system where you write text with commands, and it makes neat documents with numbered equations and figures.">LaTeX</span> (pronounced "lay-tek" or "lah-tek") is a markup-based typesetting system. You don't format text by clicking "bold" or dragging margins like in Word. You write plain-text commands — <code>\section{Methodology}</code>, <code>$L(N,D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta}$</code> — and a compiler turns that source into a professionally typeset PDF.</p>
       <p>It exists because academic papers need two things Word is bad at:</p>
       <ul>
         <li><strong>Beautiful, unambiguous math notation</strong> — fractions, Greek letters, subscripts nested inside superscripts, all rendered exactly the same way every time.</li>
@@ -219,7 +232,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <p>Nearly every arXiv paper you've read this program — Kaplan et al., Chinchilla, Switch Transformers — was written in LaTeX. Today you write the same genre of document, about your own experiment.</p>
 
       <h4>The specific artifact: a Methodology section</h4>
-      <p>A <span class="term">Methodology section</span> answers one question: <em>"if a stranger wanted to redo exactly what you did, what would they need to know?"</em> It is <strong>not</strong> a results section (no numbers, no conclusions), not an abstract, not an introduction motivating the problem. It is a precise, procedural account: what model you built, what data you generated, what grid you ran, and what fitting procedure you used to pull out the scaling-law exponents.</p>
+      <p>A <span class="term" data-tip="A part of a report that explains exactly how you did your experiment, so another person could repeat it.">Methodology section</span> answers one question: <em>"if a stranger wanted to redo exactly what you did, what would they need to know?"</em> It is <strong>not</strong> a results section (no numbers, no conclusions), not an abstract, not an introduction motivating the problem. It is a precise, procedural account: what model you built, what data you generated, what grid you ran, and what fitting procedure you used to pull out the scaling-law exponents.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The most common mistake:</b> smuggling a result into the Methodology, e.g. "we found <code>alpha ≈ 0.35</code>, showing the model is data-hungry." That sentence does two jobs — state a number, interpret it — and both belong to a later Results section. Methodology states the <em>procedure that would produce</em> a number, never the number itself.</div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://www.overleaf.com/learn" target="_blank" rel="noopener">Overleaf LaTeX learning guide</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -488,6 +501,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

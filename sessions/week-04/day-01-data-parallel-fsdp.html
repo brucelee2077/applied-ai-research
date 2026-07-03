@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,14 +220,14 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a model has parameters (weights), and that training also stores gradients and optimizer state (Week 2, Day 5: memory ≈ 16N bytes per parameter for Adam training). You've seen "sharding" — splitting one array across devices (Week 2, Day 3). <b>No prior FSDP experience needed.</b></div></div>
 
       <h4>The setup: you have many devices</h4>
-      <p>Training is faster when many devices work together. The oldest, simplest way to use them is <span class="term">Data Parallel</span> (DP): give every device the <strong>same full model</strong>, split the batch of data across the devices, let each device compute gradients on its slice of data, then combine the gradients so every copy stays identical.</p>
-      <p>The step that keeps the copies in sync is an <span class="term">all-reduce</span>: every device sums its gradient with all the others so they all end up with the same total gradient. After that, every copy applies the same update and stays a mirror of the rest.</p>
+      <p>Training is faster when many devices work together. The oldest, simplest way to use them is <span class="term" data-tip="A way to use many devices: give each one the whole model but a different slice of the data.">Data Parallel</span> (DP): give every device the <strong>same full model</strong>, split the batch of data across the devices, let each device compute gradients on its slice of data, then combine the gradients so every copy stays identical.</p>
+      <p>The step that keeps the copies in sync is an <span class="term" data-tip="An operation that sums a value across many devices and gives every device the same total back.">all-reduce</span>: every device sums its gradient with all the others so they all end up with the same total gradient. After that, every copy applies the same update and stays a mirror of the rest.</p>
 
       <h4>The problem with Data Parallel: wasted memory</h4>
       <p>Every device holds a <strong>full copy</strong> of everything — the weights, the gradients, and the optimizer state. From Week 2, training with Adam costs about <code>16N</code> bytes for a model with <code>N</code> parameters. With Data Parallel, <em>each</em> device pays that full <code>16N</code>. Eight devices store the same <code>16N</code> eight times. That is a lot of duplicate memory.</p>
 
       <h4>The answer: FSDP (a.k.a. ZeRO stage 3)</h4>
-      <p><span class="term">FSDP</span> stands for Fully Sharded Data Parallel. It is the same idea as <span class="term">ZeRO-3</span> (Zero Redundancy Optimizer, stage 3). Instead of every device keeping a full copy, FSDP <strong>shards</strong> — splits — the parameters, the gradients, <em>and</em> the optimizer state across the devices. No single device holds the whole model at rest.</p>
+      <p><span class="term" data-tip="Fully Sharded Data Parallel. Instead of every device keeping a full copy, each holds only a piece, saving memory.">FSDP</span> stands for Fully Sharded Data Parallel. It is the same idea as <span class="term" data-tip="Another name for FSDP: splitting the model's parameters, gradients, and optimizer state across devices so no chip holds it all.">ZeRO-3</span> (Zero Redundancy Optimizer, stage 3). Instead of every device keeping a full copy, FSDP <strong>shards</strong> — splits — the parameters, the gradients, <em>and</em> the optimizer state across the devices. No single device holds the whole model at rest.</p>
       <div class="callout c-info"><span class="ic">📦</span><div>When a layer is needed for its forward or backward step, FSDP does a just-in-time <code>all-gather</code>: the devices temporarily pull together that one layer's full parameters, use them, then <strong>discard</strong> them and move on.<br><span style="font-size:.85rem;color:var(--text2)">So the full weights of any one layer exist only for a moment, only where they are needed right now.</span></div></div>
 
       <h4>So what's the catch?</h4>
@@ -483,6 +496,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

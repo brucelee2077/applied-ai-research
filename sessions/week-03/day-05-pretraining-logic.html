@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network learns by looking at lots of data (Weeks 1–2), and you have seen tokens and attention (Week 3). <b>No prior knowledge of how labs plan a training run is needed.</b> This is a synthesis day.</div></div>
 
       <h4>First: what is "pretraining"?</h4>
-      <p><span class="term">Pretraining</span> is the first, large-scale training of a <strong>base model</strong> on a huge pile of text. A <span class="term">base model</span> is a model that has only learned to predict the next token over general text — it has not yet been tuned for chat or any specific task. Pretraining is the expensive part: it can use thousands of accelerator chips for weeks and produce the "raw" model everything else is built on.</p>
+      <p><span class="term" data-tip="The first big training of a base model on a huge pile of text, before any special tuning.">Pretraining</span> is the first, large-scale training of a <strong>base model</strong> on a huge pile of text. A <span class="term" data-tip="A model trained only to predict the next word in general text, not yet tuned for chat or a special job.">base model</span> is a model that has only learned to predict the next token over general text — it has not yet been tuned for chat or any specific task. Pretraining is the expensive part: it can use thousands of accelerator chips for weeks and produce the "raw" model everything else is built on.</p>
       <p>So the big question a lab must answer before spending that money is simple to state and hard to answer: <strong>which model should we actually train?</strong> How many parameters? Trained on how many tokens? In what shape (wide vs. deep, how many attention heads)?</p>
 
       <h4>The surprise: elegance does not decide it</h4>
       <p>You might expect the answer to come from a clean theory of "the best architecture." It mostly does not. In practice the choice is squeezed by <strong>three constraints pressing in at the same time</strong>. Let me name each one plainly before we go deeper.</p>
       <ul>
-        <li><strong>Scaling laws</strong> — measured rules that say, for a fixed amount of <span class="term">compute</span> (total math operations you can afford), what split of model size vs. training tokens gives the lowest error. The famous "compute-optimal" point comes from here.</li>
+        <li><strong>Scaling laws</strong> — measured rules that say, for a fixed amount of <span class="term" data-tip="The total amount of math a task needs, measured in FLOPs. More compute means more time and money.">compute</span> (total math operations you can afford), what split of model size vs. training tokens gives the lowest error. The famous "compute-optimal" point comes from here.</li>
         <li><strong>Data availability and quality</strong> — you can only train on the tokens you actually have. High-quality tokens (clean, useful text) are <strong>finite</strong>. You cannot conjure more good data just because the math wants it.</li>
-        <li><strong>Systems limits</strong> — the hardware itself: how much <span class="term">memory</span> each chip has, how fast chips talk to each other (<span class="term">bandwidth</span> and interconnect). These decide which model shapes are even physically runnable — this is exactly the Weeks 1–2 material.</li>
+        <li><strong>Systems limits</strong> — the hardware itself: how much <span class="term" data-tip="The space on a chip that holds numbers. Each chip has only so much, which limits how big a model can be.">memory</span> each chip has, how fast chips talk to each other (<span class="term" data-tip="How fast a chip can move numbers between its parts, like from big slow memory to the compute units.">bandwidth</span> and interconnect). These decide which model shapes are even physically runnable — this is exactly the Weeks 1–2 material.</li>
       </ul>
 
       <h4>How this connects to what you already know</h4>
@@ -494,6 +507,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

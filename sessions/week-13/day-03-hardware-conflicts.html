@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,16 +220,16 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you've written a Pallas kernel with a <code>BlockSpec</code> (Mon/Tue this week). <b>No CUDA experience needed</b> — we build every term from zero.</div></div>
 
       <h4>Two kinds of memory on a GPU</h4>
-      <p>Every GPU has two very different places to keep numbers. The big one is <span class="term">HBM</span> (off-chip DRAM) — it holds your whole tensors, but it is slow to reach. The small one is <span class="term">shared memory</span> — an on-chip pool of <span class="term">SRAM</span>, tens of KB up to about 228KB per chip on an H100, that is roughly 100x faster to touch than HBM.</p>
+      <p>Every GPU has two very different places to keep numbers. The big one is <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (off-chip DRAM) — it holds your whole tensors, but it is slow to reach. The small one is <span class="term" data-tip="A small but very fast pool of memory inside a GPU chip. Threads in one block share it to swap data quickly.">shared memory</span> — an on-chip pool of <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span>, tens of KB up to about 228KB per chip on an H100, that is roughly 100x faster to touch than HBM.</p>
       <p>A fast kernel's whole game is: copy a small tile from HBM into shared memory <strong>once</strong>, then reuse it from shared memory <strong>many times</strong>. This is exactly the manual memory management that Pallas lets you control with a <code>BlockSpec</code>, instead of leaving it to XLA.</p>
 
       <h4>Banks: shared memory is not one big box</h4>
-      <p>To let many threads read at once, shared memory is physically split into <span class="term">banks</span> — 32 of them on essentially every modern NVIDIA GPU, each 4 bytes wide. Which bank an address lands in is simple arithmetic:</p>
+      <p>To let many threads read at once, shared memory is physically split into <span class="term" data-tip="Small equal parts that fast shared memory is split into, so many threads can read at the same time.">banks</span> — 32 of them on essentially every modern NVIDIA GPU, each 4 bytes wide. Which bank an address lands in is simple arithmetic:</p>
       <div class="callout c-info"><span class="ic">📦</span><div><code>bank_index = (byte_address / 4) % 32</code><br><span style="font-size:.85rem;color:var(--text2)">Each bank can serve exactly one memory request per clock cycle — no more.</span></div></div>
-      <p>A <span class="term">warp</span> is a group of 32 threads that run the same instruction at the exact same moment. When a warp reads from shared memory, all 32 threads ask for their address in the same cycle.</p>
+      <p>A <span class="term" data-tip="A group of 32 threads on a GPU that all run the same instruction at the exact same moment.">warp</span> is a group of 32 threads that run the same instruction at the exact same moment. When a warp reads from shared memory, all 32 threads ask for their address in the same cycle.</p>
 
       <h4>The problem: a bank conflict</h4>
-      <p>A <span class="term">bank conflict</span> happens when two or more threads in the same warp, in the same instruction, want <em>different</em> addresses that land in the <em>same</em> bank. One bank can only answer one request per cycle, so the hardware splits the access into several sequential steps — roughly N cycles instead of 1 for an N-way conflict. (If two threads ask for the exact <em>same</em> address, that's free — a "broadcast," not a conflict.)</p>
+      <p>A <span class="term" data-tip="When several threads in one group want different addresses in the same memory part, so they must wait in turn.">bank conflict</span> happens when two or more threads in the same warp, in the same instruction, want <em>different</em> addresses that land in the <em>same</em> bank. One bank can only answer one request per cycle, so the hardware splits the access into several sequential steps — roughly N cycles instead of 1 for an N-way conflict. (If two threads ask for the exact <em>same</em> address, that's free — a "broadcast," not a conflict.)</p>
 
       <h4>Why this happens in a compiled Pallas kernel</h4>
       <p>Pallas lets you write kernel logic in traceable Python — <code>pallas_call</code>, <code>BlockSpec</code>, grid, kernel body — which then compiles down to real memory instructions on GPU. The compiler lays your block out in shared memory using the strides you gave it. If your tile's inner dimension is exactly 32 elements of a 4-byte type (a very common shape, like a <code>[32,32]</code> float32 tile read column-wise), every thread in the warp can collide into <strong>one single bank</strong> — a 32-way conflict, about a 32x slowdown on that one instruction, even though your math is completely correct.</p>
@@ -493,6 +506,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

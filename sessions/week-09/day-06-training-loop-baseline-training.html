@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,21 +220,21 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Friday's Flax addition-transformer (random-initialized weights) and Wednesday's synthetic data generator. <b>No prior training-loop experience needed.</b></div></div>
 
       <h4>The problem: a model with random weights does nothing useful</h4>
-      <p>Friday you built the architecture — the shape of the network. But its weights are still <strong>random numbers</strong>. Right now, if you feed it <code>"12+7="</code>, it outputs garbage. Something has to <strong>change those weights</strong> so the model's guesses get closer to the truth. That something is the <span class="term">training loop</span>.</p>
+      <p>Friday you built the architecture — the shape of the network. But its weights are still <strong>random numbers</strong>. Right now, if you feed it <code>"12+7="</code>, it outputs garbage. Something has to <strong>change those weights</strong> so the model's guesses get closer to the truth. That something is the <span class="term" data-tip="The repeating set of steps that slowly changes a model's weights so its guesses get closer to the right answers.">training loop</span>.</p>
 
       <h4>The four repeating steps</h4>
       <p>A training loop repeats four steps, over and over, thousands of times:</p>
       <ul>
         <li><strong>1. Forward pass</strong> — run the model on a batch of inputs to get predictions.</li>
-        <li><strong>2. Loss function</strong> — a single number that says "how wrong was this". For "predict the next digit" tasks, the standard choice is <span class="term">cross-entropy</span>: it looks at the probability the model gave the <em>correct</em> digit and penalizes low confidence with <code>-log(p_correct)</code>.</li>
+        <li><strong>2. Loss function</strong> — a single number that says "how wrong was this". For "predict the next digit" tasks, the standard choice is <span class="term" data-tip="A loss for guessing which choice is correct. It gives a big penalty when the model was unsure about the true answer.">cross-entropy</span>: it looks at the probability the model gave the <em>correct</em> digit and penalizes low confidence with <code>-log(p_correct)</code>.</li>
         <li><strong>3. Gradient</strong> — using <code>jax.grad</code>, compute the direction and size of the change to every parameter that would reduce the loss.</li>
         <li><strong>4. Optimizer update</strong> — push every parameter a small step in that direction.</li>
       </ul>
-      <p>Steps 3 and 4 together are called the <span class="term">optimizer step</span>.</p>
+      <p>Steps 3 and 4 together are called the <span class="term" data-tip="Finding which way to change each weight to lower the loss, then nudging every weight a little that way.">optimizer step</span>.</p>
 
       <h4>Where Optax comes in</h4>
-      <p><span class="term">Optax</span> is JAX's gradient-processing library. It is important to get this right: Optax does <strong>not</strong> hold your model's parameters — it only <strong>transforms gradients</strong>. Optax represents an optimizer as a <span class="term">GradientTransformation</span>: a pair of pure functions, <code>init</code> (creates optimizer state, like Adam's momentum buffers) and <code>update</code> (takes gradients plus current state, returns new gradients plus new state).</p>
-      <p>You build a real-world optimizer by <strong>chaining</strong> transformations with <code>optax.chain(...)</code> — for example, first a <span class="term">gradient clipping</span> step, then Adam. Clipping exists because early in training, or on one unusually hard batch, gradients can spike to huge values and wreck the weights in a single step ("exploding gradients"). A <span class="term">learning-rate schedule</span> is a function from training step to learning rate: small at the very start (<span class="term">warmup</span>), rising to a peak, then decaying — so the model takes careful steps early and fine-tuned steps as it converges.</p>
+      <p><span class="term" data-tip="A JAX library of optimizers. It decides how to change the weights using gradients, offering tools like Adam and gradient clipping.">Optax</span> is JAX's gradient-processing library. It is important to get this right: Optax does <strong>not</strong> hold your model's parameters — it only <strong>transforms gradients</strong>. Optax represents an optimizer as a <span class="term" data-tip="How Optax describes an optimizer: two pure functions, one that sets up state, one that reshapes gradients and updates state.">GradientTransformation</span>: a pair of pure functions, <code>init</code> (creates optimizer state, like Adam's momentum buffers) and <code>update</code> (takes gradients plus current state, returns new gradients plus new state).</p>
+      <p>You build a real-world optimizer by <strong>chaining</strong> transformations with <code>optax.chain(...)</code> — for example, first a <span class="term" data-tip="Limiting how big gradients can get, so one huge value does not ruin the weights in a single update.">gradient clipping</span> step, then Adam. Clipping exists because early in training, or on one unusually hard batch, gradients can spike to huge values and wreck the weights in a single step ("exploding gradients"). A <span class="term" data-tip="A plan that changes the learning rate (step size) over training, often lowering it as training goes on.">learning-rate schedule</span> is a function from training step to learning rate: small at the very start (<span class="term" data-tip="The early part of training when step sizes stay small, so the model takes careful steps before speeding up.">warmup</span>), rising to a peak, then decaying — so the model takes careful steps early and fine-tuned steps as it converges.</p>
 
       <h4>So what's today's catch?</h4>
       <p>The catch is that a training loop can run, show a decreasing loss number, and still be <strong>silently broken</strong> — for example if it's dragged down by trivially-easy padding tokens instead of the actual digits you care about. Today's ritual for catching this: the <strong>overfit-10-examples sanity check</strong>. If your loop, loss, and gradients are wired correctly, a model with millions of parameters should memorize 10 fixed examples perfectly, driving loss to near-zero within a few hundred steps. If it can't, something is broken — and it's far cheaper to find that bug on 10 examples in 10 seconds than on millions of examples after an hour of training.</p>
@@ -269,7 +282,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <div class="sec-body">
       <h4>The rules</h4>
       <ul>
-        <li><strong>Logits and labels.</strong> The model's raw output scores (<span class="term">logits</span>) have shape <code>[batch, seq_len, vocab_size]</code>; the true next tokens (<span class="term">labels</span>) have shape <code>[batch, seq_len]</code>.</li>
+        <li><strong>Logits and labels.</strong> The model's raw output scores (<span class="term" data-tip="The raw scores a model outputs for each choice, before they are turned into probabilities or a final prediction.">logits</span>) have shape <code>[batch, seq_len, vocab_size]</code>; the true next tokens (<span class="term" data-tip="The true correct answers, like the real next tokens, that you compare the model's guesses against.">labels</span>) have shape <code>[batch, seq_len]</code>.</li>
         <li><strong>Per-token loss.</strong> <code>optax.softmax_cross_entropy_with_integer_labels(logits, labels)</code> turns logits into probabilities and returns per-token loss of shape <code>[batch, seq_len]</code>.</li>
         <li><strong>Masked mean, not naive mean.</strong> You must build an explicit mask over only the "answer" positions and reduce with <code>jnp.sum(losses * mask) / jnp.sum(mask)</code> — never a plain <code>jnp.mean</code>.</li>
         <li><strong>Gradients in one pass.</strong> <code>jax.value_and_grad(loss_fn)</code> gives you both the scalar loss and the gradient pytree (matching <code>params</code>'s structure) together.</li>
@@ -509,6 +522,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

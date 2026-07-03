@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,15 +220,15 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Week 10's training matrix — you trained many small addition-transformers, sweeping parameter count <code>N</code> (roughly 1M–15M) and token budget <code>D</code>, and saved every run's compute cost <code>C</code> and final loss <code>L</code>. <b>No prior SciPy or curve-fitting experience needed.</b></div></div>
 
       <h4>What you already have</h4>
-      <p>Saturday you ran the matrix. Sunday you aggregated it into one clean table of rows: <code>(N, D, C, L)</code>. Here, <span class="term">N</span> is the parameter count, <span class="term">D</span> is the number of training tokens, <span class="term">C</span> is the total training compute in FLOPs (floating-point operations) — approximately <code>C = 6 * N * D</code> for a dense transformer's forward-plus-backward pass — and <span class="term">L</span> is the final training loss.</p>
+      <p>Saturday you ran the matrix. Sunday you aggregated it into one clean table of rows: <code>(N, D, C, L)</code>. Here, <span class="term" data-tip="The number of parameters in a model, meaning how many changeable values it has learned.">N</span> is the parameter count, <span class="term" data-tip="The number of training tokens, meaning how many pieces of text the model was trained on.">D</span> is the number of training tokens, <span class="term" data-tip="The total training compute, counted in FLOPs (math operations). For a normal transformer, about 6 times parameters times tokens.">C</span> is the total training compute in FLOPs (floating-point operations) — approximately <code>C = 6 * N * D</code> for a dense transformer's forward-plus-backward pass — and <span class="term" data-tip="The final training loss: one number showing how badly the model still predicts after training. Lower is better.">L</span> is the final training loss.</p>
 
       <h4>The new idea: an IsoFLOP slice</h4>
-      <p>An <span class="term">IsoFLOP slice</span> is a group of runs that all spent the <strong>same</strong> total compute <code>C</code>, but reached it with different <code>(N, D)</code> splits. Example: a big model trained on few tokens, and a small model trained on many tokens, both burning exactly <code>6×10¹⁸</code> FLOPs. "Iso" means "same" — same FLOPs, different shape.</p>
-      <p>Chinchilla's finding (Hoffmann et al. 2022): if you plot final loss against <code>log(N)</code> for one fixed <code>C</code>, you get a <strong>U-shaped curve</strong>, not a straight line down. Too few parameters, and the model is too weak to use even unlimited tokens well. Too many parameters, and — at fixed compute — you starve it of tokens, so it undertrains. Somewhere in between is a genuine minimum: the <span class="term">compute-optimal N</span> for that exact FLOP budget.</p>
+      <p>An <span class="term" data-tip="A group of training runs that all used the same total compute, but split it differently between model size and training tokens.">IsoFLOP slice</span> is a group of runs that all spent the <strong>same</strong> total compute <code>C</code>, but reached it with different <code>(N, D)</code> splits. Example: a big model trained on few tokens, and a small model trained on many tokens, both burning exactly <code>6×10¹⁸</code> FLOPs. "Iso" means "same" — same FLOPs, different shape.</p>
+      <p>Chinchilla's finding (Hoffmann et al. 2022): if you plot final loss against <code>log(N)</code> for one fixed <code>C</code>, you get a <strong>U-shaped curve</strong>, not a straight line down. Too few parameters, and the model is too weak to use even unlimited tokens well. Too many parameters, and — at fixed compute — you starve it of tokens, so it undertrains. Somewhere in between is a genuine minimum: the <span class="term" data-tip="The best number of parameters for one fixed compute budget, giving the lowest possible loss.">compute-optimal N</span> for that exact FLOP budget.</p>
 
       <h4>Today's tool: curve_fit</h4>
       <p><code>scipy.optimize.curve_fit</code> is SciPy's general-purpose curve fitter. You give it three things: (1) a function <code>f(x, *params)</code> describing the shape you believe your data follows, (2) your x data, (3) your y data. It hands back <code>popt</code> — the best-fit values for those params — and <code>pcov</code>, a covariance matrix (useful later for error bars).</p>
-      <p>Today's <code>f</code> is nothing exotic — it's a plain second-degree polynomial, a <span class="term">parabola</span>: <code>f(x, a, b, c) = a·x² + b·x + c</code>. You fit about nine of these tiny 3-parameter parabolas, one per FLOP budget, and from each one's <span class="term">vertex</span> (its lowest point) you read off exactly one number: the loss-optimal <code>N</code> for that compute level.</p>
+      <p>Today's <code>f</code> is nothing exotic — it's a plain second-degree polynomial, a <span class="term" data-tip="A U-shaped curve from the equation y = a*x^2 + b*x + c. Its lowest point marks the best value.">parabola</span>: <code>f(x, a, b, c) = a·x² + b·x + c</code>. You fit about nine of these tiny 3-parameter parabolas, one per FLOP budget, and from each one's <span class="term" data-tip="The lowest point of a parabola (a U-shaped curve). It shows where loss is smallest.">vertex</span> (its lowest point) you read off exactly one number: the loss-optimal <code>N</code> for that compute level.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://matplotlib.org/stable/" target="_blank" rel="noopener">Matplotlib</a> · <a href="https://seaborn.pydata.org/" target="_blank" rel="noopener">Seaborn</a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html" target="_blank" rel="noopener">scipy.optimize.curve_fit</a> · <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Chinchilla paper (Hoffmann et al. 2022)</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -486,6 +499,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

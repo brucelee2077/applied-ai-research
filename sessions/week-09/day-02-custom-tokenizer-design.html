@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's environment setup for the Addition Transformer capstone, and basic Python dicts/lists. <b>No prior tokenizer experience needed.</b></div></div>
 
       <h4>The problem: neural networks only understand numbers</h4>
-      <p>A neural network cannot read the string <code>"12+45=57"</code>. It only multiplies and adds numbers. So before any text reaches the model, something must turn each character into an integer — and turn the model's output integers back into readable text. That "something" is called a <span class="term">tokenizer</span>.</p>
+      <p>A neural network cannot read the string <code>"12+45=57"</code>. It only multiplies and adds numbers. So before any text reaches the model, something must turn each character into an integer — and turn the model's output integers back into readable text. That "something" is called a <span class="term" data-tip="A tool that turns text into numbers the model can read, and turns the numbers back into text.">tokenizer</span>.</p>
       <p>Every tokenizer has two halves:</p>
       <ul>
-        <li>A fixed <span class="term">vocabulary</span> — a lookup table that gives every allowed symbol its own unique integer ID.</li>
+        <li>A fixed <span class="term" data-tip="A lookup table that gives every allowed symbol its own unique number.">vocabulary</span> — a lookup table that gives every allowed symbol its own unique integer ID.</li>
         <li><code>encode</code>/<code>decode</code> functions that use that table to turn strings into arrays of IDs, and arrays of IDs back into strings.</li>
       </ul>
 
       <h4>How general-purpose tokenizers build their vocabulary</h4>
-      <p>Tokenizers you may have heard of — <span class="term">BPE</span> (Byte-Pair Encoding) and <span class="term">SentencePiece</span> — are what "Attention Is All You Need" and the Scaling Book (from Monday/Friday) assume sit in front of a language model. They build their vocabulary <strong>statistically</strong>: scan a huge pile of text, count which sub-word chunks ("ing", "tion", "the") show up often enough to deserve their own ID. They usually land on 30,000-256,000 vocabulary entries, because English has that much variety.</p>
+      <p>Tokenizers you may have heard of — <span class="term" data-tip="A common way to build a tokenizer's vocabulary by joining the most frequent pairs of characters into bigger pieces.">BPE</span> (Byte-Pair Encoding) and <span class="term" data-tip="Another common tool that builds a tokenizer's vocabulary from raw text for language models.">SentencePiece</span> — are what "Attention Is All You Need" and the Scaling Book (from Monday/Friday) assume sit in front of a language model. They build their vocabulary <strong>statistically</strong>: scan a huge pile of text, count which sub-word chunks ("ing", "tion", "the") show up often enough to deserve their own ID. They usually land on 30,000-256,000 vocabulary entries, because English has that much variety.</p>
 
       <h4>Why that is the wrong tool today</h4>
-      <p>The Addition Transformer capstone only ever sees strings built from 13 symbols: the digits <code>0-9</code>, a space, <code>+</code>, and <code>=</code>. Today you do the opposite move from BPE: a <span class="term">strict, closed-vocabulary character tokenizer</span>. You hand-write the vocabulary as a Python dict with exactly 13 entries. Nothing else is representable — no BPE merges, no learned frequencies, no <code>&lt;unk&gt;</code> fallback for a surprise character (there should never be one, since Wednesday's data generator only ever emits these 13 symbols).</p>
+      <p>The Addition Transformer capstone only ever sees strings built from 13 symbols: the digits <code>0-9</code>, a space, <code>+</code>, and <code>=</code>. Today you do the opposite move from BPE: a <span class="term" data-tip="A tokenizer with a small fixed list of symbols, one number each. Anything outside the list cannot be represented.">strict, closed-vocabulary character tokenizer</span>. You hand-write the vocabulary as a Python dict with exactly 13 entries. Nothing else is representable — no BPE merges, no learned frequencies, no <code>&lt;unk&gt;</code> fallback for a surprise character (there should never be one, since Wednesday's data generator only ever emits these 13 symbols).</p>
       <div class="callout c-info"><span class="ic">📦</span><div>General tokenizer: learns ~50,000+ entries from a huge corpus, because it must handle any English text.<br><span style="font-size:.85rem;color:var(--text2)">Today's tokenizer: exactly 13 hand-written entries, because the data's true alphabet is exactly 13 symbols.</span></div></div>
 
       <h4>Why this matters for the whole capstone, not just today</h4>
@@ -498,6 +511,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a model's weights are just numbers stored in memory, and you've seen the idea of "hand-written kernels" earlier this week. <b>No prior quantization experience needed.</b></div></div>
 
       <h4>The problem: a trained model is huge, and you can't retrain it every time</h4>
-      <p>A model finishes training. Its weights sit in memory as <span class="term">FP16</span> numbers — "16-bit floating point," 2 bytes per number. A 7-billion-parameter model needs about 14 GB just to hold its weights. That is a lot of expensive GPU memory, and it makes the model slower to run too.</p>
-      <p>You want to shrink those numbers down to <span class="term">INT8</span> — "8-bit integers," 1 byte per number — to cut memory roughly in half. But the model already finished training. You do not want to retrain it from scratch just to save memory.</p>
+      <p>A model finishes training. Its weights sit in memory as <span class="term" data-tip="A way to store a number using 16 bits, called 16-bit floating point. It can hold fractions and a wide range of values.">FP16</span> numbers — "16-bit floating point," 2 bytes per number. A 7-billion-parameter model needs about 14 GB just to hold its weights. That is a lot of expensive GPU memory, and it makes the model slower to run too.</p>
+      <p>You want to shrink those numbers down to <span class="term" data-tip="A way to store a number using only 8 bits as a whole number, from -127 to +127. It saves memory.">INT8</span> — "8-bit integers," 1 byte per number — to cut memory roughly in half. But the model already finished training. You do not want to retrain it from scratch just to save memory.</p>
 
       <h4>The answer: Post-Training Quantization (PTQ)</h4>
-      <p><span class="term">Post-Training Quantization (PTQ)</span> means: take a model that is already fully trained, and convert its weights to a lower-precision format — <strong>no retraining, no gradient updates, just a one-time numeric conversion</strong> — right before or during inference. This is different from <span class="term">Quantization-Aware Training (QAT)</span>, where the model sees quantization noise <em>during</em> training and learns to compensate for it. PTQ is cheap (minutes, not GPU-days) but riskier, because the model never got a chance to adapt. That is exactly why today's lab ends with a benchmark: you need to measure the risk, not just assume it is small.</p>
+      <p><span class="term" data-tip="Shrinking an already-trained model to smaller numbers without training it again, using only its weights and a little sample data.">Post-Training Quantization (PTQ)</span> means: take a model that is already fully trained, and convert its weights to a lower-precision format — <strong>no retraining, no gradient updates, just a one-time numeric conversion</strong> — right before or during inference. This is different from <span class="term" data-tip="Training where the model already feels the rounding noise, so it learns to work well even with smaller numbers.">Quantization-Aware Training (QAT)</span>, where the model sees quantization noise <em>during</em> training and learns to compensate for it. PTQ is cheap (minutes, not GPU-days) but riskier, because the model never got a chance to adapt. That is exactly why today's lab ends with a benchmark: you need to measure the risk, not just assume it is small.</p>
 
       <h4>The tool: bitsandbytes and LLM.int8()</h4>
-      <p><span class="term">bitsandbytes</span> is an open-source library that patches PyTorch's <code>nn.Linear</code> layers with custom CUDA kernels for 8-bit and 4-bit matrix multiplication. You do not write your own quantization math — you load a Hugging Face model with <code>load_in_8bit=True</code> and bitsandbytes intercepts every linear layer's weights and forward pass.</p>
-      <p><span class="term">LLM.int8()</span> is the specific quantization algorithm bitsandbytes uses for int8. It exists to solve one specific failure: naive int8 quantization (just mapping the min/max weight range onto 256 int8 buckets) collapses accuracy on transformers larger than about 6.7B parameters. The reason is <span class="term">emergent outlier features</span> — a small number of activation dimensions that develop huge values (sometimes 20x the normal size) as models scale. LLM.int8()'s fix is <span class="term">mixed-precision decomposition</span>: detect the outlier columns, route just those through a normal FP16 matmul, and route everything else through int8 matmul with its own per-row/column scale factors. We will build the full intuition for this in Section 2 and the exact math in Section 4.</p>
+      <p><span class="term" data-tip="An open-source library that swaps PyTorch's linear layers with fast 8-bit and 4-bit math so you do not write it yourself.">bitsandbytes</span> is an open-source library that patches PyTorch's <code>nn.Linear</code> layers with custom CUDA kernels for 8-bit and 4-bit matrix multiplication. You do not write your own quantization math — you load a Hugging Face model with <code>load_in_8bit=True</code> and bitsandbytes intercepts every linear layer's weights and forward pass.</p>
+      <p><span class="term" data-tip="The specific 8-bit method in bitsandbytes that fixes plain int8's failure by handling extreme values with their own scales.">LLM.int8()</span> is the specific quantization algorithm bitsandbytes uses for int8. It exists to solve one specific failure: naive int8 quantization (just mapping the min/max weight range onto 256 int8 buckets) collapses accuracy on transformers larger than about 6.7B parameters. The reason is <span class="term" data-tip="A few spots in a big model's numbers that grow very large as the model gets bigger, hurting simple number-shrinking.">emergent outlier features</span> — a small number of activation dimensions that develop huge values (sometimes 20x the normal size) as models scale. LLM.int8()'s fix is <span class="term" data-tip="A trick that splits a matrix multiply: a few unusual numbers stay high-precision, while most ordinary ones use small 8-bit integers.">mixed-precision decomposition</span>: detect the outlier columns, route just those through a normal FP16 matmul, and route everything else through int8 matmul with its own per-row/column scale factors. We will build the full intuition for this in Section 2 and the exact math in Section 4.</p>
 
       <h4>The measurement: perplexity</h4>
-      <p><span class="term">Perplexity (PPL)</span> is the number you use today to answer "how much did quantization hurt the model?" It measures how confused the model is when predicting the next word in real text. Lower is better. You compute it once for the FP16 model and once for the INT8 model on the exact same text, and the gap between the two is your "quantization tax."</p>
+      <p><span class="term" data-tip="A number showing how confused a model is when guessing the next word. Lower means better; you use it to check quantization damage.">Perplexity (PPL)</span> is the number you use today to answer "how much did quantization hurt the model?" It measures how confused the model is when predicting the next word in real text. Lower is better. You compute it once for the FP16 model and once for the INT8 model on the exact same text, and the gap between the two is your "quantization tax."</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://github.com/bitsandbytes-foundation/bitsandbytes" target="_blank" rel="noopener">bitsandbytes on GitHub</a> · <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noopener">LLM.int8() paper (Dettmers et al., 2022)</a> · <a href="https://github.com/EleutherAI/lm-evaluation-harness" target="_blank" rel="noopener">EleutherAI's LM Evaluation Harness</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -266,7 +279,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <ul>
         <li><strong>Vector-wise absmax quantization:</strong> for each row of the activation matrix <code>X</code> and each column of the weight matrix <code>W</code>, find the largest absolute value (<code>absmax</code>), and scale by <code>127 / absmax</code> to map every number into the int8 range <code>[-127, 127]</code>.</li>
         <li>The int8 matmul runs on the scaled integers. To recover real values, <strong>dequantize</strong> by dividing the int32 accumulator output by the product of the row-scale and column-scale used going in.</li>
-        <li><strong>Outlier detection:</strong> before quantizing, scan <code>X</code> for feature columns where any value's magnitude exceeds a threshold (default <code>6.0</code>). These are the <span class="term">emergent outlier features</span> — a small, consistent set of dimensions, often under 0.1% of columns, that carry disproportionately large values once a model is large enough (empirically, models around 6.7B+ parameters).</li>
+        <li><strong>Outlier detection:</strong> before quantizing, scan <code>X</code> for feature columns where any value's magnitude exceeds a threshold (default <code>6.0</code>). These are the <span class="term" data-tip="A few spots in a big model's numbers that grow very large as the model gets bigger, hurting simple number-shrinking.">emergent outlier features</span> — a small, consistent set of dimensions, often under 0.1% of columns, that carry disproportionately large values once a model is large enough (empirically, models around 6.7B+ parameters).</li>
         <li><strong>Mixed-precision decomposition:</strong> split the matmul into two parts. Outlier columns of <code>X</code> and their matching rows of <code>W</code> multiply in ordinary FP16. All remaining columns multiply via the int8 path above. Add the two partial results together for the final output.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>Y ≈ X_fp16_outliers @ W_fp16_outliers + dequant(X_int8_rest @ W_int8_rest)</code><br><span style="font-size:.85rem;color:var(--text2)">"Add the small full-precision outlier product to the large dequantized int8 product." This is why LLM.int8() keeps near-FP16 accuracy while storing almost all weights in 1 byte instead of 2.</span></div></div>
@@ -508,6 +521,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>

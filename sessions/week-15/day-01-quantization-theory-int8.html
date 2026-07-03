@@ -169,6 +169,19 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
 .lnav-hub .lnav-hub-ic{font-size:1.05rem}
 .lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
 </style>
 </head>
 
@@ -196,7 +209,7 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
     <h1>Quantization Theory<br>(int8)</h1>
     <p class="lead">A big model stores every weight as a 16-bit float. Swap those for 8-bit integers and you cut memory roughly in half — the model that needed two GPUs now fits on one. But do it the naive way and a large model silently loses its accuracy. Today: how int8 quantization works, why it breaks, and the clever fix that made it safe.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> explain <code>absmax</code> int8 quantization and its scale factor, describe why a single <span class="term">outlier feature</span> destroys accuracy in large transformers, and describe how <strong>LLM.int8()</strong> mixed-precision decomposition fixes it.
+      <b>🎯 By the end, you'll be able to:</b> explain <code>absmax</code> int8 quantization and its scale factor, describe why a single <span class="term" data-tip="One column of a model's numbers whose values grow far larger than the rest, causing trouble when shrinking numbers.">outlier feature</span> destroys accuracy in large transformers, and describe how <strong>LLM.int8()</strong> mixed-precision decomposition fixes it.
     </div>
   </header>
 
@@ -207,18 +220,18 @@ footer{max-width:780px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1p
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network is a big pile of numbers (the weights) that get multiplied together, and that these live on a GPU with limited memory. <b>No prior knowledge of number formats needed — we start from zero.</b></div></div>
 
       <h4>First, the vocabulary</h4>
-      <p>A number inside a neural network is normally stored as a <span class="term">float</span> (short for "floating point"). The most common kind is <span class="term">FP16</span>: 16 <span class="term">bits</span> (a bit is a single 0 or 1) per number. FP16 can represent a huge range of values, including fractions like <code>0.0037</code> or <code>128.5</code>.</p>
-      <p><span class="term">Quantization</span> means one thing: replace those 16-bit floats with smaller numbers, most often <span class="term">INT8</span> — 8-bit signed integers, meaning whole numbers from <code>-127</code> to <code>+127</code>. Fewer bits means two wins: the model takes <strong>less memory</strong> to store, and the multiply hardware is <strong>cheaper and faster</strong>. So the model runs faster and fits on smaller GPUs.</p>
+      <p>A number inside a neural network is normally stored as a <span class="term" data-tip="A way computers store numbers that can have fractions, like 0.0037 or 128.5, not just whole numbers.">float</span> (short for "floating point"). The most common kind is <span class="term" data-tip="A way to store a number using 16 bits, called 16-bit floating point. It can hold fractions and a wide range of values.">FP16</span>: 16 <span class="term" data-tip="The smallest pieces of computer data. Each bit is a single 0 or 1, and many bits together make a number.">bits</span> (a bit is a single 0 or 1) per number. FP16 can represent a huge range of values, including fractions like <code>0.0037</code> or <code>128.5</code>.</p>
+      <p><span class="term" data-tip="Replacing each large number, like a 16-bit float, with a smaller one from a limited set, so the model uses less memory.">Quantization</span> means one thing: replace those 16-bit floats with smaller numbers, most often <span class="term" data-tip="A way to store a number using only 8 bits as a whole number, from -127 to +127. It saves memory.">INT8</span> — 8-bit signed integers, meaning whole numbers from <code>-127</code> to <code>+127</code>. Fewer bits means two wins: the model takes <strong>less memory</strong> to store, and the multiply hardware is <strong>cheaper and faster</strong>. So the model runs faster and fits on smaller GPUs.</p>
 
       <h4>The catch: 256 seats vs. tens of thousands</h4>
-      <p>An INT8 can hold only 256 distinct values. FP16 can hold tens of thousands. To squeeze floats onto that tiny grid, you pick a <span class="term">scale factor</span> called <code>s</code>. You find the largest absolute value in a group of numbers (the <span class="term">absmax</span>), set <code>s = absmax / 127</code>, store each number as <code>round(x / s)</code>, and recover it later as <code>int_value × s</code>. This is <span class="term">absmax quantization</span>.</p>
-      <p>Because the scale is set by the <em>biggest</em> value, one huge number stretches the grid and squashes all the small numbers toward zero — they lose their detail. That lost detail is called <span class="term">quantization error</span>.</p>
+      <p>An INT8 can hold only 256 distinct values. FP16 can hold tens of thousands. To squeeze floats onto that tiny grid, you pick a <span class="term" data-tip="A number you divide by to fit big float values onto a small grid of whole numbers, then multiply back later.">scale factor</span> called <code>s</code>. You find the largest absolute value in a group of numbers (the <span class="term" data-tip="The largest size of a number in a group, ignoring whether it is positive or negative.">absmax</span>), set <code>s = absmax / 127</code>, store each number as <code>round(x / s)</code>, and recover it later as <code>int_value × s</code>. This is <span class="term" data-tip="A way to shrink numbers where you set the scale using the biggest value in a group.">absmax quantization</span>.</p>
+      <p>Because the scale is set by the <em>biggest</em> value, one huge number stretches the grid and squashes all the small numbers toward zero — they lose their detail. That lost detail is called <span class="term" data-tip="The small detail lost when you round a number to fit a smaller set of choices.">quantization error</span>.</p>
 
       <h4>The discovery: outlier features</h4>
-      <p>In large transformers, a few specific <span class="term">feature dimensions</span> (columns of the hidden-state matrix — the vector of numbers flowing between layers) grow enormously larger than the rest, sometimes about <strong>20× larger</strong>. These are <span class="term">outlier features</span>. They are not random: past a size threshold (around <strong>6.7 billion parameters</strong>) they appear in the same handful of dimensions (up to ~7 of them) across almost every token and layer, and the model relies on them heavily. When you absmax-quantize a whole vector containing one of these giants, every ordinary feature gets crushed into a couple of buckets and accuracy collapses. This is <span class="term">catastrophic degradation</span>.</p>
+      <p>In large transformers, a few specific <span class="term" data-tip="The columns of numbers that flow between a model's layers, each holding one part of the information.">feature dimensions</span> (columns of the hidden-state matrix — the vector of numbers flowing between layers) grow enormously larger than the rest, sometimes about <strong>20× larger</strong>. These are <span class="term" data-tip="A few fixed columns of numbers in a big model that grow far larger than the rest, about 20 times bigger.">outlier features</span>. They are not random: past a size threshold (around <strong>6.7 billion parameters</strong>) they appear in the same handful of dimensions (up to ~7 of them) across almost every token and layer, and the model relies on them heavily. When you absmax-quantize a whole vector containing one of these giants, every ordinary feature gets crushed into a couple of buckets and accuracy collapses. This is <span class="term" data-tip="When accuracy suddenly collapses, here because one giant value crushes all the small ones during shrinking.">catastrophic degradation</span>.</p>
 
       <h4>The fix: LLM.int8()</h4>
-      <p><strong>LLM.int8()</strong> uses <span class="term">mixed-precision decomposition</span>. It splits each matrix multiply into two parts: the few outlier dimensions stay in FP16 and are multiplied in FP16, while the ~99.9% of ordinary dimensions are quantized to INT8. The two partial results are added back together. Because the outliers never enter the INT8 path, they never stretch the INT8 grid — so ordinary features keep their precision. The result: 8-bit inference with essentially zero accuracy loss, even at 175B parameters.</p>
+      <p><strong>LLM.int8()</strong> uses <span class="term" data-tip="A trick that splits a matrix multiply: a few unusual numbers stay high-precision, while most ordinary ones use small 8-bit integers.">mixed-precision decomposition</span>. It splits each matrix multiply into two parts: the few outlier dimensions stay in FP16 and are multiplied in FP16, while the ~99.9% of ordinary dimensions are quantized to INT8. The two partial results are added back together. Because the outliers never enter the INT8 path, they never stretch the INT8 grid — so ordinary features keep their precision. The result: 8-bit inference with essentially zero accuracy loss, even at 175B parameters.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noopener">LLM.int8() paper (Dettmers et al.)</a> · <a href="https://github.com/bitsandbytes-foundation/bitsandbytes" target="_blank" rel="noopener">bitsandbytes on GitHub</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
@@ -442,7 +455,7 @@ var BUILD=[
     '<span><span class="node">0.4</span> <span class="node">1.1</span> <span class="node">0.7</span> <span class="node">0.3</span> <span class="node">0.9</span> <span class="node hot">62.0</span> <span class="node">1.2</span> <span class="node">0.6</span></span>'+
     '<span><span class="node">0.8</span> <span class="node">0.5</span> <span class="node">1.3</span> <span class="node">0.6</span> <span class="node">0.4</span> <span class="node hot">58.0</span> <span class="node">0.7</span> <span class="node">0.9</span></span>'+
     '<span class="dim">… column 5 is huge in every token …</span></div>',
-  note:'<b>Step 2 — reveal the outlier column.</b> In big models a few <em>fixed</em> dimensions run about 20× larger than the others — here, column 5 turns deep red at ~58–62 while everything else stays pale. These are <span class="term">outlier features</span>: systematic, not noise, and the same handful of columns light up across almost every token and layer.'},
+  note:'<b>Step 2 — reveal the outlier column.</b> In big models a few <em>fixed</em> dimensions run about 20× larger than the others — here, column 5 turns deep red at ~58–62 while everything else stays pale. These are <span class="term" data-tip="A few fixed columns of numbers in a big model that grow far larger than the rest, about 20 times bigger.">outlier features</span>: systematic, not noise, and the same handful of columns light up across almost every token and layer.'},
  {viz:'<div class="dgram">'+
     '<span class="node">[0.4 … <span style="color:var(--err)">62.0</span> … 0.6]</span> <span class="arrow">▶</span> <span class="node dim">absmax=62 · s=0.488</span> <span class="arrow">▶</span> '+
     '<span class="node dim">1</span><span class="node dim">2</span><span class="node dim">1</span><span class="node dim">1</span><span class="node dim">2</span><span class="node hot">127</span><span class="node dim">2</span><span class="node dim">1</span></div>',
@@ -455,7 +468,7 @@ var BUILD=[
     '<span class="node" style="border-style:dashed">X (4×8)</span> <span class="arrow">✂</span> '+
     '<span class="node ok" style="border-color:#C99A12;background:var(--warn-l);color:#9A7208">FP16 lane · col [5]</span> '+
     '<span class="node" style="min-width:120px">INT8 lane · cols [0-4,6,7]</span></div>',
-  note:'<b>Step 5 — split the columns.</b> A vertical cut pulls the red outlier column (col 5) out of <code>X</code> into its own narrow FP16 lane (orange), while the 7 pale columns form the wide INT8 lane (blue). This is <span class="term">mixed-precision decomposition</span>: route outlier columns one way, ordinary columns another.'},
+  note:'<b>Step 5 — split the columns.</b> A vertical cut pulls the red outlier column (col 5) out of <code>X</code> into its own narrow FP16 lane (orange), while the 7 pale columns form the wide INT8 lane (blue). This is <span class="term" data-tip="A trick that splits a matrix multiply: a few unusual numbers stay high-precision, while most ordinary ones use small 8-bit integers.">mixed-precision decomposition</span>: route outlier columns one way, ordinary columns another.'},
  {viz:'<div class="dgram">'+
     '<span class="node dim">0.4</span><span class="node dim">1.1</span><span class="node dim">0.7</span><span class="node dim">0.3</span><span class="node dim">0.9</span><span class="node dim">1.2</span><span class="node dim">0.6</span> <span class="arrow">▶</span> '+
     '<span class="node">absmax=1.3 · s=0.0102</span> <span class="arrow">▶</span> '+
@@ -528,6 +541,51 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
 })();
 </script>
 </body>
