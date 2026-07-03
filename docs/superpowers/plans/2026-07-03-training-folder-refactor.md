@@ -317,7 +317,7 @@ with:
 ```python
     hits = sorted(glob.glob(os.path.join(BASE, f"week-{wk}", f"day-{dy}-*", "lesson", "lesson.html")))
 ```
-The `rel = os.path.relpath(path, BASE)` on the next line then yields `week-NN/day-slug/lesson/lesson.html` automatically — no other change needed. (Docstring mentions of `sessions/` are comments; update them to `training/` for accuracy but they do not affect behavior.)
+The `rel = os.path.relpath(path, BASE)` on the next line then yields `week-NN/day-slug/lesson/lesson.html` automatically — no other change needed. (Docstring `sessions/` mentions are swept to `training/` in Task 9b.)
 
 ### Task 6: Update `lesson_audit.py`
 
@@ -363,7 +363,7 @@ with:
 ```python
     for html in sorted(SESSIONS.glob("week-*/day-*/lesson/lesson.html")):
 ```
-(The `ROOT` computation still resolves to the repo root after the move; `COMPANION` is unaffected. The user-facing "sessions/" strings in the docstring/print on lines 9 and 67 may be updated to `training/` for accuracy.)
+(The `ROOT` computation still resolves to the repo root after the move; `COMPANION` is unaffected. The user-facing `sessions/` strings in the docstring/print on lines ~6, ~9, ~67 are swept to `training/` in Task 9b.)
 
 ### Task 8: Update `inject_quiz.py` and `inject_viz.py`
 
@@ -419,7 +419,7 @@ with:
 ```python
     files = sorted(glob.glob(os.path.join(BASE, "week-*", "day-*", "lesson", "lesson.html")))
 ```
-(Docstring `Usage:` line ~17 `sessions/apply_scroll_format.py` may be updated to `training/…` for accuracy.)
+(Docstring `Usage:` line ~17 `sessions/apply_scroll_format.py` is swept to `training/` in Task 9b.)
 
 - [ ] **Step 3: Smoke-check it loads its template**
 
@@ -457,12 +457,52 @@ Expected: three `updated …` lines.
 Run: `grep -rl "sessions/" /Users/ruifengli/Desktop/applied-ai-research/training/*.js || echo "clean"`
 Expected: `clean`.
 
-- [ ] **Step 3: Commit Phase 4**
+- [ ] **Step 3: Commit** (the workflow-js edits ride into the Phase 4 commit in Task 9b)
+
+### Task 9b: Sweep residual `sessions/` refs in tooling + data caches, then commit Phase 4
+
+**Files:** Modify the six `training/*.py` scripts (docstrings/comments/print strings only) and `training/_recover_specs.json`
+
+These carry non-functional `sessions/` mentions plus one regenerated data cache — none affect behavior, but the Phase 6 gate greps them, so clean them deterministically. **This is mandatory and supersedes the "swept in Task 9b" notes in Tasks 5–8b.**
+
+- [ ] **Step 1: Blanket-replace the prefix in the .py scripts** (their functional paths use `BASE`/`ROOT`, never a literal `sessions/`, so this only touches docstrings/comments/prints)
+
+```bash
+cd /Users/ruifengli/Desktop/applied-ai-research/training
+python3 - <<'PY'
+for f in ("wire_index.py","lesson_audit.py","coverage_audit.py","inject_quiz.py","inject_viz.py","apply_scroll_format.py"):
+    t = open(f, encoding="utf-8").read(); n = t.count("sessions/")
+    if n:
+        open(f, "w", encoding="utf-8").write(t.replace("sessions/", "training/")); print(f"{f}: {n} -> 0")
+PY
+```
+Expected: a line per file that had refs (e.g. `wire_index.py: 3 -> 0`, `lesson_audit.py: 2 -> 0`, etc.).
+
+- [ ] **Step 2: Rewrite the recovery-cache paths** (`_recover_specs.json`, 25 refs; `_recover_set.json` is regenerated clean by `lesson_audit.py`, and `_visualize_targets.json` has none)
+
+```bash
+python3 - <<'PY'
+import re
+p = "/Users/ruifengli/Desktop/applied-ai-research/training/_recover_specs.json"
+t = open(p, encoding="utf-8").read()
+t2, n = re.subn(r'sessions/(week-\d{2})/(day-[a-z0-9-]+)\.html',
+                r'training/\1/\2/lesson/lesson.html', t)
+open(p, "w", encoding="utf-8").write(t2); print("rewrote", n, "paths in _recover_specs.json")
+PY
+```
+Expected: `rewrote 25 paths in _recover_specs.json`.
+
+- [ ] **Step 3: Confirm training/ tooling is clean**
+
+Run: `grep -rn "sessions/" /Users/ruifengli/Desktop/applied-ai-research/training/*.py /Users/ruifengli/Desktop/applied-ai-research/training/*.js /Users/ruifengli/Desktop/applied-ai-research/training/*.json || echo "training tooling clean"`
+Expected: `training tooling clean`.
+
+- [ ] **Step 4: Commit Phase 4**
 
 ```bash
 cd /Users/ruifengli/Desktop/applied-ai-research
 git add -A
-git commit -m "refactor: repair progress.json, build scripts, and workflow paths for training/ layout"
+git commit -m "refactor: repair progress.json, build scripts, workflow + recovery-cache paths for training/ layout"
 ```
 
 ---
@@ -502,6 +542,8 @@ Expected: every file reports `0`.
 **Files:** Modify `.claude/skills/frontier-review-quiz/SKILL.md`
 
 - [ ] **Step 1:** Line ~46 `` update `sessions/progress.json`: `` → `` update `training/progress.json`: `` (this skill marks a day complete and advances `cursor`; leaving the old path breaks that write and trips the Phase 6 grep).
+
+### Task 11: `frontier-experiment-lab` SKILL.md (active copy)
 
 **Files:** Modify `.claude/skills/frontier-experiment-lab/SKILL.md`
 
@@ -586,7 +628,7 @@ Replace the list under `## Output directories` with:
 
 - [ ] **Step 2: `README.md` (lines ~37–39)** — replace the `sessions/` and `experiments/` bullets with the `training/week-<NN>/<day-slug>/lesson/` and `.../experiments/<slug>/` convention; leave `courseware/`.
 
-- [ ] **Step 3: `EXAMPLE_PROMPTS.md`** — update the illustrative `sessions/day-001-kv-cache.md` output path to `training/week-<NN>/<day-slug>/lesson/lesson.html`; leave `courseware/…` examples.
+- [ ] **Step 3: `EXAMPLE_PROMPTS.md`** — replace **both** occurrences (lines ~5 and ~30) of `sessions/day-001-kv-cache.md` with `training/week-<NN>/<day-slug>/lesson/lesson.html`; leave the `courseware/…` example paths.
 
 - [ ] **Step 4: Bundle skill files** — apply the same day-scoped experiment-path edit as Tasks 11–12 to `frontier_lab_claude_skills/skills/frontier-experiment-lab/SKILL.md` (lines ~14–18) and `frontier-paper-course/SKILL.md` (lines ~21, ~29–30); and change `frontier-session-coach/SKILL.md` line ~67 `sessions/day-001.md` → `training/week-<NN>/<day-slug>/lesson/lesson.html`.
 
