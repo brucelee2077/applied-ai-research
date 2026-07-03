@@ -57,4 +57,4 @@ frontier-lab-study-os/
 - Visual-first: HTML and D3.js outputs are preferred whenever useful.
 - Artifact-driven: every session produces a concrete file.
 - Bilingual: Chinese + English, with key technical terms in English.
-- No Apple/CVML by default: self-study only unless explicitly requested.
+- No employer/day-job context by default: self-study only unless explicitly requested.

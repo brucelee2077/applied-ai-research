@@ -1,6 +1,6 @@
 # Frontier Lab Study OS
 
-This repo is for self-study toward Frontier Lab readiness. Do not include Apple/CVML/day-job planning unless explicitly requested.
+This repo is for self-study toward Frontier Lab readiness. Do not include employer or day-job planning unless explicitly requested.
 
 ## Default loop
 Every session must produce an artifact.

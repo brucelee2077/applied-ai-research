@@ -4,7 +4,7 @@ export const meta = {
   phases: [{ title: 'Generate' }, { title: 'Verify' }],
 }
 
-const ROOT = '/Users/ruifengli/Desktop/applied-ai-research'
+const ROOT = (args && args.root) || '.'  // pass {root:"<abs repo path>"} if agents need absolute paths
 const TEMPLATE = ROOT + '/sessions/week-01/day-03-vmap.html'
 
 // Shared build instructions — the cp+edit method keeps CSS/JS byte-identical.

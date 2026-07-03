@@ -17,8 +17,8 @@ topic when they open it — your job is to take them from zero to "I get it, and
 > already know," and define every topic-specific term/tool/syntax on first use. Assume normal
 > programming fluency (Python/NumPy), assume **zero** knowledge of the day's subject.
 
-This skill is for self-study only. Do not include Apple, CVML, workplace promotion, or
-internal eval work unless the user explicitly asks.
+This skill is for self-study only. Do not include employer, day-job, or internal work
+context unless the user explicitly asks.
 
 ## Inputs you read first
 

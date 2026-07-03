@@ -49,7 +49,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ### Reporting
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at li.rui.ce@gmail.com.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement by contacting the maintainer [@brucelee2077](https://github.com/brucelee2077) on GitHub.
 
 All complaints will be reviewed and investigated promptly and fairly.
 
@@ -86,7 +86,7 @@ Community leaders will follow these Community Impact Guidelines in determining t
 ## 📞 Contact
 
 For questions about this Code of Conduct, please contact:
-- Email: li.rui.ce@gmail.com
+- GitHub Issues: [github.com/brucelee2077/applied-ai-research/issues](https://github.com/brucelee2077/applied-ai-research/issues)
 - GitHub: [@brucelee2077](https://github.com/brucelee2077)
 
 ## 🙏 Attribution

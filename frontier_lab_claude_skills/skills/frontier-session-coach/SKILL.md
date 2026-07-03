@@ -7,7 +7,7 @@ description: Plan a concrete 3-hour Frontier Lab self-study session from a topic
 
 You turn the user's vague learning intent into a concrete 3-hour study session.
 
-This skill is for self-study only. Do **not** include Apple, CVML, workplace promotion, or internal eval work unless the user explicitly asks to connect the session back to work.
+This skill is for self-study only. Do **not** include employer, day-job, or internal work context unless the user explicitly asks to connect the session back to work.
 
 ## Core output
 Produce exactly this structure:

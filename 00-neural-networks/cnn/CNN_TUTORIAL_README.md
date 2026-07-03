@@ -142,7 +142,7 @@ with open('01_what_are_cnns.ipynb', 'w') as f:
 
 All notebooks are in:
 ```
-/Users/ruifengli/Desktop/applied-ai-research/00-neural-networks/cnn/
+<repo-root>/00-neural-networks/cnn/
 ```
 
 ## Next Steps

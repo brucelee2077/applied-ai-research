@@ -6,7 +6,7 @@ Run with: python generate_interviewer_notebooks.py
 import json
 import os
 
-BASE = "/Users/ruifengli/Desktop/applied-ai-research/ML Design"
+BASE = os.path.dirname(os.path.abspath(__file__))  # the 'ML Design' dir this script lives in
 
 # ── Per-module configuration ─────────────────────────────────────────────────
 MODULES = [
