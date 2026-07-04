@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention Pipeline — from words to a context vector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --bg-warm:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --q:#2563eb; --k:#7c3aed; --v:#f97316;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 14px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+b{color:var(--text)}
+
+.nav{position:sticky;top:0;z-index:100;height:54px;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:.4rem}
+.card .how{font-size:.9rem;color:var(--muted);margin-bottom:1rem}
+.card .how b{color:var(--accent-d)}
+
+/* stepper controls */
+.pipe-controls{display:flex;align-items:center;gap:1rem;justify-content:center;margin:.4rem 0 1rem;flex-wrap:wrap}
+.btn{font-family:var(--body);border:1px solid var(--border);background:#fff;color:var(--text2);padding:.5rem 1rem;border-radius:var(--r-sm);font-weight:600;cursor:pointer;font-size:.9rem;transition:all .12s}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover:not(:disabled){background:var(--accent-d);color:#fff}
+.pipe-step{font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--accent-d);background:var(--accent-l);padding:.25rem .7rem;border-radius:var(--r-sm)}
+
+.fig-wrap{width:100%}
+svg{display:block;width:100%;height:auto}
+.pipe-explain{font-size:.95rem;color:var(--text2);min-height:2.4em;margin-top:.9rem;line-height:1.5;text-align:center}
+.pipe-explain b{color:var(--accent-d)}
+.pipe-explain code{font-family:var(--mono);font-size:.86em;background:var(--surface2);border:1px solid var(--border);padding:.05em .3em;border-radius:5px}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;border:1px dashed var(--bad);border-radius:var(--r-md);background:#fff}
+
+/* d3 matrix cells + cross-highlight */
+.d3-axis-title{font-family:var(--body);font-size:12px;font-weight:600;fill:var(--text2)}
+.d3-op{font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--muted)}
+.d3-num{font-family:var(--mono);font-size:13px}
+.d3-shape{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.mtx-cell{transition:stroke .15s,stroke-width .15s}
+.mtx-cell.contrib-q{stroke:var(--q)!important;stroke-width:2.5px!important}
+.mtx-cell.contrib-k{stroke:var(--k)!important;stroke-width:2.5px!important}
+.mtx-cell.contrib-v{stroke:var(--v)!important;stroke-width:2.5px!important}
+.mtx-cell.target{stroke:var(--accent)!important;stroke-width:3px!important}
+
+.d3-tooltip{position:fixed;pointer-events:none;z-index:200;background:#1f2735;color:#fff;font-family:var(--mono);font-size:.74rem;line-height:1.45;padding:.4rem .6rem;border-radius:6px;opacity:0;transition:opacity .12s;max-width:250px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.d3-tooltip b{color:#fff}
+
+.notice{background:var(--accent-l);border:1px solid #BEE0EB;border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.1rem}
+.notice li{margin-bottom:.5rem;font-size:.92rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+.trap{background:#FFF6E9;border:1px solid #F0DCB0;border-left:4px solid var(--warn);border-radius:0 var(--r-md) var(--r-md) 0;padding:.9rem 1.2rem;margin-top:1.2rem}
+.trap b{color:#9A7208}
+.trap-h{font-weight:700;color:#9A7208;margin-bottom:.35rem}
+
+details.quiz{margin-top:1.5rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:.4rem 1rem}
+details.quiz summary{cursor:pointer;font-weight:700;font-family:var(--display);padding:.7rem 0;color:var(--accent-d)}
+.q{margin:.8rem 0}.q-q{font-weight:600;margin-bottom:.2rem}.q-a{font-size:.9rem;color:var(--text2)}.q-a b{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="nav"><div class="nav-in">
+  <span class="nav-title">Attention Pipeline</span>
+  <a class="nav-back" href="../index.html">← All lessons</a>
+</div></div>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Attention · Represent</span>
+    <h1>From two words to a context vector</h1>
+    <p class="intro">
+      Attention is one formula: <b><code style="font-family:var(--mono)">softmax(Q · Kᵀ / √d_k) · V</code></b>. It looks scary as a whole,
+      so let's build it <b>one stage at a time</b> on the tiniest example — two words, “cat” and “sat”. Step through it, and
+      on the matmul stages, hover a result square to see the <b>exact row and column</b> that produced it.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Walk the pipeline, one matmul at a time</h2>
+    <p class="how"><b>How to interact:</b> press <b>Next</b> / <b>Prev</b> to move through the 5 stages. On the
+      <b>scores</b> and <b>output</b> stages, hover a square in the result matrix — it lights up the one query row and
+      one key/value column that were multiplied to make it.</p>
+    <div class="pipe-controls">
+      <button class="btn" id="pipe-prev">← Prev</button>
+      <span class="pipe-step" id="pipe-step">Stage 0 / 4</span>
+      <button class="btn btn-primary" id="pipe-next">Next →</button>
+    </div>
+    <div class="fig-wrap" id="pipe-visuals" role="group" aria-label="Attention pipeline step-through"></div>
+    <p class="pipe-explain" id="pipe-explain"></p>
+  </div>
+
+  <div class="card">
+    <div class="notice">
+      <h3>What to notice</h3>
+      <ul>
+        <li><b>A score is just one dot product.</b> On the scores stage, each square is one query row times one key row —
+          hover it and watch exactly those two light up. That is all “Q · Kᵀ” means.</li>
+        <li><b>Softmax turns scores into a budget.</b> After <code>÷√d_k</code> and softmax, each row of weights sums to
+          <b>1.00</b> — a 100% attention budget spread over the words.</li>
+        <li><b>The output is a blend of Values.</b> The final matrix is the weights used as volume knobs on the V rows.
+          A word's output now <i>carries context</i> from the words it attended to.</li>
+      </ul>
+    </div>
+    <div class="trap">
+      <div class="trap-h">One trap to avoid</div>
+      <span>The scores matrix <code>S = Q · Kᵀ</code> is <b>seq × seq</b> — it grows with the <b>square</b> of the
+      sequence length. That n² grid is the source of attention's memory and compute cost, and the reason FlashAttention
+      and long-context tricks exist. Two words is cheap; ten thousand words is not.</span>
+    </div>
+  </div>
+
+  <details class="quiz">
+    <summary>Quick check (3 questions)</summary>
+    <div class="q"><div class="q-q">1. What is a single entry of the scores matrix <code>S = Q · Kᵀ</code>?</div>
+      <div class="q-a">The <b>dot product of one query row and one key row</b> — “how well does word i's question match word j's advertisement?”</div></div>
+    <div class="q"><div class="q-q">2. Why divide the scores by √d_k before softmax?</div>
+      <div class="q-a">Dot products grow with dimension; without scaling, softmax would <b>saturate</b> (all-or-nothing) and gradients would vanish. √d_k keeps the scores in a gentle range.</div></div>
+    <div class="q"><div class="q-q">3. The final output for “cat” is a weighted mix of what?</div>
+      <div class="q-a">The <b>Value (V) rows</b>, weighted by “cat”'s attention row. Output = Weights · V.</div></div>
+  </details>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var visuals = document.getElementById("pipe-visuals");
+  var explain = document.getElementById("pipe-explain");
+  var stepEl = document.getElementById("pipe-step");
+  var prevBtn = document.getElementById("pipe-prev");
+  var nextBtn = document.getElementById("pipe-next");
+
+  if (typeof window.d3 === "undefined") {
+    console.warn("[attention-pipeline] d3 not found — showing fallback.");
+    visuals.innerHTML = '<div class="fallback">Could not load the chart library (d3.v7.min.js). '
+      + 'The steps still hold: project X into Q, K, V; score with Q·Kᵀ; scale by √d_k and softmax; blend the V rows.</div>';
+    if(prevBtn) prevBtn.disabled = true; if(nextBtn) nextBtn.disabled = true;
+    return;
+  }
+  var d3 = window.d3;
+  var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function dur(ms){ return REDUCED?0:ms; }
+  var LINE="#E5DFD6", INK="#2C2A28";
+
+  // ---- shared math ----
+  function dot(a,b){return a.reduce(function(s,v,i){return s+v*b[i];},0);}
+  function transpose(m){return m[0].map(function(_,i){return m.map(function(row){return row[i];});});}
+  function matmul(a,b){var bT=transpose(b);return a.map(function(r){return bT.map(function(c){return dot(r,c);});});}
+  function softmax(arr){var mx=Math.max.apply(null,arr);var e=arr.map(function(x){return Math.exp(x-mx);});var s=e.reduce(function(a,b){return a+b;},0);return e.map(function(x){return x/s;});}
+
+  // ---- shared tooltip ----
+  var tt=document.createElement("div");tt.className="d3-tooltip";tt.setAttribute("aria-hidden","true");document.body.appendChild(tt);
+  function showTip(html,e){tt.innerHTML=html;tt.style.opacity="1";moveTip(e);}
+  function moveTip(e){var x=e.clientX+14,y=e.clientY+14,maxX=window.innerWidth-tt.offsetWidth-8;if(x>maxX)x=e.clientX-tt.offsetWidth-14;tt.style.left=x+"px";tt.style.top=y+"px";}
+  function hideTip(){tt.style.opacity="0";}
+
+  // ---- the worked example ----
+  var W=["cat","sat"];
+  var X=[[1,0],[0,1]], WQ=[[1,0],[0,1]], WK=[[0,1],[1,0]], WV=[[1,1],[0,1]];
+  var Q=matmul(X,WQ), K=matmul(X,WK), V=matmul(X,WV);
+  var Kt=transpose(K);
+  var S=matmul(Q,Kt);
+  var Sc=S.map(function(r){return r.map(function(v){return v/Math.sqrt(2);});});
+  var Wt=Sc.map(softmax);
+  var O=matmul(Wt,V);
+
+  var qSoft="#eaf1ff",kSoft="#f3ecff",vSoft="#fff1e6",nSoft="#f3f5fb";
+  var fillNeutral=function(){return nSoft;}, fillQ=function(){return qSoft;}, fillK=function(){return kSoft;}, fillV=function(){return vSoft;};
+  function seqFill(maxAbs,baseRGB){return function(v){var norm=maxAbs>0?Math.abs(v)/maxAbs:0;return "rgba("+baseRGB+","+(0.06+0.55*norm).toFixed(3)+")";};}
+  var fillScore=seqFill(1,"239,68,68");
+  var fillWeight=function(v){return d3.interpolateBlues(v);};
+  var weightText=function(v){return v>0.6?"#fff":INK;};
+  var fillOut=seqFill(1,"249,115,22");
+
+  var CELL=36, GAP=5;
+  function matW(cols){return cols*CELL+(cols-1)*GAP;}
+  function matH(rows){return rows*CELL+(rows-1)*GAP;}
+
+  function drawMatrix(parent,mat,ox,oy,opts){
+    opts=opts||{};
+    var rows=mat.length, cols=mat[0].length;
+    var g=parent.append("g").attr("transform","translate("+ox+","+oy+")");
+    if(opts.title) g.append("text").attr("class","d3-axis-title").attr("x",matW(cols)/2).attr("y",-10).attr("text-anchor","middle").text(opts.title);
+    var data=[];
+    for(var r=0;r<rows;r++) for(var c=0;c<cols;c++) data.push({r:r,c:c,v:mat[r][c]});
+    var mc=g.selectAll("g.mc").data(data).join("g").attr("class","mc")
+      .attr("transform",function(d){return "translate("+(d.c*(CELL+GAP))+","+(d.r*(CELL+GAP))+")";});
+    mc.append("rect").attr("class","mtx-cell")
+      .attr("data-r",function(d){return d.r;}).attr("data-c",function(d){return d.c;})
+      .attr("width",CELL).attr("height",CELL).attr("rx",6)
+      .attr("fill",function(d){return opts.fill?opts.fill(d.v,d.r,d.c):"#f3f5fb";})
+      .attr("stroke",opts.stroke||LINE).attr("stroke-width",1);
+    mc.append("text").attr("class","d3-num")
+      .attr("x",CELL/2).attr("y",CELL/2).attr("text-anchor","middle").attr("dominant-baseline","central")
+      .attr("fill",function(d){return opts.textFill?opts.textFill(d.v):INK;})
+      .text(function(d){return opts.floats?(Math.round(d.v*100)/100).toFixed(2):d.v;});
+    if(opts.shape) g.append("text").attr("class","d3-shape").attr("x",matW(cols)/2).attr("y",matH(rows)+14).attr("text-anchor","middle").text(opts.shape);
+    return {g:g, mc:mc, rects:g.selectAll(".mtx-cell"), w:matW(cols), h:matH(rows)};
+  }
+
+  var SVG_W=720, SVG_H=220, CY=116;
+  var step=0, NSTEPS=5;
+  var explainText=[
+    "Each token is a row of X. We learn three matrices W_Q, W_K, W_V — the only trained parts here.",
+    "Project X by each matrix: Q = X·W_Q (what each token is looking for), K (what it advertises), V (its payload).",
+    "Score every query against every key: <b>S = Q·Kᵀ</b>. Hover a square — it is exactly one query row times one key row. This <b>seq×seq</b> grid grows with the <b>square</b> of the sequence length — the source of attention's O(n²) cost.",
+    "Divide by √d_k = √2 to keep softmax gentle, then <b>softmax each row</b> → weights that sum to 1. Hover a weight square to see its row sums to 1.00.",
+    "Blend the values: <b>Output = Weights · V</b>. Hover an output square — the routing weight is a volume knob on the payload V. Output ‘cat’ = [0.33, 1.00]."
+  ];
+
+  function layout(parent,items){
+    var total=items.reduce(function(s,it){return s+it.w;},0)+14*(items.length-1);
+    var x=Math.max(8,(SVG_W-total)/2);
+    var refs=[];
+    items.forEach(function(it){
+      if(it.kind==="m"){ refs.push(it.draw(parent,x,CY-it.h/2)); }
+      else { parent.append("text").attr("class","d3-op").attr("x",x+it.w/2).attr("y",CY).attr("text-anchor","middle").attr("dominant-baseline","central").text(it.text); refs.push(null); }
+      x+=it.w+14;
+    });
+    return refs;
+  }
+  function m(mat,opts){ return {kind:"m", w:matW(mat[0].length), h:matH(mat.length), draw:function(p,x,y){return drawMatrix(p,mat,x,y,opts);}}; }
+  function op(text,w){ return {kind:"op", w:w||30, text:text}; }
+  function clearHi(g){ g.selectAll(".mtx-cell").classed("contrib-q",false).classed("contrib-k",false).classed("contrib-v",false).classed("target",false); }
+
+  function drawStep(){
+    d3.select(visuals).selectAll("*").remove();
+    var svg=d3.select(visuals).append("svg")
+      .attr("viewBox","0 0 "+SVG_W+" "+SVG_H).attr("preserveAspectRatio","xMidYMid meet")
+      .attr("role","img").attr("aria-label","Attention pipeline, stage "+step+": "+explainText[step].replace(/<[^>]+>/g,''));
+    var g=svg.append("g");
+    var refs;
+
+    if(step===0){
+      refs=layout(g,[
+        m(X,{title:"X (embeddings)",shape:"2×2",fill:fillNeutral}),
+        op("learned →",70),
+        m(WQ,{title:"W_Q",shape:"2×2",fill:fillQ}),
+        m(WK,{title:"W_K",shape:"2×2",fill:fillK}),
+        m(WV,{title:"W_V",shape:"2×2",fill:fillV})
+      ]);
+    } else if(step===1){
+      refs=layout(g,[
+        m(Q,{title:"Q = X·W_Q",shape:"looking-for",fill:fillQ}),
+        m(K,{title:"K = X·W_K",shape:"advertising",fill:fillK}),
+        m(V,{title:"V = X·W_V",shape:"payload",fill:fillV})
+      ]);
+    } else if(step===2){
+      refs=layout(g,[
+        m(Q,{title:"Q",shape:"2×2",fill:fillQ}),
+        op("×"),
+        m(Kt,{title:"Kᵀ",shape:"2×2",fill:fillK}),
+        op("="),
+        m(S,{title:"S = Q·Kᵀ",shape:"2×2 scores",fill:fillScore,textFill:function(v){return v>=1?"#fff":INK;}})
+      ]);
+      var qRef=refs[0], ktRef=refs[2], sRef=refs[4];
+      function hiScore(node,d){
+        clearHi(g);
+        qRef.rects.classed("contrib-q",function(dd){return dd.r===d.r;});
+        ktRef.rects.classed("contrib-k",function(dd){return dd.c===d.c;});
+        d3.select(node).selectAll("rect.mtx-cell").classed("target",true);
+      }
+      sRef.mc.style("cursor","crosshair").attr("tabindex",0).attr("role","img")
+        .attr("aria-label",function(d){return "Score: query "+W[d.r]+" times key "+W[d.c]+" = "+S[d.r][d.c];})
+        .on("mouseenter",function(e,d){hiScore(this,d);showTip("<b>S["+d.r+"]["+d.c+"] = "+S[d.r][d.c]+"</b><br>query ‘"+W[d.r]+"’ · key ‘"+W[d.c]+"’",e);})
+        .on("mousemove",function(e){moveTip(e);})
+        .on("mouseleave",function(){clearHi(g);hideTip();})
+        .on("focus",function(e,d){hiScore(this,d);})
+        .on("blur",function(){clearHi(g);});
+    } else if(step===3){
+      refs=layout(g,[
+        m(S,{title:"S",shape:"2×2",fill:fillScore,textFill:function(v){return v>=1?"#fff":INK;}}),
+        op("÷√2",40),
+        m(Sc,{title:"Scaled",shape:"2×2",fill:seqFill(1,"239,68,68"),floats:true}),
+        op("softmax→",64),
+        m(Wt,{title:"Weights",shape:"rows sum to 1",fill:fillWeight,floats:true,textFill:weightText})
+      ]);
+      var wRef=refs[4];
+      function hiWeight(d){clearHi(g);wRef.rects.classed("target",function(dd){return dd.r===d.r;});}
+      wRef.mc.style("cursor","crosshair").attr("tabindex",0).attr("role","img")
+        .attr("aria-label",function(d){return "Softmax weight row "+W[d.r]+", sums to 1";})
+        .on("mouseenter",function(e,d){hiWeight(d);var rs=Wt[d.r].reduce(function(a,b){return a+b;},0);showTip("<b>row ‘"+W[d.r]+"’</b>: softmax over keys → ["+Wt[d.r].map(function(x){return x.toFixed(2);}).join(", ")+"]<br><b>Σ = "+rs.toFixed(2)+"</b> (a probability distribution)",e);})
+        .on("mousemove",function(e){moveTip(e);})
+        .on("mouseleave",function(){clearHi(g);hideTip();})
+        .on("focus",function(e,d){hiWeight(d);})
+        .on("blur",function(){clearHi(g);});
+    } else {
+      refs=layout(g,[
+        m(Wt,{title:"Weights",shape:"2×2",fill:fillWeight,floats:true,textFill:weightText}),
+        op("×"),
+        m(V,{title:"V (payload)",shape:"2×2",fill:fillV}),
+        op("="),
+        m(O,{title:"Output = W·V",shape:"context",fill:fillOut,floats:true,textFill:function(v){return v>=0.9?"#fff":INK;}})
+      ]);
+      var w2=refs[0], vRef=refs[2], oRef=refs[4];
+      function hiOut(node,d){
+        clearHi(g);
+        w2.rects.classed("contrib-q",function(dd){return dd.r===d.r;});
+        vRef.rects.classed("contrib-v",function(dd){return dd.c===d.c;});
+        d3.select(node).selectAll("rect.mtx-cell").classed("target",true);
+      }
+      oRef.mc.style("cursor","crosshair").attr("tabindex",0).attr("role","img")
+        .attr("aria-label",function(d){return "Output row "+W[d.r]+", dim "+(d.c+1)+" = "+O[d.r][d.c].toFixed(2);})
+        .on("mouseenter",function(e,d){hiOut(this,d);showTip("<b>Output[‘"+W[d.r]+"’][d"+(d.c+1)+"] = "+O[d.r][d.c].toFixed(2)+"</b><br>blend of column "+(d.c+1)+" of V, weighted by row ‘"+W[d.r]+"’",e);})
+        .on("mousemove",function(e){moveTip(e);})
+        .on("mouseleave",function(){clearHi(g);hideTip();})
+        .on("focus",function(e,d){hiOut(this,d);})
+        .on("blur",function(){clearHi(g);});
+    }
+
+    if(!REDUCED){
+      // opacity-only entrance (avoids animating the SVG transform, which is
+      // universally safe and renders identically without the 8px slide)
+      g.attr("opacity",0).transition().duration(dur(260)).attr("opacity",1);
+    }
+    if(explain) explain.innerHTML=explainText[step];
+    if(stepEl) stepEl.textContent="Stage "+step+" / "+(NSTEPS-1);
+    if(prevBtn) prevBtn.disabled=step===0;
+    if(nextBtn) nextBtn.disabled=step===NSTEPS-1;
+  }
+
+  if(prevBtn) prevBtn.addEventListener("click",function(){if(step>0){step--;drawStep();}});
+  if(nextBtn) nextBtn.addEventListener("click",function(){if(step<NSTEPS-1){step++;drawStep();}});
+  drawStep();
+})();
+</script>
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;            /* opened standalone — no parent to size */
+  var last = 0;
+  function measure(){
+    return Math.ceil(Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    ));
+  }
+  function report(){
+    var h = measure();
+    if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); }
+  }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 360); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

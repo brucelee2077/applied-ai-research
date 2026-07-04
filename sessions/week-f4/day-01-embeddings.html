@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 4 · Day 1 — Words to Numbers (Embeddings)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf4-d01-embeddings">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M4 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../week-f3/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M3 · Review Gate</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-qkv.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Query, Key, Value</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 4 · Represent · Day 1</span>
+    <h1>Words to Numbers<br>Embeddings: Meaning as Geometry</h1>
+    <p class="lead">Transformers — the models behind every chatbot — start with a simple problem: a computer can't do math on the word "cat." So the first step of every language model turns each word into a list of numbers, called an <strong>embedding</strong>, arranged so that similar words sit close together.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain what an embedding is, look one up as a row of a matrix, and measure how "similar" two word-vectors are with a dot product.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Turning words into vectors</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> M1 (arrays, indexing a row, the dot product). <b>No transformer background needed</b> — this is the very first step of one.</div></div>
+
+      <h4>The problem</h4>
+      <p>A neural network only does math on numbers (M1–M3). But language is made of <span class="term" data-tip="A word or word-piece — the basic unit a language model reads. Turning text into tokens is called tokenization.">tokens</span> (words or word-pieces). So step one of every language model is: turn each token into numbers.</p>
+
+      <h4>What is an embedding?</h4>
+      <p>An <span class="term" data-tip="A vector of numbers that represents a token's meaning. Similar tokens get nearby vectors. Stored as rows of a learned embedding matrix.">embedding</span> is a <strong>vector</strong> (a list of numbers) that stands for a token's meaning. The trick: the numbers are arranged so that <strong>similar words get similar vectors</strong>. "cat" and "dog" land close; "cat" and "car" land far apart.</p>
+
+      <h4>How is it stored?</h4>
+      <p>As a big lookup table — an <span class="term" data-tip="A matrix of shape (vocabulary size, d_model). Row i is the embedding vector for token id i.">embedding matrix</span>. Give it token id <code>i</code> and it hands back row <code>i</code> (indexing a row — M1 Day 2!). Those numbers aren't hand-set; they're <strong>learned during training</strong> (M3's loop), so meaning gradually becomes geometry. Keep going 👇</p>
+      <button class="gotit" type="button">Got what an embedding is — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A map of meaning</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🗺️</span><h5>Words as places on a map</h5><p>Each word is a point. Related words cluster: animals here, vehicles there. The <em>position</em> carries the meaning, and closeness means similarity.</p></div>
+        <div class="card"><span class="big">🎨</span><h5>Like a color code</h5><p>A color is just three numbers (R, G, B). A word is a longer list of numbers. Nearby lists = alike; and directions can carry meaning ("king − man + woman ≈ queen").</p></div>
+      </div>
+      <p><strong>In one line:</strong> an embedding turns each word into a point in space so that meaning becomes distance and direction.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real embedding isn't 2-D — it's hundreds of dimensions (a size called <code>d_model</code>). We draw 2-D pictures, but the model works in a much bigger space you can't fully visualize.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Word → id → vector → similarity</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Follow a word from text to a vector, then measure similarity. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="ids" type="button">① words → integer ids</button>
+          <button class="play-btn" data-demo="lookup" type="button">② id → embedding vector</button>
+          <button class="play-btn" data-demo="sim" type="button">③ similarity (dot product)</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: looking up a vector is just indexing a row (M1 Day 2); similarity is a dot product (M1 Day 4). Old skills, new job.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The lookup table — and why every LLM starts here</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The mechanism</h4>
+      <ul>
+        <li>The embedding matrix has shape <code>(vocab_size, d_model)</code>: one row per token, each row a vector of length <code>d_model</code>.</li>
+        <li>Embedding a token = <strong>indexing its row</strong>: <code>E[id]</code> (M1 Day 2).</li>
+        <li>Similarity between two vectors = a <strong>dot product</strong> (M1 Day 4): bigger means more alike.</li>
+        <li>The numbers are <strong>learned</strong> by the training loop (M3), so words used in similar contexts drift close together.</li>
+      </ul>
+
+      <h4>Why a frontier lab cares</h4>
+      <p>This is <strong>step 1 of every language model</strong>: text → tokens → embeddings, and everything after (attention, the layers you built in M2) operates on these vectors. <code>d_model</code> is a core size knob, and the embedding matrix is a big share of a model's parameters (vocab is often 50k–250k rows). Get the input representation right and the rest has something meaningful to work with.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> text → tokens → ids → embedding lookup → vectors that place meaning in space. Next lessons: how a word's vector <em>looks at</em> the other words' vectors to understand context — that's attention (Q, K, V).</div></div>
+      <button class="gotit" type="button">Got embeddings</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From a word to a point in meaning-space — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea built one step at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Look up a few embeddings and measure similarity yourself — that's what makes the day count. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/foundations/m04_embeddings.py</code>. Make a tiny vocab dict, an embedding matrix <code>E</code> of shape <code>(4, 2)</code>, look up the vectors for a couple of words by id, and compute the dot-product similarity between "cat" &amp; "dog" vs "cat" &amp; "car" — confirm the animals score higher. Run with <code>python3 m04_embeddings.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 4 Day 1 artifact.
+
+Create experiments/foundations/m04_embeddings.py that, with a comment on each step:
+1. Defines vocab = {"cat":0,"dog":1,"car":2,"the":3} and maps a sentence to ids.
+2. Builds an embedding matrix E of shape (4,2) with hand-set rows so cat/dog are close and car is far.
+3. Looks up E[vocab["cat"]] and prints it (indexing a row = M1 Day 2).
+4. Defines sim(a,b)=np.dot(a,b) and prints sim(cat,dog) vs sim(cat,car), confirming animals score higher than cat-vs-car.
+Then run it and paste the output at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f4/day-01-log.md</code>: why is it useful that similar words end up with nearby vectors?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Module 4 · Day 1 complete!</h3>
+    <p>Words are now vectors: text → tokens → ids → embedding lookup → points in meaning-space, where a dot product measures similarity.<br>Next up: <b>Query, Key, Value</b> — how each word's vector decides which other words to pay attention to.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../week-f3/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M3 · Review Gate</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-qkv.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Query, Key, Value</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  ids:{html:'<span class="prompt">&gt;&gt;&gt;</span> vocab = {<span class="str">"cat"</span>:<span class="num">0</span>, <span class="str">"dog"</span>:<span class="num">1</span>, <span class="str">"car"</span>:<span class="num">2</span>, <span class="str">"the"</span>:<span class="num">3</span>}\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> [vocab[w] <span class="kw">for</span> w <span class="kw">in</span> [<span class="str">"the"</span>, <span class="str">"cat"</span>]]   <span class="dim"># words → integer ids</span>\n'+
+    '<span class="hl">[3, 0]</span>',
+    take:'<b>①  First, words become integer ids.</b> "the cat" → [3, 0]. This step is tokenization. Ids are just labels — there\'s no meaning in the numbers 3 and 0 yet.'},
+  lookup:{html:'<span class="prompt">&gt;&gt;&gt;</span> E = np.array([[ <span class="num">0.9</span>,  <span class="num">0.1</span>],   <span class="dim"># id 0: cat</span>\n'+
+    '<span class="dim">...</span>               [ <span class="num">0.8</span>,  <span class="num">0.2</span>],   <span class="dim"># id 1: dog</span>\n'+
+    '<span class="dim">...</span>               [<span class="num">-0.7</span>,  <span class="num">0.6</span>],   <span class="dim"># id 2: car</span>\n'+
+    '<span class="dim">...</span>               [ <span class="num">0.0</span>,  <span class="num">0.0</span>]])  <span class="dim"># id 3: the</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> E[<span class="num">0</span>]      <span class="dim"># embedding for "cat" = row 0</span>\n'+
+    '<span class="ok">array([0.9, 0.1])</span>',
+    take:'<b>②  An embedding is a lookup table.</b> Row i is the vector for token i. Looking up "cat" (id 0) is just indexing row 0 — exactly M1 Day 2. Shape here is (4 words, 2 numbers each).'},
+  sim:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">sim</span>(a, b): <span class="kw">return</span> np.dot(a, b)   <span class="dim"># bigger = more alike</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> sim(E[<span class="num">0</span>], E[<span class="num">1</span>])    <span class="dim"># cat vs dog (both animals)</span>\n'+
+    '<span class="hl">0.74</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> sim(E[<span class="num">0</span>], E[<span class="num">2</span>])    <span class="dim"># cat vs car (unrelated)</span>\n'+
+    '<span class="hl">-0.57</span>',
+    take:'<b>③  Closeness = dot product (M1 Day 4).</b> cat·dog = 0.74 (similar), cat·car = −0.57 (different). Training arranges the vectors so meaning turns into geometry — that\'s the whole point of embeddings.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<div class='build-embed'><iframe src='../viz/attention-heatmap.html' title='Interactive: attention heatmap — who attends to whom' loading='lazy'></iframe><div class='cap'>↑ interactive — hover any square, or arrow-key a word on the left. <a href='../viz/attention-heatmap.html' target='_blank' rel='noopener'>open full screen ↗</a></div></div>",
+  note:"<b>Play with the live version first.</b> This is where embeddings are heading: once words are numbers, the model builds a grid of who-attends-to-whom. Hover the row for ‘it’ — it points at ‘cat’. Then scroll down to build it from zero."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='The word cat which a computer cannot do math on'><g font-family='monospace' font-size='15' text-anchor='middle'><rect x='200' y='30' width='120' height='34' rx='8' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='260' y='53' fill='#C93B3B'>\"cat\"</text><text x='260' y='82' font-size='11' fill='#6B645E'>a network can't multiply a word</text></g></svg>",
+  note:"<b>Start with the problem.</b> A neural network only does math on numbers, but text is words. We need to turn <code>\"cat\"</code> into numbers before anything else can happen."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='The word cat becomes the integer id 0'><g font-family='monospace' font-size='15' text-anchor='middle'><rect x='120' y='30' width='90' height='32' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='165' y='51' fill='#1F6280'>\"cat\"</text><text x='250' y='51' fill='#6B645E'>→</text><rect x='300' y='30' width='90' height='32' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='345' y='51' fill='#5E5191'>id = 0</text></g></svg>",
+  note:"<b>Tokenize → an id.</b> Each token maps to an integer id from the vocabulary. \"cat\" → 0. But an id is just a label; the number 0 carries no meaning on its own."},
+ {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='The embedding matrix, and looking up row 0 for cat'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='120' y='24' width='120' height='96' rx='6' fill='#FDF9F3' stroke='#E5DFD6' stroke-width='2'/><rect x='120' y='24' width='120' height='24' rx='0' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='180' y='40' fill='#1a5c38'>[0.9, 0.1] ← id 0</text><text x='180' y='64' fill='#6B645E'>[0.8, 0.2] ← id 1</text><text x='180' y='84' fill='#6B645E'>[-0.7,0.6] ← id 2</text><text x='180' y='104' fill='#6B645E'>[0.0, 0.0] ← id 3</text><text x='180' y='134' fill='#6B645E'>embedding matrix (4 × 2)</text><text x='300' y='38' fill='#2D8B55'>E[0] → [0.9, 0.1]</text></g></svg>",
+  note:"<b>Look up the row: the embedding.</b> The embedding matrix has one row per token. <code>E[0]</code> returns cat's vector <code>[0.9, 0.1]</code> — indexing a row, straight from M1 Day 2. Now the word is a vector of numbers."},
+ {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='Words plotted as points: cat and dog close, car far away'><g font-family='monospace' font-size='12'><line x1='40' y1='120' x2='300' y2='120' stroke='#E5DFD6' stroke-width='1.5'/><line x1='40' y1='120' x2='40' y2='20' stroke='#E5DFD6' stroke-width='1.5'/><circle cx='250' cy='40' r='5' fill='#2D8B55'/><text x='268' y='44' fill='#1a5c38'>cat</text><circle cx='235' cy='55' r='5' fill='#2D8B55'/><text x='253' y='59' fill='#1a5c38'>dog</text><circle cx='80' cy='95' r='5' fill='#C93B3B'/><text x='98' y='99' fill='#C93B3B'>car</text><text x='420' y='70' fill='#2C2A28' text-anchor='middle'>similar words</text><text x='420' y='88' fill='#2C2A28' text-anchor='middle'>= nearby points</text></g></svg>",
+  note:"<b>Each word is now a point.</b> Plot the vectors and structure appears: cat and dog sit close (both animals); car is off on its own. Position encodes meaning — that's why we call it a map of meaning."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Dot product gives high similarity for cat and dog, negative for cat and car'><g font-family='monospace' font-size='13' text-anchor='middle'><text x='150' y='45' fill='#1a5c38'>cat · dog = 0.74</text><text x='150' y='75' fill='#C93B3B'>cat · car = −0.57</text><text x='360' y='60' fill='#6B645E'>dot product = similarity</text></g></svg>",
+  note:"<b>Measure similarity with a dot product.</b> cat·dog is high (0.74), cat·car is negative (−0.57) — M1 Day 4 doing new work. Meaning has become something you can compute with."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Text to tokens to ids to embeddings feeding into attention'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='20' y='42' width='70' height='28' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='55' y='60' fill='#1F6280'>text</text><text x='100' y='60' fill='#6B645E'>→</text><rect x='118' y='42' width='70' height='28' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='153' y='60' fill='#5E5191'>ids</text><text x='198' y='60' fill='#6B645E'>→</text><rect x='216' y='42' width='100' height='28' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='266' y='60' fill='#1a5c38'>embeddings</text><text x='326' y='60' fill='#6B645E'>→</text><rect x='344' y='42' width='150' height='28' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='419' y='60' fill='#9A7208'>attention (next)</text></g></svg>",
+  note:"<b>Why it matters: step 1 of every LLM.</b> text → tokens → ids → embeddings. Everything after — attention, the layers from M2 — runs on these vectors, and the embedding matrix is a big share of a model's parameters. Next: how each word's vector looks at the others (Q, K, V)."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What does an embedding do?',
+  opts:['speeds up matmul','turns a token into a vector of numbers that captures its meaning','counts the layers','removes the bias'],
+  ans:1, fb:'Right. An embedding maps each token to a vector, arranged so similar tokens get nearby vectors.'},
+ {q:'2. Looking up a token\'s embedding is which Module-1 operation?',
+  opts:['broadcasting','indexing a row of a matrix','a logarithm','squaring'],
+  ans:1, fb:'Right. E[id] returns row id of the embedding matrix — indexing a row, from M1 Day 2.'},
+ {q:'3. In embedding space, similar words are:',
+  opts:['far apart','close together (nearby vectors)','always identical','at the origin'],
+  ans:1, fb:'Right. Similar meanings → nearby vectors; a dot product measures how close.'},
+ {q:'4. Where do the embedding numbers come from?',
+  opts:['they are set by hand','they are learned during training','they are always random','they are the token ids'],
+  ans:1, fb:'Right. The embedding matrix is learned by the training loop (M3), so meaning becomes geometry.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+<script>
+/* auto-size embedded viz iframes to the height each viz reports (removes the inner scrollbar) */
+(function(){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || d.type !== 'viz-height' || typeof d.px !== 'number') return;
+    var frames = document.querySelectorAll('.build-embed iframe');
+    for (var i = 0; i < frames.length; i++){
+      if (frames[i].contentWindow === e.source){
+        frames[i].style.height = Math.min(Math.max(d.px, 320), 3200) + 'px';
+        break;
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>

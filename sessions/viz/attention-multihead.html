@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Head Attention — many looks at once</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --bg-warm:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 14px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+b{color:var(--text)}
+
+.nav{position:sticky;top:0;z-index:100;height:54px;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:.4rem}
+.card h3{font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:1.2rem 0 .5rem}
+.card .how{font-size:.9rem;color:var(--muted);margin-bottom:1rem}
+.card .how b{color:var(--accent-d)}
+
+.dk-row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1.1rem}
+.dk-lbl{font-size:.88rem;font-weight:600;color:var(--text)}
+.btn{font-family:var(--body);border:1px solid var(--border);background:#fff;color:var(--text2);padding:.4rem .9rem;border-radius:var(--r-sm);font-weight:600;cursor:pointer;font-size:.9rem;transition:all .12s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-d);color:#fff}
+
+.fig-wrap{width:100%}
+svg{display:block;width:100%;height:auto}
+#mh-heads{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;align-items:flex-start}
+.head-cell{flex:0 0 auto;width:150px;text-align:center}
+.head-cell .ht{font-family:var(--mono);font-size:.78rem;font-weight:600;margin-bottom:.25rem}
+.mh-caption{font-size:.95rem;color:var(--text2);min-height:2.4em;margin-top:1rem;line-height:1.5}
+.mh-caption b{color:var(--accent-d)}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;border:1px dashed var(--bad);border-radius:var(--r-md);background:#fff}
+
+.d3-axis-label{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.d3-axis-title{font-family:var(--body);font-size:11px;font-weight:600;fill:var(--text2)}
+
+.d3-tooltip{position:fixed;pointer-events:none;z-index:200;background:#1f2735;color:#fff;font-family:var(--mono);font-size:.74rem;line-height:1.45;padding:.4rem .6rem;border-radius:6px;opacity:0;transition:opacity .12s;max-width:250px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.d3-tooltip b{color:#fff}
+
+.notice{background:var(--accent-l);border:1px solid #BEE0EB;border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.1rem}
+.notice li{margin-bottom:.5rem;font-size:.92rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+.trap{background:#FFF6E9;border:1px solid #F0DCB0;border-left:4px solid var(--warn);border-radius:0 var(--r-md) var(--r-md) 0;padding:.9rem 1.2rem;margin-top:1.2rem}
+.trap b{color:#9A7208}
+.trap-h{font-weight:700;color:#9A7208;margin-bottom:.35rem}
+
+details.quiz{margin-top:1.5rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:.4rem 1rem}
+details.quiz summary{cursor:pointer;font-weight:700;font-family:var(--display);padding:.7rem 0;color:var(--accent-d)}
+.q{margin:.8rem 0}.q-q{font-weight:600;margin-bottom:.2rem}.q-a{font-size:.9rem;color:var(--text2)}.q-a b{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="nav"><div class="nav-in">
+  <span class="nav-title">Multi-Head Attention</span>
+  <a class="nav-back" href="../index.html">← All lessons</a>
+</div></div>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Attention · Represent</span>
+    <h1>Many looks at once</h1>
+    <p class="intro">
+      One attention can only track <b>one kind of relationship</b> at a time. Real transformers split the vector into
+      several <b>heads</b> — each does its own attention on a thinner slice, so one head can track subject→verb while
+      another tracks pronoun→noun. Slide the number of heads and watch the vector split and the patterns multiply.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Split the vector into heads</h2>
+    <p class="how"><b>How to interact:</b> choose how many heads to use. Watch two things change: the model vector
+      (d_model = 12) splits into that many colored <b>slices</b> (each of size d_k = 12 ÷ heads), and you get that
+      many <b>independent attention grids</b>, each free to look at a different pattern.</p>
+
+    <div class="dk-row" role="group" aria-label="Number of heads">
+      <span class="dk-lbl">number of heads:</span>
+      <button class="btn" data-h="1" aria-pressed="false">1</button>
+      <button class="btn" data-h="2" aria-pressed="false">2</button>
+      <button class="btn btn-primary" data-h="3" aria-pressed="true">3</button>
+      <button class="btn" data-h="4" aria-pressed="false">4</button>
+      <button class="btn" data-h="6" aria-pressed="false">6</button>
+    </div>
+
+    <h3>1 · The vector is split (d_model = 12)</h3>
+    <div class="fig-wrap" id="mh-split" role="img" aria-label="The model vector split into head slices"></div>
+
+    <h3>2 · Each head attends on its own — sentence: “cat sat mat”</h3>
+    <p class="how" style="margin-bottom:.7rem">In each grid, a <b>row</b> is the word doing the looking and a <b>column</b> is the word being looked at; every row of weights adds up to 1. <b>These grids are hand-picked example patterns for teaching</b> — a real model learns its own weights, not these exact numbers.</p>
+    <div class="fig-wrap" id="mh-heads"></div>
+
+    <h3>3 · Concatenate the heads, then mix with W_O</h3>
+    <div class="fig-wrap" id="mh-concat" role="img" aria-label="Concatenate head outputs and project with W_O"></div>
+
+    <p class="mh-caption" id="mh-caption"></p>
+  </div>
+
+  <div class="card">
+    <div class="notice">
+      <h3>What to notice</h3>
+      <ul>
+        <li>Each head gets a <b>distinct grid</b>. With several heads, one can track “look back at the subject,”
+          another “look at the next word,” another “stay on yourself.” One head could never do all three at once.</li>
+        <li>More heads means <b>thinner slices</b>: d_k = d_model ÷ heads shrinks. The total width is unchanged — you
+          are <b>reshaping</b> the same vector, not adding parameters.</li>
+        <li>The heads are recombined by <b>concatenating</b> their outputs and multiplying by one matrix <b>W_O</b>,
+          which lets the model mix what the different heads found.</li>
+      </ul>
+    </div>
+    <div class="trap">
+      <div class="trap-h">One trap to avoid</div>
+      <span>Heads do <b>not</b> each run on the full vector. The d_model dimensions are <b>divided</b> among the heads,
+      so 8 heads on a 512-wide model means each head works in a 64-wide space. More heads ≠ more total compute here —
+      it is the same width, sliced.</span>
+    </div>
+  </div>
+
+  <details class="quiz">
+    <summary>Quick check (3 questions)</summary>
+    <div class="q"><div class="q-q">1. Why use more than one attention head?</div>
+      <div class="q-a">So the model can track <b>several kinds of relationships at once</b> — each head learns its own attention pattern (e.g. one for pronoun→noun, one for verb→subject).</div></div>
+    <div class="q"><div class="q-q">2. If d_model = 512 and there are 8 heads, what is d_k per head?</div>
+      <div class="q-a"><b>64</b> (512 ÷ 8). The vector is split, so each head works in a smaller subspace.</div></div>
+    <div class="q"><div class="q-q">3. How are the heads recombined into one output?</div>
+      <div class="q-a"><b>Concatenate</b> the per-head outputs back to d_model, then multiply by the output matrix <b>W_O</b> to mix them.</div></div>
+  </details>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var splitEl = document.getElementById("mh-split");
+  var headsEl = document.getElementById("mh-heads");
+  var concatEl = document.getElementById("mh-concat");
+  var caption = document.getElementById("mh-caption");
+  var dkRow = document.querySelector(".dk-row");
+
+  if (typeof window.d3 === "undefined") {
+    console.warn("[attention-multihead] d3 not found — showing fallback.");
+    splitEl.innerHTML = '<div class="fallback">Could not load the chart library (d3.v7.min.js). '
+      + 'The idea still holds: the d_model vector is split into H heads of size d_model/H; each head attends independently; the outputs are concatenated and mixed by W_O.</div>';
+    return;
+  }
+  var d3 = window.d3;
+  var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function dur(ms){ return REDUCED?0:ms; }
+  var LINE="#E5DFD6", INK="#2C2A28";
+  var D_MODEL = 12;
+  var H = 3;
+  var HEAD_COLORS = ["#2563eb","#f97316","#7c3aed","#2D8B55","#C99A12","#BE3E26"];
+  var words = ["cat","sat","mat"];
+
+  // six distinct, illustrative attention patterns (rows sum to ~1) + a short role name
+  var PATTERNS = [
+    {name:"look at self",    A:[[0.8,0.1,0.1],[0.1,0.8,0.1],[0.1,0.1,0.8]]},
+    {name:"look back",       A:[[1,0,0],[0.8,0.2,0],[0,0.8,0.2]]},
+    {name:"look ahead",      A:[[0.2,0.8,0],[0,0.2,0.8],[0,0,1]]},
+    {name:"look at subject", A:[[0.9,0.05,0.05],[0.7,0.2,0.1],[0.6,0.2,0.2]]},
+    {name:"spread evenly",   A:[[0.4,0.3,0.3],[0.3,0.4,0.3],[0.3,0.3,0.4]]},
+    {name:"look at last",    A:[[0.1,0.1,0.8],[0.1,0.2,0.7],[0.05,0.05,0.9]]}
+  ];
+  var color = d3.scaleSequential(d3.interpolateBlues).domain([0,1]);
+
+  // ---- shared tooltip ----
+  var tt=document.createElement("div");tt.className="d3-tooltip";tt.setAttribute("aria-hidden","true");document.body.appendChild(tt);
+  function showTip(html,e){tt.innerHTML=html;tt.style.opacity="1";moveTip(e);}
+  function moveTip(e){var x=e.clientX+14,y=e.clientY+14,maxX=window.innerWidth-tt.offsetWidth-8;if(x>maxX)x=e.clientX-tt.offsetWidth-14;tt.style.left=x+"px";tt.style.top=y+"px";}
+  function hideTip(){tt.style.opacity="0";}
+
+  // wire head-count selector
+  Array.prototype.forEach.call(dkRow.querySelectorAll(".btn"),function(b){
+    b.addEventListener("click",function(){
+      H=+b.getAttribute("data-h");
+      Array.prototype.forEach.call(dkRow.querySelectorAll(".btn"),function(bb){
+        var on=+bb.getAttribute("data-h")===H;
+        bb.classList.toggle("btn-primary",on);
+        bb.setAttribute("aria-pressed",String(on));
+      });
+      renderAll();
+    });
+  });
+
+  // ---- Section 1: the split bar ----
+  function renderSplit(){
+    var W=640, cell=W/D_MODEL, barY=18, barH=40;
+    var Hh=barH+barY+34;
+    d3.select(splitEl).selectAll("*").remove();
+    var svg=d3.select(splitEl).append("svg").attr("viewBox","0 0 "+W+" "+Hh)
+      .attr("preserveAspectRatio","xMidYMid meet").attr("role","img")
+      .attr("aria-label","The 12-dimensional model vector split into "+H+" head slices of size "+(D_MODEL/H)+".");
+    var dk=D_MODEL/H;
+    // 12 cells, colored by which head they belong to
+    for(var i=0;i<D_MODEL;i++){
+      var head=Math.floor(i/dk);
+      svg.append("rect").attr("x",i*cell+1).attr("y",barY).attr("width",cell-2).attr("height",barH).attr("rx",4)
+        .attr("fill",HEAD_COLORS[head]).attr("opacity",0.28).attr("stroke",HEAD_COLORS[head]).attr("stroke-width",1);
+    }
+    // group brackets + labels
+    for(var h=0;h<H;h++){
+      var x0=h*dk*cell, x1=(h+1)*dk*cell;
+      svg.append("line").attr("x1",x0+2).attr("x2",x1-2).attr("y1",barY+barH+8).attr("y2",barY+barH+8)
+        .attr("stroke",HEAD_COLORS[h]).attr("stroke-width",2);
+      svg.append("text").attr("x",(x0+x1)/2).attr("y",barY+barH+24).attr("text-anchor","middle")
+        .attr("class","d3-axis-label").attr("fill",HEAD_COLORS[h]).style("font-weight",600)
+        .text("head "+(h+1)+" · d_k="+dk);
+    }
+    svg.append("text").attr("x",0).attr("y",12).attr("class","d3-axis-title").text("d_model = 12 dimensions →");
+  }
+
+  // ---- Section 2: one small attention grid per head ----
+  function renderHeads(){
+    d3.select(headsEl).selectAll("*").remove();
+    var n=words.length;
+    for(var h=0;h<H;h++){
+      var pat=PATTERNS[h % PATTERNS.length];
+      var cellDiv=d3.select(headsEl).append("div").attr("class","head-cell");
+      cellDiv.append("div").attr("class","ht").style("color",HEAD_COLORS[h]).text("head "+(h+1)+" — “"+pat.name+"”");
+      var GS=120, pad=22;
+      var svg=cellDiv.append("svg").attr("viewBox","0 0 "+(GS+pad)+" "+(GS+pad))
+        .attr("preserveAspectRatio","xMidYMid meet").attr("role","img")
+        .attr("aria-label","Head "+(h+1)+" attention grid, "+pat.name);
+      var x=d3.scaleBand().domain(d3.range(n)).range([pad,GS+pad]).padding(0.08);
+      var y=d3.scaleBand().domain(d3.range(n)).range([pad,GS+pad]).padding(0.08);
+      // row (query) labels
+      words.forEach(function(w,i){
+        svg.append("text").attr("x",pad-3).attr("y",y(i)+y.bandwidth()/2).attr("text-anchor","end")
+          .attr("dominant-baseline","central").attr("class","d3-axis-label").text(w);
+        svg.append("text").attr("x",x(i)+x.bandwidth()/2).attr("y",pad-5).attr("text-anchor","middle")
+          .attr("class","d3-axis-label").text(w);
+      });
+      (function(pat,h){
+        var cells=[];
+        for(var r=0;r<n;r++) for(var c=0;c<n;c++) cells.push({r:r,c:c,w:pat.A[r][c]});
+        var sel=svg.selectAll("rect.mh").data(cells).join("rect").attr("class","mh")
+          .attr("x",function(d){return x(d.c);}).attr("y",function(d){return y(d.r);})
+          .attr("width",x.bandwidth()).attr("height",y.bandwidth()).attr("rx",2)
+          .attr("fill",function(d){return d.w>0?color(d.w):"#fbfcfe";})
+          .attr("stroke",LINE).attr("stroke-width",0.75)
+          .on("mouseenter",function(e,d){showTip("head "+(h+1)+": <b>‘"+words[d.r]+"’</b> → <b>"+Math.round(d.w*100)+"%</b> ‘"+words[d.c]+"’",e);})
+          .on("mousemove",function(e){moveTip(e);})
+          .on("mouseleave",function(){hideTip();});
+        if(!REDUCED){ sel.attr("opacity",0).transition().duration(dur(350)).delay(function(d){return (d.r*n+d.c)*20;}).attr("opacity",1); }
+      })(pat,h);
+    }
+  }
+
+  // ---- Section 3: concat + W_O ----
+  function renderConcat(){
+    var W=640, H2=96;
+    d3.select(concatEl).selectAll("*").remove();
+    var svg=d3.select(concatEl).append("svg").attr("viewBox","0 0 "+W+" "+H2)
+      .attr("preserveAspectRatio","xMidYMid meet").attr("role","img")
+      .attr("aria-label","Concatenate "+H+" head outputs into a 12-wide vector, then multiply by W_O.");
+    var dk=D_MODEL/H, cell=260/D_MODEL, x0=8, cy=44;
+    // concat bar (12 cells colored by head)
+    svg.append("text").attr("x",x0).attr("y",18).attr("class","d3-axis-title").text("concat heads → 12");
+    for(var i=0;i<D_MODEL;i++){
+      var head=Math.floor(i/dk);
+      svg.append("rect").attr("x",x0+i*cell).attr("y",cy-14).attr("width",cell-1.5).attr("height",28).attr("rx",3)
+        .attr("fill",HEAD_COLORS[head]).attr("opacity",0.28).attr("stroke",HEAD_COLORS[head]).attr("stroke-width",1);
+    }
+    var afterConcat=x0+D_MODEL*cell;
+    svg.append("text").attr("x",afterConcat+26).attr("y",cy).attr("text-anchor","middle").attr("dominant-baseline","central")
+      .attr("class","d3-axis-title").style("font-size","14px").text("× W_O");
+    // output bar
+    var ox=afterConcat+58;
+    svg.append("text").attr("x",ox).attr("y",18).attr("class","d3-axis-title").text("mixed output → 12");
+    for(var j=0;j<D_MODEL;j++){
+      svg.append("rect").attr("x",ox+j*cell).attr("y",cy-14).attr("width",cell-1.5).attr("height",28).attr("rx",3)
+        .attr("fill","#2A7B9B").attr("opacity",0.22).attr("stroke","#2A7B9B").attr("stroke-width",1);
+    }
+    svg.append("text").attr("x",ox+D_MODEL*cell/2).attr("y",cy+30).attr("text-anchor","middle")
+      .attr("class","d3-axis-label").text("W_O lets heads share what they found");
+  }
+
+  function renderAll(){
+    renderSplit(); renderHeads(); renderConcat();
+    var dk=D_MODEL/H;
+    if(caption){
+      if(H===1){
+        caption.innerHTML="With <b>1 head</b>, the model gets one d_k=12 attention — it can track exactly <b>one</b> relationship. Add heads to see it specialize.";
+      } else {
+        caption.innerHTML="<b>"+H+" heads</b>, each of size d_k = 12 ÷ "+H+" = <b>"+dk+"</b>. Each grid is a different pattern (illustrative here; a real model learns its own), so the model tracks <b>"+H+" relationships at once</b> — then W_O mixes them back together. Same 12-wide vector, just sliced.";
+      }
+    }
+  }
+
+  renderAll();
+})();
+</script>
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;            /* opened standalone — no parent to size */
+  var last = 0;
+  function measure(){
+    return Math.ceil(Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    ));
+  }
+  function report(){
+    var h = measure();
+    if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); }
+  }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 360); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

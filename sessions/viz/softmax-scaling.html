@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why divide by √d_k — the softmax collapse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --bg-warm:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12; --v:#f97316; --amber:#f59e0b;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 14px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+b{color:var(--text)}
+
+.nav{position:sticky;top:0;z-index:100;height:54px;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:.4rem}
+.card .how{font-size:.9rem;color:var(--muted);margin-bottom:1rem}
+.card .how b{color:var(--accent-d)}
+
+/* controls */
+.dk-row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}
+.dk-lbl{font-size:.88rem;font-weight:600;color:var(--text)}
+.btn{font-family:var(--body);border:1px solid var(--border);background:#fff;color:var(--text2);padding:.4rem .85rem;border-radius:var(--r-sm);font-weight:600;cursor:pointer;font-size:.9rem;transition:all .12s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-d);color:#fff}
+.scale-row{display:flex;align-items:center;gap:.9rem;margin-bottom:1.2rem}
+.scale-label{font-weight:700;color:var(--muted);font-size:.9rem}
+.scale-label.active{color:var(--accent-d)}
+.switch{position:relative;width:56px;height:30px;border-radius:999px;border:none;background:#cbd2e0;cursor:pointer;transition:background .2s;flex:0 0 auto}
+.switch.on{background:var(--accent)}
+.switch .knob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch.on .knob{transform:translateX(26px)}
+
+.fig-wrap{width:100%}
+svg{display:block;width:100%;height:auto}
+.scale-caption{font-size:.95rem;color:var(--text2);min-height:3em;margin-top:.9rem;line-height:1.5}
+.scale-caption b{color:var(--accent-d)}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;border:1px dashed var(--bad);border-radius:var(--r-md);background:#fff}
+
+.d3-axis-title{font-family:var(--body);font-size:12px;font-weight:600;fill:var(--text2)}
+.d3-axis-label{font-family:var(--mono);font-size:12px;fill:var(--text)}
+.bar-val{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+
+.notice{background:var(--accent-l);border:1px solid #BEE0EB;border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.1rem}
+.notice li{margin-bottom:.5rem;font-size:.92rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+.trap{background:#FFF6E9;border:1px solid #F0DCB0;border-left:4px solid var(--warn);border-radius:0 var(--r-md) var(--r-md) 0;padding:.9rem 1.2rem;margin-top:1.2rem}
+.trap b{color:#9A7208}
+.trap-h{font-weight:700;color:#9A7208;margin-bottom:.35rem}
+
+details.quiz{margin-top:1.5rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:.4rem 1rem}
+details.quiz summary{cursor:pointer;font-weight:700;font-family:var(--display);padding:.7rem 0;color:var(--accent-d)}
+.q{margin:.8rem 0}.q-q{font-weight:600;margin-bottom:.2rem}.q-a{font-size:.9rem;color:var(--text2)}.q-a b{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="nav"><div class="nav-in">
+  <span class="nav-title">√d_k Scaling</span>
+  <a class="nav-back" href="../index.html">← All lessons</a>
+</div></div>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Attention · Represent</span>
+    <h1>Why divide the scores by √d_k?</h1>
+    <p class="intro">
+      The attention formula has a small, odd-looking division: <b>scores ÷ √d_k</b>, where d_k is the size of a key
+      vector. Skip it and the model breaks in a specific way. This page lets you turn the scaling <b>on and off</b>,
+      and grow d_k, so you can watch softmax <b>collapse onto one option</b> — and then recover.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Three options, one softmax</h2>
+    <p class="how"><b>How to interact:</b> pick a key dimension <b>d_k</b>, then flip <b>scaling</b> on and off. The
+      left bars are the raw scores (logits); the right bars are the softmax weights. Watch what large d_k does to the
+      right side when scaling is <b>off</b>.</p>
+
+    <div class="dk-row" role="group" aria-label="Key dimension d_k">
+      <span class="dk-lbl">key dimension d_k:</span>
+      <button class="btn" data-dk="1" aria-pressed="false">1</button>
+      <button class="btn" data-dk="4" aria-pressed="false">4</button>
+      <button class="btn" data-dk="16" aria-pressed="false">16</button>
+      <button class="btn btn-primary" data-dk="64" aria-pressed="true">64</button>
+    </div>
+    <div class="scale-row">
+      <span class="scale-label active" id="scale-label-off">scaling OFF</span>
+      <button class="switch" id="scale-toggle" role="switch" aria-checked="false" aria-label="Toggle √d_k scaling"><span class="knob"></span></button>
+      <span class="scale-label" id="scale-label-on">scaling ON (÷√d_k)</span>
+    </div>
+
+    <div class="fig-wrap" id="d3-scaling" role="group" aria-label="Logits and softmax weights"></div>
+    <p class="scale-caption" id="scale-caption"></p>
+  </div>
+
+  <div class="card">
+    <div class="notice">
+      <h3>What to notice</h3>
+      <ul>
+        <li>Set d_k = 64, scaling <b>OFF</b>: the raw scores are ~<b>√64 = 8×</b> bigger, and softmax hands almost
+          <b>100%</b> to the top option. The other options get ~0% — and so do their gradients. Learning stalls.</li>
+        <li>Now flip scaling <b>ON</b>: dividing by √d_k cancels that growth, and the weights spread back into a
+          sensible blend. Same options, healthy distribution.</li>
+        <li>Set d_k = <b>1</b>: √1 = 1, so scaling does nothing and the two views match. <b>Scaling only matters as
+          d_k grows</b> — which it always does in real models (d_k is 64, 128, …).</li>
+      </ul>
+    </div>
+    <div class="trap">
+      <div class="trap-h">One trap to avoid</div>
+      <span>The fix is <b>not</b> "make the scores smaller so the numbers look nice." It is that dot-product magnitude
+      grows like <b>√d_k</b> purely from adding more dimensions. √d_k scaling <b>cancels exactly that growth</b>, so
+      softmax behaves the same whether a head is 16-dimensional or 128-dimensional.</span>
+    </div>
+  </div>
+
+  <details class="quiz">
+    <summary>Quick check (3 questions)</summary>
+    <div class="q"><div class="q-q">1. What happens to softmax if the scores are very large?</div>
+      <div class="q-a">It <b>saturates</b>: nearly all weight goes to the single biggest score, the rest get ~0, and their gradients vanish. The model can't learn to blend.</div></div>
+    <div class="q"><div class="q-q">2. Why √d_k specifically, not some other constant?</div>
+      <div class="q-a">A dot product of two d_k-dimensional vectors grows in magnitude like <b>√d_k</b>. Dividing by √d_k cancels that exact growth, keeping scores stable at any head size.</div></div>
+    <div class="q"><div class="q-q">3. At d_k = 1, does scaling change anything?</div>
+      <div class="q-a"><b>No.</b> √1 = 1. Scaling only starts to matter once d_k is larger than 1.</div></div>
+  </details>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var container = document.getElementById("d3-scaling");
+  var toggle = document.getElementById("scale-toggle");
+  var labelOff = document.getElementById("scale-label-off");
+  var labelOn = document.getElementById("scale-label-on");
+  var caption = document.getElementById("scale-caption");
+  var dkRow = document.querySelector(".dk-row");
+
+  if (typeof window.d3 === "undefined") {
+    console.warn("[softmax-scaling] d3 not found — showing fallback.");
+    container.innerHTML = '<div class="fallback">Could not load the chart library (d3.v7.min.js). '
+      + 'The idea still holds: dot products grow like √d_k, so without dividing by √d_k, softmax saturates onto one option as d_k grows.</div>';
+    return;
+  }
+  var d3 = window.d3;
+  var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function dur(ms){ return REDUCED?0:ms; }
+
+  function softmax(arr){var mx=Math.max.apply(null,arr);var e=arr.map(function(x){return Math.exp(x-mx);});var s=e.reduce(function(a,b){return a+b;},0);return e.map(function(x){return x/s;});}
+
+  var foods=[
+    {name:"Pizza",emo:"🍕",color:"#f97316"},
+    {name:"Pasta",emo:"🍝",color:"#f59e0b"},
+    {name:"Salad",emo:"🥗",color:"#2D8B55"}
+  ];
+  var base=[2.0,1.0,0.4];
+  var dk=64;
+  var scaled=false;
+
+  // wire the d_k selector
+  Array.prototype.forEach.call(dkRow.querySelectorAll(".btn"),function(b){
+    b.addEventListener("click",function(){
+      dk=+b.getAttribute("data-dk");
+      Array.prototype.forEach.call(dkRow.querySelectorAll(".btn"),function(bb){
+        var on=+bb.getAttribute("data-dk")===dk;
+        bb.classList.toggle("btn-primary",on);
+        bb.setAttribute("aria-pressed",String(on));
+      });
+      render();
+    });
+  });
+
+  var SVG_W=700, SVG_H=210;
+  var margin={top:30,right:16,bottom:10,left:96};
+  var rowH=46, barH=22;
+  var logitX0=margin.left+14, logitW=170;
+  var weightX0=margin.left+270, weightW=170;
+
+  function render(){
+    var logits = scaled ? base.slice() : base.map(function(b){return b*Math.sqrt(dk);});
+    var weights = softmax(logits).map(function(w){return w*100;});
+    // fixed logit domain so the RAW scores visibly grow with d_k (the whole
+    // point of the page). 16 = base[0]·√64, the largest logit reachable.
+    var maxLogit = base[0]*Math.sqrt(64);
+    var xLogit = d3.scaleLinear().domain([0,maxLogit]).range([0,logitW]);
+    var xWeight = d3.scaleLinear().domain([0,100]).range([0,weightW]);
+
+    d3.select(container).selectAll("*").remove();
+    var svg=d3.select(container).append("svg")
+      .attr("viewBox","0 0 "+SVG_W+" "+SVG_H).attr("preserveAspectRatio","xMidYMid meet")
+      .attr("role","img").attr("aria-label","Logits and softmax weights for three options at d_k "+dk+(scaled?" with":" without")+" scaling.");
+
+    svg.append("text").attr("class","d3-axis-title").attr("x",logitX0).attr("y",18).text("score (logit)");
+    svg.append("text").attr("class","d3-axis-title").attr("x",weightX0).attr("y",18).text("softmax weight");
+
+    foods.forEach(function(food,i){
+      var cy=margin.top+i*rowH;
+      svg.append("text").attr("class","d3-axis-label").attr("x",margin.left-6).attr("y",cy+barH/2)
+        .attr("text-anchor","end").attr("dominant-baseline","central").text(food.emo+" "+food.name);
+
+      svg.append("rect").attr("x",logitX0).attr("y",cy).attr("width",logitW).attr("height",barH).attr("rx",6).attr("fill","#eef1f7");
+      var lbar=svg.append("rect").attr("x",logitX0).attr("y",cy).attr("width",0).attr("height",barH).attr("rx",6).attr("fill",food.color).attr("opacity",0.85);
+      lbar.transition().duration(dur(550)).attr("width",Math.max(0,xLogit(logits[i])));
+      svg.append("text").attr("class","bar-val").attr("x",logitX0+logitW+6).attr("y",cy+barH/2)
+        .attr("dominant-baseline","central").text(logits[i].toFixed(2));
+
+      svg.append("rect").attr("x",weightX0).attr("y",cy).attr("width",weightW).attr("height",barH).attr("rx",6).attr("fill","#eef1f7");
+      var wbar=svg.append("rect").attr("x",weightX0).attr("y",cy).attr("width",0).attr("height",barH).attr("rx",6).attr("fill",food.color);
+      wbar.transition().duration(dur(550)).attr("width",xWeight(weights[i]));
+      svg.append("text").attr("class","bar-val").attr("x",weightX0+weightW+6).attr("y",cy+barH/2)
+        .attr("dominant-baseline","central").text(weights[i].toFixed(1)+"%");
+    });
+
+    if(toggle){ toggle.classList.toggle("on",scaled); toggle.setAttribute("aria-checked",scaled?"true":"false"); }
+    if(labelOff) labelOff.classList.toggle("active",!scaled);
+    if(labelOn) labelOn.classList.toggle("active",scaled);
+
+    if(caption){
+      if(dk===1){
+        caption.innerHTML="At d_k = 1, √d_k = 1, so scaling does nothing — the two views match. <b>Scaling only matters once d_k grows.</b>";
+      } else if(!scaled){
+        caption.innerHTML="Scaling <b>OFF</b>, d_k = "+dk+": the raw dot products are about √"+dk+" = "+Math.sqrt(dk).toFixed(1)+
+          "× larger (that is just how dot-product size grows with dimension). The biggest score crushes the rest — <b>softmax collapses to a spike</b> and gradients to the others vanish.";
+      } else {
+        caption.innerHTML="Scaling <b>ON</b>: dividing by √d_k cancels that √d_k growth, keeping logits in a gentle range no matter how big d_k is, so the model can still <b>blend several options</b>.";
+      }
+    }
+  }
+
+  if(toggle) toggle.addEventListener("click",function(){scaled=!scaled;render();});
+  render();
+})();
+</script>
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;            /* opened standalone — no parent to size */
+  var last = 0;
+  function measure(){
+    return Math.ceil(Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    ));
+  }
+  function report(){
+    var h = measure();
+    if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); }
+  }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 360); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>
