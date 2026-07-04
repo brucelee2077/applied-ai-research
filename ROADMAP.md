@@ -74,10 +74,10 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | M | Build-module | Cap. | Source | Action | ~L | Cost | Status |
 |---|---|---|---|---|----|------|--------|
 | **Phase 0 · Foundations — The Neural Net From Scratch** | | | | | | | |
-| 1 | Numbers, Arrays & Shapes | Represent | Python/NumPy + light math | author | 6 | $0 | 🔄 5/6 + gate |
-| 2 | The Neuron & How It Learns *(merged)* | Represent→Train | `00-nn/fundamentals` 01–08 | author | 9 | $0 | 🔄 6/9 + gates |
-| 3 | Attention as a Pure Idea *(+ RoPE build)* | Represent | `01-transformers/days` 01–17 | author | 6 | $0 | 🔄 4/6 + gate |
-| 4 | MLP → PyTorch *(+ einsum primer)* | Train | `…fundamentals` 09–10 | author | 6 | $0 | 🔄 1/6 (stub) |
+| 1 | Numbers, Arrays & Shapes | Represent | Python/NumPy + light math | author | 6 | $0 | ✅ 6/6 + gate |
+| 2 | The Neuron & How It Learns *(merged)* | Represent→Train | `00-nn/fundamentals` 01–08 | author | 9 | $0 | ✅ 9/9 + gates |
+| 3 | Attention as a Pure Idea *(+ RoPE build)* | Represent | `01-transformers/days` 01–17 | author | 6 | $0 | ✅ 5/5 + gate |
+| 4 | MLP → PyTorch *(+ einsum primer)* | Train | `…fundamentals` 09–10 | author | 6 | $0 | ✅ 6/6 + gate |
 | 5a | Full Text Transformer *(+ modern components)* | Represent | `01-transformers/days` 18–28 | author | 8 | $0 | ⬜ |
 | 5b | Vision Transformer (ViT) | Represent | frontier ViT | author | 4 | $0 | ⬜ |
 | 6 | CNNs & Vision Encoders ⭐ | Represent | `00-nn/cnn` + `05-multimodal` | author | 8 | $0 | ⬜ |
@@ -155,10 +155,10 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 |-----|--------|------|----------|--------|
 | 1 | Arrays & the shape of data | `week-f1/day-01-arrays.html` | `wf1-d01-arrays` | ✅ done |
 | 2 | Indexing & slicing | `week-f1/day-02-indexing-slicing.html` | `wf1-d02-indexing` | ✅ done |
-| 3 | Broadcasting & dtypes | `week-f1/day-03-broadcasting-dtypes.html` | `wf1-d03-broadcasting` | ✅ done (⬜ embed `broadcasting.html`) |
-| 4 | Matmul & shapes | `week-f1/day-04-matmul-and-shapes.html` | `wf1-d04-matmul` | ✅ done (⬜ embed `matmul.html`) |
+| 3 | Broadcasting & dtypes | `week-f1/day-03-broadcasting-dtypes.html` | `wf1-d03-broadcasting` | ✅ done (✅ embedded `broadcasting.html`) |
+| 4 | Matmul & shapes | `week-f1/day-04-matmul-and-shapes.html` | `wf1-d04-matmul` | ✅ done (✅ embedded `matmul.html`) |
 | 5 | Logs & exponents | `week-f1/day-05-logs-and-exponents.html` | `wf1-d05-logs` | ✅ done |
-| 6 | **Random seeds / PRNG** | `week-f1/day-06-random-seeds.html` | `wf1-d06-seeds` | ⬜ **finish-first** |
+| 6 | **Random seeds / PRNG** | `week-f1/day-06-random-seeds.html` | `wf1-d06-seeds` | ✅ done |
 | — | Review gate | `week-f1/review.html` | `wf1-review` | ✅ done |
 
 #### M2 — The Neuron and How It Learns · 9 lessons *(merged: forward pass + how it learns)*
@@ -176,9 +176,9 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | 4 | Loss (MSE, cross-entropy, softmax) | `week-f3/day-01-loss.html` | `wf3-d01-loss` | ✅ done |
 | 5 | Gradients & backprop | `week-f3/day-02-gradients-backprop.html` | `wf3-d02-backprop` | ✅ done |
 | 6 | The training loop | `week-f3/day-03-training-loop.html` | `wf3-d03-loop` | ✅ done |
-| 7 | **Optimizers: SGD → momentum → Adam** | `week-f3/day-04-optimizers.html` | `wf3-d04-optimizers` | ⬜ **finish-first** (⬜ embed `gradient-descent.html`) |
-| 8 | **Learning-rate intuition** | `week-f3/day-05-learning-rate.html` | `wf3-d05-lr` | ⬜ **finish-first** |
-| 9 | **Train/val/test split & overfitting** | `week-f3/day-06-train-val-test.html` | `wf3-d06-split` | ⬜ **finish-first** |
+| 7 | **Optimizers: SGD → momentum → Adam** | `week-f3/day-04-optimizers.html` | `wf3-d04-optimizers` | ✅ done (✅ embedded `gradient-descent.html`) |
+| 8 | **Learning-rate intuition** | `week-f3/day-05-learning-rate.html` | `wf3-d05-lr` | ✅ done |
+| 9 | **Train/val/test split & overfitting** | `week-f3/day-06-train-val-test.html` | `wf3-d06-split` | ✅ done |
 | — | Review gates | `week-f2/review.html` · `week-f3/review.html` | `wf2-review` · `wf3-review` | ✅ done |
 
 ### Foundations · Part B — Attention & First Models
@@ -199,7 +199,7 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | 2 | Query / Key / Value | `week-f4/day-02-qkv.html` | `wf4-d02-qkv` | — (static cards) | ✅ built |
 | 3 | Attention scores, √d_k & softmax | `week-f4/day-03-attention-scores.html` | `wf4-d03-scores` | `attention-pipeline` + `softmax-scaling` | ✅ built · viz verified |
 | 4 | Multi-head attention | `week-f4/day-04-multihead.html` | `wf4-d04-multihead` | `attention-multihead.html` | ✅ built · viz verified |
-| 5 | **Positional encoding (+ shuffle problem, RoPE build)** | `week-f4/day-05-positional.html` | `wf4-d05-position` | (candidate: new) | ⬜ **finish-first** |
+| 5 | **Positional encoding (+ shuffle problem, RoPE build)** | `week-f4/day-05-positional.html` | `wf4-d05-position` | (static SVG) | ✅ done (RoPE = awareness) |
 | — | Review gate | `week-f4/review.html` | `wf4-review` | — | ✅ done |
 
 #### M4 — Your First From-Scratch Model: an MLP, Then the PyTorch Version · 6 lessons
@@ -207,7 +207,7 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 - **You build:** forward pass → backward + wiring → mini-batch loop with an overfit-one-batch sanity check → full MNIST train with a **loss-curve read and dropout** → the same model re-implemented in PyTorch → a review gate.
 - **Topics:** from-scratch MLP forward+backward · mini-batch loop · overfit-one-batch sanity check · **reading a loss curve** · **dropout / basic regularization** · the same model in PyTorch (autograd / nn.Module / optimizer) · why PyTorch tensors mirror NumPy.
 - **Source:** `00-neural-networks/fundamentals` 09–10 · **Action:** author · **Builds on:** M2 (M3 seeds intuition) · **Cost:** $0.
-- **⚠️ Status: 1/6 — stub.** Only `week-f5/day-01-mlp-mnist.html` exists. Missing: backward+wiring, mini-batch loop, loss-curve+dropout, PyTorch re-implementation, review gate. **This is the most stalled foundation module — finish before advancing to M5.**
+- **✅ Status: 6/6 + gate — complete.** All six days built (`day-01-mlp-mnist` … `day-06-why-pytorch`) + `review.html`: from-scratch backward pass, mini-batch loop + overfit-one-batch, full training with loss-curve reading + dropout, PyTorch re-implementation, and why PyTorch mirrors NumPy. `day-04` embeds `gradient-descent.html`. *(Note: the revamp's "+einsum primer" is not yet in these lessons — flag for follow-up.)*
 
 ### Foundations · Part C — Full Architectures
 
@@ -516,13 +516,13 @@ Every source directory on disk, and the module that consumes it. This section ex
 ### Priority 0 — finish the foundations *(do first; ~62% built)*
 | WP | Module | Deliverable(s) | Source | Depends on | Status |
 |----|--------|----------------|--------|-----------|--------|
-| **P0-1** | M1 | `week-f1/day-06-random-seeds.html` (`wf1-d06-seeds`) | Python/NumPy PRNG; bridge to M7 JAX keys | — | ⬜ |
-| **P0-2** | M2 | `week-f3/day-04-optimizers.html`, `day-05-learning-rate.html`, `day-06-train-val-test.html` | `00-nn/fundamentals` 06–08 + optimizer content | P0-V3 (day-04 embed) | ⬜ |
-| **P0-3** | M3 | `week-f4/day-05-positional.html` (`wf4-d05-position`) | `01-transformers/days` (positional day) | — | ⬜ |
-| **P0-4** ⚠️ | M4 | `week-f5/day-02`…`day-06` + `review.html` (5 + gate) | `00-nn/fundamentals` 09–10 | P0-V3 (loss-curve viz) | ⬜ |
-| **P0-V1** | viz | `sessions/viz/matmul.html` (M1 d04 embed) | `visual-tutorial/d3-viz.js` `drawMatrix` + contrib highlight | — | ⬜ |
-| **P0-V2** | viz | `sessions/viz/broadcasting.html` (M1 d03 embed) | new (resize operands → broadcast rule fires/fails) | — | ⬜ |
-| **P0-V3** | viz | `sessions/viz/gradient-descent.html` (M2 d07, M4) | new (loss surface + LR slider + step button) | — | ⬜ |
+| **P0-1** | M1 | `week-f1/day-06-random-seeds.html` (`wf1-d06-seeds`) | Python/NumPy PRNG; bridge to M7 JAX keys | — | ✅ |
+| **P0-2** | M2 | `week-f3/day-04-optimizers.html`, `day-05-learning-rate.html`, `day-06-train-val-test.html` | `00-nn/fundamentals` 06–08 + optimizer content | P0-V3 (day-04 embed) | ✅ |
+| **P0-3** | M3 | `week-f4/day-05-positional.html` (`wf4-d05-position`) | `01-transformers/days` (positional day) | — | ✅ |
+| **P0-4** ⚠️ | M4 | `week-f5/day-02`…`day-06` + `review.html` (5 + gate) | `00-nn/fundamentals` 09–10 | P0-V3 (loss-curve viz) | ✅ |
+| **P0-V1** | viz | `sessions/viz/matmul.html` (M1 d04 embed) | `visual-tutorial/d3-viz.js` `drawMatrix` + contrib highlight | — | ✅ |
+| **P0-V2** | viz | `sessions/viz/broadcasting.html` (M1 d03 embed) | new (resize operands → broadcast rule fires/fails) | — | ✅ |
+| **P0-V3** | viz | `sessions/viz/gradient-descent.html` (M2 d07, M4) | new (loss surface + LR slider + step button) | — | ✅ |
 
 - **P0-1** (M1 PRNG): why reproducibility matters, seeding NumPy, the *idea* of a PRNG key so JAX's explicit `key`/`split` in M7 isn't cold. `cp week-f1/day-05-logs-and-exponents.html`. No viz needed.
 - **P0-2** (M2 learning half — completes the merged module, now 6/9): `day-04` SGD→momentum→Adam on the 2-layer net (embeds `gradient-descent.html`); `day-05` LR intuition (too-big diverges / too-small crawls); `day-06` train/val/test + overfitting demo. `cp week-f3/day-03-training-loop.html`.
@@ -542,7 +542,7 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 - Authored lessons inside otherwise-reuse modules: **M16a** BPE · **M18** two-tower foundation · **M21a** RLHF + fine-tuning conversion · **M28** 5 TLA+ lessons.
 
 ### Status glance
-- **Priority 0 (foundations): 0 / 7 WPs — start here.**
+- **Priority 0 (foundations): 7 / 7 WPs — ✅ complete (M1, M2, M3, M4 + all 3 viz built, verified, wired).**
 - Priority 1 (Phases 0–5): 0 / ~30 build-modules · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
 - **Legend:** ⬜ unclaimed · 🔄 in progress (add session date) · ✅ done & verified · ⛔ blocked (note blocker).
 
@@ -579,9 +579,9 @@ The learner's benchmark is the **Attention Lab** (`visual-tutorial/d3-viz.js`, `
 | `attention-pipeline.html` | ● built | M3 day-03 |
 | `softmax-scaling.html` | ● built | M3 day-03 |
 | `attention-multihead.html` | ● built | M3 day-04 |
-| `gradient-descent.html` | 🆕 to build | M2, M4 |
-| `matmul.html` | 🆕 to build | M1 day-04 |
-| `broadcasting.html` | 🆕 to build | M1 day-03 |
+| `gradient-descent.html` | ● built | M2, M4 |
+| `matmul.html` | ● built | M1 day-04 |
+| `broadcasting.html` | ● built | M1 day-03 |
 | `diffusion-noising.html` | 🆕 to build | M22b |
 
 ---
