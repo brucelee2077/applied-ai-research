@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Module 1 · Day 3 — Broadcasting &amp; dtypes</title>
+<title>Module 5 · Day 4 — Full Training: Reading the Loss Curve &amp; Dropout</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -184,12 +184,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 </style>
 </head>
 
-<body data-quest-id="wf1-d03-broadcasting">
+<body data-quest-id="wf5-d04-training">
 
 <nav class="nav">
   <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
   <div class="nav-in">
-    <span class="nav-title">Foundations · M1 Day 3</span>
+    <span class="nav-title">Foundations · M5 Day 4</span>
     <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
   </div>
 </nav>
@@ -197,100 +197,109 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav prev" href="day-03-minibatch-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Mini-Batch Loop</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav next" href="day-05-pytorch-version.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
 </nav>
 
   <header class="hero">
-    <span class="eyebrow">Module 1 · Represent · Day 3</span>
-    <h1>Broadcasting &amp; dtypes<br>Math Between Different Shapes</h1>
-    <p class="lead">You've built arrays, sliced them, and read their shape. But what happens when you add two arrays of <strong>different</strong> shapes? And why does it matter whether a number is stored as <code>float32</code> or <code>float64</code>? Both answers decide how much memory a model eats.</p>
+    <span class="eyebrow">Module 5 · Train · Day 4</span>
+    <h1>Full Training<br>Reading the Loss Curve &amp; Dropout</h1>
+    <p class="lead">Your loop works and it passed the sanity check. Now you run it for real on MNIST — and you learn to read the story the loss curve is telling you. Falling means learning. Flat means stuck. And when the validation loss starts rising while training loss keeps dropping, the model is memorizing. Dropout is one simple fix.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> predict whether two shapes can be added, state the one broadcasting rule, and explain why <code>float32</code> uses half the memory of <code>float64</code>.
+      <b>🎯 By the end, you'll be able to:</b> read a loss curve (learning vs stuck vs overfitting), and explain how dropout randomly switches off neurons so the network cannot over-rely on any single one.
     </div>
   </header>
 
   <!-- ===== 1. WHAT IS IT ===== -->
   <section class="sec" id="s1" data-sec="what">
-    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two ideas: broadcasting and dtype</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Watching training, and keeping it honest</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–2 — arrays, shape, and that <code>x + 10</code> adds to every element. <b>No new tools</b> — two ideas that ride on what you have.</div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the mini-batch loop from Day 3, the loss from M3 Day 1, and the idea of a held-out set (Day 1). Today we run the loop for real and read what it produces.</div></div>
 
-      <h4>What is broadcasting?</h4>
-      <p><span class="term" data-tip="NumPy's rule for doing math between arrays of different shapes by automatically stretching the smaller one to match — without copying data.">Broadcasting</span> is NumPy's rule for doing math between arrays of <strong>different shapes</strong>. It automatically "stretches" the smaller one to fit the larger, so you never write a loop. You already used the simplest case on Day 1: <code>x + 10</code> stretched the single number 10 across every element.</p>
+      <h4>The loss curve — training's speedometer</h4>
+      <p>Every epoch, you record the average loss. Plot loss against epoch and you get the <span class="term" data-tip="A plot of the loss value over training steps or epochs. Its shape tells you whether the model is learning, stuck, or overfitting.">loss curve</span>. It is the single most useful picture in training: its shape tells you what to do next.</p>
 
-      <h4>What is a dtype?</h4>
-      <p>A <span class="term" data-tip="Data type: the single kind and size every element of an array shares, e.g. int64, float32, float64.">dtype</span> (data type) is the <strong>one kind and size</strong> every element in an array shares — like <code>int64</code>, <code>float32</code>, or <code>float64</code>. It decides two things: what values fit (whole numbers vs decimals) and <strong>how many bytes each number costs</strong>.</p>
+      <h4>Two curves, not one</h4>
+      <p>You plot two lines: the <span class="term" data-tip="The loss measured on the data the model trains on. It almost always keeps falling.">training loss</span> and the <span class="term" data-tip="The loss measured on a separate held-out set the model never trains on. It shows whether the model is truly learning or just memorizing.">validation loss</span> (on a held-out set). Training loss usually keeps falling. When validation loss turns and starts <strong>rising</strong> while training keeps dropping, the model is <span class="term" data-tip="When a model fits the training data too closely and does worse on new data. Seen as the validation loss rising while training loss keeps falling.">overfitting</span> — memorizing instead of generalizing.</p>
 
-      <h4>Why put them together today?</h4>
-      <p>Both are about <strong>doing math efficiently at scale</strong>. Broadcasting lets one small array (like a bias) act on a huge one with no copies. The dtype decides the memory bill — and that bill is what forces the whole quantization story you'll meet later. Keep going 👇</p>
-      <button class="gotit" type="button">Got the two ideas — let's go</button>
+      <h4>Dropout — a simple cure</h4>
+      <p><span class="term" data-tip="A regularization trick: during training, randomly set a fraction of neuron outputs to zero each step, so the network cannot depend on any single neuron.">Dropout</span> fights overfitting. During training, at each step you randomly switch off a fraction of neurons (set them to zero). The network is forced to spread its knowledge around instead of leaning on any one neuron. Keep going 👇</p>
+      <button class="gotit" type="button">Got the goal — let's go</button>
     </div>
   </section>
 
   <!-- ===== 2. INTUITION ===== -->
   <section class="sec" id="s2" data-sec="intuition">
-    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A stamp, and a set of boxes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Practising with a random teammate missing</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <div class="relate">
-        <div class="card"><span class="big">🖊️</span><h5>Broadcasting = one stamp</h5><p>To add 10 to every cell, you don't rewrite "10" in each one. You press <strong>one stamp</strong> across the whole grid. NumPy stretches the small thing to cover the big thing.</p></div>
-        <div class="card"><span class="big">📦</span><h5>dtype = the size of the box</h5><p>Each number sits in a box. <code>float64</code> is a big box (8 bytes, lots of precision); <code>float32</code> a smaller box (4 bytes); <code>bfloat16</code> tiny (2 bytes). Smaller box = less memory.</p></div>
+        <div class="card"><span class="big">📉</span><h5>The loss curve is a story</h5><p>Loss falling = the team is getting better. Loss flat = practice is not helping. Practice score great but real-game score getting worse = the team only works in one exact setup.</p></div>
+        <div class="card"><span class="big">🏀</span><h5>Dropout = a random benched player</h5><p>Each practice drill, bench one or two players at random. Now no single star can be the whole plan. Everyone learns to contribute, so the team stays strong even when someone is off.</p></div>
       </div>
-      <p><strong>In one line:</strong> broadcasting stretches a small shape to match a big one; dtype is how large each number's box is.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: broadcasting doesn't actually make copies — the "stretch" is virtual, so it costs no extra memory. And a smaller dtype box isn't free: squeeze too hard and you lose precision. That trade-off is the heart of quantization later.</div></div>
+      <p><strong>In one line:</strong> read the two loss curves to spot memorizing, and use dropout — randomly benching neurons during training — so no single neuron becomes a point of failure.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a benched player rests and comes back unchanged, but dropout switches off <em>different</em> neurons every single step, and at test time <strong>all</strong> neurons play together. So the model trains as many overlapping "teams" and then uses the whole roster to make predictions.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
   </section>
 
   <!-- ===== 3. PLAYGROUND ===== -->
   <section class="sec" id="s3" data-sec="play">
-    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three cases and see for yourself</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Train, read the curve, then add dropout</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Below is a simulated Python terminal. Click each button and watch the shapes line up. <strong>Click all three</strong> to finish this section.</p>
+      <p>Below is a simulated Python terminal. Train the MLP, spot the overfitting turn, then switch on dropout. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="scalar" type="button">① array + 10</button>
-          <button class="play-btn" data-demo="row" type="button">② grid + row (3,)</button>
-          <button class="play-btn" data-demo="dtype" type="button">③ dtypes: int vs float, bytes</button>
+          <button class="play-btn" data-demo="run" type="button">① train &amp; print both losses</button>
+          <button class="play-btn" data-demo="overfit" type="button">② spot the overfitting turn</button>
+          <button class="play-btn" data-demo="dropout" type="button">③ add dropout → gap shrinks</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>.nbytes</code> is the total memory an array uses = number of elements × bytes per element.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: <span class="term" data-tip="A method that discourages a model from fitting the training data too closely, so it does better on new data. Dropout is one kind.">regularization</span> is the family name for tricks like dropout that fight overfitting.</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
   </section>
 
   <!-- ===== 4. MECHANISM & WHY ===== -->
   <section class="sec" id="s4" data-sec="why">
-    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The one rule, the byte table, and why money is bytes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Three curve shapes, and how dropout works</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <h4>The one broadcasting rule</h4>
-      <p>Line the two shapes up <strong>from the right</strong>. Going right-to-left, each pair of dimensions must be either <strong>equal</strong>, or <strong>one of them is 1</strong> (or missing). The size-1 (or missing) side is the one that stretches. If a pair is neither equal nor 1, it's an error.</p>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>(2, 3) + (3,)</code> → align right: <code>3</code> vs <code>3</code> ✓, then <code>2</code> vs <em>missing</em> ✓ → result <code>(2, 3)</code>.</div></div>
-      <div class="callout c-warn"><span class="ic">❌</span><div><code>(2, 3) + (2,)</code> → align right: <code>3</code> vs <code>2</code> — not equal, neither is 1 → <strong>error</strong>.</div></div>
-
-      <h4>The byte table</h4>
+      <h4>Reading the loss curve — three shapes</h4>
       <ul>
-        <li><code>float64</code> = 8 bytes · <code>float32</code> = 4 bytes · <span class="term" data-tip="A 16-bit floating type used a lot in ML: half the memory of float32, keeps the same range with less precision.">bfloat16</span> = 2 bytes each.</li>
-        <li>Memory of a tensor = number of elements × bytes/element. Halve the bytes → halve the memory.</li>
+        <li><strong>Falling steadily:</strong> good — the model is learning. Let it keep going.</li>
+        <li><strong>Flat from the start (or stuck high):</strong> stuck — usually the learning rate is too small or too large, or a wiring bug. This is why you overfit one batch first (Day 3).</li>
+        <li><strong>Training falls, validation turns upward:</strong> overfitting — the model is memorizing the training set. Stop early, add data, or add regularization like dropout.</li>
       </ul>
 
-      <h4>Why a frontier lab cares</h4>
-      <p>Bytes are money and speed. A 7-billion-parameter model in <code>float32</code> needs ~28 GB just for weights; in <code>bfloat16</code>, ~14 GB — the difference between fitting on one chip or not. Broadcasting is how a bias vector <code>(features,)</code> gets added to a whole batch <code>(batch, features)</code> with no copy.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> broadcasting → one op covers many shapes, no copies → less code + less memory. dtype → fewer bytes per number → bigger models fit on the same hardware. <strong>Every quantization trick later is just this dial.</strong></div></div>
-      <button class="gotit" type="button">Got the rule and the bytes</button>
+      <h4>Dropout — Step 1, in plain words</h4>
+      <p>During each training step, roll a dice for every neuron. With probability <code>p</code>, set that neuron's output to zero for this step. Because a different random set is off each step, no neuron can become the single thing the answer depends on.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        mask = (random(h.shape) &gt; p)     <span class="dim"># True where the neuron stays on</span><br>
+        h = h * mask / (1 - p)           <span class="dim"># zero out the rest, scale up the survivors</span>
+      </div></div>
+      <p>Symbols: <code>h</code> = the hidden activations, <code>p</code> = dropout rate (say 0.2 means drop 20%), <code>mask</code> = a random on/off pattern. Dividing by <code>(1 - p)</code> keeps the average size of <code>h</code> the same, so the next layer sees roughly the same total signal. At test time you turn dropout off — all neurons are used.</p>
+
+      <h4>Step 3 — a worked feel</h4>
+      <p>With <code>p = 0.2</code> and 128 hidden neurons, about 26 are zeroed each step, and the surviving ~102 are scaled up by <code>1/0.8 = 1.25</code>. Next step, a different 26 are off. Over many steps the model learns to be robust to any subset being missing.</p>
+
+      <h4>Why labs care</h4>
+      <p>The loss curve is the primary dashboard for every training run, from this MLP to a giant LLM — engineers stare at it for days. And overfitting never goes away; it just changes shape. Dropout, weight decay, and early stopping are the everyday tools that keep big models honest.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The habit:</b> always watch validation loss, not just training loss. The moment the two diverge is the moment your model stops learning the task and starts memorizing the answers.</div></div>
+      <button class="gotit" type="button">Got curves and dropout</button>
     </div>
   </section>
 
   <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
   <section class="sec" id="s5" data-sec="build">
-    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch shapes stretch, then shrink the bytes — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Feel the descent, then read the curve — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Here is broadcasting and dtype, built one piece at a time. First, <strong>play with the live tool</strong> below — set two shapes and watch the rule fire or fail. Then <strong>scroll down slowly</strong> through the static build underneath, where each piece fades in with a short note. By the bottom you'll predict any broadcast and any memory bill.</p>
-      <div class="build-embed"><iframe src="../viz/broadcasting.html" title="Interactive broadcasting rule" loading="lazy"></iframe>
-      <div class="cap">↑ interactive — pick the two shapes and watch them align from the right. <a href="../viz/broadcasting.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
+      <p>First, play with gradient descent itself — drag the controls and watch a ball roll downhill toward the lowest loss. That downhill roll is what every training step is doing.</p>
+      <div class="build-embed"><iframe src="../viz/gradient-descent.html" title="interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <p>Now here is the loss-curve story and dropout, built one step at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -311,39 +320,39 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
   <section class="sec" id="s7" data-sec="produce">
     <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Broadcast a few shapes and weigh a few dtypes yourself — that's what makes the day count. Pick one:</p>
+      <p>Understanding ≠ being able to write it. Train on MNIST, plot the two loss curves, and see dropout shrink the gap — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03_broadcasting.py</code>. Add a scalar to an array; add a <code>(3,)</code> row to a <code>(2,3)</code> grid; try <code>(2,3) + (2,)</code> inside a <code>try/except</code> and print the error; then print <code>.dtype</code> and <code>.nbytes</code> for the same data as <code>float64</code> vs <code>float32</code>. Run it with <code>python3 m03_broadcasting.py</code>.</p>
+      <p>Create <code>experiments/foundations/m05_training_dropout.py</code>. Train the 784→128→10 MLP on MNIST with your Day-3 loop. Record training loss and validation loss each epoch and plot both curves (save the figure). Then add dropout with <code>p = 0.2</code> on the hidden layer, retrain, and compare the train-vs-validation gap before and after. Run with <code>python3 m05_training_dropout.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 3 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 4 artifact.
 
-Create experiments/foundations/m03_broadcasting.py that, with a comment on each step:
-1. Prints x + 10 for x = np.array([1,2,3]) (scalar broadcast).
-2. Adds row = np.array([10,20,30]) to g = np.array([[1,2,3],[4,5,6]]) and prints the (2,3) result, noting the (3,) row was stretched across both rows.
-3. Wraps g + np.array([1,2]) in try/except and prints the broadcasting error (shapes (2,3) and (2,) do not align).
-4. Builds b = np.array([1.,2.,3.]) as float64, makes f = b.astype(np.float32), and prints b.dtype, f.dtype, b.nbytes, f.nbytes — showing float32 uses half the bytes.
-Then run it and paste the output at the bottom as a comment.</pre>
+Create experiments/foundations/m05_training_dropout.py that, with a comment on each step, trains the 2-layer MLP on MNIST and studies the loss curve (NumPy, reuse the Day 2-3 code):
+1. Trains for several epochs, recording BOTH training loss and validation loss (on a held-out split) each epoch.
+2. Plots the two loss curves on one figure and saves it; prints where the validation loss stops improving (the overfitting turn).
+3. Adds dropout with p=0.2 on the hidden activations during training only (mask + scale by 1/(1-p)); turns it off at eval time.
+4. Retrains and prints the train-vs-validation gap with and without dropout, showing the gap shrinks with dropout.
+Then run it and paste the two gaps at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-03-log.md</code>: which broadcast surprised you, or which dtype fact stuck?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-04-log.md</code>: at which epoch did validation loss stop improving, and how much did dropout shrink the train-vs-validation gap?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
 
   <div class="fin" id="fin" role="status" aria-hidden="true">
     <span class="em">🎉</span>
-    <h3>Module 1 · Day 3 complete!</h3>
-    <p>You can predict a broadcast from two shapes and explain why <code>float32</code> halves the memory of <code>float64</code>.<br>Next up: <b>Matmul &amp; Shapes</b> — the one operation every neural network is built from.</p>
+    <h3>Module 5 · Day 4 complete!</h3>
+    <p>You can now read a loss curve — falling means learning, flat means stuck, rising validation means overfitting — and you know dropout randomly switches off neurons so no single one becomes a point of failure.<br>Next up: <b>The Same Model in PyTorch</b> — rebuild everything you hand-wired, in far fewer lines.</p>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav prev" href="day-03-minibatch-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Mini-Batch Loop</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav next" href="day-05-pytorch-version.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -387,21 +396,19 @@ document.getElementById('reset').addEventListener('click', function(){
 
 /* PLAYGROUND */
 var DEMOS = {
-  scalar:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])   <span class="dim"># shape (3,)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> x + <span class="num">10</span>          <span class="dim"># the 10 is stretched to every element</span>\n'+
-    '<span class="ok">array([11, 12, 13])</span>',
-    take:'<b>①  Scalar broadcast.</b> A single number is stretched to match the whole array — the simplest broadcast. You met this on Day 1; now you know its name.'},
-  row:{html:'<span class="prompt">&gt;&gt;&gt;</span> g = np.array([[<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], [<span class="num">4</span>,<span class="num">5</span>,<span class="num">6</span>]])  <span class="dim"># (2,3)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> row = np.array([<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>])       <span class="dim"># (3,)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> g + row       <span class="dim"># row stretched down onto BOTH rows</span>\n'+
-    '<span class="ok">array([[11, 22, 33],\n       [14, 25, 36]])</span>',
-    take:'<b>②  The general case.</b> Shapes differ — (2,3) vs (3,) — but the (3,) row is copied down across both rows of the grid. One row acts on the whole batch, no loop.'},
-  dtype:{html:'<span class="prompt">&gt;&gt;&gt;</span> a = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]);  a.dtype\n<span class="hl">dtype(\'int64\')</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> b = np.array([<span class="num">1.0</span>, <span class="num">2.0</span>, <span class="num">3.0</span>]);  b.dtype\n<span class="hl">dtype(\'float64\')</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> f = b.astype(np.float32)\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> b.nbytes, f.nbytes     <span class="dim"># float64=8B each, float32=4B</span>\n'+
-    '<span class="hl">(24, 12)</span>',
-    take:'<b>③  dtype = kind + size.</b> Whole numbers default to int64, decimals to float64. Casting to float32 halves the bytes (24 → 12). Halving bytes halves memory — the seed of quantization.'}
+  run:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> epoch <span class="kw">in</span> range(<span class="num">8</span>):\n'+
+    '<span class="dim">...</span>     train_epoch()\n'+
+    '<span class="dim">...</span>     print(epoch, f<span class="str">"train {train_loss:.3f}"</span>, f<span class="str">"val {val_loss:.3f}"</span>)\n'+
+    '<span class="ok">0  train 0.55  val 0.52</span>\n<span class="ok">1  train 0.34  val 0.33</span>\n<span class="ok">2  train 0.24  val 0.26</span>\n<span class="hl">3  train 0.18  val 0.24</span>',
+    take:'<b>①  Record two losses each epoch.</b> Training loss (on data it learns from) and validation loss (on held-out data). Early on, both fall together — the model is genuinely learning.'},
+  overfit:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># keep going...</span>\n'+
+    '<span class="ok">3  train 0.18  val 0.24</span>\n<span class="hl">4  train 0.13  val 0.25  ← val stops falling</span>\n'+
+    '<span class="bad">5  train 0.09  val 0.28  ← val RISING</span>\n<span class="bad">6  train 0.06  val 0.32</span>\n<span class="bad">7  train 0.04  val 0.37</span>',
+    take:'<b>②  The overfitting turn.</b> Training loss keeps dropping but validation loss turns and rises. The model is now memorizing the training set instead of learning to read new digits. Around epoch 4 was the sweet spot.'},
+  dropout:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># add dropout p=0.2 on the hidden layer</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> mask = (rand(h.shape) &gt; <span class="num">0.2</span>); h = h*mask/<span class="num">0.8</span>\n'+
+    '<span class="ok">4  train 0.19  val 0.21</span>\n<span class="ok">5  train 0.16  val 0.19</span>\n<span class="ok">6  train 0.14  val 0.18</span>\n<span class="ok">7  train 0.13  val 0.17  ← gap much smaller ✓</span>',
+    take:'<b>③  Dropout closes the gap.</b> Randomly zeroing 20% of neurons each step stops the model over-relying on any one. Training loss falls a little slower, but validation loss stays low — better on unseen digits.'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -414,18 +421,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* BUILD — scroll-reveal visual build-up */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Scalar 10 broadcast across a length-3 array'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='70' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='93' y='66' fill='#1F6280'>1</text><rect x='120' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='143' y='66' fill='#1F6280'>2</text><rect x='170' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='193' y='66' fill='#1F6280'>3</text><text x='240' y='66' font-size='18' fill='#6B645E'>+</text><rect x='265' y='40' width='46' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='288' y='66' fill='#9A7208' font-weight='bold'>10</text><text x='288' y='100' font-size='10' fill='#C93B3B'>one number…</text><text x='340' y='66' font-size='18' fill='#6B645E'>=</text><rect x='365' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='388' y='66' fill='#1a5c38' font-weight='bold'>11</text><rect x='413' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='436' y='66' fill='#1a5c38' font-weight='bold'>12</text><rect x='461' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='484' y='66' fill='#1a5c38' font-weight='bold'>13</text></g></svg>",
-  note:"<b>Start with the simplest broadcast.</b> <code>x + 10</code>: the single number 10 is <b>stretched</b> to line up with all three slots, then added element-by-element. You used this on Day 1 without knowing its name."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Broadcasting rule: align shapes from the right, size-1 or missing stretches'><g font-family='monospace' font-size='14'><text x='260' y='24' text-anchor='middle' fill='#2C2A28'>align shapes from the RIGHT →</text><text x='150' y='60' text-anchor='end' fill='#1F6280'>( 2 ,</text><text x='210' y='60' text-anchor='middle' fill='#1F6280' font-weight='bold'>3 )</text><text x='150' y='90' text-anchor='end' fill='#9A7208'>(</text><text x='210' y='90' text-anchor='middle' fill='#9A7208' font-weight='bold'>3 )</text><line x1='198' y1='68' x2='198' y2='78' stroke='#2D8B55' stroke-width='2'/><text x='300' y='60' fill='#6B645E'>3 = 3  ✓</text><text x='300' y='90' fill='#6B645E'>2 vs (missing) ✓ → stretch</text><text x='260' y='118' text-anchor='middle' fill='#2D8B55' font-weight='bold'>compatible → result (2, 3)</text></g></svg>",
-  note:"<b>The one rule.</b> Line the shapes up from the right. Each pair must be <b>equal</b>, or <b>one is 1</b> (or missing). The size-1 / missing side stretches. Check the rightmost pair first, then move left."},
- {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='A (3,) row broadcast down onto both rows of a (2,3) grid'><g font-family='monospace' font-size='13' text-anchor='middle'><rect x='40' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><rect x='84' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><rect x='128' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='61' y='63' fill='#9A7208'>10</text><text x='105' y='63' fill='#9A7208'>20</text><text x='149' y='63' fill='#9A7208'>30</text><text x='105' y='92' fill='#6B645E' font-size='11'>row (3,)</text><path d='M105 96 L105 112' stroke='#C99A12' stroke-width='2' stroke-dasharray='4,3'/><path d='M105 96 L105 130' stroke='#C99A12' stroke-width='2' stroke-dasharray='4,3'/><text x='210' y='90' font-size='18' fill='#6B645E'>onto</text><rect x='300' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='344' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='388' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='300' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='344' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='388' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='321' y='63' fill='#1a5c38'>11</text><text x='365' y='63' fill='#1a5c38'>22</text><text x='409' y='63' fill='#1a5c38'>33</text><text x='321' y='101' fill='#1a5c38'>14</text><text x='365' y='101' fill='#1a5c38'>25</text><text x='409' y='101' fill='#1a5c38'>36</text><text x='365' y='134' fill='#2D8B55' font-weight='bold'>(2,3) + (3,) = (2,3)</text></g></svg>",
-  note:"<b>The general case.</b> A <code>(3,)</code> row added to a <code>(2,3)</code> grid: the row is copied down onto <b>both</b> rows, then added. This is exactly how a bias vector adds to every row of a batch."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Incompatible shapes (2,3) and (2,) raise a broadcasting error'><g font-family='monospace' font-size='14'><text x='150' y='55' text-anchor='end' fill='#1F6280'>( 2 ,</text><text x='210' y='55' text-anchor='middle' fill='#C93B3B' font-weight='bold'>3 )</text><text x='150' y='88' text-anchor='end' fill='#9A7208'>(</text><text x='210' y='88' text-anchor='middle' fill='#C93B3B' font-weight='bold'>2 )</text><text x='300' y='72' fill='#C93B3B' font-weight='bold'>3 ≠ 2, neither is 1</text><rect x='120' y='100' width='280' height='22' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5'/><text x='260' y='115' text-anchor='middle' font-size='11' fill='#C93B3B'>ValueError: operands could not be broadcast</text></g></svg>",
-  note:"<b>When it fails.</b> <code>(2,3) + (2,)</code>: align right → 3 vs 2. They're not equal and neither is 1, so NumPy raises a broadcasting error. This mismatch — a row length that doesn't match — is a very common bug."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='float64 8 bytes, float32 4 bytes, bfloat16 2 bytes per number'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='60' y='40' width='120' height='34' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='120' y='62' fill='#C93B3B' font-weight='bold'>float64 · 8 B</text><rect x='200' y='40' width='90' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='245' y='62' fill='#9A7208' font-weight='bold'>float32 · 4 B</text><rect x='310' y='40' width='60' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='340' y='62' fill='#1a5c38' font-weight='bold'>bf16 · 2 B</text><text x='260' y='100' fill='#2C2A28'>same number, smaller box → less memory</text></g></svg>",
-  note:"<b>Now the dtype dial.</b> The exact same value costs 8, 4, or 2 bytes depending on its dtype. Choosing a smaller box is the single lever that decides how much memory an array (or a whole model) eats."},
- {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='A 7B model shrinks from 28GB in float32 to 14GB in bfloat16'><g font-family='monospace'><rect x='90' y='30' width='150' height='40' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='165' y='55' text-anchor='middle' font-size='13' fill='#C93B3B' font-weight='bold'>7B · fp32 ≈ 28 GB</text><text x='265' y='55' text-anchor='middle' font-size='16' fill='#6B645E'>→</text><rect x='300' y='38' width='110' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='355' y='63' text-anchor='middle' font-size='13' fill='#1a5c38' font-weight='bold'>bf16 ≈ 14 GB</text><text x='260' y='108' text-anchor='middle' font-size='12' fill='#2C2A28'>halving the dtype halves the memory bill</text><text x='260' y='128' text-anchor='middle' font-size='11' fill='#6B645E'>fits on one chip, or it doesn&apos;t — this is why labs live in bytes</text></g></svg>",
-  note:"<b>Why it matters at frontier scale.</b> Weights = params × bytes/param. A 7-billion-param model is ~28 GB in float32 but ~14 GB in bfloat16 — often the difference between fitting on a single accelerator or not. Every quantization method you'll study is a cleverer way to shrink this box without losing too much precision."}
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Loss recorded each epoch forms a falling curve'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 40 C 150 62, 260 80, 420 90' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><circle cx='70' cy='40' r='3' fill='#2A7B9B'/><circle cx='160' cy='63' r='3' fill='#2A7B9B'/><circle cx='260' cy='80' r='3' fill='#2A7B9B'/><circle cx='420' cy='90' r='3' fill='#2A7B9B'/><text x='245' y='112' font-size='11' fill='#6B645E' text-anchor='middle'>epoch →</text><text x='30' y='60' font-size='11' fill='#6B645E' text-anchor='middle' transform='rotate(-90 30 60)'>loss</text></g></svg>",
+  note:"<b>The loss curve.</b> Record the average loss each epoch and plot it. A curve that falls steadily means the model is learning. This one picture is the main dashboard for any training run."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Three loss curve shapes: learning, stuck, overfitting'><g font-family='monospace' font-size='9.5'><path d='M20 40 C 60 65, 110 82, 150 88' fill='none' stroke='#2D8B55' stroke-width='2'/><text x='85' y='108' fill='#1a5c38' text-anchor='middle'>learning ✓</text><line x1='190' y1='45' x2='320' y2='45' stroke='#C99A12' stroke-width='2'/><text x='255' y='108' fill='#9A7208' text-anchor='middle'>stuck</text><path d='M360 40 C 400 62, 430 70, 445 72' fill='none' stroke='#2A7B9B' stroke-width='2'/><path d='M360 45 C 400 60, 440 55, 500 40' fill='none' stroke='#C93B3B' stroke-width='2'/><text x='430' y='108' fill='#C93B3B' text-anchor='middle'>overfitting</text></g></svg>",
+  note:"<b>Three shapes to know.</b> Falling = learning. Flat = stuck (bad learning rate or a bug — overfit one batch to check, Day 3). Training down but validation up = overfitting: the model is memorizing, not generalizing."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Train loss keeps falling while validation loss turns up'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 45 C 160 70, 260 82, 420 90' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><path d='M70 48 C 160 66, 230 62, 420 40' fill='none' stroke='#C93B3B' stroke-width='2.5'/><line x1='235' y1='30' x2='235' y2='95' stroke='#C93B3B' stroke-width='1' stroke-dasharray='4 3'/><text x='235' y='22' font-size='9.5' fill='#C93B3B' text-anchor='middle'>the turn</text><text x='448' y='92' font-size='10' fill='#1F6280'>train</text><text x='448' y='42' font-size='10' fill='#C93B3B'>val</text></g></svg>",
+  note:"<b>Spot the turn.</b> Training loss (blue) keeps dropping, but validation loss (red) bottoms out and rises. That crossing point is where the model stopped learning the task and began memorizing. Best to stop, or regularize, around there."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Dropout randomly switches off some neurons each step'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='90' y='22' fill='#6B645E'>step A</text><circle cx='50' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='90' cy='55' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='130' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='50' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='90' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='130' cy='90' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><text x='390' y='22' fill='#6B645E'>step B</text><circle cx='350' cy='55' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='390' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='430' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='350' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='390' cy='90' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='430' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/></g></svg>",
+  note:"<b>Dropout: a different team each step.</b> Dashed grey circles are neurons switched off this step. A different random set is dropped each time, so no single neuron can become the whole answer. The formula: <code>h = h * mask / (1 - p)</code>."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='At test time all neurons are used with dropout off'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='38' width='160' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='110' y='58' fill='#9A7208'>train: dropout ON</text><text x='205' y='58' fill='#6B645E'>vs</text><rect x='240' y='38' width='170' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='325' y='58' fill='#1a5c38'>test: dropout OFF</text></g></svg>",
+  note:"<b>On for training, off for testing.</b> Dropout only runs while learning. At test time every neuron is used, so predictions are stable. The <code>/(1-p)</code> scaling during training keeps the signal size matched so the switch is seamless."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='With dropout the validation curve stays low, gap shrinks'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 48 C 160 66, 260 76, 420 82' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><path d='M70 50 C 160 66, 260 74, 420 78' fill='none' stroke='#2D8B55' stroke-width='2.5'/><text x='448' y='84' font-size='10' fill='#1F6280'>train</text><text x='448' y='74' font-size='10' fill='#1a5c38'>val</text><text x='245' y='112' font-size='11' fill='#6B645E' text-anchor='middle'>epoch →</text></g></svg>",
+  note:"<b>The payoff.</b> With dropout, training and validation curves stay close and both stay low. The model does better on unseen digits. This same dashboard-and-regularize habit scales all the way up to giant LLMs — only the numbers get bigger."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -448,18 +455,18 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. <code>g</code> has shape (2,3) and <code>row</code> has shape (3,). Does <code>g + row</code> work, and what shape is the result?',
-  opts:['Error — shapes differ','Yes → shape (2,3)','Yes → shape (3,)','Yes → shape (2,)'],
-  ans:1, fb:'Right. Align from the right: 3=3 ✓, then 2 vs missing ✓. The row stretches down both rows → (2,3).'},
- {q:'2. Two dimensions are broadcast-compatible if they are equal, or if one of them is ___.',
-  opts:['0','1','even','a float'],
-  ans:1, fb:'Right. A dimension of size 1 (or missing) is the one that gets stretched to match the other.'},
- {q:'3. What does an array\'s <code>dtype</code> control?',
-  opts:['Its shape','The kind and byte-size of each element (precision & memory)','How many dimensions it has','Which axis is the batch'],
-  ans:1, fb:'Right. dtype = the shared type (int/float) and how many bytes each number costs — which sets the memory bill.'},
- {q:'4. Compared to <code>float32</code>, how much memory does <code>bfloat16</code> use per number?',
-  opts:['Twice as much','The same','Half','Four times as much'],
-  ans:2, fb:'Right. bfloat16 is 2 bytes vs float32\'s 4 — half the memory. That is the core lever behind quantization.'}
+ {q:'1. A loss curve that falls steadily means:',
+  opts:['the model is stuck','the model is learning','the model is overfitting','the code has a bug'],
+  ans:1, fb:'Right. A steadily falling loss is the healthy sign — the model is improving epoch by epoch.'},
+ {q:'2. Training loss keeps dropping but validation loss starts rising. This is:',
+  opts:['learning normally','a good sign to keep training','overfitting — the model is memorizing','a stuck model'],
+  ans:2, fb:'Right. When the two curves diverge, the model is memorizing the training set instead of generalizing.'},
+ {q:'3. What does dropout do during training?',
+  opts:['adds more neurons','randomly switches off a fraction of neurons each step','removes the loss function','makes the batch bigger'],
+  ans:1, fb:'Right. It zeros a random subset of neurons each step, so the network cannot over-rely on any single one.'},
+ {q:'4. At test time, dropout is:',
+  opts:['turned on with a higher rate','turned off — all neurons are used','applied twice','the same as training'],
+  ans:1, fb:'Right. Dropout runs only during training; at test time every neuron is used, and the /(1-p) scaling keeps signals matched.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

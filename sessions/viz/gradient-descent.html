@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient Descent Playground — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+/* top bar */
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+
+/* buttons */
+.btn-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.2rem}
+.btn{font-family:var(--body);font-size:.82rem;font-weight:600;color:#fff;
+  background:var(--accent);border:1px solid var(--accent-d);border-radius:var(--r-sm);
+  padding:.5rem .95rem;cursor:pointer;transition:background .15s,transform .1s}
+.btn:hover{background:var(--accent-d)}.btn:active{transform:translateY(1px)}
+.btn.secondary{color:var(--accent-d);background:var(--accent-l);border-color:var(--border)}
+.btn.secondary:hover{background:#d4e9f0}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
+.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
+.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.mem{color:var(--bad)}.ro-v.comp{color:var(--ok)}
+@media(max-width:560px){.readouts{grid-template-columns:repeat(2,1fr)}}
+
+/* figure */
+.figwrap{width:100%}
+svg#gd{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.axis path,.axis line{stroke:var(--border);stroke-width:1}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.axis-title{fill:var(--text2);font-family:var(--body);font-size:12px;font-weight:600}
+.grid line{stroke:var(--border2);stroke-width:1;shape-rendering:crispEdges}
+.grid path{stroke:none}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+
+/* diverge banner */
+.diverge{color:var(--bad);font-weight:700}
+
+/* takeaway */
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+.k-mem{color:var(--bad);font-weight:600}.k-comp{color:var(--ok);font-weight:600}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Gradient Descent Playground</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Optimizers &middot; learning rate</span>
+    <h1>Gradient Descent Playground</h1>
+    <p><b>What am I looking at?</b> The curve is a loss &mdash; a bowl that measures how wrong the model is for
+    each value of a weight <b>w</b>. Training wants to reach the bottom. The ball sits at the current w. Each
+    "step" reads the slope (the gradient) and slides the ball a bit downhill. The <b>learning rate</b> sets how
+    big each slide is. Try a tiny rate, a good rate, and a too-big rate to see what changes.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Learning rate <span class="ctrl-hint">(step size, log scale)</span></span>
+          <span class="ctrl-val" id="val-lr">0.10</span>
+        </div>
+        <input type="range" id="lr" min="-2" max="0.08" step="0.001" value="-1"
+               aria-label="Learning rate, log scale from 0.01 to about 1.2">
+      </div>
+
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Try a regime:</span>
+        <button class="preset-btn" data-lr="0.02">Tiny &middot; crawls</button>
+        <button class="preset-btn" data-lr="0.3">Good &middot; converges</button>
+        <button class="preset-btn" data-lr="1.05">Too big &middot; diverges</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" id="btn-step">Step once</button>
+        <button class="btn" id="btn-run">Run 20 steps</button>
+        <button class="btn secondary" id="btn-reset">Reset</button>
+      </div>
+
+      <div class="readouts">
+        <div class="ro">
+          <div class="ro-k">Step #</div>
+          <div class="ro-v" id="ro-step">0</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Weight w</div>
+          <div class="ro-v" id="ro-w">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Loss L(w)</div>
+          <div class="ro-v" id="ro-loss">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Gradient dL/dw</div>
+          <div class="ro-v" id="ro-grad">&mdash;</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Loss landscape</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="gd" viewBox="0 0 720 420" role="img"
+           aria-label="A U-shaped loss curve plotting loss against the weight w. A ball sits on the curve at the current weight. An arrow shows the gradient-descent step to the next weight, and a straight line shows the tangent slope at the current point.">
+      </svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>The gradient <b>points uphill</b>, so we step <b>against</b> it: <b>w &larr; w &minus; lr &times; dL/dw</b>.
+        The steeper the slope, the bigger the raw pull toward the bottom.</li>
+      <li>The <b>learning rate is the step size</b>. A <span class="k-comp">good</span> rate walks down the bowl and
+        settles at the minimum. A <span class="k-mem">tiny</span> rate barely moves &mdash; it crawls and needs many steps.</li>
+      <li>A <span class="diverge">too-big</span> rate <b>overshoots</b> the bottom and lands higher on the far wall.
+        Each step then jumps farther out and the loss <b>grows</b> &mdash; the run diverges.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById("gd");
+
+  // Graceful degradation if D3 failed to load.
+  if (typeof window.d3 === "undefined") {
+    console.warn("[gradient-descent] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) {
+      svgEl.outerHTML =
+        '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>' +
+        'Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>';
+    }
+    return;
+  }
+
+  var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = reduceMotion ? 0 : 380;
+
+  // ---- the loss: a smooth bowl -------------------------------------------
+  //   L(w) = (w - 2)^2 + 0.5   (small offset so the minimum loss is not zero)
+  //   dL/dw = 2 (w - 2)
+  var W_MIN_TRUE = 2;                          // the weight that minimises loss
+  function loss(w){ return (w - 2) * (w - 2) + 0.5; }
+  function grad(w){ return 2 * (w - 2); }
+
+  var W0 = -3.2;                               // starting weight (up the left wall)
+
+  // ---- axis domains ------------------------------------------------------
+  var X_MIN = -7, X_MAX = 11;                  // weight range shown
+  var Y_MIN = 0,  Y_MAX = 42;                  // loss range shown
+
+  // ---- geometry ----------------------------------------------------------
+  var W = 720, H = 420;
+  var M = { top: 22, right: 28, bottom: 48, left: 62 };
+  var iw = W - M.left - M.right;
+  var ih = H - M.top - M.bottom;
+
+  var svg = d3.select(svgEl);
+  var root = svg.append("g").attr("transform", "translate(" + M.left + "," + M.top + ")");
+
+  var x = d3.scaleLinear().domain([X_MIN, X_MAX]).range([0, iw]);
+  var y = d3.scaleLinear().domain([Y_MIN, Y_MAX]).range([ih, 0]);
+
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  // ---- gridlines ---------------------------------------------------------
+  root.append("g")
+      .attr("class", "grid")
+      .attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(x).ticks(8).tickSize(-ih).tickFormat(""));
+  root.append("g")
+      .attr("class", "grid")
+      .call(d3.axisLeft(y).ticks(5).tickSize(-iw).tickFormat(""));
+
+  // ---- axes --------------------------------------------------------------
+  root.append("g")
+      .attr("class", "axis")
+      .attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("~g")));
+  root.append("g")
+      .attr("class", "axis")
+      .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format("~g")));
+
+  root.append("text")
+      .attr("class", "axis-title")
+      .attr("x", iw / 2).attr("y", ih + 38)
+      .attr("text-anchor", "middle")
+      .text("Weight  w");
+
+  root.append("text")
+      .attr("class", "axis-title")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -ih / 2).attr("y", -44)
+      .attr("text-anchor", "middle")
+      .text("Loss  L(w)");
+
+  // ---- the loss curve (static path) --------------------------------------
+  var curvePts = [];
+  for (var wi = X_MIN; wi <= X_MAX + 1e-9; wi += 0.05){
+    curvePts.push([wi, loss(wi)]);
+  }
+  var lossLine = d3.line()
+      .x(function(d){ return x(d[0]); })
+      .y(function(d){ return y(clamp(d[1], Y_MIN, Y_MAX)); });
+
+  root.append("path")
+      .attr("d", lossLine(curvePts))
+      .attr("fill", "none")
+      .attr("stroke", "var(--accent)")
+      .attr("stroke-width", 2.5)
+      .attr("stroke-linejoin", "round");
+
+  // marker for the true minimum
+  root.append("line")
+      .attr("x1", x(W_MIN_TRUE)).attr("x2", x(W_MIN_TRUE))
+      .attr("y1", y(loss(W_MIN_TRUE))).attr("y2", ih)
+      .attr("stroke", "var(--ok)")
+      .attr("stroke-width", 1).attr("stroke-dasharray", "2 3").attr("opacity", 0.6);
+  root.append("text")
+      .attr("x", x(W_MIN_TRUE)).attr("y", ih - 8)
+      .attr("text-anchor", "middle")
+      .attr("fill", "var(--ok)")
+      .attr("font-family", "var(--mono)").attr("font-size", "10px").attr("font-weight", "600")
+      .text("minimum");
+
+  // ---- arrow marker (for the step) ---------------------------------------
+  var defs = svg.append("defs");
+  defs.append("marker")
+      .attr("id", "gd-arrow")
+      .attr("viewBox", "0 0 10 10")
+      .attr("refX", 8).attr("refY", 5)
+      .attr("markerWidth", 7).attr("markerHeight", 7)
+      .attr("orient", "auto-start-reverse")
+      .append("path")
+      .attr("d", "M0,0 L10,5 L0,10 z")
+      .attr("fill", "var(--warn)");
+
+  // ---- dynamic elements (created once, updated on change) ----------------
+  // tangent line = the local slope at the current point
+  var tangent = root.append("line")
+      .attr("stroke", "var(--muted)")
+      .attr("stroke-width", 1.75)
+      .attr("stroke-dasharray", "6 4")
+      .attr("opacity", 0.85);
+
+  // step arrow along the x axis from old w to new w
+  var stepArrow = root.append("line")
+      .attr("stroke", "var(--warn)")
+      .attr("stroke-width", 2.5)
+      .attr("marker-end", "url(#gd-arrow)");
+
+  // droplines from the ball down to the axis
+  var dropOld = root.append("line")
+      .attr("stroke", "var(--muted)").attr("stroke-width", 1)
+      .attr("stroke-dasharray", "2 3").attr("opacity", 0.5);
+
+  // the ball sitting on the curve
+  var ball = root.append("circle")
+      .attr("r", 8)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 2)
+      .attr("fill", "var(--accent-d)");
+
+  var ballLabel = root.append("text")
+      .attr("font-family", "var(--mono)")
+      .attr("font-size", "10px")
+      .attr("font-weight", "600")
+      .attr("text-anchor", "middle")
+      .attr("fill", "var(--accent-d)");
+
+  // ---- readout handles ---------------------------------------------------
+  var elLr    = document.getElementById("lr");
+  var valLr   = document.getElementById("val-lr");
+  var roStep  = document.getElementById("ro-step");
+  var roW     = document.getElementById("ro-w");
+  var roLoss  = document.getElementById("ro-loss");
+  var roGrad  = document.getElementById("ro-grad");
+
+  var btnStep  = document.getElementById("btn-step");
+  var btnRun   = document.getElementById("btn-run");
+  var btnReset = document.getElementById("btn-reset");
+
+  // ---- run state ---------------------------------------------------------
+  var w = W0;
+  var stepCount = 0;
+  var diverged = false;
+  var running = false;
+
+  function curLR(){ return Math.pow(10, +elLr.value); }   // slider is log10
+
+  // place the ball + tangent for the CURRENT w (no step drawn)
+  function renderPoint(animate){
+    var g = grad(w);
+    var lval = loss(w);
+
+    var cx = x(clamp(w, X_MIN, X_MAX));
+    var cy = y(clamp(lval, Y_MIN, Y_MAX));
+
+    var t = animate ? ball.transition().duration(DUR) : ball;
+    t.attr("cx", cx).attr("cy", cy)
+     .attr("fill", diverged ? "var(--bad)" : "var(--accent-d)");
+
+    var lblY = cy - 14 < 6 ? cy + 22 : cy - 14;
+    var lt = animate ? ballLabel.transition().duration(DUR) : ballLabel;
+    lt.attr("x", clamp(cx, 26, iw - 26)).attr("y", lblY)
+      .attr("fill", diverged ? "var(--bad)" : "var(--accent-d)");
+    ballLabel.text("w = " + w.toFixed(2));
+
+    var dt = animate ? dropOld.transition().duration(DUR) : dropOld;
+    dt.attr("x1", cx).attr("x2", cx).attr("y1", cy).attr("y2", ih);
+
+    // tangent: line through (w, L) with slope g, drawn over a small window
+    var dw = 1.9;
+    var wa = w - dw, wb = w + dw;
+    var la = lval + g * (wa - w);
+    var lb = lval + g * (wb - w);
+    var tt = animate ? tangent.transition().duration(DUR) : tangent;
+    tt.attr("x1", x(clamp(wa, X_MIN, X_MAX))).attr("y1", y(clamp(la, Y_MIN, Y_MAX)))
+      .attr("x2", x(clamp(wb, X_MIN, X_MAX))).attr("y2", y(clamp(lb, Y_MIN, Y_MAX)))
+      .style("display", diverged ? "none" : null);
+
+    updateReadouts(g, lval);
+  }
+
+  function updateReadouts(g, lval){
+    roStep.textContent = stepCount;
+    roW.textContent = w.toFixed(3);
+    if (diverged) {
+      roLoss.innerHTML = '<span class="diverge">diverged</span>';
+      roLoss.className = "ro-v";
+      roGrad.textContent = g.toFixed(2);
+      roGrad.className = "ro-v mem";
+      roW.className = "ro-v mem";
+    } else {
+      roLoss.textContent = lval.toFixed(3);
+      roLoss.className = "ro-v comp";
+      roGrad.textContent = g.toFixed(3);
+      roGrad.className = "ro-v";
+      roW.className = "ro-v";
+    }
+  }
+
+  // do ONE gradient-descent update and animate the step
+  function doStep(){
+    if (diverged) return;
+    var g = grad(w);
+    var lr = curLR();
+    var wOld = w;
+    var lOld = loss(wOld);
+    var wNew = w - lr * g;
+
+    // hide the step arrow if effectively no move
+    var cxOld = x(clamp(wOld, X_MIN, X_MAX));
+    var cyOld = y(clamp(lOld, Y_MIN, Y_MAX));
+
+    // draw the step arrow along the curve level, then along x toward new w
+    stepArrow
+        .style("display", null)
+        .attr("x1", cxOld).attr("y1", cyOld)
+        .attr("x2", cxOld).attr("y2", cyOld);
+    stepArrow.transition().duration(DUR)
+        .attr("x2", x(clamp(wNew, X_MIN, X_MAX)))
+        .attr("y2", y(clamp(loss(wNew), Y_MIN, Y_MAX)));
+
+    // commit the new weight
+    w = wNew;
+    stepCount += 1;
+
+    // divergence check: loss shot up well past the visible top, or is not finite
+    if (!isFinite(w) || loss(w) > Y_MAX * 1.5) {
+      diverged = true;
+      ball.transition().delay(DUR).duration(DUR).attr("fill", "var(--bad)");
+      setButtons();   // lock Step / Run once the run has blown up
+    }
+
+    renderPoint(true);
+  }
+
+  // run a batch of steps, spaced out so the animation is visible
+  var runTimer = null;
+  function runSteps(n){
+    if (running || diverged) return;
+    running = true;
+    setButtons();
+    var left = n;
+    var gap = reduceMotion ? 0 : DUR + 40;
+    function tick(){
+      if (left <= 0 || diverged){
+        running = false;
+        setButtons();
+        return;
+      }
+      doStep();
+      left -= 1;
+      runTimer = window.setTimeout(tick, gap);
+    }
+    tick();
+  }
+
+  function setButtons(){
+    btnStep.disabled  = running || diverged;
+    btnRun.disabled   = running || diverged;
+  }
+
+  function reset(){
+    if (runTimer) { window.clearTimeout(runTimer); runTimer = null; }
+    running = false;
+    w = W0;
+    stepCount = 0;
+    diverged = false;
+    stepArrow.style("display", "none");
+    setButtons();
+    renderPoint(false);
+  }
+
+  // ---- wire up controls --------------------------------------------------
+  ["input", "change"].forEach(function(evt){
+    elLr.addEventListener(evt, function(){
+      valLr.textContent = curLR().toFixed(2);
+      // hide any stale step arrow when the rate changes mid-run
+      if (!running) stepArrow.style("display", "none");
+    });
+  });
+
+  btnStep.addEventListener("click", function(){
+    if (running || diverged) return;
+    stepArrow.style("display", "none");
+    doStep();
+  });
+  btnRun.addEventListener("click", function(){ runSteps(20); });
+  btnReset.addEventListener("click", reset);
+
+  // preset buttons set the learning-rate slider (log10)
+  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      var target = +btn.getAttribute("data-lr");
+      var log = clamp(Math.log10(target), +elLr.min, +elLr.max);
+      elLr.value = log;
+      valLr.textContent = curLR().toFixed(2);
+      reset();
+    });
+  });
+
+  // ---- init --------------------------------------------------------------
+  valLr.textContent = curLR().toFixed(2);
+  stepArrow.style("display", "none");
+  reset();
+})();
+</script>
+</body>
+</html>

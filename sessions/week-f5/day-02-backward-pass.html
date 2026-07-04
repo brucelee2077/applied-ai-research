@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Module 1 · Day 3 — Broadcasting &amp; dtypes</title>
+<title>Module 5 · Day 2 — The Backward Pass, Wired by Hand</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -184,12 +184,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 </style>
 </head>
 
-<body data-quest-id="wf1-d03-broadcasting">
+<body data-quest-id="wf5-d02-backward">
 
 <nav class="nav">
   <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
   <div class="nav-in">
-    <span class="nav-title">Foundations · M1 Day 3</span>
+    <span class="nav-title">Foundations · M5 Day 2</span>
     <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
   </div>
 </nav>
@@ -197,100 +197,107 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav prev" href="day-01-mlp-mnist.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav next" href="day-03-minibatch-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mini-Batch Loop</span></a>
 </nav>
 
   <header class="hero">
-    <span class="eyebrow">Module 1 · Represent · Day 3</span>
-    <h1>Broadcasting &amp; dtypes<br>Math Between Different Shapes</h1>
-    <p class="lead">You've built arrays, sliced them, and read their shape. But what happens when you add two arrays of <strong>different</strong> shapes? And why does it matter whether a number is stored as <code>float32</code> or <code>float64</code>? Both answers decide how much memory a model eats.</p>
+    <span class="eyebrow">Module 5 · Train · Day 2</span>
+    <h1>The Backward Pass<br>Wired by Hand</h1>
+    <p class="lead">Yesterday your MLP made a guess. Today you teach it to fix that guess. You will compute the gradient — the "which way to nudge each weight" signal — layer by layer, using the chain rule. You will wire <code>dL/dW</code> for every layer of the 784→128→10 MLP by hand, and then check your work against a slow-but-honest numerical gradient.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> predict whether two shapes can be added, state the one broadcasting rule, and explain why <code>float32</code> uses half the memory of <code>float64</code>.
+      <b>🎯 By the end, you'll be able to:</b> walk the gradient backward through a 2-layer MLP with the chain rule, write <code>dL/dW1</code> and <code>dL/dW2</code>, and verify them against a numerical gradient.
     </div>
   </header>
 
   <!-- ===== 1. WHAT IS IT ===== -->
   <section class="sec" id="s1" data-sec="what">
-    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two ideas: broadcasting and dtype</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Computing the fix for every weight</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–2 — arrays, shape, and that <code>x + 10</code> adds to every element. <b>No new tools</b> — two ideas that ride on what you have.</div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the forward pass <code>h = relu(x@W1+b1)</code>, <code>logits = h@W2+b2</code> (M2), the cross-entropy loss (M3 Day 1), and that a <span class="term" data-tip="A number that tells you which way, and how much, to change one weight to make the loss smaller. It is the slope of the loss with respect to that weight.">gradient</span> tells you which way to nudge a weight (M3 Day 2). Today we compute those gradients ourselves.</div></div>
 
-      <h4>What is broadcasting?</h4>
-      <p><span class="term" data-tip="NumPy's rule for doing math between arrays of different shapes by automatically stretching the smaller one to match — without copying data.">Broadcasting</span> is NumPy's rule for doing math between arrays of <strong>different shapes</strong>. It automatically "stretches" the smaller one to fit the larger, so you never write a loop. You already used the simplest case on Day 1: <code>x + 10</code> stretched the single number 10 across every element.</p>
+      <h4>The one question the backward pass answers</h4>
+      <p>For every single weight in the model, ask: <em>"if I nudge you a tiny bit, how much does the loss change?"</em> That answer is the gradient. The <span class="term" data-tip="The algorithm that computes the gradient of the loss for every weight, working from the output back to the input, reusing the chain rule at each layer.">backward pass</span> (also called <span class="term" data-tip="Short for backward propagation of errors. Same thing as the backward pass.">backpropagation</span>) computes all of them in one sweep from the output back to the input.</p>
 
-      <h4>What is a dtype?</h4>
-      <p>A <span class="term" data-tip="Data type: the single kind and size every element of an array shares, e.g. int64, float32, float64.">dtype</span> (data type) is the <strong>one kind and size</strong> every element in an array shares — like <code>int64</code>, <code>float32</code>, or <code>float64</code>. It decides two things: what values fit (whole numbers vs decimals) and <strong>how many bytes each number costs</strong>.</p>
+      <h4>Why "backward"?</h4>
+      <p>The loss lives at the very end of the forward pass. To know how an early weight affects the loss, you have to trace its effect through every later step. So you start at the loss and walk <strong>backward</strong>, step by step, carrying the blame with you. That tool for chaining the steps together is the <span class="term" data-tip="A rule from calculus: if a depends on b, and b depends on c, then the effect of c on a is the product of the two smaller effects. It lets you multiply step-by-step slopes together.">chain rule</span>.</p>
 
-      <h4>Why put them together today?</h4>
-      <p>Both are about <strong>doing math efficiently at scale</strong>. Broadcasting lets one small array (like a bias) act on a huge one with no copies. The dtype decides the memory bill — and that bill is what forces the whole quantization story you'll meet later. Keep going 👇</p>
-      <button class="gotit" type="button">Got the two ideas — let's go</button>
+      <h4>The check that keeps you honest</h4>
+      <p>Hand-wired gradients are easy to get subtly wrong. So you compare them to a <span class="term" data-tip="An estimate of a gradient found by nudging a weight up and down a tiny amount and measuring how the loss changes. Slow but almost impossible to get wrong.">numerical gradient</span> — nudge a weight, watch the loss, divide. If the two match, your wiring is correct. Keep going 👇</p>
+      <button class="gotit" type="button">Got the goal — let's go</button>
     </div>
   </section>
 
   <!-- ===== 2. INTUITION ===== -->
   <section class="sec" id="s2" data-sec="intuition">
-    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A stamp, and a set of boxes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Passing the blame down a line of workers</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <div class="relate">
-        <div class="card"><span class="big">🖊️</span><h5>Broadcasting = one stamp</h5><p>To add 10 to every cell, you don't rewrite "10" in each one. You press <strong>one stamp</strong> across the whole grid. NumPy stretches the small thing to cover the big thing.</p></div>
-        <div class="card"><span class="big">📦</span><h5>dtype = the size of the box</h5><p>Each number sits in a box. <code>float64</code> is a big box (8 bytes, lots of precision); <code>float32</code> a smaller box (4 bytes); <code>bfloat16</code> tiny (2 bytes). Smaller box = less memory.</p></div>
+        <div class="card"><span class="big">🏭</span><h5>An assembly line</h5><p>Worker 1 hands a part to Worker 2, who hands it to Worker 3, who ships it. The final product is wrong. Someone made a mistake — but who, and how much?</p></div>
+        <div class="card"><span class="big">📣</span><h5>Blame flows backward</h5><p>The manager tells Worker 3 "you were off by this much". Worker 3 works out how much of that came from the part Worker 2 gave them, and passes that share of blame back. So does Worker 2 to Worker 1.</p></div>
       </div>
-      <p><strong>In one line:</strong> broadcasting stretches a small shape to match a big one; dtype is how large each number's box is.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: broadcasting doesn't actually make copies — the "stretch" is virtual, so it costs no extra memory. And a smaller dtype box isn't free: squeeze too hard and you lose precision. That trade-off is the heart of quantization later.</div></div>
+      <p><strong>In one line:</strong> each layer takes the blame it received from the layer after it, keeps its own share, and passes the rest further back — that passing-back is the chain rule.</p>
+      <p>Your forward pass is the assembly line: <code>x → layer 1 → h → layer 2 → logits → loss</code>. The backward pass sends the blame the other way: <code>loss → layer 2 → h → layer 1 → x</code>. At each layer, the blame it holds tells it exactly how to fix its own weights.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers each pass blame once, but the same intermediate value (like <code>h</code>) can feed many later steps. The chain rule handles that by <strong>adding up</strong> all the blame that flows back through it — a worker can be blamed by several people at once.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
   </section>
 
   <!-- ===== 3. PLAYGROUND ===== -->
   <section class="sec" id="s3" data-sec="play">
-    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three cases and see for yourself</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Forward, then walk the blame back, then check it</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Below is a simulated Python terminal. Click each button and watch the shapes line up. <strong>Click all three</strong> to finish this section.</p>
+      <p>Below is a simulated Python terminal. Run the forward pass, wire the gradients backward, then verify against a numerical gradient. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="scalar" type="button">① array + 10</button>
-          <button class="play-btn" data-demo="row" type="button">② grid + row (3,)</button>
-          <button class="play-btn" data-demo="dtype" type="button">③ dtypes: int vs float, bytes</button>
+          <button class="play-btn" data-demo="fwd" type="button">① forward + save the pieces</button>
+          <button class="play-btn" data-demo="back" type="button">② gradients, layer by layer</button>
+          <button class="play-btn" data-demo="check" type="button">③ check vs numerical gradient</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>.nbytes</code> is the total memory an array uses = number of elements × bytes per element.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>dL/dW</code> means "how much the loss changes when W changes" — the number you subtract a small slice of to improve the weight (M3 Day 3).</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
   </section>
 
   <!-- ===== 4. MECHANISM & WHY ===== -->
   <section class="sec" id="s4" data-sec="why">
-    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The one rule, the byte table, and why money is bytes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The chain rule, wired for our two layers</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <h4>The one broadcasting rule</h4>
-      <p>Line the two shapes up <strong>from the right</strong>. Going right-to-left, each pair of dimensions must be either <strong>equal</strong>, or <strong>one of them is 1</strong> (or missing). The size-1 (or missing) side is the one that stretches. If a pair is neither equal nor 1, it's an error.</p>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>(2, 3) + (3,)</code> → align right: <code>3</code> vs <code>3</code> ✓, then <code>2</code> vs <em>missing</em> ✓ → result <code>(2, 3)</code>.</div></div>
-      <div class="callout c-warn"><span class="ic">❌</span><div><code>(2, 3) + (2,)</code> → align right: <code>3</code> vs <code>2</code> — not equal, neither is 1 → <strong>error</strong>.</div></div>
+      <h4>Step 1 — in plain words</h4>
+      <p>The forward pass is a chain: <code>logits = (relu(x@W1+b1)) @ W2 + b2</code>, then softmax and cross-entropy give the loss. To find how <code>W1</code> affects the loss, multiply together the small effects along the chain: how the loss depends on the logits, how the logits depend on <code>h</code>, how <code>h</code> depends on <code>W1</code>. That multiplying-along-the-chain is the chain rule.</p>
 
-      <h4>The byte table</h4>
-      <ul>
-        <li><code>float64</code> = 8 bytes · <code>float32</code> = 4 bytes · <span class="term" data-tip="A 16-bit floating type used a lot in ML: half the memory of float32, keeps the same range with less precision.">bfloat16</span> = 2 bytes each.</li>
-        <li>Memory of a tensor = number of elements × bytes/element. Halve the bytes → halve the memory.</li>
-      </ul>
+      <h4>Step 2 — the formulas, symbol by symbol</h4>
+      <p>A lovely fact makes the start simple: for softmax + cross-entropy, the blame at the output is just <strong>predicted probabilities minus the true one-hot label</strong>. Everything else falls out of it.</p>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        dlogits = probs − y_true       <span class="dim"># shape (10,) — the starting blame</span><br>
+        dW2 = h.T @ dlogits            <span class="dim"># (128,1)@(1,10) → (128,10)</span><br>
+        db2 = dlogits                  <span class="dim"># (10,)</span><br>
+        dh  = dlogits @ W2.T           <span class="dim"># (1,10)@(10,128) → (128,) — blame handed to layer 1</span><br>
+        dz1 = dh * (z1 &gt; 0)            <span class="dim"># ReLU gate: blame passes only where z1 was positive</span><br>
+        dW1 = x.T @ dz1                <span class="dim"># (784,1)@(1,128) → (784,128)</span><br>
+        db1 = dz1                      <span class="dim"># (128,)</span>
+      </div></div>
+      <p>Symbols: <code>probs</code> = softmax output (10 numbers), <code>y_true</code> = one-hot true label, <code>h</code> = the hidden activations, <code>z1 = x@W1+b1</code> = the pre-ReLU values, <code>W2.T</code> = the transpose of <code>W2</code>. Every <code>d…</code> is "loss's sensitivity to that thing". Notice the pattern: each layer's <code>dW</code> is <strong>its input, transposed, times the blame flowing into it</strong>.</p>
 
-      <h4>Why a frontier lab cares</h4>
-      <p>Bytes are money and speed. A 7-billion-parameter model in <code>float32</code> needs ~28 GB just for weights; in <code>bfloat16</code>, ~14 GB — the difference between fitting on one chip or not. Broadcasting is how a bias vector <code>(features,)</code> gets added to a whole batch <code>(batch, features)</code> with no copy.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> broadcasting → one op covers many shapes, no copies → less code + less memory. dtype → fewer bytes per number → bigger models fit on the same hardware. <strong>Every quantization trick later is just this dial.</strong></div></div>
-      <button class="gotit" type="button">Got the rule and the bytes</button>
+      <h4>Step 3 — a worked example (tiny numbers)</h4>
+      <p>Say the true digit is class 0, so <code>y_true = [1, 0, 0, …]</code>, and softmax gave <code>probs = [0.7, 0.2, 0.1, …]</code>. Then <code>dlogits = probs − y_true = [-0.3, 0.2, 0.1, …]</code>. The <code>-0.3</code> on the true class says "push this logit up"; the positives say "push those down". Feed that into <code>dW2 = h.T @ dlogits</code> and you get one gradient number per weight in <code>W2</code>. The ReLU gate <code>(z1 &gt; 0)</code> then zeroes out blame for any hidden unit that was switched off.</p>
+
+      <h4>Why this is the whole game</h4>
+      <p>Every deep network — including a giant LLM — learns with exactly this backward sweep: start with <code>probs − y_true</code>, then repeat "transpose the input, multiply the blame" through each layer, gating at each nonlinearity. Tomorrow you will run it in a loop over mini-batches.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The check:</b> a numerical gradient nudges one weight by a tiny <code>ε</code>, measures <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code>, and should match your hand-wired <code>dW</code> to several decimal places. If it doesn't, a transpose or a gate is wrong.</div></div>
+      <button class="gotit" type="button">Got the full backward pass</button>
     </div>
   </section>
 
   <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
   <section class="sec" id="s5" data-sec="build">
-    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch shapes stretch, then shrink the bytes — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Walk the blame from loss back to the first weight — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Here is broadcasting and dtype, built one piece at a time. First, <strong>play with the live tool</strong> below — set two shapes and watch the rule fire or fail. Then <strong>scroll down slowly</strong> through the static build underneath, where each piece fades in with a short note. By the bottom you'll predict any broadcast and any memory bill.</p>
-      <div class="build-embed"><iframe src="../viz/broadcasting.html" title="Interactive broadcasting rule" loading="lazy"></iframe>
-      <div class="cap">↑ interactive — pick the two shapes and watch them align from the right. <a href="../viz/broadcasting.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
+      <p>Here is the backward pass built one step at a time, from the loss all the way back to <code>dW1</code>. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -311,39 +318,40 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
   <section class="sec" id="s7" data-sec="produce">
     <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Broadcast a few shapes and weigh a few dtypes yourself — that's what makes the day count. Pick one:</p>
+      <p>Understanding ≠ being able to write it. Wire the backward pass yourself and prove it with a numerical check — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03_broadcasting.py</code>. Add a scalar to an array; add a <code>(3,)</code> row to a <code>(2,3)</code> grid; try <code>(2,3) + (2,)</code> inside a <code>try/except</code> and print the error; then print <code>.dtype</code> and <code>.nbytes</code> for the same data as <code>float64</code> vs <code>float32</code>. Run it with <code>python3 m03_broadcasting.py</code>.</p>
+      <p>Create <code>experiments/foundations/m05_backward_pass.py</code>. Build the 784→128→10 forward pass, then hand-write <code>dW2, db2, dW1, db1</code> from <code>dlogits = probs − y_true</code>. Add a numerical-gradient checker that nudges each weight by <code>ε = 1e-5</code> and compares. Print the largest difference between your gradient and the numerical one — it should be tiny (below about <code>1e-6</code>). Run with <code>python3 m05_backward_pass.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 3 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 2 artifact.
 
-Create experiments/foundations/m03_broadcasting.py that, with a comment on each step:
-1. Prints x + 10 for x = np.array([1,2,3]) (scalar broadcast).
-2. Adds row = np.array([10,20,30]) to g = np.array([[1,2,3],[4,5,6]]) and prints the (2,3) result, noting the (3,) row was stretched across both rows.
-3. Wraps g + np.array([1,2]) in try/except and prints the broadcasting error (shapes (2,3) and (2,) do not align).
-4. Builds b = np.array([1.,2.,3.]) as float64, makes f = b.astype(np.float32), and prints b.dtype, f.dtype, b.nbytes, f.nbytes — showing float32 uses half the bytes.
-Then run it and paste the output at the bottom as a comment.</pre>
+Create experiments/foundations/m05_backward_pass.py that, with a comment on each step, wires the backward pass of a 2-layer MLP by hand in NumPy:
+1. A 784 -> 128 (ReLU) -> 10 forward pass on one small random input, saving z1, h, logits.
+2. Softmax + cross-entropy loss against a one-hot label.
+3. Manual gradients using the chain rule: dlogits = probs - y_true, then dW2 = h.T @ dlogits, db2, dh = dlogits @ W2.T, dz1 = dh * (z1 > 0), dW1 = x.T @ dz1, db1.
+4. A numerical gradient checker: nudge each weight by eps=1e-5 and compare (f(W+eps)-f(W-eps))/(2*eps) to the analytic gradient.
+Print the maximum absolute difference for W1 and W2 and confirm it is below 1e-6.
+Then run it and paste the max difference at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-03-log.md</code>: which broadcast surprised you, or which dtype fact stuck?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-02-log.md</code>: what was the largest gap between your hand-wired gradient and the numerical one, and did any layer surprise you?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
 
   <div class="fin" id="fin" role="status" aria-hidden="true">
     <span class="em">🎉</span>
-    <h3>Module 1 · Day 3 complete!</h3>
-    <p>You can predict a broadcast from two shapes and explain why <code>float32</code> halves the memory of <code>float64</code>.<br>Next up: <b>Matmul &amp; Shapes</b> — the one operation every neural network is built from.</p>
+    <h3>Module 5 · Day 2 complete!</h3>
+    <p>You wired the backward pass by hand: from <code>dlogits = probs − y_true</code> back through <code>dW2</code>, the ReLU gate, and <code>dW1</code> — and checked it against a numerical gradient.<br>Next up: <b>The Mini-Batch Loop &amp; Overfit-One-Batch</b> — run this backward pass in a loop, and use one batch to prove your wiring works.</p>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav prev" href="day-01-mlp-mnist.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav next" href="day-03-minibatch-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mini-Batch Loop</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -387,21 +395,27 @@ document.getElementById('reset').addEventListener('click', function(){
 
 /* PLAYGROUND */
 var DEMOS = {
-  scalar:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])   <span class="dim"># shape (3,)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> x + <span class="num">10</span>          <span class="dim"># the 10 is stretched to every element</span>\n'+
-    '<span class="ok">array([11, 12, 13])</span>',
-    take:'<b>①  Scalar broadcast.</b> A single number is stretched to match the whole array — the simplest broadcast. You met this on Day 1; now you know its name.'},
-  row:{html:'<span class="prompt">&gt;&gt;&gt;</span> g = np.array([[<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], [<span class="num">4</span>,<span class="num">5</span>,<span class="num">6</span>]])  <span class="dim"># (2,3)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> row = np.array([<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>])       <span class="dim"># (3,)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> g + row       <span class="dim"># row stretched down onto BOTH rows</span>\n'+
-    '<span class="ok">array([[11, 22, 33],\n       [14, 25, 36]])</span>',
-    take:'<b>②  The general case.</b> Shapes differ — (2,3) vs (3,) — but the (3,) row is copied down across both rows of the grid. One row acts on the whole batch, no loop.'},
-  dtype:{html:'<span class="prompt">&gt;&gt;&gt;</span> a = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]);  a.dtype\n<span class="hl">dtype(\'int64\')</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> b = np.array([<span class="num">1.0</span>, <span class="num">2.0</span>, <span class="num">3.0</span>]);  b.dtype\n<span class="hl">dtype(\'float64\')</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> f = b.astype(np.float32)\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> b.nbytes, f.nbytes     <span class="dim"># float64=8B each, float32=4B</span>\n'+
-    '<span class="hl">(24, 12)</span>',
-    take:'<b>③  dtype = kind + size.</b> Whole numbers default to int64, decimals to float64. Casting to float32 halves the bytes (24 → 12). Halving bytes halves memory — the seed of quantization.'}
+  fwd:{html:'<span class="prompt">&gt;&gt;&gt;</span> z1 = x @ W1 + b1          <span class="dim"># pre-activation, save it for later</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> h  = relu(z1)              <span class="dim"># hidden activations (128,)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> logits = h @ W2 + b2\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> probs  = softmax(logits)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss   = cross_entropy(probs, y_true)\n'+
+    '<span class="hl">loss = 1.204</span>   <span class="dim"># saved: z1, h, logits, probs</span>',
+    take:'<b>①  Forward pass, but keep the pieces.</b> The backward pass needs <code>z1</code>, <code>h</code>, and <code>probs</code> again. Saving them now is why you compute forward before backward.'},
+  back:{html:'<span class="prompt">&gt;&gt;&gt;</span> dlogits = probs - y_true   <span class="dim"># the starting blame (10,)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dW2 = h.T @ dlogits        <span class="dim"># (128,10)  layer-2 weight grad</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dh  = dlogits @ W2.T       <span class="dim"># (128,)   blame handed to layer 1</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dz1 = dh * (z1 &gt; 0)        <span class="dim"># ReLU gate: block where z1&lt;=0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dW1 = x.T @ dz1            <span class="dim"># (784,128) layer-1 weight grad</span>\n'+
+    '<span class="ok">dW1.shape (784, 128)   dW2.shape (128, 10)  ✓</span>',
+    take:'<b>②  Blame flows backward.</b> Each layer: transpose the input, multiply the incoming blame. The ReLU gate <code>(z1&gt;0)</code> blocks blame for units that were off. Shapes match the weights — a good first sanity check.'},
+  check:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">num_grad</span>(W, i, j, eps=<span class="num">1e-5</span>):\n'+
+    '<span class="dim">...</span>     <span class="kw">return</span> (loss_at(W,i,j,+eps) - loss_at(W,i,j,-eps)) / (<span class="num">2</span>*eps)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> analytic = dW2[<span class="num">3</span>,<span class="num">5</span>];  numeric = num_grad(W2,<span class="num">3</span>,<span class="num">5</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> analytic, numeric, abs(analytic-numeric)\n'+
+    '<span class="hl">(0.041832, 0.041833, 7.4e-07)</span>\n'+
+    '<span class="ok"># match to 6 decimals → the wiring is correct ✓</span>',
+    take:'<b>③  Trust, but verify.</b> The numerical gradient nudges one weight and watches the loss. It agrees with your hand-wired <code>dW2</code> to 6 decimals, so the chain rule was applied correctly.'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -414,18 +428,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* BUILD — scroll-reveal visual build-up */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Scalar 10 broadcast across a length-3 array'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='70' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='93' y='66' fill='#1F6280'>1</text><rect x='120' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='143' y='66' fill='#1F6280'>2</text><rect x='170' y='40' width='46' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='193' y='66' fill='#1F6280'>3</text><text x='240' y='66' font-size='18' fill='#6B645E'>+</text><rect x='265' y='40' width='46' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='288' y='66' fill='#9A7208' font-weight='bold'>10</text><text x='288' y='100' font-size='10' fill='#C93B3B'>one number…</text><text x='340' y='66' font-size='18' fill='#6B645E'>=</text><rect x='365' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='388' y='66' fill='#1a5c38' font-weight='bold'>11</text><rect x='413' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='436' y='66' fill='#1a5c38' font-weight='bold'>12</text><rect x='461' y='40' width='46' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='484' y='66' fill='#1a5c38' font-weight='bold'>13</text></g></svg>",
-  note:"<b>Start with the simplest broadcast.</b> <code>x + 10</code>: the single number 10 is <b>stretched</b> to line up with all three slots, then added element-by-element. You used this on Day 1 without knowing its name."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Broadcasting rule: align shapes from the right, size-1 or missing stretches'><g font-family='monospace' font-size='14'><text x='260' y='24' text-anchor='middle' fill='#2C2A28'>align shapes from the RIGHT →</text><text x='150' y='60' text-anchor='end' fill='#1F6280'>( 2 ,</text><text x='210' y='60' text-anchor='middle' fill='#1F6280' font-weight='bold'>3 )</text><text x='150' y='90' text-anchor='end' fill='#9A7208'>(</text><text x='210' y='90' text-anchor='middle' fill='#9A7208' font-weight='bold'>3 )</text><line x1='198' y1='68' x2='198' y2='78' stroke='#2D8B55' stroke-width='2'/><text x='300' y='60' fill='#6B645E'>3 = 3  ✓</text><text x='300' y='90' fill='#6B645E'>2 vs (missing) ✓ → stretch</text><text x='260' y='118' text-anchor='middle' fill='#2D8B55' font-weight='bold'>compatible → result (2, 3)</text></g></svg>",
-  note:"<b>The one rule.</b> Line the shapes up from the right. Each pair must be <b>equal</b>, or <b>one is 1</b> (or missing). The size-1 / missing side stretches. Check the rightmost pair first, then move left."},
- {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='A (3,) row broadcast down onto both rows of a (2,3) grid'><g font-family='monospace' font-size='13' text-anchor='middle'><rect x='40' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><rect x='84' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><rect x='128' y='40' width='42' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='61' y='63' fill='#9A7208'>10</text><text x='105' y='63' fill='#9A7208'>20</text><text x='149' y='63' fill='#9A7208'>30</text><text x='105' y='92' fill='#6B645E' font-size='11'>row (3,)</text><path d='M105 96 L105 112' stroke='#C99A12' stroke-width='2' stroke-dasharray='4,3'/><path d='M105 96 L105 130' stroke='#C99A12' stroke-width='2' stroke-dasharray='4,3'/><text x='210' y='90' font-size='18' fill='#6B645E'>onto</text><rect x='300' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='344' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='388' y='40' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='300' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='344' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='388' y='78' width='42' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='321' y='63' fill='#1a5c38'>11</text><text x='365' y='63' fill='#1a5c38'>22</text><text x='409' y='63' fill='#1a5c38'>33</text><text x='321' y='101' fill='#1a5c38'>14</text><text x='365' y='101' fill='#1a5c38'>25</text><text x='409' y='101' fill='#1a5c38'>36</text><text x='365' y='134' fill='#2D8B55' font-weight='bold'>(2,3) + (3,) = (2,3)</text></g></svg>",
-  note:"<b>The general case.</b> A <code>(3,)</code> row added to a <code>(2,3)</code> grid: the row is copied down onto <b>both</b> rows, then added. This is exactly how a bias vector adds to every row of a batch."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Incompatible shapes (2,3) and (2,) raise a broadcasting error'><g font-family='monospace' font-size='14'><text x='150' y='55' text-anchor='end' fill='#1F6280'>( 2 ,</text><text x='210' y='55' text-anchor='middle' fill='#C93B3B' font-weight='bold'>3 )</text><text x='150' y='88' text-anchor='end' fill='#9A7208'>(</text><text x='210' y='88' text-anchor='middle' fill='#C93B3B' font-weight='bold'>2 )</text><text x='300' y='72' fill='#C93B3B' font-weight='bold'>3 ≠ 2, neither is 1</text><rect x='120' y='100' width='280' height='22' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5'/><text x='260' y='115' text-anchor='middle' font-size='11' fill='#C93B3B'>ValueError: operands could not be broadcast</text></g></svg>",
-  note:"<b>When it fails.</b> <code>(2,3) + (2,)</code>: align right → 3 vs 2. They're not equal and neither is 1, so NumPy raises a broadcasting error. This mismatch — a row length that doesn't match — is a very common bug."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='float64 8 bytes, float32 4 bytes, bfloat16 2 bytes per number'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='60' y='40' width='120' height='34' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='120' y='62' fill='#C93B3B' font-weight='bold'>float64 · 8 B</text><rect x='200' y='40' width='90' height='34' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='245' y='62' fill='#9A7208' font-weight='bold'>float32 · 4 B</text><rect x='310' y='40' width='60' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='340' y='62' fill='#1a5c38' font-weight='bold'>bf16 · 2 B</text><text x='260' y='100' fill='#2C2A28'>same number, smaller box → less memory</text></g></svg>",
-  note:"<b>Now the dtype dial.</b> The exact same value costs 8, 4, or 2 bytes depending on its dtype. Choosing a smaller box is the single lever that decides how much memory an array (or a whole model) eats."},
- {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='A 7B model shrinks from 28GB in float32 to 14GB in bfloat16'><g font-family='monospace'><rect x='90' y='30' width='150' height='40' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='165' y='55' text-anchor='middle' font-size='13' fill='#C93B3B' font-weight='bold'>7B · fp32 ≈ 28 GB</text><text x='265' y='55' text-anchor='middle' font-size='16' fill='#6B645E'>→</text><rect x='300' y='38' width='110' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='355' y='63' text-anchor='middle' font-size='13' fill='#1a5c38' font-weight='bold'>bf16 ≈ 14 GB</text><text x='260' y='108' text-anchor='middle' font-size='12' fill='#2C2A28'>halving the dtype halves the memory bill</text><text x='260' y='128' text-anchor='middle' font-size='11' fill='#6B645E'>fits on one chip, or it doesn&apos;t — this is why labs live in bytes</text></g></svg>",
-  note:"<b>Why it matters at frontier scale.</b> Weights = params × bytes/param. A 7-billion-param model is ~28 GB in float32 but ~14 GB in bfloat16 — often the difference between fitting on a single accelerator or not. Every quantization method you'll study is a cleverer way to shrink this box without losing too much precision."}
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The forward chain from input to loss'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='20' y='45' width='55' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='47' y='62' fill='#1F6280'>x</text><text x='90' y='62' fill='#6B645E'>→</text><rect x='105' y='45' width='75' height='26' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='142' y='62' fill='#1a5c38'>h</text><text x='195' y='62' fill='#6B645E'>→</text><rect x='210' y='45' width='90' height='26' rx='4' fill='#FCF3DC' stroke='#C99A12' stroke-width='1.5'/><text x='255' y='62' fill='#9A7208'>logits</text><text x='315' y='62' fill='#6B645E'>→</text><rect x='330' y='45' width='90' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='375' y='62' fill='#1F6280'>probs</text><text x='435' y='62' fill='#6B645E'>→</text><rect x='448' y='45' width='58' height='26' rx='4' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='477' y='62' fill='#C93B3B'>loss</text></g></svg>",
+  note:"<b>Start with the forward chain.</b> Each arrow is one operation. The loss sits at the far right. To improve any weight, you need to know how it affects that far-right loss. Save <code>z1</code>, <code>h</code>, and <code>probs</code> — the backward pass reuses them."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='The starting blame equals probs minus true label'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='30' y='38' width='90' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='75' y='58' fill='#1F6280'>probs</text><text x='135' y='58' fill='#6B645E'>−</text><rect x='155' y='38' width='100' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='205' y='58' fill='#5E5191'>y_true (1-hot)</text><text x='275' y='58' fill='#6B645E'>=</text><rect x='295' y='38' width='110' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='350' y='58' fill='#C93B3B'>dlogits (blame)</text></g></svg>",
+  note:"<b>The blame at the output is tiny to compute.</b> For softmax + cross-entropy, <code>dlogits = probs − y_true</code>. If the true digit is class 0, subtracting the one-hot pushes that logit up and the rest down. This is the seed of the whole backward pass."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Layer 2 weight gradient is h transpose times dlogits'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='70' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='65' y='58' fill='#1a5c38'>h.T</text><text x='115' y='58' fill='#6B645E'>@</text><rect x='130' y='38' width='90' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='175' y='58' fill='#C93B3B'>dlogits</text><text x='235' y='58' fill='#6B645E'>=</text><rect x='255' y='38' width='150' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='330' y='58' fill='#9A7208'>dW2  (128, 10)</text></g></svg>",
+  note:"<b>Layer 2's gradient.</b> <code>dW2 = h.T @ dlogits</code>. The pattern to remember: a layer's weight gradient is <strong>its input, transposed, times the blame flowing into it</strong>. The shape <code>(128,10)</code> matches <code>W2</code> exactly."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Blame handed back to the hidden layer via W2 transpose'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='90' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='75' y='58' fill='#C93B3B'>dlogits</text><text x='135' y='58' fill='#6B645E'>@</text><rect x='150' y='38' width='70' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='185' y='58' fill='#9A7208'>W2.T</text><text x='235' y='58' fill='#6B645E'>=</text><rect x='255' y='38' width='120' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='315' y='58' fill='#1a5c38'>dh  (128,)</text></g></svg>",
+  note:"<b>Hand the blame back a layer.</b> <code>dh = dlogits @ W2.T</code> spreads the output blame back onto the 128 hidden units, weighted by the same <code>W2</code> that carried them forward. This <code>dh</code> is layer 1's share of the mistake."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='ReLU gate zeroes blame where z1 was not positive'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='75' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='67' y='58' fill='#1a5c38'>dh</text><text x='120' y='58' fill='#6B645E'>×</text><rect x='135' y='38' width='110' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='190' y='58' fill='#5E5191'>(z1 &gt; 0)</text><text x='260' y='58' fill='#6B645E'>=</text><rect x='280' y='38' width='120' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='340' y='58' fill='#C93B3B'>dz1 (128,)</text></g></svg>",
+  note:"<b>The ReLU gate.</b> ReLU passed only positive values forward, so it passes blame back only where <code>z1 &gt; 0</code>. <code>dz1 = dh * (z1 &gt; 0)</code> zeroes out the units that were switched off — they had no effect, so they get no blame."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Layer 1 weight gradient and the numerical check'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='20' y='30' width='60' height='28' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='50' y='49' fill='#1F6280'>x.T</text><text x='92' y='49' fill='#6B645E'>@</text><rect x='105' y='30' width='60' height='28' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='135' y='49' fill='#C93B3B'>dz1</text><text x='178' y='49' fill='#6B645E'>=</text><rect x='195' y='30' width='150' height='28' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='270' y='49' fill='#9A7208'>dW1 (784,128)</text><rect x='120' y='72' width='300' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='270' y='89' fill='#1a5c38'>numerical check: match to 1e-6 ✓</text></g></svg>",
+  note:"<b>Back to the first weight, then verify.</b> <code>dW1 = x.T @ dz1</code> — same pattern, input-transposed times incoming blame. Finally, a numerical gradient nudges each weight and confirms your hand-wired gradients to about 6 decimals. Match = correct. This exact sweep trains every deep network, LLMs included."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -448,18 +462,18 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. <code>g</code> has shape (2,3) and <code>row</code> has shape (3,). Does <code>g + row</code> work, and what shape is the result?',
-  opts:['Error — shapes differ','Yes → shape (2,3)','Yes → shape (3,)','Yes → shape (2,)'],
-  ans:1, fb:'Right. Align from the right: 3=3 ✓, then 2 vs missing ✓. The row stretches down both rows → (2,3).'},
- {q:'2. Two dimensions are broadcast-compatible if they are equal, or if one of them is ___.',
-  opts:['0','1','even','a float'],
-  ans:1, fb:'Right. A dimension of size 1 (or missing) is the one that gets stretched to match the other.'},
- {q:'3. What does an array\'s <code>dtype</code> control?',
-  opts:['Its shape','The kind and byte-size of each element (precision & memory)','How many dimensions it has','Which axis is the batch'],
-  ans:1, fb:'Right. dtype = the shared type (int/float) and how many bytes each number costs — which sets the memory bill.'},
- {q:'4. Compared to <code>float32</code>, how much memory does <code>bfloat16</code> use per number?',
-  opts:['Twice as much','The same','Half','Four times as much'],
-  ans:2, fb:'Right. bfloat16 is 2 bytes vs float32\'s 4 — half the memory. That is the core lever behind quantization.'}
+ {q:'1. Why is the backward pass called "backward"?',
+  opts:['it runs the code in reverse order','it starts at the loss and traces each weight\'s effect back through the network','it uses negative numbers','it undoes the forward pass'],
+  ans:1, fb:'Right. The loss is at the end, so you walk back from it, carrying the blame to each earlier weight.'},
+ {q:'2. For softmax + cross-entropy, the blame at the output (dlogits) equals:',
+  opts:['probs × y_true','probs − y_true','y_true − 1','log(probs)'],
+  ans:1, fb:'Right. dlogits = probs − y_true — subtracting the one-hot label from the predicted probabilities.'},
+ {q:'3. A layer\'s weight gradient follows which pattern?',
+  opts:['weight × blame','the input transposed, times the blame flowing in','blame ÷ input','just the blame'],
+  ans:1, fb:'Right. dW = input.T @ incoming_blame — e.g. dW2 = h.T @ dlogits, dW1 = x.T @ dz1.'},
+ {q:'4. What is a numerical gradient used for here?',
+  opts:['to train the model faster','to check the hand-wired gradients are correct','to replace backprop in production','to add more layers'],
+  ans:1, fb:'Right. Nudge a weight, watch the loss; if the estimate matches your dW, the chain rule was applied correctly.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){
