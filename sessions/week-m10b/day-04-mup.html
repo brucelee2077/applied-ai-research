@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 10b · Day 4 — muP &amp; Hyperparameter Transfer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m10b-d04-mup">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M10b Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-03-lr-schedules.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Learning-Rate Schedules</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-stability-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Stability Synthesis</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 10b · Scale · Day 4</span>
+    <h1>muP &amp; Hyperparameter Transfer</h1>
+    <p class="lead">Training one giant model can cost millions of dollars. So you cannot try 50 learning rates on it to find the best. muP (maximal update parameterization) solves this: tune the settings on a small, cheap model, then reuse the exact same settings on the huge one — with no re-tuning. The best learning rate stays the same as the model grows. Today you learn why naive scaling breaks and how muP fixes it.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why the best hyperparameters normally shift when a model gets bigger, say what muP and depth-scaled init do, and describe how tuning on a small model transfers zero-shot to the big one.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Tune small, then reuse the settings on big</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> from Day 3 you know the learning rate and its schedule are settings you must choose. Today's problem: how do you choose them for a model so big you can only afford to train it once?</div></div>
+
+      <h4>The dials you must set</h4>
+      <p>Before training you must pick several <span class="term" data-tip="Settings you choose before training, not learned during it — for example the learning rate, the initial weight scale, and the batch size.">hyperparameters</span>: the learning rate, how big the starting weights are, and more. Pick badly and the run is slow or spikes. Finding good values normally means training many times and comparing — a search.</p>
+
+      <h4>The problem: you cannot search on a giant model</h4>
+      <p>A search needs dozens of runs. On a small model that is cheap. On a model that costs millions per run, it is impossible. Worse, the best learning rate for a small model is usually <em>not</em> the best for a big one — so you cannot just copy the small model's setting over.</p>
+
+      <h4>Why the best setting shifts — naive scaling breaks</h4>
+      <p>When you make a model <span class="term" data-tip="Making a model bigger — more neurons per layer (wider) or more layers (deeper). Under a naive setup, the internal number sizes change with width, so old settings no longer fit.">wider</span> the usual way, the sizes of the numbers inside it change with the width. A learning rate that was perfect at width 256 is now too big or too small at width 4096. The dial has moved. This is <span class="term" data-tip="The failure where the best hyperparameters for a small model are wrong for a bigger model, because internal signals scale with size in the standard setup.">naive scaling breaking</span>.</p>
+
+      <h4>The fix: muP</h4>
+      <p><span class="term" data-tip="Maximal Update Parameterization: a way of setting the initial weight scales and per-layer learning rates so the internal signal sizes stay steady as the model gets wider. This keeps the best hyperparameters fixed across sizes.">muP</span> (maximal update parameterization) changes how the initial weights and per-layer learning rates are scaled so the internal signals stay the same size as the model widens. Then the best learning rate no longer moves. Tune it on a tiny model, copy it straight to the giant one. Add <span class="term" data-tip="Setting the initial weight scale based on how deep the model is, so adding more layers does not blow up or shrink the signal. Pairs with muP.">depth-scaled init</span> for depth. Keep going 👇</p>
+      <button class="gotit" type="button">Got the idea — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A wind-tunnel scale model of an airplane</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">✈️</span><h5>The scale model</h5><p>Before building a real airplane, engineers test a small model in a wind tunnel. It costs almost nothing compared to the real plane. If the model is built to the right rules, what they learn from it — how the wings behave — carries over to the full-size plane. They do not have to crash real planes to learn.</p></div>
+        <div class="card"><span class="big">📐</span><h5>The scaling rules matter</h5><p>The model only predicts the real plane if it is built with the correct scaling rules (how forces change with size). A model built with the wrong rules tells you nothing. muP is the set of correct rules for neural networks: build the small model right, and its best settings match the big one.</p></div>
+      </div>
+      <p><strong>In one line:</strong> muP is a wind tunnel for training — tune a cheap small model that is built with the right scaling rules, and its best hyperparameters transfer straight to the huge model.</p>
+      <p>Without muP, it is like using a paper airplane to predict a jumbo jet — the wrong scaling rules, so nothing transfers. The best learning rate you found on the small model would be wrong on the big one. muP is what makes the small test trustworthy.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a wind-tunnel model is a shrunken copy of the same shape. A muP small model is not a shrunken big model — it is narrower (fewer neurons per layer). What transfers is the tuning knobs, not the trained weights. You still train the big model from scratch; you just skip the expensive search.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch the best learning rate move, then stay put</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Watch naive scaling shift the best learning rate as width grows, then muP hold it fixed, then the cost saved. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="naive" type="button">① naive: the best LR drifts</button>
+          <button class="play-btn" data-demo="mup" type="button">② muP: the best LR stays</button>
+          <button class="play-btn" data-demo="cost" type="button">③ the cost saved</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: muP does not make the model better on its own. It makes the small model a trustworthy stand-in, so the settings you find are the settings you keep.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Why width changes signal size — and how muP cancels it</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Inside a layer, each output neuron adds up many inputs times their weights. The more inputs (the wider the layer), the more terms in that sum, so the sum tends to get bigger just because there are more things added. If the sum grows with width, the best learning rate has to shrink with width to keep steps the right size. muP scales the weights so the sum stays the same size no matter the width.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        pre-activation  y = Σᵢ wᵢ xᵢ    (i = 1 … n)   <span class="dim"># sum over n inputs</span><br>
+        naive: size of y grows with n<br>
+        muP:   scale weights by 1/n  →  size of y stays steady as n grows
+      </div></div>
+      <p>Symbols: <code>y</code> = one neuron's value before the activation. <code>wᵢ</code> = a weight. <code>xᵢ</code> = an input. <code>n</code> = the width, the number of inputs. <code>Σᵢ</code> = add over all <code>n</code> inputs. Naively, more terms means a bigger <code>y</code>. muP scales the contribution by <code>1/n</code> so <code>y</code> stays the same typical size at any width.</p>
+
+      <h4>Step 3 — a worked example</h4>
+      <p>Say each term <code>wᵢ xᵢ</code> is about <code>1</code> on average. Compare a narrow and a wide layer:</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        narrow n=4:   naive y ≈ 4×1 = <span class="hl">4</span> &nbsp;&nbsp;| muP y ≈ (1/4)×4 = <span class="hl">1</span><br>
+        wide   n=64:  naive y ≈ 64×1 = <span class="hl">64</span> | muP y ≈ (1/64)×64 = <span class="hl">1</span><br><br>
+        naive: signal jumped 4 → 64 as width grew (LR must change)<br>
+        muP:   signal stayed 1 → 1 (same LR works at any width)
+      </div></div>
+      <p>Under naive scaling the neuron's value jumped from <code>4</code> to <code>64</code> just from widening. That is why the old learning rate no longer fits. Under muP the value stayed near <code>1</code> at both widths — so the same learning rate is still correct. The dial stopped moving.</p>
+
+      <h4>What muP gives you, and the depth partner</h4>
+      <ul>
+        <li><strong>Zero-shot transfer:</strong> tune the learning rate (and other dials) on a small width, copy them to the big width, no re-tuning.</li>
+        <li><strong>Cheap search:</strong> the whole search runs on a model that costs a tiny fraction of the real one.</li>
+        <li><strong>Depth-scaled init:</strong> muP handles width; scaling the initial weights by the number of layers keeps signals steady as the model gets <em>deeper</em> too.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>muP is not free magic. You must apply the right scaling to every layer type, and a bug in the setup silently breaks transfer — the small-model tuning would then mislead you. Teams verify transfer by checking that the best learning rate really is the same across two or three widths before trusting it.</div></div>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> Days 1–3 kept a single run stable. muP lets you choose that run's settings without betting the budget. Day 5 puts everything together into one pre-flight checklist for a real training run.</div></div>
+      <button class="gotit" type="button">Got why muP transfers</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From a broken search to zero-shot transfer — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one step at a time: the costly problem, naive scaling breaking, the muP fix, the flat learning-rate curve, the small-to-big transfer, and depth-scaled init. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Show the signal size with and without muP (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Show the width effect yourself and see muP cancel it. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/scale/m10b_mup_signal.py</code>. For several widths (say 4, 16, 64, 256), make random weights and inputs, compute the pre-activation sum y = Σ wᵢ xᵢ, and measure its typical size. Do it two ways: naive (no scaling) and muP (scale the sum by 1/width, or scale the init by 1/sqrt(width)). Print the typical size at each width for both. Naive should grow with width; muP should stay flat. Run with <code>python3 m10b_mup_signal.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 10b Day 4 artifact.
+
+Create experiments/scale/m10b_mup_signal.py that, with a comment on each step, shows why naive scaling breaks and how muP fixes it, in NumPy:
+1. Loops over several widths n (for example 4, 16, 64, 256, 1024).
+2. For each width, makes random inputs x and random weights w, and computes the pre-activation y = sum(w * x) over many random draws.
+3. Measures the typical size of y (its standard deviation) two ways: NAIVE (standard init, no width scaling) and muP (scale the init or the sum so the size stays constant, e.g. init variance 1/n).
+4. Prints a table: width vs typical |y| for naive vs muP. The naive column should grow with width; the muP column should stay roughly flat.
+5. Adds one short comment explaining that a signal that grows with width forces the best learning rate to change with width, and that muP keeping it flat is what lets the learning rate transfer.
+Then run it and paste the table at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m10b/day-04-log.md</code>: from the smallest to the largest width, how much did the naive signal grow, and how flat did the muP signal stay?</div></div>
+      <button class="gotit" type="button">Done — on to Day 5</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">✈️</span>
+    <h3>Day 4 complete — you have a wind tunnel!</h3>
+    <p>You now know why naive scaling breaks (the internal signals grow with width, so the best learning rate shifts), what muP does (scale the weights so signals stay steady, keeping the best hyperparameters fixed across sizes), and how depth-scaled init handles more layers. Tune small, transfer zero-shot to big.<br>Next: <b>Day 5</b> — assemble everything into one pre-flight stability checklist.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-03-lr-schedules.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Learning-Rate Schedules</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-stability-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Stability Synthesis</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  naive:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># find best LR at each width (naive setup)</span>\n'+
+    '<span class="prompt">width  256</span> → best lr = <span class="num">0.010</span>\n'+
+    '<span class="prompt">width 1024</span> → best lr = <span class="num">0.004</span>\n'+
+    '<span class="prompt">width 4096</span> → best lr = <span class="num">0.001</span>\n'+
+    '<span class="bad"># the best LR keeps moving as the model grows</span>\n'+
+    '<span class="bad"># → you must re-search on the big model (too costly)</span>',
+    take:'<b>①  Naive scaling: the dial drifts.</b> The best learning rate at width 256 is wrong at width 4096. The internal signals grow with width, so the sweet spot moves. You cannot just copy the small model\'s setting.'},
+  mup:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># same search, but with muP</span>\n'+
+    '<span class="prompt">width  256</span> → best lr = <span class="num">0.008</span>\n'+
+    '<span class="prompt">width 1024</span> → best lr = <span class="num">0.008</span>\n'+
+    '<span class="prompt">width 4096</span> → best lr = <span class="num">0.008</span>\n'+
+    '<span class="ok"># the best LR is the same at every width</span>\n'+
+    '<span class="hl"># → tune at 256, copy straight to 4096</span>',
+    take:'<b>②  muP: the dial stops moving.</b> With muP the internal signals stay the same size at every width, so the best learning rate is fixed. Find it on the small model, reuse it on the giant one — zero-shot transfer.'},
+  cost:{html:'<span class="prompt">&gt;&gt;&gt;</span> search = <span class="num">20</span> runs to find the best LR\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> big-model run cost  = <span class="num">1000</span> units\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> small-model run cost = <span class="num">1</span> unit\n'+
+    '<span class="dim"># search on big:   20 × 1000 = 20000 units</span>\n'+
+    '<span class="dim"># search on small: 20 × 1    =    20 units</span>\n'+
+    '<span class="hl">→ ~1000x cheaper, then one big run</span>',
+    take:'<b>③  The cost saved.</b> Searching on the giant model would cost a fortune. muP lets the whole search run on a model ~1000x cheaper, then you spend the big budget once, on settings you already trust.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A tiny image drawn as a grid of numbers'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the image (a grid of numbers)</text><g fill='#1F6280'><rect x='190' y='30' width='140' height='80' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='210' y='52'>1</text><text x='237' y='52'>2</text><text x='264' y='52'>0</text><text x='291' y='52'>3</text><text x='210' y='76'>0</text><text x='237' y='76'>1</text><text x='264' y='76'>3</text><text x='291' y='76'>2</text><text x='210' y='100'>2</text><text x='237' y='100'>1</text><text x='264' y='100'>0</text><text x='291' y='100'>1</text></g></g></svg>",
+  note:"<b>An image is just numbers.</b> Every pixel is a number saying how bright it is. Here is a tiny 3-row image. The network never sees a picture — it sees this grid. The whole game is finding useful patterns in these numbers."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A small 3 by 3 filter of weights'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the filter (3x3 weights, shared)</text><rect x='205' y='30' width='110' height='80' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><g fill='#5E5191'><text x='225' y='52'>0</text><text x='260' y='52'>1</text><text x='295' y='52'>0</text><text x='225' y='76'>1</text><text x='260' y='76'>0</text><text x='295' y='76'>1</text><text x='225' y='100'>0</text><text x='260' y='100'>1</text><text x='295' y='100'>0</text></g></g></svg>",
+  note:"<b>The filter is a small pattern.</b> These 9 numbers make a plus-shape detector. The same 9 numbers are used at every spot in the image — that is weight sharing. Learn one pattern, find it everywhere."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The filter sits on one patch and computes one number'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='36' width='150' height='60' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='30' fill='#6B645E'>patch</text><text x='210' y='72' fill='#6B645E'>×</text><rect x='230' y='36' width='150' height='60' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='305' y='30' fill='#6B645E'>filter</text><text x='400' y='72' fill='#6B645E'>=</text><rect x='420' y='46' width='70' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='455' y='72' fill='#1a5c38' font-size='16'>6</text></g></svg>",
+  note:"<b>One patch → one number.</b> Line up the filter with a patch. Multiply each pair and add: 2+0+3+1 = <b>6</b>. That single number says how strongly the plus-pattern showed up right here. This is the whole convolution, done once."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The filter slides to the next position'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='85' y='62' fill='#1F6280'>stop 1</text><text x='150' y='62' fill='#6B645E'>→</text><rect x='175' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='220' y='62' fill='#1F6280'>stop 2</text><text x='285' y='62' fill='#6B645E'>→</text><rect x='310' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='355' y='62' fill='#1F6280'>stop 3</text><text x='420' y='62' fill='#6B645E'>→ …</text></g></svg>",
+  note:"<b>Slide and repeat.</b> Move the filter one step and compute again. The <i>same</i> weights are reused at every stop. Slide across the whole image and you fill in a whole grid of match-scores."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The full feature map of match scores'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>feature map (all the match scores)</text><rect x='190' y='30' width='140' height='80' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><g fill='#1a5c38'><text x='217' y='58'>1</text><text x='260' y='58'>5</text><text x='303' y='58'>3</text><text x='217' y='90'>4</text><text x='260' y='90'>6</text><text x='303' y='90'>2</text></g></g></svg>",
+  note:"<b>The feature map.</b> Every filter stop wrote one number, so together they form a small grid. Big numbers = strong match, small numbers = weak match. This map is the convolution layer's output — a map of where the pattern lives."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Max pooling shrinks the feature map'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='34' width='130' height='60' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='105' y='28' fill='#6B645E'>4x4 map</text><text x='195' y='68' fill='#6B645E'>max 2x2 →</text><rect x='300' y='44' width='90' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='38' fill='#6B645E'>2x2 map</text><text x='345' y='70' fill='#9A7208'>keep biggest</text></g></svg>",
+  note:"<b>Pooling shrinks it.</b> Slide a 2×2 window and keep only the biggest number in each block. The map gets half as wide and half as tall, but the strongest matches survive. Smaller map, same signal, less work for the next layer. That is one full conv-then-pool block."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What is a convolution filter?',
+  opts:['a picture of the object','a small grid of weights that slides over the image','a list of all the pixels','the final answer'],
+  ans:1, fb:'Right. A filter is a tiny grid of weights (often 3×3) dragged across the image to detect a pattern.'},
+ {q:'2. At one filter position, how do you get the output number?',
+  opts:['pick the biggest pixel','multiply each overlapping pair and add them all up','count the pixels','divide the image by the filter'],
+  ans:1, fb:'Right. Multiply each filter number by the image number under it, then add all the products into one value.'},
+ {q:'3. "Weight sharing" means:',
+  opts:['each spot learns its own weights','the same filter weights are reused at every position','the weights are random','the weights never change'],
+  ans:1, fb:'Right. One small set of weights is reused everywhere, so a pattern learned once is found across the whole image.'},
+ {q:'4. What does max pooling do to a feature map?',
+  opts:['makes it bigger','keeps the largest value in each small block, shrinking the map','adds all the numbers','turns it into an image'],
+  ans:1, fb:'Right. Each block (like 2×2) becomes one number — its biggest value — so the map gets smaller but keeps the strong matches.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

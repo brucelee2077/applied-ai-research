@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 9b · Day 2 — Loss Scaling &amp; Master Weights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m9b-d02-lossscale">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M9b Day 2</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-01-float-formats.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Float Formats</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-mixed-precision-recipe.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mixed-Precision Recipe</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 9b · Scale · Day 2</span>
+    <h1>Loss Scaling<br>&amp; Master Weights</h1>
+    <p class="lead">Yesterday you saw fp16 has a narrow range. That narrow range bites at the bottom too: many gradients are so tiny they round down to zero in fp16, and a zero gradient means that weight stops learning. Today you learn the two-part fix that saved fp16 training: keep a full-precision copy of the weights, and turn the loss "volume" up before the backward pass so small gradients survive.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why small fp16 gradients underflow to zero, describe fp32 master weights and loss scaling by a factor S, and walk through a gradient that dies without scaling but survives with it.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Tiny gradients vanish, so we amplify them</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> from Day 1 you know fp16 has a narrow range. From M2 you know the training loop: a forward pass makes a loss, a backward pass makes gradients, and the optimizer nudges each weight. Today we look at what happens to those gradients when they are stored in fp16.</div></div>
+
+      <h4>The problem: gradients are often tiny</h4>
+      <p>A <span class="term" data-tip="A number for each weight that says which way to nudge it to lower the loss. Made by the backward pass. Late in training, most gradients are very small.">gradient</span> tells each weight how to change. Deep in a network these numbers are often very small — around <code>0.00001</code> or less. fp16's smallest normal number is about <code>0.00006</code>. Anything smaller rounds to zero. This is called <span class="term" data-tip="When a number is smaller than the smallest value a format can store, so it rounds down to zero. In fp16, gradients below about 6e-5 underflow to 0.">underflow</span>.</p>
+
+      <h4>Why underflow stalls training</h4>
+      <p>A gradient of zero tells the optimizer "do not change this weight". If many gradients underflow to zero, most of the model stops learning. The loss flattens and training <span class="term" data-tip="When the loss stops going down because the updates have become zero or meaningless. Underflowing fp16 gradients are a common cause.">stalls</span> — the run wastes time and money going nowhere.</p>
+
+      <h4>Fix part 1: fp32 master weights</h4>
+      <p>Keep one exact copy of every weight in fp32. This copy is the <span class="term" data-tip="A full-precision (fp32) copy of the model's weights that the optimizer updates. The fast fp16/bf16 copy is used only for the forward and backward passes, then refreshed from this master.">master weights</span>. The forward and backward passes use a fast fp16 copy, but the actual update is applied to the fp32 master, so tiny updates are not lost to rounding.</p>
+
+      <h4>Fix part 2: loss scaling</h4>
+      <p>Before the backward pass, multiply the loss by a big number <code>S</code>. Because of the chain rule, every gradient also gets multiplied by <code>S</code>, lifting the tiny ones up out of the underflow zone. After the backward pass, divide the gradients by <code>S</code> to put them back to their true size. This is <span class="term" data-tip="Multiplying the loss by a factor S before the backward pass so all gradients are scaled up by S and small ones do not underflow, then dividing the gradients by S afterward to restore their true size.">loss scaling</span>. Keep going 👇</p>
+      <button class="gotit" type="button">Got the underflow problem — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Turn the recording volume up, then back down</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🎙️</span><h5>Recording a whisper</h5><p>You want to record a very quiet sound. Your microphone has a floor — sounds below it are recorded as pure silence. A whisper falls below the floor, so the recording is just zero. The whisper is lost, the same way a tiny gradient rounds to zero in fp16.</p></div>
+        <div class="card"><span class="big">🔊</span><h5>Turn the gain up first</h5><p>So you turn the recording gain way up before you record. Now the whisper is loud enough to land above the floor and gets captured. Later, when you play it back, you turn the volume back down by the same amount, and the whisper sounds normal again.</p></div>
+      </div>
+      <p><strong>In one line:</strong> loss scaling turns the "gain" up (multiply the loss by S) so tiny gradients are loud enough to survive fp16, then turns it back down (divide by S) so the real update size is restored.</p>
+      <p>The fp32 master weights are like keeping the original, un-compressed master tape. All the day-to-day work happens on the small fast copy, but the true, exact record lives in the fp32 master, so nothing important is quietly thrown away.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a microphone's gain is one fixed knob you set by hand. Loss scaling can be automatic — the factor S goes up when gradients look safe and drops the moment a gradient overflows to infinity. That self-adjusting version is called dynamic loss scaling.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch a gradient die, then survive</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. See a tiny gradient underflow to zero in fp16, then see loss scaling rescue it, then see dynamic scaling back off after an overflow. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="underflow" type="button">① gradient underflows</button>
+          <button class="play-btn" data-demo="scaled" type="button">② scale by S, it survives</button>
+          <button class="play-btn" data-demo="dynamic" type="button">③ dynamic scaling backs off</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the update always lands on the fp32 master weights. Loss scaling only protects the gradients while they pass through fp16.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">One gradient, dying then rescued</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>The backward pass makes a gradient for each weight. If a gradient is smaller than fp16's smallest storable number, it becomes zero — the weight will not move. Loss scaling multiplies the loss by a factor <code>S</code> before the backward pass. By the chain rule, this multiplies every gradient by <code>S</code> too, so tiny gradients get pushed above the zero-threshold. After the backward pass you divide the gradients by <code>S</code> to get their true size back, then update the fp32 master weights.</p>
+
+      <h4>Step 2 — the formulas</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        scaled_loss = loss × S            <span class="dim"># S is the loss-scale factor</span><br>
+        grad_scaled = backward(scaled_loss)  <span class="dim"># = grad_true × S (chain rule)</span><br>
+        grad_true  = grad_scaled ÷ S       <span class="dim"># unscale before the update</span><br>
+        master_fp32 = master_fp32 − lr × grad_true
+      </div></div>
+      <p>Symbols: <code>loss</code> = the training loss. <code>S</code> = the scale factor (a big number like 1024). <code>grad_scaled</code> = the gradient while it is still S times too big. <code>grad_true</code> = the real gradient after dividing by S. <code>lr</code> = the learning rate. <code>master_fp32</code> = the full-precision copy of the weight.</p>
+
+      <h4>Step 3 — a worked example</h4>
+      <p>Say a gradient's true value is <code>0.00003</code>, and fp16's smallest normal value is about <code>0.00006</code>. Use a scale factor <code>S = 1024</code>.</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        without scaling:<br>
+        &nbsp;&nbsp;grad_true = 0.00003  &lt; 0.00006<br>
+        &nbsp;&nbsp;stored in fp16 → <span class="hl">0.0</span>   <span class="dim"># underflow, weight frozen</span><br><br>
+        with scaling (S = 1024):<br>
+        &nbsp;&nbsp;grad_scaled = 0.00003 × 1024 = <span class="hl">0.0307</span>   <span class="dim"># well above 0.00006</span><br>
+        &nbsp;&nbsp;stored in fp16 → 0.0307  <span class="dim"># survives!</span><br>
+        &nbsp;&nbsp;unscale: 0.0307 ÷ 1024 = <span class="hl">0.00003</span>   <span class="dim"># true value back</span>
+      </div></div>
+      <p>Without scaling, <code>0.00003</code> is below fp16's floor, so it becomes <code>0.0</code> and the weight is stuck. With <code>S = 1024</code>, the gradient becomes <code>0.0307</code> — far above the floor — so fp16 keeps it. Dividing by <code>1024</code> afterward returns the true <code>0.00003</code>, and that update lands on the fp32 master weight.</p>
+
+      <h4>Why this works and why dynamic S</h4>
+      <ul>
+        <li><strong>The chain rule does the work:</strong> scaling the loss once scales every gradient by the same S, so you fix all of them with a single multiply.</li>
+        <li><strong>fp32 master weights catch the tiny update:</strong> even after unscaling, the update may be small; applying it to the fp32 copy avoids losing it to rounding again.</li>
+        <li><strong>Dynamic loss scaling:</strong> too-large S can push gradients past fp16's top (65,504) into <code>inf</code>. So S starts high, and if any gradient overflows, that step is skipped and S is halved; after many safe steps, S is doubled. It hunts for the biggest safe S automatically.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> fp16 needs this crutch because its range is narrow at both ends. bf16, with fp32-wide range, mostly does not need loss scaling at all. Tomorrow you assemble the full mixed-precision recipe that ties master weights, scaling, and format choice together.</div></div>
+      <button class="gotit" type="button">Got how a gradient is rescued</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From a dying gradient to a full scaled step — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one step at a time: the tiny gradient, the fp16 floor it falls under, the scale-up, the survival, the unscale, and the update to the fp32 master. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove a gradient survives scaling (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to show it. Prove to yourself that a tiny gradient dies in fp16 and lives with loss scaling. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/spiral/m9b_loss_scaling.py</code>. Make a tiny gradient like <code>3e-5</code> as a float. Cast it to <code>float16</code> and print it (it becomes 0). Then multiply by <code>S = 1024</code>, cast to <code>float16</code>, print it (it survives), then divide by <code>1024</code> and print the recovered value. Run with <code>python3 m9b_loss_scaling.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 9b Day 2 artifact.
+
+Create experiments/spiral/m9b_loss_scaling.py that, with a comment on each step, shows fp16 gradient underflow and how loss scaling fixes it, using PyTorch:
+1. Prints fp16's smallest normal positive value (use torch.finfo(torch.float16).tiny).
+2. Takes a true gradient value 3e-5, casts it to torch.float16, and prints it — showing it underflows to 0.
+3. Multiplies the gradient by a scale factor S = 1024, casts to float16, prints it (it survives), then divides by S and prints the recovered value near 3e-5.
+4. Adds a small demo of dynamic loss scaling: start S high, if a value overflows to inf, halve S and skip; after several safe steps, double S. Print the S it settles on.
+Then run it and paste the printed values at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m9b/day-02-log.md</code>: what value did the unscaled gradient round to in fp16, and what scale factor S did the dynamic loop settle on?</div></div>
+      <button class="gotit" type="button">Done — on to Day 3</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎙️</span>
+    <h3>Day 2 complete — you can rescue a gradient!</h3>
+    <p>You now know why tiny fp16 gradients underflow to zero and stall training, and the two-part fix: keep fp32 master weights, and scale the loss by S before the backward pass so small gradients survive, then divide by S after. Dynamic loss scaling finds the biggest safe S on its own.<br>Next: <b>Day 3</b> — the full mixed-precision recipe and what must stay fp32.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-01-float-formats.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Float Formats</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-mixed-precision-recipe.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mixed-Precision Recipe</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  underflow:{html:'<span class="prompt">&gt;&gt;&gt;</span> grad = <span class="num">3e-5</span>   <span class="dim"># a tiny true gradient</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> fp16_floor = <span class="num">6.1e-5</span>   <span class="dim"># fp16 smallest normal value</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> to_fp16(grad)\n'+
+    '<span class="bad">0.0</span>   <span class="dim"># underflow! 3e-5 < 6.1e-5</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> weight -= lr * <span class="bad">0.0</span>   <span class="dim"># weight never moves</span>',
+    take:'<b>①  A tiny gradient rounds to zero.</b> 3e-5 is below fp16’s smallest normal value (~6.1e-5), so it becomes 0.0. The optimizer then does weight − lr × 0 = no change. That weight is frozen and stops learning.'},
+  scaled:{html:'<span class="prompt">&gt;&gt;&gt;</span> S = <span class="num">1024</span>   <span class="dim"># loss-scale factor</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> grad_scaled = <span class="num">3e-5</span> * S\n'+
+    '<span class="ok">0.0307</span>   <span class="dim"># well above the fp16 floor</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> to_fp16(grad_scaled)  <span class="dim"># survives</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> grad_true = 0.0307 / S\n'+
+    '<span class="hl">3.00e-05</span>   <span class="dim"># true value recovered, applied to fp32 master</span>',
+    take:'<b>②  Scale up, survive, scale down.</b> Multiply by S=1024 and the gradient becomes 0.0307 — far above the floor, so fp16 keeps it. Divide by 1024 afterward to get 3e-5 back, then apply it to the fp32 master weight.'},
+  dynamic:{html:'<span class="prompt">&gt;&gt;&gt;</span> S = <span class="num">65536</span>   <span class="dim"># start high</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> step()  → grad hit <span class="bad">inf</span>   <span class="dim"># S too big, overflow</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> skip update; S = S / 2 → <span class="num">32768</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="num">2000</span>): safe steps\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> S = S * 2 → try higher again\n'+
+    '<span class="ok">settled S ≈ 32768</span>   <span class="dim"># biggest safe scale</span>',
+    take:'<b>③  Dynamic scaling self-tunes.</b> If a gradient overflows to inf, that step is skipped and S is halved. After many safe steps, S is doubled to probe higher. It keeps hunting for the largest S that does not overflow — no hand-tuning needed.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 96' role='img' aria-label='A tiny gradient value'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='20' fill='#6B645E'>the backward pass makes a tiny gradient</text><rect x='190' y='38' width='140' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='63' fill='#1F6280'>grad = 0.00003</text></g></svg>",
+  note:"<b>Gradients get tiny.</b> Deep in a network the backward pass often produces very small gradients like <b>0.00003</b>. Each one is a small nudge for a weight. Small does not mean useless — added over many steps, they matter."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The fp16 floor cuts off the gradient'><g font-family='monospace' font-size='11' text-anchor='middle'><line x1='40' y1='70' x2='480' y2='70' stroke='#C93B3B' stroke-width='2' stroke-dasharray='5 4'/><text x='120' y='88' fill='#C93B3B'>fp16 floor ≈ 0.00006</text><rect x='320' y='40' width='140' height='24' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='390' y='57' fill='#C93B3B'>0.00003 → 0.0</text></g></svg>",
+  note:"<b>It falls under the floor.</b> fp16 cannot store anything smaller than about <b>0.00006</b>. Our 0.00003 is below that line, so fp16 rounds it to <b>0.0</b>. The nudge disappears and the weight freezes."},
+ {viz:"<svg viewBox='0 0 520 96' role='img' aria-label='Multiply the loss by S'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='38' width='150' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='63' fill='#1F6280'>loss × S</text><text x='210' y='63' fill='#6B645E'>→</text><rect x='240' y='38' width='240' height='40' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='360' y='63' fill='#5E5191'>every grad × S (chain rule)</text></g></svg>",
+  note:"<b>Turn the volume up.</b> Multiply the loss by a big factor <b>S</b> (say 1024) before the backward pass. By the chain rule, this multiplies <i>every</i> gradient by S — one knob lifts them all at once."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The scaled gradient clears the floor'><g font-family='monospace' font-size='11' text-anchor='middle'><line x1='40' y1='78' x2='480' y2='78' stroke='#C93B3B' stroke-width='2' stroke-dasharray='5 4'/><text x='120' y='96' fill='#C93B3B'>fp16 floor</text><rect x='300' y='30' width='170' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='385' y='48' fill='#1a5c38'>0.00003 × 1024 = 0.0307</text></g></svg>",
+  note:"<b>Now it clears the floor.</b> 0.00003 × 1024 = <b>0.0307</b> — far above the fp16 floor. fp16 stores it with no trouble. The gradient survived the trip through 16-bit storage."},
+ {viz:"<svg viewBox='0 0 520 96' role='img' aria-label='Divide the gradient by S to unscale'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='38' width='170' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='125' y='63' fill='#1a5c38'>0.0307 ÷ 1024</text><text x='230' y='63' fill='#6B645E'>→</text><rect x='260' y='38' width='210' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='365' y='63' fill='#9A7208'>0.00003 (true size back)</text></g></svg>",
+  note:"<b>Turn the volume back down.</b> After the backward pass, divide the gradients by the same S. 0.0307 ÷ 1024 = <b>0.00003</b> — the real gradient is back, just as if fp16 had never rounded it away."},
+ {viz:"<svg viewBox='0 0 520 96' role='img' aria-label='Update the fp32 master weight'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='60' y='38' width='150' height='40' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='135' y='63' fill='#5E5191'>fp32 master</text><text x='230' y='63' fill='#6B645E'>− lr × grad</text><rect x='320' y='38' width='150' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='395' y='63' fill='#1a5c38'>updated master</text></g></svg>",
+  note:"<b>Apply it to the fp32 master.</b> The true 0.00003 update lands on the full-precision master weight, so even a tiny step is not lost to rounding a second time. That is the whole loop: scale up, survive, unscale, update the master."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why do small gradients cause trouble in fp16 training?',
+  opts:['they make the loss bigger','they underflow to zero, so those weights stop learning','they are always negative','they overflow to infinity'],
+  ans:1, fb:'Right. A gradient below fp16’s smallest value rounds to 0, and the optimizer then applies no update, freezing that weight.'},
+ {q:'2. What does loss scaling do to fix this?',
+  opts:['it deletes small gradients','it multiplies the loss by S before backward, so every gradient is scaled up by S and survives','it makes the model smaller','it lowers the learning rate'],
+  ans:1, fb:'Right. By the chain rule, scaling the loss by S scales every gradient by S, lifting tiny ones above the underflow threshold.'},
+ {q:'3. After the backward pass with scaling, what must you do before the update?',
+  opts:['multiply the gradients by S again','divide the gradients by S to restore their true size','set the gradients to zero','skip the update'],
+  ans:1, fb:'Right. You unscale by dividing by S so the update has the correct magnitude before it is applied to the fp32 master weights.'},
+ {q:'4. What are fp32 master weights for?',
+  opts:['to make training slower on purpose','to keep a full-precision copy the optimizer updates, so tiny updates are not lost to rounding','to store the images','to replace the loss'],
+  ans:1, fb:'Right. The fast fp16 copy does the forward and backward passes, but the real update lands on the exact fp32 master so small steps survive.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>
