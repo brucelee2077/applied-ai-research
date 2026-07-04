@@ -85,13 +85,13 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | **Phase 1 · Hardware, Distribution & Scaling** | | | | | | | |
 | 8 | Transformer Math + Search 🎨 *(+ FlashAttention concept)* | Represent | `week-03` + 4 design studies | reuse+wrap | 8 | $0 | ⬜ |
 | 9a | Hardware: One Device *(+ activation recomputation)* | Scale | `week-02` | reuse | 5 | $0 | ⬜ |
-| 9b | Mixed-Precision & fp8 Training ⭐ | Scale | 🆕 authored (bf16/fp8 numerics) | author | 4 | $0 | ⬜ |
+| 9b | Mixed-Precision & fp8 Training ⭐ | Scale | 🆕 authored (bf16/fp8 numerics) | author | 4 | $0 | ✅ 4/4 + gate |
 | 9c | Sharding & Parallelism *(+ modern parallelism depth)* | Scale | `week-04` | reuse+author | 8 | $0 | ⬜ |
 | 9d | First Real Multi-Device Run 🔴 | Scale | `week-04` bridge | reuse | 2 | ~$50 | ⬜ |
-| 9e | Distributed Orchestration & Fault Tolerance ⭐ | Scale | 🆕 authored (bit-exact resume, preemption) | author | 5 | $0 | ⬜ |
+| 9e | Distributed Orchestration & Fault Tolerance ⭐ | Scale | 🆕 authored (bit-exact resume, preemption) | author | 5 | $0 | ✅ 5/5 + gate |
 | 10a | Scaling Laws + Simulator *(+ data curation & mixtures)* | Scale | `week-05` + 🆕 curation | reuse+author | 8 | $0 | ⬜ |
-| 10b | Training Stability & Optimization Dynamics ⭐ | Scale | 🆕 authored (spikes, z-loss, muP, LR schedules) | author | 5 | $0 | ⬜ |
-| 11 | Experimental Method & Statistics ⭐ | Scale | 🆕 authored (absorbs prob/stats) | author | 5 | $0 | ⬜ |
+| 10b | Training Stability & Optimization Dynamics ⭐ | Scale | 🆕 authored (spikes, z-loss, muP, LR schedules) | author | 5 | $0 | ✅ 5/5 + gate |
+| 11 | Experimental Method & Statistics ⭐ | Scale | 🆕 authored (absorbs prob/stats) | author | 5 | $0 | ✅ 5/5 + gate |
 | **Phase 2 · The Capstone (paid)** | | | | | | | |
 | 12 | Addition Transformer — Build 🔴 | Train | `week-09` + `week-10`(d1–3) + `week-08` | reuse | 10 | paid TPU | ⬜ |
 | 13 | Your Own IsoFlops Law 🔴 | Scale | `week-10`(d4–6) + `week-11`(d1–3) | reuse | 6 | ~$150–250 | ⬜ |
@@ -543,7 +543,7 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 
 ### Status glance
 - **Priority 0 (foundations): 7 / 7 WPs — ✅ complete (M1, M2, M3, M4 + all 3 viz built, verified, wired).**
-- Priority 1 (Phases 0–5): 3 / ~30 build-modules (M5a, M5b, M6 ✅) · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
+- Priority 1 (Phases 0–5): 7 / ~30 build-modules (M5a, M5b, M6, M9b, M9e, M10b, M11 ✅) · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
 - **Legend:** ⬜ unclaimed · 🔄 in progress (add session date) · ✅ done & verified · ⛔ blocked (note blocker).
 
 ---
