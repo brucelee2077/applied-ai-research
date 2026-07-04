@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Module 6 · Day 1 — Convolution &amp; Pooling</title>
+<title>Module 10b · Day 5 — Stability Synthesis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -184,12 +184,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 </style>
 </head>
 
-<body data-quest-id="wf8-d01-conv">
+<body data-quest-id="m10b-d05-synthesis">
 
 <nav class="nav">
   <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
   <div class="nav-in">
-    <span class="nav-title">Foundations · M6 Day 1</span>
+    <span class="nav-title">Spiral · M10b Day 5</span>
     <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
   </div>
 </nav>
@@ -197,116 +197,121 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav prev" href="day-04-mup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">muP &amp; Hyperparameter Transfer</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Module 10b Review Gate</span></a>
 </nav>
 
   <header class="hero">
-    <span class="eyebrow">Module 6 · Represent · Day 1</span>
-    <h1>Convolution<br>&amp; Pooling</h1>
-    <p class="lead">A photo is a huge grid of numbers. A normal neural network would need millions of weights just to look at it once. A convolution is smarter: it uses one tiny grid of numbers — a filter — and slides it across the whole image, reusing the same weights everywhere. Then pooling shrinks the result while keeping what matters. This is how a machine starts to "see".</p>
+    <span class="eyebrow">Module 10b · Scale · Day 5</span>
+    <h1>Stability Synthesis</h1>
+    <p class="lead">You have met the pieces: loss spikes and how to recover, the stabilizer toolkit, learning-rate schedules, and muP. Today you put them together into one thing a real team actually uses — a pre-flight stability checklist. Before you press "start" on a run that will cost a lot of money and time, you go down the list, item by item, exactly like a pilot before takeoff.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> explain a convolution as a small filter sliding over an image with shared weights, compute one output value by hand on a tiny grid, and say what pooling does and why we downsample.
+      <b>🎯 By the end, you'll be able to:</b> walk through a pre-flight stability checklist for a real training run, say what each item guards against, and connect every item back to the day that taught it.
     </div>
   </header>
 
   <!-- ===== 1. WHAT IS IT ===== -->
   <section class="sec" id="s1" data-sec="what">
-    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">A tiny filter that slides across the image</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">One checklist you run before you press start</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know that an image is a grid of numbers (pixels), and you know matrix multiply and the training loop from M4–M5. Today we swap the "every pixel talks to every neuron" idea for something much cheaper and smarter.</div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you did Days 1–4 of this module. Today adds no new mechanism — it collects what you already know into one ordered list you can actually use.</div></div>
 
-      <h4>The problem with a plain network</h4>
-      <p>A small photo of 224 by 224 pixels is over 50,000 numbers. If you connect every pixel to every neuron, the first layer alone needs tens of millions of weights. That is slow, hungry for memory, and it throws away a key fact: pixels that sit next to each other belong together.</p>
+      <h4>Why a checklist at all</h4>
+      <p>A big training run is expensive and slow. Once it starts, a mistake can waste days and a lot of money before you notice. A <span class="term" data-tip="An ordered list of safety checks you go through before starting a training run, so nothing important is forgotten. Modeled on a pilot's pre-flight checklist.">pre-flight stability checklist</span> is a fixed list you go down before pressing start. It turns "I hope this run is set up right" into "I checked every item".</p>
 
-      <h4>The fix: a convolution</h4>
-      <p>A <span class="term" data-tip="A small grid of learned weights (for example 3 by 3) that slides across an image. At each spot it multiplies and adds to detect a pattern like an edge.">filter</span> is a tiny grid of numbers — often just 3 by 3. A <span class="term" data-tip="The operation of sliding a small filter across an image, and at each position multiplying the overlapping numbers and adding them up. The result is a feature map.">convolution</span> slides this filter over the whole image. At each stop, it multiplies the numbers that line up and adds them into one output number. Slide, multiply-add, write one number. Repeat.</p>
+      <h4>What goes on the list</h4>
+      <p>The items come straight from this module. Set the learning-rate schedule (Day 3). Turn on the stabilizers (Day 2). Make sure checkpoints save often (Day 1). Confirm the hyperparameters were transferred with muP (Day 4). Set up spike detection so a problem is caught early (Day 1).</p>
 
-      <h4>The magic word: shared weights</h4>
-      <p>The same filter is used at every position. This is called <span class="term" data-tip="Reusing the same small set of filter weights at every position in the image, instead of learning separate weights for each spot. Fewer weights, and a pattern found in one place is found everywhere.">weight sharing</span>. Learn one edge-detector once, and it finds edges anywhere in the picture. Nine weights can scan a whole image, instead of millions.</p>
+      <h4>Two kinds of items: prevent and catch</h4>
+      <p>Some items <strong>prevent</strong> trouble: warmup, gradient clipping, z-loss. Others <strong>catch</strong> trouble that slips through: a loss monitor that flags a spike, frequent checkpoints so you can roll back. A good list has both — you cannot prevent everything, so you must also be ready to recover.</p>
 
-      <h4>Then: pooling shrinks it</h4>
-      <p>After a convolution you get a grid of "how strongly did the pattern match here" numbers, called a <span class="term" data-tip="The grid of numbers a filter produces after sliding over the image. Each number says how strongly the filter's pattern matched at that spot.">feature map</span>. <span class="term" data-tip="Shrinking a feature map by summarizing small blocks into one number. Max pooling keeps the largest value in each block.">Pooling</span> shrinks that map by keeping only the strongest value in each small block. Smaller map, same important signal. Keep going 👇</p>
-      <button class="gotit" type="button">Got the filter idea — let's go</button>
+      <h4>The order matters</h4>
+      <p>You go top to bottom, and you do not start until every item is ticked. This is exactly how a pilot works: no skipping, no "I'll check that later". The whole point is that the list is boring and complete, so a tired engineer at 2am still gets it right. Keep going 👇</p>
+      <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
   </section>
 
   <!-- ===== 2. INTUITION ===== -->
   <section class="sec" id="s2" data-sec="intuition">
-    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A flashlight scanning for a pattern</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A pilot going through the pre-flight checklist</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <div class="relate">
-        <div class="card"><span class="big">🔦</span><h5>The flashlight</h5><p>Imagine a dark room with a picture on the wall. You hold a small flashlight and move it across the picture, one spot at a time. At each spot the light shows a small patch. The filter is your flashlight: it only sees one small patch at a time.</p></div>
-        <div class="card"><span class="big">🔎</span><h5>Looking for one thing</h5><p>Now say you are only looking for one shape — a corner. At each patch you ask "is there a corner here?" and write down how sure you are. Do this at every spot and you get a map of where corners are. That map is the feature map.</p></div>
+        <div class="card"><span class="big">🧑‍✈️</span><h5>The pilot</h5><p>Before every flight, even experienced pilots read a checklist out loud: fuel, flaps, instruments, doors. They do not trust memory. The list is fixed and boring on purpose, so nothing is missed on a bad day. Starting a big training run works the same way.</p></div>
+        <div class="card"><span class="big">📋</span><h5>Each item = one lesson</h5><p>Every line on the checklist is something that has gone wrong before. "Warmup set?" exists because a cold model spiked once. "Clipping on?" exists because a huge gradient exploded a run. The list is the memory of past crashes.</p></div>
       </div>
-      <p><strong>In one line:</strong> a convolution is a small pattern-detector (the flashlight) dragged over the whole image, writing down "how much did I find my pattern here" at each spot.</p>
-      <p>Pooling then walks over that map of matches and, in each little block, keeps only the strongest one. It is like reading a page and keeping only the loudest word from each paragraph — the map gets smaller but the signal survives.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real flashlight only reveals what is already there. A filter also carries its own numbers (weights), so it does not just show the patch — it reacts more strongly to some shapes than others, and those numbers are learned during training.</div></div>
+      <p><strong>In one line:</strong> the stability checklist is a pilot's pre-flight list for training — a fixed, ordered set of checks you complete before starting, so no known failure catches you by surprise.</p>
+      <p>You have already learned every item. Today you just put them in order and practice running the list, so that setting up a real run becomes calm and routine instead of anxious guessing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a pilot's checklist is the same on every flight. A training checklist changes with the model — a small model may skip muP, a huge one must not. The habit of running a list transfers; the exact items depend on the run.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
   </section>
 
   <!-- ===== 3. PLAYGROUND ===== -->
   <section class="sec" id="s3" data-sec="play">
-    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Slide the filter, then pool the result</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Run the checklist, and see what happens if you skip it</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Below is a simulated Python terminal. Watch one filter position multiply-and-add, then slide across the row, then shrink the map with max pooling. <strong>Click all three</strong> to finish this section.</p>
+      <p>Below is a simulated launch console. Watch a full pre-flight pass, a run that skipped an item and paid for it, and how each item traces back to a day. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="onestop" type="button">① one filter stop</button>
-          <button class="play-btn" data-demo="slide" type="button">② slide across a row</button>
-          <button class="play-btn" data-demo="pool" type="button">③ max pooling shrinks it</button>
+          <button class="play-btn" data-demo="preflight" type="button">① full pre-flight pass</button>
+          <button class="play-btn" data-demo="skipped" type="button">② a skipped item bites</button>
+          <button class="play-btn" data-demo="trace" type="button">③ each item → its day</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: the same 9 filter numbers are used at every stop. That is weight sharing — the whole point of a convolution.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: real teams keep this list in a config file and print the ticked items into the run's log, so the setup is recorded forever.</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
   </section>
 
   <!-- ===== 4. MECHANISM & WHY ===== -->
   <section class="sec" id="s4" data-sec="why">
-    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">One output value, worked out by hand</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The checklist, and why it pays for itself</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <h4>Step 1 — in plain words</h4>
-      <p>Put the filter on top of one patch of the image. The filter and the patch are the same size (say 3 by 3). Multiply each filter number by the image number right under it. Add all those products. That single sum is one output number. Then move the filter one step and do it again.</p>
+      <h4>The checklist itself</h4>
+      <p>Here is a compact pre-flight stability list. Each line names what it guards against and the day it came from.</p>
+      <div class="callout c-info"><span class="ic">✅</span><div style="font-family:var(--mono);font-size:.8rem;line-height:1.9">
+        [ ] warmup + schedule set (cosine or WSD)   <span class="dim"># no wild first step — Day 3</span><br>
+        [ ] gradient clipping on (global norm ≤ C)  <span class="dim"># cap every step — Day 2</span><br>
+        [ ] z-loss / soft-cap on if logits drift    <span class="dim"># keep logits calm — Day 2</span><br>
+        [ ] QK-norm on if attention explodes         <span class="dim"># safe attention — Day 2</span><br>
+        [ ] checkpoints save often                   <span class="dim"># able to roll back — Day 1</span><br>
+        [ ] loss monitor + spike detection running   <span class="dim"># catch it early — Day 1</span><br>
+        [ ] hyperparameters transferred via muP      <span class="dim"># right dials, cheaply — Day 4</span><br>
+        [ ] LR ↔ batch size coupled correctly        <span class="dim"># step matches batch — Day 3</span>
+      </div></div>
+
+      <h4>Step 1 — why the list pays off, in plain words</h4>
+      <p>A checklist takes a few minutes. A spike you did not catch can waste days of compute. So even if the list only sometimes saves you, the saving is huge compared to the tiny cost of running it. You can put real numbers on this.</p>
 
       <h4>Step 2 — the formula</h4>
       <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
-        out = Σ ( image_patch[i][j] × filter[i][j] )<br>
-        <span class="dim"># Σ means "add up over every cell i, j in the patch"</span>
+        expected_waste = p_fail × cost_of_failure<br>
+        <span class="dim"># p_fail = chance the run fails, cost_of_failure = compute lost</span>
       </div></div>
-      <p>Symbols: <code>image_patch[i][j]</code> = the image number at row i, column j under the filter. <code>filter[i][j]</code> = the filter weight at the same spot. <code>Σ</code> = add every product together. One patch in, one number out.</p>
+      <p>Symbols: <code>p_fail</code> = the chance the run hits an uncaught spike. <code>cost_of_failure</code> = the compute you lose when it does. <code>expected_waste</code> = the two multiplied — the average cost you should expect. The checklist lowers <code>p_fail</code> and, through frequent checkpoints, lowers <code>cost_of_failure</code> too.</p>
 
-      <h4>Step 3 — a worked 3×3 example</h4>
-      <p>Say the image patch and the filter are these small 3 by 3 grids:</p>
+      <h4>Step 3 — a worked example</h4>
       <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
-        patch  = [[1, 2, 0], [0, 1, 3], [2, 1, 0]]<br>
-        filter = [[0, 1, 0], [1, 0, 1], [0, 1, 0]]   <span class="dim"># a plus-shape detector</span><br><br>
-        products (only where filter = 1):<br>
-        &nbsp;&nbsp;2 (top) + 0 (left) + 3 (right) + 1 (bottom) = <span class="hl">6</span><br><br>
-        out = <span class="hl">6</span>   <span class="dim"># one number for this patch</span>
+        without list: p_fail=0.30, cost=1000 → expected_waste = 0.30×1000 = <span class="hl">300</span><br>
+        with list:    p_fail=0.05, cost=100  → expected_waste = 0.05×100  = <span class="hl">5</span><br><br>
+        list cost ≈ a few minutes ≈ <span class="hl">1</span><br>
+        saving = 300 − 5 − 1 = <span class="hl">294</span> units on average
       </div></div>
-      <p>Only the plus-shaped cells count (the filter is 1 there, 0 elsewhere). Adding the four kept numbers 2 + 0 + 3 + 1 gives <code>6</code>. That <code>6</code> is how strongly the "plus" pattern showed up in this patch. Slide the filter to the next patch and you get the next output number.</p>
+      <p>Without the list, you expect to waste <code>300</code> units on average. With it, the chance of failure drops (fewer spikes) and the cost of any failure drops too (frequent checkpoints mean a short roll-back). Expected waste falls to <code>5</code>. The list itself costs about <code>1</code>. You save around <code>294</code> — every run.</p>
 
-      <h4>Why this is a big deal</h4>
-      <ul>
-        <li><strong>Few weights:</strong> a 3×3 filter has only 9 numbers, not millions. Weight sharing reuses them everywhere.</li>
-        <li><strong>Keeps neighbors together:</strong> because the filter looks at a patch, it uses the fact that nearby pixels belong together.</li>
-        <li><strong>Finds patterns anywhere:</strong> a filter that spots an edge on the left also spots it on the right — one learned pattern, used across the whole image.</li>
-      </ul>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> stack many such filters and layers, and the network builds up from tiny edges to shapes to whole objects. Pooling between layers keeps the maps small so this stays fast. Every image model you have heard of starts from exactly this idea.</div></div>
-      <button class="gotit" type="button">Got how one value is computed</button>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this module took you from "my run spiked at 40k steps and I panicked" to "I recognize it, roll back, skip, and I set up guardrails so it rarely happens". The checklist is how a team makes that reliable across many runs and many engineers. That is what training stability really means.</div></div>
+      <button class="gotit" type="button">Got why the list pays off</button>
     </div>
   </section>
 
   <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
   <section class="sec" id="s5" data-sec="build">
-    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From one patch to a pooled feature map — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Assemble the checklist, item by item — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Here is the whole idea, built one step at a time: the image, the filter, one multiply-add, the slide, the feature map, then pooling. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <p>Here is the whole checklist, built one item at a time: the schedule, the stabilizers, the checkpoints, the spike monitor, the muP-transferred settings, and the ready-for-launch state. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -325,44 +330,45 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
   <!-- ===== 7. PRODUCE ===== -->
   <section class="sec" id="s7" data-sec="produce">
-    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove it with a tiny convolution (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Write your own pre-flight checklist tool (strongly recommended)</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Prove the slide-and-add to yourself on a tiny grid. Pick one:</p>
+      <p>Understanding ≠ being able to write it. Turn the checklist into a tiny tool you could actually run before a training job. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_conv_by_hand.py</code>. Make a small 5×5 image and a 3×3 filter as NumPy arrays. Write two loops that slide the filter over the image, and at each stop compute the multiply-and-add sum. Print the feature map. Then do a 2×2 max pooling on that map (keep the biggest value in each 2×2 block) and print the smaller map. Run with <code>python3 m06_conv_by_hand.py</code>.</p>
+      <p>Create <code>experiments/scale/m10b_preflight.py</code>. Make a small config dictionary describing a training run (warmup steps, clip threshold, z-loss on/off, checkpoint interval, muP used, learning rate, batch size). Write a checklist function that inspects the config and prints PASS or a clear warning for each stability item. Make it refuse to "launch" if any critical item fails. Run it once with a good config and once with a broken one and compare. Run with <code>python3 m10b_preflight.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 1 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 10b Day 5 artifact.
 
-Create experiments/foundations/m06_conv_by_hand.py that, with a comment on each step, shows a convolution and pooling from scratch in NumPy:
-1. Builds a small 5x5 image and a 3x3 filter (for example an edge or plus detector).
-2. Slides the filter over the image with two nested loops, stride 1, no padding; at each position it multiplies the overlapping cells and sums them into one output value; prints the resulting 3x3 feature map.
-3. Runs a 2x2 max pooling over the feature map (keep the largest value in each 2x2 block) and prints the smaller map.
-4. Prints the shapes at every step (image, filter, feature map, pooled map).
-Then run it and paste the feature map and pooled map at the bottom as a comment.</pre>
+Create experiments/scale/m10b_preflight.py that, with a comment on each step, implements a pre-flight stability checklist for a training run:
+1. Defines a config dict describing a run: warmup_steps, total_steps, clip_threshold, use_zloss, use_qk_norm, checkpoint_interval, use_mup, learning_rate, batch_size.
+2. Writes a function preflight_check(config) that inspects the config and, for each stability item, prints PASS or a clear WARNING with the reason (for example warmup_steps <= 0, no gradient clipping, checkpoint_interval too large, muP off for a large model).
+3. Treats a few items as CRITICAL (gradient clipping, checkpoints, warmup) and refuses to "launch" (returns False) if any critical item fails.
+4. Runs the check twice: once on a well-configured run (all PASS, launch OK) and once on a broken run (several warnings, launch blocked), and prints both reports.
+5. Adds a comment next to each item naming which day of the module it comes from.
+Then run it and paste both reports at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-01-log.md</code>: what did the feature map's biggest number tell you, and how much smaller did pooling make the map?</div></div>
-      <button class="gotit" type="button">Done — on to Day 2</button>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m10b/day-05-log.md</code>: which item did your broken config fail on, and did the tool correctly refuse to launch?</div></div>
+      <button class="gotit" type="button">Done — finish the module</button>
     </div>
   </section>
 
   <div class="fin" id="fin" role="status" aria-hidden="true">
-    <span class="em">🔦</span>
-    <h3>Day 1 complete — you can see the slide!</h3>
-    <p>You now know what a convolution is: a tiny filter dragged over the image, multiplying and adding one patch at a time, with the same weights reused everywhere. And you know pooling shrinks the feature map while keeping the strongest signal.<br>Next: <b>Day 2</b> — how to count the exact output size.</p>
+    <span class="em">🧑‍✈️</span>
+    <h3>Day 5 complete — module finale!</h3>
+    <p>You built the full pre-flight stability checklist and know what every item guards against and where it came from. You started this module unsure what to do when a run spiked at 40k steps; now you can recognize the spike, roll back and skip, raise the guardrails, pace the run, and transfer the settings with muP.<br>One last step: the <b>review gate</b> locks it all in. See you there.</p>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav prev" href="day-04-mup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">muP &amp; Hyperparameter Transfer</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Module 10b Review Gate</span></a>
 </nav>
 
-<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
 
 <script>
 (function(){
@@ -403,26 +409,31 @@ document.getElementById('reset').addEventListener('click', function(){
 
 /* PLAYGROUND */
 var DEMOS = {
-  onestop:{html:'<span class="prompt">&gt;&gt;&gt;</span> patch  = [[<span class="num">1</span>,<span class="num">2</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>,<span class="num">3</span>],[<span class="num">2</span>,<span class="num">1</span>,<span class="num">0</span>]]\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> filt   = [[<span class="num">0</span>,<span class="num">1</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">0</span>,<span class="num">1</span>],[<span class="num">0</span>,<span class="num">1</span>,<span class="num">0</span>]]   <span class="dim"># plus-shape</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> out = sum(patch[i][j]*filt[i][j])\n'+
-    '<span class="dim">#   kept cells: 2 + 0 + 3 + 1</span>\n'+
-    '<span class="hl">out = 6</span>   <span class="dim"># one number for one patch</span>',
-    take:'<b>①  Multiply-and-add = one output number.</b> The filter and the patch line up cell by cell. Multiply each pair, add them all, write one number. Here only the plus cells matter, so 2+0+3+1 = 6.'},
-  slide:{html:'<span class="prompt">&gt;&gt;&gt;</span> row   = [<span class="num">1</span>,<span class="num">2</span>,<span class="num">0</span>,<span class="num">3</span>,<span class="num">1</span>]   <span class="dim"># one row of the image</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> filt  = [<span class="num">1</span>,<span class="num">0</span>,<span class="num">1</span>]         <span class="dim"># a 1x3 filter</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> start <span class="kw">in</span> range(<span class="num">3</span>): slide + multiply-add\n'+
-    '<span class="dim">#  1*1+2*0+0*1 = 1</span>\n'+
-    '<span class="dim">#  2*1+0*0+3*1 = 5</span>\n'+
-    '<span class="dim">#  0*1+3*0+1*1 = 1</span>\n'+
-    '<span class="hl">feature_row = [1, 5, 1]</span>   <span class="dim"># 5 in -> 3 out</span>',
-    take:'<b>②  Slide, reuse the same filter.</b> The 3-wide filter fits at 3 start positions across a 5-wide row. Same filter numbers every time (weight sharing). Each stop makes one number, so 5 in gives 3 out.'},
-  pool:{html:'<span class="prompt">&gt;&gt;&gt;</span> fmap = [[<span class="num">1</span>,<span class="num">5</span>,<span class="num">3</span>,<span class="num">2</span>],[<span class="num">4</span>,<span class="num">6</span>,<span class="num">0</span>,<span class="num">1</span>],\n'+
-    '<span class="prompt">...</span>         [<span class="num">2</span>,<span class="num">1</span>,<span class="num">7</span>,<span class="num">3</span>],[<span class="num">0</span>,<span class="num">2</span>,<span class="num">1</span>,<span class="num">4</span>]]\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> max_pool(fmap, block=<span class="num">2</span>)   <span class="dim"># keep biggest in each 2x2</span>\n'+
-    '<span class="dim">#  top-left 2x2 [[1,5],[4,6]] -> 6</span>\n'+
-    '<span class="hl">[[6, 3], [2, 7]]</span>   <span class="dim"># 4x4 shrank to 2x2</span>',
-    take:'<b>③  Pooling shrinks and keeps the strongest.</b> Each 2×2 block becomes one number — its biggest value. A 4×4 map becomes 2×2: half the width, half the height, but the strong matches survive.'}
+  preflight:{html:'<span class="prompt">preflight&gt;</span> checking run config...\n'+
+    '<span class="ok">[✓] warmup + schedule set</span>\n'+
+    '<span class="ok">[✓] gradient clipping on (C = 1.0)</span>\n'+
+    '<span class="ok">[✓] z-loss enabled</span>\n'+
+    '<span class="ok">[✓] checkpoints every 500 steps</span>\n'+
+    '<span class="ok">[✓] spike monitor running</span>\n'+
+    '<span class="ok">[✓] muP hyperparameters transferred</span>\n'+
+    '<span class="hl">ALL CLEAR — cleared for launch 🚀</span>',
+    take:'<b>①  A full pass.</b> Every item ticked, top to bottom, before start. This is the calm state: you know the run is set up right, so you can leave it running and trust it. Nothing important was left to memory.'},
+  skipped:{html:'<span class="prompt">preflight&gt;</span> checking run config...\n'+
+    '<span class="ok">[✓] warmup + schedule set</span>\n'+
+    '<span class="bad">[ ] gradient clipping OFF ← skipped!</span>\n'+
+    '<span class="ok">[✓] checkpoints every 500 steps</span>\n'+
+    '<span class="dim"># launched anyway...</span>\n'+
+    '<span class="bad"># step 41,000: huge gradient → loss = NaN</span>\n'+
+    '<span class="hl">rolled back to step 40,500 — 500 steps lost</span>',
+    take:'<b>②  A skipped item bites.</b> Clipping was left off. At step 41k a huge gradient spiked the loss to NaN. The checkpoint saved you — but you still lost time. One unchecked box turned into a real cost. That is why the list is not optional.'},
+  trace:{html:'<span class="prompt">&gt;&gt;&gt;</span> where each item comes from:\n'+
+    '<span class="dim"># warmup + schedule ....... Day 3</span>\n'+
+    '<span class="dim"># gradient clipping ....... Day 2</span>\n'+
+    '<span class="dim"># z-loss / soft-cap ....... Day 2</span>\n'+
+    '<span class="dim"># checkpoints + rollback .. Day 1</span>\n'+
+    '<span class="dim"># spike detection ......... Day 1</span>\n'+
+    '<span class="hl"># muP transfer ............ Day 4</span>',
+    take:'<b>③  Every item is a lesson.</b> The checklist is just this whole module, put in order. Days 1–4 each contributed a line. Nothing here is new — it is your knowledge, arranged so you can act on it under pressure.'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -435,18 +446,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* BUILD — scroll-reveal visual build-up */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A tiny image drawn as a grid of numbers'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the image (a grid of numbers)</text><g fill='#1F6280'><rect x='190' y='30' width='140' height='80' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='210' y='52'>1</text><text x='237' y='52'>2</text><text x='264' y='52'>0</text><text x='291' y='52'>3</text><text x='210' y='76'>0</text><text x='237' y='76'>1</text><text x='264' y='76'>3</text><text x='291' y='76'>2</text><text x='210' y='100'>2</text><text x='237' y='100'>1</text><text x='264' y='100'>0</text><text x='291' y='100'>1</text></g></g></svg>",
-  note:"<b>An image is just numbers.</b> Every pixel is a number saying how bright it is. Here is a tiny 3-row image. The network never sees a picture — it sees this grid. The whole game is finding useful patterns in these numbers."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A small 3 by 3 filter of weights'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the filter (3x3 weights, shared)</text><rect x='205' y='30' width='110' height='80' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><g fill='#5E5191'><text x='225' y='52'>0</text><text x='260' y='52'>1</text><text x='295' y='52'>0</text><text x='225' y='76'>1</text><text x='260' y='76'>0</text><text x='295' y='76'>1</text><text x='225' y='100'>0</text><text x='260' y='100'>1</text><text x='295' y='100'>0</text></g></g></svg>",
-  note:"<b>The filter is a small pattern.</b> These 9 numbers make a plus-shape detector. The same 9 numbers are used at every spot in the image — that is weight sharing. Learn one pattern, find it everywhere."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The filter sits on one patch and computes one number'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='36' width='150' height='60' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='30' fill='#6B645E'>patch</text><text x='210' y='72' fill='#6B645E'>×</text><rect x='230' y='36' width='150' height='60' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='305' y='30' fill='#6B645E'>filter</text><text x='400' y='72' fill='#6B645E'>=</text><rect x='420' y='46' width='70' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='455' y='72' fill='#1a5c38' font-size='16'>6</text></g></svg>",
-  note:"<b>One patch → one number.</b> Line up the filter with a patch. Multiply each pair and add: 2+0+3+1 = <b>6</b>. That single number says how strongly the plus-pattern showed up right here. This is the whole convolution, done once."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The filter slides to the next position'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='85' y='62' fill='#1F6280'>stop 1</text><text x='150' y='62' fill='#6B645E'>→</text><rect x='175' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='220' y='62' fill='#1F6280'>stop 2</text><text x='285' y='62' fill='#6B645E'>→</text><rect x='310' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='355' y='62' fill='#1F6280'>stop 3</text><text x='420' y='62' fill='#6B645E'>→ …</text></g></svg>",
-  note:"<b>Slide and repeat.</b> Move the filter one step and compute again. The <i>same</i> weights are reused at every stop. Slide across the whole image and you fill in a whole grid of match-scores."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The full feature map of match scores'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>feature map (all the match scores)</text><rect x='190' y='30' width='140' height='80' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><g fill='#1a5c38'><text x='217' y='58'>1</text><text x='260' y='58'>5</text><text x='303' y='58'>3</text><text x='217' y='90'>4</text><text x='260' y='90'>6</text><text x='303' y='90'>2</text></g></g></svg>",
-  note:"<b>The feature map.</b> Every filter stop wrote one number, so together they form a small grid. Big numbers = strong match, small numbers = weak match. This map is the convolution layer's output — a map of where the pattern lives."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Max pooling shrinks the feature map'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='34' width='130' height='60' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='105' y='28' fill='#6B645E'>4x4 map</text><text x='195' y='68' fill='#6B645E'>max 2x2 →</text><rect x='300' y='44' width='90' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='38' fill='#6B645E'>2x2 map</text><text x='345' y='70' fill='#9A7208'>keep biggest</text></g></svg>",
-  note:"<b>Pooling shrinks it.</b> Slide a 2×2 window and keep only the biggest number in each block. The map gets half as wide and half as tall, but the strongest matches survive. Smaller map, same signal, less work for the next layer. That is one full conv-then-pool block."}
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='An empty checklist ready to fill'><g font-family='monospace' font-size='11'><text x='260' y='16' fill='#6B645E' text-anchor='middle'>pre-flight checklist (empty)</text><rect x='140' y='30' width='240' height='66' rx='8' fill='#FDF9F3' stroke='#E5DFD6' stroke-width='2'/><text x='160' y='52' fill='#6B645E'>[ ] ______________</text><text x='160' y='72' fill='#6B645E'>[ ] ______________</text><text x='160' y='90' fill='#6B645E'>[ ] ______________</text></g></svg>",
+  note:"<b>Start with an empty list.</b> Before a big run you open the checklist. It is empty now — you will fill it with the items from this module, in order, and tick each one before you press start. Nothing left to memory."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='First checklist item: warmup and schedule'><g font-family='monospace' font-size='11'><rect x='90' y='34' width='340' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='110' y='57' fill='#1a5c38'>[✓] warmup + schedule (Day 3)</text></g></svg>",
+  note:"<b>Item 1 — the schedule.</b> Warmup so the cold model is not shoved hard, then cosine or WSD decay. This guards against a wild first step and a bouncy finish. It comes straight from Day 3."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Second item: the stabilizer toolkit'><g font-family='monospace' font-size='11'><rect x='90' y='30' width='340' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='110' y='53' fill='#1a5c38'>[✓] warmup + schedule (Day 3)</text><rect x='90' y='72' width='340' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='110' y='95' fill='#1a5c38'>[✓] clip + z-loss + QK-norm (Day 2)</text></g></svg>",
+  note:"<b>Item 2 — the stabilizers.</b> Turn on gradient clipping (always), plus z-loss, soft-capping, or QK-norm when a model shows that kind of blow-up. These prevent most spikes before they start. From Day 2."},
+ {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='Third item: checkpoints and spike monitor'><g font-family='monospace' font-size='10'><rect x='90' y='24' width='340' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='108' y='44' fill='#1a5c38'>[✓] warmup + schedule (Day 3)</text><rect x='90' y='58' width='340' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='108' y='78' fill='#1a5c38'>[✓] clip + z-loss + QK-norm (Day 2)</text><rect x='90' y='92' width='340' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='108' y='112' fill='#1a5c38'>[✓] checkpoints + spike monitor (Day 1)</text></g></svg>",
+  note:"<b>Item 3 — the safety net.</b> Frequent checkpoints so a roll-back is cheap, and a loss monitor that flags a spike the moment it happens. These do not prevent trouble — they catch it early so you recover fast. From Day 1."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Fourth item: muP-transferred hyperparameters'><g font-family='monospace' font-size='10'><rect x='90' y='20' width='340' height='24' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='37' fill='#1a5c38'>[✓] warmup + schedule (Day 3)</text><rect x='90' y='48' width='340' height='24' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='65' fill='#1a5c38'>[✓] clip + z-loss + QK-norm (Day 2)</text><rect x='90' y='76' width='340' height='24' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='93' fill='#1a5c38'>[✓] checkpoints + monitor (Day 1)</text><rect x='90' y='104' width='340' height='24' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='105' y='121' fill='#1F6280'>[✓] muP-transferred settings (Day 4)</text></g></svg>",
+  note:"<b>Item 4 — the right dials, cheaply.</b> Confirm the learning rate and friends came from a muP search on a small model, so they are correct for this size without a costly search. This is what Day 4 unlocked."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='All items ticked, cleared for launch'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>all items ticked</text><rect x='150' y='34' width='220' height='52' rx='10' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2.5'/><text x='260' y='58' fill='#1a5c38' font-size='14'>ALL CLEAR</text><text x='260' y='77' fill='#1a5c38'>cleared for launch 🚀</text></g></svg>",
+  note:"<b>Cleared for launch.</b> Every box ticked, in order. Now you press start with confidence, not hope. This is the whole module in one habit: recognize, prevent, catch, and transfer — a training run you can trust with a big budget."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -469,18 +480,18 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What is a convolution filter?',
-  opts:['a picture of the object','a small grid of weights that slides over the image','a list of all the pixels','the final answer'],
-  ans:1, fb:'Right. A filter is a tiny grid of weights (often 3×3) dragged across the image to detect a pattern.'},
- {q:'2. At one filter position, how do you get the output number?',
-  opts:['pick the biggest pixel','multiply each overlapping pair and add them all up','count the pixels','divide the image by the filter'],
-  ans:1, fb:'Right. Multiply each filter number by the image number under it, then add all the products into one value.'},
- {q:'3. "Weight sharing" means:',
-  opts:['each spot learns its own weights','the same filter weights are reused at every position','the weights are random','the weights never change'],
-  ans:1, fb:'Right. One small set of weights is reused everywhere, so a pattern learned once is found across the whole image.'},
- {q:'4. What does max pooling do to a feature map?',
-  opts:['makes it bigger','keeps the largest value in each small block, shrinking the map','adds all the numbers','turns it into an image'],
-  ans:1, fb:'Right. Each block (like 2×2) becomes one number — its biggest value — so the map gets smaller but keeps the strong matches.'}
+ {q:'1. What is a pre-flight stability checklist?',
+  opts:['a list of the model\'s layers','an ordered set of safety checks you run before starting a training run','the training data','a type of optimizer'],
+  ans:1, fb:'Right. It is a fixed, ordered list you go through before pressing start, like a pilot\'s pre-flight list, so no known failure catches you by surprise.'},
+ {q:'2. A checklist has both "prevent" and "catch" items. Which pair is which?',
+  opts:['both prevent','gradient clipping prevents; a loss monitor + checkpoints catch','both catch','neither matters'],
+  ans:1, fb:'Right. Clipping and warmup prevent spikes; a spike monitor and frequent checkpoints catch and recover from ones that slip through. A good list has both.'},
+ {q:'3. Using expected_waste = p_fail × cost_of_failure, if p_fail=0.30 and cost=1000, the expected waste is:',
+  opts:['30','300','3000','1'],
+  ans:1, fb:'Right. 0.30 × 1000 = 300 units of expected waste without the checklist. The list lowers both p_fail and cost_of_failure, so it pays for itself many times over.'},
+ {q:'4. On the checklist, which item comes from Day 4 (muP)?',
+  opts:['gradient clipping is on','hyperparameters were transferred from a small model','checkpoints save often','warmup is set'],
+  ans:1, fb:'Right. muP (Day 4) lets you tune on a cheap small model and transfer the settings, so the checklist confirms the hyperparameters were transferred rather than searched on the giant model.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

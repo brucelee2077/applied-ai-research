@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Module 6 · Day 1 — Convolution &amp; Pooling</title>
+<title>Module 9e · Day 5 — Goodput &amp; MFU</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -184,12 +184,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 </style>
 </head>
 
-<body data-quest-id="wf8-d01-conv">
+<body data-quest-id="m9e-d05-goodput">
 
 <nav class="nav">
   <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
   <div class="nav-in">
-    <span class="nav-title">Foundations · M6 Day 1</span>
+    <span class="nav-title">Spiral · M9e Day 5</span>
     <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
   </div>
 </nav>
@@ -197,116 +197,116 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav prev" href="day-04-preemption-recovery.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Preemption &amp; Recovery</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
   <header class="hero">
-    <span class="eyebrow">Module 6 · Represent · Day 1</span>
-    <h1>Convolution<br>&amp; Pooling</h1>
-    <p class="lead">A photo is a huge grid of numbers. A normal neural network would need millions of weights just to look at it once. A convolution is smarter: it uses one tiny grid of numbers — a filter — and slides it across the whole image, reusing the same weights everywhere. Then pooling shrinks the result while keeping what matters. This is how a machine starts to "see".</p>
+    <span class="eyebrow">Module 9e · Scale · Day 5</span>
+    <h1>Finished Goods,<br>Not Hours Lit</h1>
+    <p class="lead">The finale. You have kept the run alive — mesh, checkpoints, bit-exact resume, elastic recovery. But how do you <em>score</em> a month-long run? Not by how long the machines were powered on. A giant run lives or dies on one number: goodput — the slice of wall-clock time that was actually useful training. Restarts, stragglers, and slow saves all steal it. Today you learn to measure it and see where it leaks.</p>
     <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> explain a convolution as a small filter sliding over an image with shared weights, compute one output value by hand on a tiny grid, and say what pooling does and why we downsample.
+      <b>🎯 By the end, you'll be able to:</b> define goodput as useful training time divided by wall-clock time, explain MFU (model FLOPs utilization), and name what steals goodput — restarts, stragglers, and checkpoint stalls.
     </div>
   </header>
 
   <!-- ===== 1. WHAT IS IT ===== -->
   <section class="sec" id="s1" data-sec="what">
-    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">A tiny filter that slides across the image</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Scoring a run by useful work, not uptime</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know that an image is a grid of numbers (pixels), and you know matrix multiply and the training loop from M4–M5. Today we swap the "every pixel talks to every neuron" idea for something much cheaper and smarter.</div></div>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> from Days 1–4 you know the pieces that keep a run alive — the mesh, checkpoints, bit-exact resume, elastic recovery. Today we put a single number on how well all of that is working.</div></div>
 
-      <h4>The problem with a plain network</h4>
-      <p>A small photo of 224 by 224 pixels is over 50,000 numbers. If you connect every pixel to every neuron, the first layer alone needs tens of millions of weights. That is slow, hungry for memory, and it throws away a key fact: pixels that sit next to each other belong together.</p>
+      <h4>The wrong way to score a run</h4>
+      <p>You could measure a month-long run by how many hours the machines were switched on. But powered-on is not the same as working. Some of those hours were spent restarting after a crash, waiting on a straggler, or stalled writing a checkpoint. Those hours cost money but taught the model nothing.</p>
 
-      <h4>The fix: a convolution</h4>
-      <p>A <span class="term" data-tip="A small grid of learned weights (for example 3 by 3) that slides across an image. At each spot it multiplies and adds to detect a pattern like an edge.">filter</span> is a tiny grid of numbers — often just 3 by 3. A <span class="term" data-tip="The operation of sliding a small filter across an image, and at each position multiplying the overlapping numbers and adding them up. The result is a feature map.">convolution</span> slides this filter over the whole image. At each stop, it multiplies the numbers that line up and adds them into one output number. Slide, multiply-add, write one number. Repeat.</p>
+      <h4>The right number: goodput</h4>
+      <p><span class="term" data-tip="The fraction of wall-clock time that was spent on useful training. Goodput = useful training time / total wall-clock time. Higher is better; restarts and stalls lower it.">Goodput</span> is the fraction of real time that went to useful training. If the run was on for 100 hours but only 90 of them were actually training (the other 10 were restarts and stalls), goodput is 90%. It answers: of the time we paid for, how much actually moved the model forward?</p>
 
-      <h4>The magic word: shared weights</h4>
-      <p>The same filter is used at every position. This is called <span class="term" data-tip="Reusing the same small set of filter weights at every position in the image, instead of learning separate weights for each spot. Fewer weights, and a pattern found in one place is found everywhere.">weight sharing</span>. Learn one edge-detector once, and it finds edges anywhere in the picture. Nine weights can scan a whole image, instead of millions.</p>
+      <h4>A partner number: MFU</h4>
+      <p>Goodput asks "was the run training or stalled?". A second number, <span class="term" data-tip="Model FLOPs Utilization: the fraction of the chips' peak math speed the model actually uses while training. Even when training, chips are rarely at 100%; MFU says how close.">MFU</span> (model FLOPs utilization), asks "while training, how hard were the chips actually working?". A <span class="term" data-tip="A FLOP is one floating-point math operation (a single multiply or add). Chip speed is measured in FLOPs per second — how many such operations it can do.">FLOP</span> is one math operation. Chips have a top speed; MFU is the fraction of that top speed the model really reaches. Both numbers must be high for a run to be efficient.</p>
 
-      <h4>Then: pooling shrinks it</h4>
-      <p>After a convolution you get a grid of "how strongly did the pattern match here" numbers, called a <span class="term" data-tip="The grid of numbers a filter produces after sliding over the image. Each number says how strongly the filter's pattern matched at that spot.">feature map</span>. <span class="term" data-tip="Shrinking a feature map by summarizing small blocks into one number. Max pooling keeps the largest value in each block.">Pooling</span> shrinks that map by keeping only the strongest value in each small block. Smaller map, same important signal. Keep going 👇</p>
-      <button class="gotit" type="button">Got the filter idea — let's go</button>
+      <h4>What steals goodput</h4>
+      <p>Everything from this week shows up here. <strong>Restarts</strong> (from crashes) burn time re-loading. <strong>Stragglers</strong> make every step wait on the slowest chip. <strong>Checkpoint stalls</strong> pause training if saving is not async. Each one is a leak in goodput. Keep going 👇</p>
+      <button class="gotit" type="button">Got the goodput idea — let's go</button>
     </div>
   </section>
 
   <!-- ===== 2. INTUITION ===== -->
   <section class="sec" id="s2" data-sec="intuition">
-    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A flashlight scanning for a pattern</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A factory measured by finished goods</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <div class="relate">
-        <div class="card"><span class="big">🔦</span><h5>The flashlight</h5><p>Imagine a dark room with a picture on the wall. You hold a small flashlight and move it across the picture, one spot at a time. At each spot the light shows a small patch. The filter is your flashlight: it only sees one small patch at a time.</p></div>
-        <div class="card"><span class="big">🔎</span><h5>Looking for one thing</h5><p>Now say you are only looking for one shape — a corner. At each patch you ask "is there a corner here?" and write down how sure you are. Do this at every spot and you get a map of where corners are. That map is the feature map.</p></div>
+        <div class="card"><span class="big">🏭</span><h5>Finished goods per day</h5><p>A good factory manager does not brag "the lights were on 24 hours". They ask "how many finished products came out today?". Lights-on time is what you pay for. Finished goods are what you actually get. A factory jammed for half the day made goods for only half the day, no matter how long the lights burned.</p></div>
+        <div class="card"><span class="big">⚙️</span><h5>And how fast the line ran</h5><p>Even when the line was moving, it might have crawled — half its top speed. So there are two questions: how much of the day was the line running at all, and while running, how fast did it go? Both must be high to make a lot of goods.</p></div>
       </div>
-      <p><strong>In one line:</strong> a convolution is a small pattern-detector (the flashlight) dragged over the whole image, writing down "how much did I find my pattern here" at each spot.</p>
-      <p>Pooling then walks over that map of matches and, in each little block, keeps only the strongest one. It is like reading a page and keeping only the loudest word from each paragraph — the map gets smaller but the signal survives.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real flashlight only reveals what is already there. A filter also carries its own numbers (weights), so it does not just show the patch — it reacts more strongly to some shapes than others, and those numbers are learned during training.</div></div>
+      <p><strong>In one line:</strong> lights-on time is wall-clock time, finished goods are useful training, and jams are restarts, stragglers, and checkpoint stalls. <span class="term" data-tip="Useful training time divided by total wall-clock time.">Goodput</span> is "what fraction of the day the line was running".</p>
+      <p>How fast the line ran while moving is <span class="term" data-tip="Model FLOPs utilization: the fraction of the chips' peak speed the model actually uses.">MFU</span>. A run with high goodput but low MFU is a factory that runs all day but slowly. You want both high: rarely jammed, and fast when moving.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a factory jam is loud and obvious — you see the pile-up. A training goodput leak can be quiet: a straggler slowing every step, or a background stall you only spot by carefully timing steps and comparing against the ideal.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
   </section>
 
   <!-- ===== 3. PLAYGROUND ===== -->
   <section class="sec" id="s3" data-sec="play">
-    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Slide the filter, then pool the result</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Measure goodput, watch a leak, then MFU</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Below is a simulated Python terminal. Watch one filter position multiply-and-add, then slide across the row, then shrink the map with max pooling. <strong>Click all three</strong> to finish this section.</p>
+      <p>Below is a simulated Python terminal. First compute goodput from useful and total time, then add a restart and a stall and watch it drop, then see MFU on top. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="onestop" type="button">① one filter stop</button>
-          <button class="play-btn" data-demo="slide" type="button">② slide across a row</button>
-          <button class="play-btn" data-demo="pool" type="button">③ max pooling shrinks it</button>
+          <button class="play-btn" data-demo="measure" type="button">① measure goodput</button>
+          <button class="play-btn" data-demo="leak" type="button">② a leak lowers it</button>
+          <button class="play-btn" data-demo="mfu" type="button">③ MFU on top</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: the same 9 filter numbers are used at every stop. That is weight sharing — the whole point of a convolution.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: every fix from this week — async saves, elastic recovery, straggler hunting — is really a fight to raise goodput.</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
   </section>
 
   <!-- ===== 4. MECHANISM & WHY ===== -->
   <section class="sec" id="s4" data-sec="why">
-    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">One output value, worked out by hand</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Working out goodput, hour by hour</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <h4>Step 1 — in plain words</h4>
-      <p>Put the filter on top of one patch of the image. The filter and the patch are the same size (say 3 by 3). Multiply each filter number by the image number right under it. Add all those products. That single sum is one output number. Then move the filter one step and do it again.</p>
+      <p>Take the total time the run was going (wall-clock). Subtract every hour that was not useful training — restarts, straggler stalls, checkpoint pauses. What is left is useful training time. Goodput is useful time divided by total time. It is always between 0 and 1, and you want it close to 1.</p>
 
       <h4>Step 2 — the formula</h4>
       <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
-        out = Σ ( image_patch[i][j] × filter[i][j] )<br>
-        <span class="dim"># Σ means "add up over every cell i, j in the patch"</span>
+        goodput = useful_training_time / wall_clock_time<br>
+        useful_training_time = wall_clock_time − wasted_time<br>
+        <span class="dim"># wasted_time = restarts + straggler stalls + checkpoint stalls</span>
       </div></div>
-      <p>Symbols: <code>image_patch[i][j]</code> = the image number at row i, column j under the filter. <code>filter[i][j]</code> = the filter weight at the same spot. <code>Σ</code> = add every product together. One patch in, one number out.</p>
+      <p>Symbols: <code>wall_clock_time</code> = total time the run was going. <code>wasted_time</code> = all the non-training hours. <code>useful_training_time</code> = the rest. <code>goodput</code> = the fraction that was useful, from 0 to 1.</p>
 
-      <h4>Step 3 — a worked 3×3 example</h4>
-      <p>Say the image patch and the filter are these small 3 by 3 grids:</p>
+      <h4>Step 3 — a worked example</h4>
+      <p>Say a run was going for <code>100</code> hours. Restarts cost <code>4</code> hours, stragglers cost <code>5</code> hours, and non-async checkpoint stalls cost <code>1</code> hour.</p>
       <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
-        patch  = [[1, 2, 0], [0, 1, 3], [2, 1, 0]]<br>
-        filter = [[0, 1, 0], [1, 0, 1], [0, 1, 0]]   <span class="dim"># a plus-shape detector</span><br><br>
-        products (only where filter = 1):<br>
-        &nbsp;&nbsp;2 (top) + 0 (left) + 3 (right) + 1 (bottom) = <span class="hl">6</span><br><br>
-        out = <span class="hl">6</span>   <span class="dim"># one number for this patch</span>
+        wasted   = 4 + 5 + 1 = <span class="hl">10</span> hours<br>
+        useful   = 100 − 10  = <span class="hl">90</span> hours<br>
+        goodput  = 90 / 100  = <span class="hl">0.90</span>   <span class="dim"># 90%</span><br><br>
+        cut stragglers to 1h → useful 94h → goodput <span class="ok">0.94</span>
       </div></div>
-      <p>Only the plus-shaped cells count (the filter is 1 there, 0 elsewhere). Adding the four kept numbers 2 + 0 + 3 + 1 gives <code>6</code>. That <code>6</code> is how strongly the "plus" pattern showed up in this patch. Slide the filter to the next patch and you get the next output number.</p>
+      <p>90% goodput means 10 of every 100 paid hours taught the model nothing. On a run costing millions, that 10% is a fortune. Fix the biggest leak — here the 5-hour straggler bill — and goodput climbs. Every technique this week is a tool to raise this one number.</p>
 
-      <h4>Why this is a big deal</h4>
+      <h4>Why the two numbers work together</h4>
       <ul>
-        <li><strong>Few weights:</strong> a 3×3 filter has only 9 numbers, not millions. Weight sharing reuses them everywhere.</li>
-        <li><strong>Keeps neighbors together:</strong> because the filter looks at a patch, it uses the fact that nearby pixels belong together.</li>
-        <li><strong>Finds patterns anywhere:</strong> a filter that spots an edge on the left also spots it on the right — one learned pattern, used across the whole image.</li>
+        <li><strong>Goodput</strong> = was the run training or stalled? Raised by async saves, elastic recovery, and straggler hunting.</li>
+        <li><strong>MFU</strong> = while training, how hard were the chips working? Raised by good mesh placement (Day 1) and efficient kernels.</li>
+        <li><strong>Real throughput ≈ goodput × MFU × peak speed:</strong> both fractions must be high, or the run wastes the hardware you paid for.</li>
       </ul>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> stack many such filters and layers, and the network builds up from tiny edges to shapes to whole objects. Pooling between layers keeps the maps small so this stays fast. Every image model you have heard of starts from exactly this idea.</div></div>
-      <button class="gotit" type="button">Got how one value is computed</button>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this whole module was one story — keep a 10,000-chip, month-long run alive and efficient. Goodput is the scoreboard. Bringing up the mesh, saving full checkpoints, resuming bit-exact, and recovering from failure all serve this one number. That is the defining staff systems skill.</div></div>
+      <button class="gotit" type="button">Got how goodput is measured</button>
     </div>
   </section>
 
   <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
   <section class="sec" id="s5" data-sec="build">
-    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From one patch to a pooled feature map — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From wall-clock hours to a goodput score — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Here is the whole idea, built one step at a time: the image, the filter, one multiply-add, the slide, the feature map, then pooling. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <p>Here is the whole idea, built one step at a time: the wall-clock bar, the three leaks (restarts, stragglers, stalls), the useful slice, the goodput fraction, MFU on top, and how this week's fixes plug the leaks. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -325,44 +325,45 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
   <!-- ===== 7. PRODUCE ===== -->
   <section class="sec" id="s7" data-sec="produce">
-    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove it with a tiny convolution (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove it with a goodput calculator (strongly recommended)</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Prove the slide-and-add to yourself on a tiny grid. Pick one:</p>
+      <p>Understanding ≠ being able to compute it. Build a small goodput calculator and see which leak hurts most. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_conv_by_hand.py</code>. Make a small 5×5 image and a 3×3 filter as NumPy arrays. Write two loops that slide the filter over the image, and at each stop compute the multiply-and-add sum. Print the feature map. Then do a 2×2 max pooling on that map (keep the biggest value in each 2×2 block) and print the smaller map. Run with <code>python3 m06_conv_by_hand.py</code>.</p>
+      <p>Create <code>experiments/scale/m9e_goodput.py</code>. Set a wall-clock time (say 100 hours) and three wasted amounts: restarts, stragglers, checkpoint stalls. Write <code>goodput(wall, wasted)</code> that returns <code>(wall - wasted) / wall</code>. Print the baseline goodput. Then, one at a time, cut each leak in half and print the new goodput, so you can see which fix helps most. Run with <code>python3 m9e_goodput.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 1 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 9e Day 5 artifact.
 
-Create experiments/foundations/m06_conv_by_hand.py that, with a comment on each step, shows a convolution and pooling from scratch in NumPy:
-1. Builds a small 5x5 image and a 3x3 filter (for example an edge or plus detector).
-2. Slides the filter over the image with two nested loops, stride 1, no padding; at each position it multiplies the overlapping cells and sums them into one output value; prints the resulting 3x3 feature map.
-3. Runs a 2x2 max pooling over the feature map (keep the largest value in each 2x2 block) and prints the smaller map.
-4. Prints the shapes at every step (image, filter, feature map, pooled map).
-Then run it and paste the feature map and pooled map at the bottom as a comment.</pre>
+Create experiments/scale/m9e_goodput.py that, with a comment on each step, computes goodput and shows which leak hurts most:
+1. Sets wall_clock hours (e.g. 100) and three wasted amounts: restarts, stragglers, checkpoint_stalls.
+2. Defines goodput(wall, wasted) = (wall - wasted) / wall and prints the baseline goodput as a percent.
+3. Cuts each leak in half one at a time, recomputes goodput, and prints which single fix raises goodput the most.
+4. Optionally combines goodput with an MFU fraction to print effective throughput = goodput * mfu.
+5. Prints a one-line takeaway: goodput is useful training time over wall-clock time, and the biggest leak is where to spend effort.
+Then run it and paste the baseline goodput and the three "cut in half" results at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-01-log.md</code>: what did the feature map's biggest number tell you, and how much smaller did pooling make the map?</div></div>
-      <button class="gotit" type="button">Done — on to Day 2</button>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m9e/day-05-log.md</code>: what was your baseline goodput, and which leak — restarts, stragglers, or stalls — gave the biggest gain when halved?</div></div>
+      <button class="gotit" type="button">Done — finish the module</button>
     </div>
   </section>
 
   <div class="fin" id="fin" role="status" aria-hidden="true">
-    <span class="em">🔦</span>
-    <h3>Day 1 complete — you can see the slide!</h3>
-    <p>You now know what a convolution is: a tiny filter dragged over the image, multiplying and adding one patch at a time, with the same weights reused everywhere. And you know pooling shrinks the feature map while keeping the strongest signal.<br>Next: <b>Day 2</b> — how to count the exact output size.</p>
+    <span class="em">🏭</span>
+    <h3>Module 9e complete — you can keep a giant run alive!</h3>
+    <p>You built the defining staff systems skill this week: bring up many hosts as one machine (mesh, ICI vs DCN), save every part of the run (checkpointing), resume bit-exact, and recover from failure (preemption, elastic recovery, stragglers). Today you learned to score it all with one number — goodput, useful training time over wall-clock time — and its partner MFU.<br>Next: the <b>Review Gate</b> to lock it in.</p>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav prev" href="day-04-preemption-recovery.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Preemption &amp; Recovery</span></a>
   <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
-<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
 
 <script>
 (function(){
@@ -403,26 +404,24 @@ document.getElementById('reset').addEventListener('click', function(){
 
 /* PLAYGROUND */
 var DEMOS = {
-  onestop:{html:'<span class="prompt">&gt;&gt;&gt;</span> patch  = [[<span class="num">1</span>,<span class="num">2</span>,<span class="num">0</span>],[<span class="num">0</span>,<span class="num">1</span>,<span class="num">3</span>],[<span class="num">2</span>,<span class="num">1</span>,<span class="num">0</span>]]\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> filt   = [[<span class="num">0</span>,<span class="num">1</span>,<span class="num">0</span>],[<span class="num">1</span>,<span class="num">0</span>,<span class="num">1</span>],[<span class="num">0</span>,<span class="num">1</span>,<span class="num">0</span>]]   <span class="dim"># plus-shape</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> out = sum(patch[i][j]*filt[i][j])\n'+
-    '<span class="dim">#   kept cells: 2 + 0 + 3 + 1</span>\n'+
-    '<span class="hl">out = 6</span>   <span class="dim"># one number for one patch</span>',
-    take:'<b>①  Multiply-and-add = one output number.</b> The filter and the patch line up cell by cell. Multiply each pair, add them all, write one number. Here only the plus cells matter, so 2+0+3+1 = 6.'},
-  slide:{html:'<span class="prompt">&gt;&gt;&gt;</span> row   = [<span class="num">1</span>,<span class="num">2</span>,<span class="num">0</span>,<span class="num">3</span>,<span class="num">1</span>]   <span class="dim"># one row of the image</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> filt  = [<span class="num">1</span>,<span class="num">0</span>,<span class="num">1</span>]         <span class="dim"># a 1x3 filter</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> start <span class="kw">in</span> range(<span class="num">3</span>): slide + multiply-add\n'+
-    '<span class="dim">#  1*1+2*0+0*1 = 1</span>\n'+
-    '<span class="dim">#  2*1+0*0+3*1 = 5</span>\n'+
-    '<span class="dim">#  0*1+3*0+1*1 = 1</span>\n'+
-    '<span class="hl">feature_row = [1, 5, 1]</span>   <span class="dim"># 5 in -> 3 out</span>',
-    take:'<b>②  Slide, reuse the same filter.</b> The 3-wide filter fits at 3 start positions across a 5-wide row. Same filter numbers every time (weight sharing). Each stop makes one number, so 5 in gives 3 out.'},
-  pool:{html:'<span class="prompt">&gt;&gt;&gt;</span> fmap = [[<span class="num">1</span>,<span class="num">5</span>,<span class="num">3</span>,<span class="num">2</span>],[<span class="num">4</span>,<span class="num">6</span>,<span class="num">0</span>,<span class="num">1</span>],\n'+
-    '<span class="prompt">...</span>         [<span class="num">2</span>,<span class="num">1</span>,<span class="num">7</span>,<span class="num">3</span>],[<span class="num">0</span>,<span class="num">2</span>,<span class="num">1</span>,<span class="num">4</span>]]\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> max_pool(fmap, block=<span class="num">2</span>)   <span class="dim"># keep biggest in each 2x2</span>\n'+
-    '<span class="dim">#  top-left 2x2 [[1,5],[4,6]] -> 6</span>\n'+
-    '<span class="hl">[[6, 3], [2, 7]]</span>   <span class="dim"># 4x4 shrank to 2x2</span>',
-    take:'<b>③  Pooling shrinks and keeps the strongest.</b> Each 2×2 block becomes one number — its biggest value. A 4×4 map becomes 2×2: half the width, half the height, but the strong matches survive.'}
+  measure:{html:'<span class="prompt">&gt;&gt;&gt;</span> wall = <span class="num">100</span>      <span class="dim"># hours the run was going</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> useful = <span class="num">95</span>    <span class="dim"># hours actually training</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> goodput = useful / wall\n'+
+    '<span class="ok">0.95   # 95% of paid time was useful</span>\n'+
+    '<span class="hl">higher is better; you want near 1.0</span>',
+    take:'<b>①  Goodput = useful / wall-clock.</b> Of 100 hours the run was going, 95 were real training. Goodput is 0.95. It measures finished goods, not lights-on time.'},
+  leak:{html:'<span class="prompt">&gt;&gt;&gt;</span> wasted = restarts(<span class="num">4</span>) + stragglers(<span class="num">5</span>) + stalls(<span class="num">1</span>)\n'+
+    '<span class="bad">wasted = 10 hours</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> goodput = (100 - 10) / 100\n'+
+    '<span class="bad">0.90   # 10 hours taught nothing</span>\n'+
+    '<span class="hl">biggest leak: stragglers (5h)</span>',
+    take:'<b>②  Leaks pull goodput down.</b> Restarts, stragglers, and checkpoint stalls cost 10 hours here, so goodput drops to 0.90. On a run costing millions, 10% is a fortune — fix the biggest leak first.'},
+  mfu:{html:'<span class="prompt">&gt;&gt;&gt;</span> goodput = <span class="num">0.90</span>   <span class="dim"># was it training?</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> mfu = <span class="num">0.55</span>       <span class="dim"># how hard were chips working?</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> effective = goodput * mfu\n'+
+    '<span class="hl">0.495   # ~half the hardware\'s potential used</span>\n'+
+    '<span class="dim"># both must be high to not waste chips</span>',
+    take:'<b>③  MFU is the second number.</b> Goodput asks "was it training?"; MFU asks "while training, how fast?". Multiply them and you see how much of the hardware you paid for actually did work. Both must be high.'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -435,18 +434,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* BUILD — scroll-reveal visual build-up */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A tiny image drawn as a grid of numbers'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the image (a grid of numbers)</text><g fill='#1F6280'><rect x='190' y='30' width='140' height='80' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='210' y='52'>1</text><text x='237' y='52'>2</text><text x='264' y='52'>0</text><text x='291' y='52'>3</text><text x='210' y='76'>0</text><text x='237' y='76'>1</text><text x='264' y='76'>3</text><text x='291' y='76'>2</text><text x='210' y='100'>2</text><text x='237' y='100'>1</text><text x='264' y='100'>0</text><text x='291' y='100'>1</text></g></g></svg>",
-  note:"<b>An image is just numbers.</b> Every pixel is a number saying how bright it is. Here is a tiny 3-row image. The network never sees a picture — it sees this grid. The whole game is finding useful patterns in these numbers."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A small 3 by 3 filter of weights'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the filter (3x3 weights, shared)</text><rect x='205' y='30' width='110' height='80' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><g fill='#5E5191'><text x='225' y='52'>0</text><text x='260' y='52'>1</text><text x='295' y='52'>0</text><text x='225' y='76'>1</text><text x='260' y='76'>0</text><text x='295' y='76'>1</text><text x='225' y='100'>0</text><text x='260' y='100'>1</text><text x='295' y='100'>0</text></g></g></svg>",
-  note:"<b>The filter is a small pattern.</b> These 9 numbers make a plus-shape detector. The same 9 numbers are used at every spot in the image — that is weight sharing. Learn one pattern, find it everywhere."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The filter sits on one patch and computes one number'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='36' width='150' height='60' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='30' fill='#6B645E'>patch</text><text x='210' y='72' fill='#6B645E'>×</text><rect x='230' y='36' width='150' height='60' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='305' y='30' fill='#6B645E'>filter</text><text x='400' y='72' fill='#6B645E'>=</text><rect x='420' y='46' width='70' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='455' y='72' fill='#1a5c38' font-size='16'>6</text></g></svg>",
-  note:"<b>One patch → one number.</b> Line up the filter with a patch. Multiply each pair and add: 2+0+3+1 = <b>6</b>. That single number says how strongly the plus-pattern showed up right here. This is the whole convolution, done once."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The filter slides to the next position'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='85' y='62' fill='#1F6280'>stop 1</text><text x='150' y='62' fill='#6B645E'>→</text><rect x='175' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='220' y='62' fill='#1F6280'>stop 2</text><text x='285' y='62' fill='#6B645E'>→</text><rect x='310' y='40' width='90' height='34' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='355' y='62' fill='#1F6280'>stop 3</text><text x='420' y='62' fill='#6B645E'>→ …</text></g></svg>",
-  note:"<b>Slide and repeat.</b> Move the filter one step and compute again. The <i>same</i> weights are reused at every stop. Slide across the whole image and you fill in a whole grid of match-scores."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The full feature map of match scores'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>feature map (all the match scores)</text><rect x='190' y='30' width='140' height='80' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><g fill='#1a5c38'><text x='217' y='58'>1</text><text x='260' y='58'>5</text><text x='303' y='58'>3</text><text x='217' y='90'>4</text><text x='260' y='90'>6</text><text x='303' y='90'>2</text></g></g></svg>",
-  note:"<b>The feature map.</b> Every filter stop wrote one number, so together they form a small grid. Big numbers = strong match, small numbers = weak match. This map is the convolution layer's output — a map of where the pattern lives."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Max pooling shrinks the feature map'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='34' width='130' height='60' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='105' y='28' fill='#6B645E'>4x4 map</text><text x='195' y='68' fill='#6B645E'>max 2x2 →</text><rect x='300' y='44' width='90' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='38' fill='#6B645E'>2x2 map</text><text x='345' y='70' fill='#9A7208'>keep biggest</text></g></svg>",
-  note:"<b>Pooling shrinks it.</b> Slide a 2×2 window and keep only the biggest number in each block. The map gets half as wide and half as tall, but the strongest matches survive. Smaller map, same signal, less work for the next layer. That is one full conv-then-pool block."}
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='The full wall-clock time as one bar'><g font-family='monospace' font-size='11' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>wall-clock time (100 hours)</text><rect x='40' y='36' width='440' height='34' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='58' fill='#1F6280'>all the time the run was going</text></g></svg>",
+  note:"<b>Start with wall-clock time.</b> This whole bar is every hour the run was going and you were paying for it. But not all of it was useful. The question is: how much of this bar actually trained the model?"},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Three leaks eat into the bar'><g font-family='monospace' font-size='9' text-anchor='middle'><text x='260' y='16' fill='#C93B3B'>leaks: restarts + stragglers + stalls</text><rect x='40' y='34' width='352' height='30' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='216' y='53' fill='#1a5c38'>useful (90h)</text><rect x='392' y='34' width='36' height='30' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5'/><text x='410' y='80' fill='#C93B3B'>restart 4h</text><rect x='428' y='34' width='40' height='30' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5'/><text x='448' y='92' fill='#C93B3B'>strag 5h</text></g></svg>",
+  note:"<b>Leaks eat the bar.</b> Restarts after crashes, stragglers making everyone wait, and checkpoint stalls all take time that trains nothing. Every problem from this week shows up here as a red slice."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='The useful training slice highlighted'><g font-family='monospace' font-size='11' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>useful training time = 90 hours</text><rect x='40' y='36' width='352' height='34' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2.5'/><text x='216' y='58' fill='#1a5c38'>this is the part that taught the model</text><rect x='392' y='36' width='88' height='34' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5' stroke-dasharray='4 3'/><text x='436' y='58' fill='#C93B3B'>wasted 10h</text></g></svg>",
+  note:"<b>Keep only the useful part.</b> Subtract the leaks from wall-clock and you get useful training time — here 90 of the 100 hours. This green slice is what actually moved the model forward."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Goodput as a fraction'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>goodput = useful / wall-clock</text><rect x='120' y='36' width='120' height='40' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='180' y='61' fill='#1a5c38'>90 / 100</text><text x='260' y='61' fill='#6B645E'>=</text><rect x='290' y='36' width='110' height='40' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='61' fill='#9A7208'>0.90 (90%)</text></g></svg>",
+  note:"<b>The score: goodput.</b> Divide useful by wall-clock: 90/100 = 0.90. That is the run's goodput — the fraction of paid time that was useful. You want it as close to 1.0 as you can get."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='MFU multiplies goodput to give effective throughput'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='40' width='110' height='36' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='95' y='63' fill='#9A7208'>goodput 0.90</text><text x='165' y='63' fill='#6B645E'>×</text><rect x='185' y='40' width='90' height='36' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='230' y='63' fill='#5E5191'>MFU 0.55</text><text x='290' y='63' fill='#6B645E'>=</text><rect x='310' y='40' width='170' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='395' y='63' fill='#1a5c38'>effective 0.495</text></g></svg>",
+  note:"<b>MFU on top.</b> Goodput asks \"was it training?\"; MFU asks \"while training, how fast?\". Multiply them for the real fraction of the hardware you used — here about 0.50. Both must be high, or you waste chips you paid for."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='This week fixes plug the goodput leaks'><g font-family='monospace' font-size='9' text-anchor='middle'><text x='260' y='16' fill='#2D8B55'>this week = plugging the leaks</text><rect x='30' y='34' width='150' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='51' fill='#1a5c38'>async saves → no stalls</text><rect x='30' y='66' width='150' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='83' fill='#1a5c38'>elastic recovery → less restart</text><rect x='30' y='98' width='150' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='105' y='115' fill='#1a5c38'>straggler hunt → no waiting</text><text x='210' y='66' fill='#6B645E'>+ mesh (Day 1) → high MFU</text><text x='300' y='90' fill='#9A7208'>→ goodput ↑</text></g></svg>",
+  note:"<b>The whole module, in one number.</b> Async checkpointing kills stalls, elastic recovery shrinks restart time, straggler hunting stops the waiting, and good mesh placement lifts MFU. Every skill this week exists to raise goodput — that is how you keep a 10,000-chip, month-long run alive and worth its cost."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -469,18 +468,18 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What is a convolution filter?',
-  opts:['a picture of the object','a small grid of weights that slides over the image','a list of all the pixels','the final answer'],
-  ans:1, fb:'Right. A filter is a tiny grid of weights (often 3×3) dragged across the image to detect a pattern.'},
- {q:'2. At one filter position, how do you get the output number?',
-  opts:['pick the biggest pixel','multiply each overlapping pair and add them all up','count the pixels','divide the image by the filter'],
-  ans:1, fb:'Right. Multiply each filter number by the image number under it, then add all the products into one value.'},
- {q:'3. "Weight sharing" means:',
-  opts:['each spot learns its own weights','the same filter weights are reused at every position','the weights are random','the weights never change'],
-  ans:1, fb:'Right. One small set of weights is reused everywhere, so a pattern learned once is found across the whole image.'},
- {q:'4. What does max pooling do to a feature map?',
-  opts:['makes it bigger','keeps the largest value in each small block, shrinking the map','adds all the numbers','turns it into an image'],
-  ans:1, fb:'Right. Each block (like 2×2) becomes one number — its biggest value — so the map gets smaller but keeps the strong matches.'}
+ {q:'1. What does goodput measure?',
+  opts:['how many hours the machines were powered on','useful training time divided by total wall-clock time','the size of the model','the number of chips'],
+  ans:1, fb:'Right. Goodput is the fraction of real time that was spent on useful training, from 0 to 1. Higher is better.'},
+ {q:'2. A run goes for 100 hours; 4h restarts, 5h stragglers, 1h checkpoint stalls. Its goodput is:',
+  opts:['1.00','0.90','0.50','0.10'],
+  ans:1, fb:'Right. Wasted = 4+5+1 = 10, useful = 90, goodput = 90/100 = 0.90.'},
+ {q:'3. What does MFU (model FLOPs utilization) tell you?',
+  opts:['how many chips died','while training, what fraction of the chips\' peak math speed the model actually uses','the checkpoint size','how far through the data you are'],
+  ans:1, fb:'Right. Goodput asks "was it training?"; MFU asks "while training, how hard were the chips working?". Both must be high.'},
+ {q:'4. Which of these steals goodput?',
+  opts:['using more data','restarts, stragglers, and checkpoint stalls','a larger vocabulary','a lower learning rate'],
+  ans:1, fb:'Right. Every one of these burns wall-clock time without training the model — each is a leak the week\'s techniques exist to plug.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){
