@@ -51,6 +51,8 @@ These are **self-paced modules, not calendar weeks.** A module is a themed miles
 
 **Live-interactive bar:** every foundation lesson whose topic *rewards manipulation* opens its "Build it up" section with a **live interactive** (`sessions/viz/*.html`, embedded via the `.build-embed` iframe), then keeps the static scroll-reveal diagram underneath as the piece-by-piece explanation. Pure "anatomy" frames stay static. See the [visualization plan](#visualization-plan-live-vs-static).
 
+**Staff-lens bar** *(added 2026-07-04)*: any lesson with a Mechanism/math section needs a named **failure-mode** callout and a named **trade-off** callout, plus at least one diagnostic-style quiz question — see the Staff Lens rule in `.claude/skills/frontier-session-coach/TEACHING_PRINCIPLES.md`. Model: `attention-lab-course/modules/04-the-math.html`.
+
 **Legend**
 
 | Marker | Meaning |
@@ -545,6 +547,21 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 - **Priority 0 (foundations): 7 / 7 WPs — ✅ complete (M1, M2, M3, M4 + all 3 viz built, verified, wired).**
 - Priority 1 (Phases 0–5): 7 / ~30 build-modules (M5a, M5b, M6, M9b, M9e, M10b, M11 ✅) · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
 - **Legend:** ⬜ unclaimed · 🔄 in progress (add session date) · ✅ done & verified · ⛔ blocked (note blocker).
+
+### Staff-lens retrofit watchlist *(added 2026-07-04)*
+Not a work package — a deferred check. The Staff Lens bar (Global rules, above) was added
+after comparing built lessons against `attention-lab-course`, which already names failure
+modes and trade-offs explicitly and asks diagnostic-style quiz questions. Existing lessons
+were **not** retrofitted in that pass. When a future session picks up one of the still-⬜
+math-heavy modules below, check the topic's already-built source lesson (if `reuse`-sourced)
+against the Staff Lens bar and upgrade it opportunistically rather than treating this as
+separate mandatory work:
+
+- **M8** — transformer math (`week-03`): transformer arithmetic, QKV, KV-cache
+- **M10a** — scaling laws (`week-05`): Kaplan, Chinchilla, IsoFlops methodology
+- **M14a** — Mixture of Experts (`week-07`)
+- **M17a** — quantization (`week-15`)
+- **M17b** — long-context decoding (`week-16`): speculative decoding, KV eviction
 
 ---
 

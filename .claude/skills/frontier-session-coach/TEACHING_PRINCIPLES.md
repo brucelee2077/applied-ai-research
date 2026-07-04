@@ -41,6 +41,27 @@ Every topic must include three layers:
 2. System/mechanism explanation
 3. Frontier-lab relevance
 
+## Staff Lens
+*(applies whenever a lesson has a Mechanism/math section — section 4, "机制/为什么";
+skip for a pure-intuition or playground-only day with no mechanism section)*
+
+Beginner-friendly and staff-interview-grade are not in tension — a good analogy plus a
+named failure mode is what makes the mechanism stick. Two requirements:
+
+1. **Name a failure mode and a trade-off, don't just describe them.** Give each its own
+   labeled callout in the Mechanism section:
+   - **Failure mode** — a concrete way this breaks *silently* (no crash, no error, quietly
+     wrong output/behavior). Frame it as "what a senior engineer catches in code review."
+   - **Trade-off** — what you give up for what you gain. Frame it as "what gets raised in a
+     design review."
+   (Model: `attention-lab-course/modules/04-the-math.html` — "the wrong-axis bug is the one
+   a senior engineer catches in code review... the O(n²) trade-off is the one they raise in
+   a design review.")
+2. **At least one quiz question must be diagnostic, not recall.** Instead of "what does
+   symbol X mean," ask "a teammate's code runs without errors but training stalls / the
+   metric looks off — where do you look first, and why?" Recall questions are fine for the
+   other three; at least one must force the reader to reason like they're debugging.
+
 ## Language rule
 - **Write in English.** The user is comfortable reading English and prefers it.
 - Use Chinese only when it genuinely aids comprehension of a specific nuance — which is rare.
