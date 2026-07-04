@@ -78,9 +78,9 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | 2 | The Neuron & How It Learns *(merged)* | Represent→Train | `00-nn/fundamentals` 01–08 | author | 9 | $0 | ✅ 9/9 + gates |
 | 3 | Attention as a Pure Idea *(+ RoPE build)* | Represent | `01-transformers/days` 01–17 | author | 6 | $0 | ✅ 5/5 + gate |
 | 4 | MLP → PyTorch *(+ einsum primer)* | Train | `…fundamentals` 09–10 | author | 6 | $0 | ✅ 6/6 + gate |
-| 5a | Full Text Transformer *(+ modern components)* | Represent | `01-transformers/days` 18–28 | author | 8 | $0 | ⬜ |
-| 5b | Vision Transformer (ViT) | Represent | frontier ViT | author | 4 | $0 | ⬜ |
-| 6 | CNNs & Vision Encoders ⭐ | Represent | `00-nn/cnn` + `05-multimodal` | author | 8 | $0 | ⬜ |
+| 5a | Full Text Transformer *(+ modern components)* | Represent | `01-transformers/days` 18–28 | author | 8 | $0 | ✅ 8/8 + gate |
+| 5b | Vision Transformer (ViT) | Represent | frontier ViT | author | 4 | $0 | ✅ 4/4 + gate |
+| 6 | CNNs & Vision Encoders ⭐ | Represent | `00-nn/cnn` + `05-multimodal` | author | 8 | $0 | ✅ 8/8 + gate |
 | 7 | Thinking in JAX *(+ autodiff internals)* | Train | `week-01` (+ MLP capstone 🆕) | reuse+author | 6 | $0 | ⬜ |
 | **Phase 1 · Hardware, Distribution & Scaling** | | | | | | | |
 | 8 | Transformer Math + Search 🎨 *(+ FlashAttention concept)* | Represent | `week-03` + 4 design studies | reuse+wrap | 8 | $0 | ⬜ |
@@ -543,7 +543,7 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 
 ### Status glance
 - **Priority 0 (foundations): 7 / 7 WPs — ✅ complete (M1, M2, M3, M4 + all 3 viz built, verified, wired).**
-- Priority 1 (Phases 0–5): 0 / ~30 build-modules · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
+- Priority 1 (Phases 0–5): 3 / ~30 build-modules (M5a, M5b, M6 ✅) · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
 - **Legend:** ⬜ unclaimed · 🔄 in progress (add session date) · ✅ done & verified · ⛔ blocked (note blocker).
 
 ---

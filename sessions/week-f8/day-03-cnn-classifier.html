@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 6 · Day 3 — A Small CNN Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf8-d03-cnn">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M6 Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-batch-normalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 6 · Represent · Day 3</span>
+    <h1>A Small CNN<br>Classifier</h1>
+    <p class="lead">You have the two pieces: convolution finds patterns, pooling shrinks the map. Today you stack them into a whole classifier. The shape follows one recipe: conv → pool → conv → pool → flatten → dense. Each conv-pool block zooms out — from tiny edges, to shapes, to whole objects — until a final dense layer says which class the picture is.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> describe a complete small CNN (conv → pool → conv → pool → flatten → dense), explain what each stage does, and follow the shape as it flows from image to class scores.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Stacking blocks into a classifier</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 1 (convolution + pooling) and Day 2 (output-size formula). Today we put the pieces in order and read the shape as it flows through.</div></div>
+
+      <h4>The recipe</h4>
+      <p>A small <span class="term" data-tip="Convolutional Neural Network: a network that uses convolution filters to find patterns in images, plus pooling to shrink, then a dense layer to make the final decision.">CNN</span> is a fixed sequence of blocks: <code>conv → pool → conv → pool → flatten → dense</code>. The first blocks find patterns and shrink the picture. The last block makes the decision.</p>
+
+      <h4>What each stage does</h4>
+      <ul>
+        <li><strong>Conv:</strong> slide filters over the image to make feature maps (Day 1). Early convs find edges; later convs find shapes.</li>
+        <li><strong>Pool:</strong> shrink each feature map, keeping the strongest signal. This makes the network faster and a little position-proof.</li>
+        <li><span class="term" data-tip="Turning a small multi-channel grid of numbers into one long single row, so a normal dense layer can read it.">Flatten</span>: turn the final small grid of numbers into one long row.</li>
+        <li><span class="term" data-tip="A fully-connected layer where every input connects to every output. It maps the flattened features to one score per class. Same as the layers in your M5 MLP.">Dense layer</span>: your familiar fully-connected layer, giving one score per class.</li>
+      </ul>
+
+      <h4>Channels grow as size shrinks</h4>
+      <p>A <span class="term" data-tip="One 2D feature map inside a layer. An image starts with 3 color channels (red, green, blue); a conv layer can output many more, one per filter.">channel</span> is one feature map. As the picture gets smaller (pooling), the number of channels usually grows — few big maps become many small maps, each spotting a different pattern. Keep going 👇</p>
+      <button class="gotit" type="button">Got the recipe — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Zoom out, step by step</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🔍</span><h5>Start up close</h5><p>The first conv layer looks very closely and finds tiny things: edges, corners, little curves. It cannot see a whole cat yet — just the smallest pieces, everywhere in the image.</p></div>
+        <div class="card"><span class="big">🐱</span><h5>Zoom out to objects</h5><p>Each pool step steps back, and the next conv combines the small pieces into bigger ones: edges become an ear, curves become an eye. By the last block, whole objects show up. The dense layer then names it.</p></div>
+      </div>
+      <p><strong>In one line:</strong> a CNN builds understanding from the ground up — tiny features first, then bigger features, then a decision — like zooming out from brush strokes to the whole painting.</p>
+      <p>This is why depth helps. One layer only sees edges. Stack many, and later layers see combinations of combinations — enough to tell a cat from a car.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: zooming out with your eyes just makes things smaller. A CNN does more — at each step it also learns new filters that actively combine the earlier pieces into new, more meaningful ones. It is not only shrinking; it is building.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch the shape flow through the CNN</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Follow a 28×28 grayscale digit through the first block, the second block, then the flatten-and-decide. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="block1" type="button">① conv → pool (block 1)</button>
+          <button class="play-btn" data-demo="block2" type="button">② conv → pool (block 2)</button>
+          <button class="play-btn" data-demo="head" type="button">③ flatten → dense</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the width and height shrink while the channel count grows — few big maps become many small maps.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Trace the shape from image to class scores</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Each layer takes a shape in and gives a shape out. Convolution uses the Day-2 formula. Pooling with a 2×2 window and stride 2 halves the width and height. Flatten multiplies the remaining numbers into one long row. The dense layer maps that row to one score per class.</p>
+
+      <h4>Step 2 — the layers, symbol by symbol</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        conv:    out = floor((W − K + 2P)/S) + 1   <span class="dim"># width/height, per Day 2</span><br>
+        pool2x2: out = W // 2                        <span class="dim"># halve width and height</span><br>
+        flatten: length = C × H × W                  <span class="dim"># C channels, H×W each</span><br>
+        dense:   scores = flat · Weights             <span class="dim"># one score per class</span>
+      </div></div>
+      <p>Symbols: <code>W</code>, <code>H</code> = width and height, <code>C</code> = number of channels (feature maps), <code>K/S/P</code> = kernel, stride, padding from Day 2.</p>
+
+      <h4>Step 3 — a worked shape trace (a 28×28 digit)</h4>
+      <p>Start with 1 channel (grayscale), 28×28. Use conv with K=3, P=1, S=1 (keeps size), 8 filters; then 2×2 pool; then conv again with 16 filters; then 2×2 pool:</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.85">
+        input:        (1, 28, 28)<br>
+        conv 8, K3P1: (8, 28, 28)   <span class="dim"># size kept, now 8 channels</span><br>
+        pool 2x2:     (8, 14, 14)   <span class="dim"># halved</span><br>
+        conv 16,K3P1: (16, 14, 14)  <span class="dim"># 16 channels</span><br>
+        pool 2x2:     (16, 7, 7)    <span class="dim"># halved again</span><br>
+        flatten:      16×7×7 = <span class="hl">784</span><br>
+        dense 784→10: (10)          <span class="dim"># one score per digit 0–9</span>
+      </div></div>
+      <p>The picture went from 28×28 down to 7×7, while channels grew 1 → 8 → 16. Flatten turns the final <code>16×7×7</code> grid into a row of <code>784</code> numbers, and one dense layer turns that into <code>10</code> class scores.</p>
+
+      <h4>Why this order works</h4>
+      <ul>
+        <li><strong>Conv before dense:</strong> convolution keeps neighbor information; if you flattened first you would throw that away.</li>
+        <li><strong>Pool between convs:</strong> shrinking keeps the network fast and lets later filters see a bigger area of the original image.</li>
+        <li><strong>Dense at the end:</strong> once features are small and rich, a fully-connected layer is the cheapest way to make the final call.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this exact conv-pool-conv-pool-flatten-dense shape is LeNet, the first practical CNN from 1998, and it still describes the skeleton of far bigger modern image models.</div></div>
+      <button class="gotit" type="button">Got the shape flow</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Stacking the classifier, block by block — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole CNN, built one stage at a time: the image, first conv-pool, second conv-pool, flatten, dense, and the final class scores. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build the CNN and print each shape (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Build the small CNN in PyTorch and watch the shape flow. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/foundations/m06_small_cnn.py</code>. Build an <code>nn.Sequential</code> with: Conv2d(1→8, k=3, p=1), ReLU, MaxPool2d(2), Conv2d(8→16, k=3, p=1), ReLU, MaxPool2d(2), Flatten, Linear(16·7·7 → 10). Push a dummy tensor of shape (1,1,28,28) through it, printing the shape after every layer. Confirm the last shape is (1,10). Run with <code>python3 m06_small_cnn.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 3 artifact.
+
+Create experiments/foundations/m06_small_cnn.py that, with a comment on each step, builds a small CNN image classifier and traces its shapes:
+1. Builds a model: Conv2d(1,8,kernel_size=3,padding=1) -> ReLU -> MaxPool2d(2) -> Conv2d(8,16,kernel_size=3,padding=1) -> ReLU -> MaxPool2d(2) -> Flatten -> Linear(16*7*7, 10).
+2. Creates a dummy input of shape (1,1,28,28) and passes it through, printing the tensor shape after every layer so the width/height shrink and the channels grow are visible.
+3. Asserts the final output shape is (1, 10) — one score per digit class.
+4. Prints the total parameter count.
+Then run it and paste the sequence of shapes at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-03-log.md</code>: what was the shape right before flatten, and did 16×7×7 equal the flattened length you expected?</div></div>
+      <button class="gotit" type="button">Done — on to Day 4</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🧱</span>
+    <h3>Day 3 complete — you built a classifier!</h3>
+    <p>You can now describe a full small CNN: conv → pool → conv → pool → flatten → dense. You know the picture shrinks while channels grow, and you can trace the shape from a 28×28 digit down to 10 class scores. That is a real image classifier.<br>Next: <b>Day 4</b> — batch normalization, to train it faster.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-batch-normalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  block1:{html:'<span class="prompt">&gt;&gt;&gt;</span> x.shape   <span class="dim"># 1 grayscale channel, 28x28</span>\n'+
+    '<span class="hl">(1, 28, 28)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = conv(x, filters=<span class="num">8</span>, K=<span class="num">3</span>, P=<span class="num">1</span>); relu(x)\n'+
+    '<span class="hl">(8, 28, 28)</span>   <span class="dim"># 8 feature maps, size kept</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = maxpool(x, <span class="num">2</span>)\n'+
+    '<span class="hl">(8, 14, 14)</span>   <span class="dim"># halved by pooling</span>',
+    take:'<b>①  Block 1 finds edges, then shrinks.</b> Conv turns 1 channel into 8 feature maps, keeping 28×28 (padding P=1). Then 2×2 pool halves it to 14×14. Small features found, map made smaller.'},
+  block2:{html:'<span class="prompt">&gt;&gt;&gt;</span> x.shape   <span class="dim"># from block 1</span>\n'+
+    '<span class="hl">(8, 14, 14)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = conv(x, filters=<span class="num">16</span>, K=<span class="num">3</span>, P=<span class="num">1</span>); relu(x)\n'+
+    '<span class="hl">(16, 14, 14)</span>   <span class="dim"># now 16 maps</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = maxpool(x, <span class="num">2</span>)\n'+
+    '<span class="hl">(16, 7, 7)</span>   <span class="dim"># halved again</span>',
+    take:'<b>②  Block 2 combines into bigger shapes.</b> A second conv makes 16 richer maps, then pooling halves again to 7×7. Channels grew 8→16 while width/height shrank 14→7 — few big maps became many small ones.'},
+  head:{html:'<span class="prompt">&gt;&gt;&gt;</span> x.shape   <span class="dim"># from block 2</span>\n'+
+    '<span class="hl">(16, 7, 7)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = flatten(x)   <span class="dim"># 16*7*7</span>\n'+
+    '<span class="hl">(784,)</span>   <span class="dim"># one long row</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> scores = dense(x, out=<span class="num">10</span>)\n'+
+    '<span class="hl">(10,)</span>   <span class="dim"># one score per digit 0–9</span>',
+    take:'<b>③  Flatten, then decide.</b> The final 16×7×7 grid becomes a row of 784 numbers. One dense layer maps that to 10 class scores. The biggest score is the network\'s guess.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Input image 1 channel 28x28'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='200' y='28' width='120' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='53' fill='#1F6280'>(1, 28, 28)</text><text x='260' y='84' fill='#6B645E' font-size='10'>a grayscale digit</text></g></svg>",
+  note:"<b>The input.</b> One grayscale channel, 28×28 pixels. This is a single handwritten digit. The network's job: turn this grid of brightness numbers into a guess from 0 to 9."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Block 1 conv and pool'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='30' width='120' height='36' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='90' y='53' fill='#5E5191'>conv 8 →(8,28,28)</text><text x='170' y='53' fill='#6B645E'>→</text><rect x='195' y='30' width='130' height='36' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='260' y='53' fill='#9A7208'>pool →(8,14,14)</text></g></svg>",
+  note:"<b>Block 1: find edges, shrink.</b> The first conv makes 8 feature maps (with P=1 the size stays 28×28), then a 2×2 pool halves it to 14×14. Early layers catch tiny features like edges and corners."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Block 2 conv and pool'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='30' width='130' height='36' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='95' y='53' fill='#5E5191'>conv 16→(16,14,14)</text><text x='175' y='53' fill='#6B645E'>→</text><rect x='200' y='30' width='125' height='36' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='262' y='53' fill='#9A7208'>pool →(16,7,7)</text></g></svg>",
+  note:"<b>Block 2: combine, shrink again.</b> A second conv makes 16 richer maps, then pooling halves to 7×7. Channels grew 8→16 while size shrank — the network now sees bigger shapes, not just edges."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Flatten the grid into one row'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='30' width='120' height='36' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='100' y='53' fill='#9A7208'>(16, 7, 7)</text><text x='185' y='53' fill='#6B645E'>flatten →</text><rect x='300' y='30' width='120' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='360' y='53' fill='#1a5c38'>(784,)</text></g></svg>",
+  note:"<b>Flatten.</b> The final 16×7×7 grid is stretched into one long row of 16×7×7 = 784 numbers. Now a normal dense layer can read it. Neighbor info was already captured by the convs, so flattening here is safe."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Dense layer to 10 class scores'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='60' y='30' width='110' height='36' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='115' y='53' fill='#1a5c38'>(784,)</text><text x='195' y='53' fill='#6B645E'>dense →</text><rect x='300' y='30' width='150' height='36' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='375' y='53' fill='#1F6280'>(10,) scores</text></g></svg>",
+  note:"<b>Dense: make the call.</b> One fully-connected layer (like your M5 MLP) maps 784 features to 10 class scores. Softmax turns these into probabilities; the biggest one is the network's guess."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='The full pipeline from image to answer'><g font-family='monospace' font-size='9.5' text-anchor='middle'><rect x='15' y='40' width='60' height='28' rx='4' fill='#E4F2F7' stroke='#2A7B9B'/><text x='45' y='58' fill='#1F6280'>image</text><text x='82' y='58' fill='#6B645E'>→</text><rect x='92' y='40' width='75' height='28' rx='4' fill='#EDE9F8' stroke='#7C6DAA'/><text x='129' y='58' fill='#5E5191'>conv·pool</text><text x='174' y='58' fill='#6B645E'>→</text><rect x='184' y='40' width='75' height='28' rx='4' fill='#EDE9F8' stroke='#7C6DAA'/><text x='221' y='58' fill='#5E5191'>conv·pool</text><text x='266' y='58' fill='#6B645E'>→</text><rect x='276' y='40' width='70' height='28' rx='4' fill='#FCF3DC' stroke='#C99A12'/><text x='311' y='58' fill='#9A7208'>flatten</text><text x='352' y='58' fill='#6B645E'>→</text><rect x='362' y='40' width='60' height='28' rx='4' fill='#E8F5EE' stroke='#2D8B55'/><text x='392' y='58' fill='#1a5c38'>dense</text><text x='430' y='58' fill='#6B645E'>→ 🐱</text></g></svg>",
+  note:"<b>The whole classifier.</b> conv → pool → conv → pool → flatten → dense. This is LeNet from 1998, and the same skeleton lives inside far larger modern image models. You just built the shape of a real vision network."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. The standard small-CNN recipe is:',
+  opts:['dense → dense → dense','conv → pool → conv → pool → flatten → dense','pool only','flatten → conv'],
+  ans:1, fb:'Right. Conv-pool blocks find and shrink features, then flatten and a dense layer make the final decision.'},
+ {q:'2. As you go deeper through the conv-pool blocks, the feature maps usually:',
+  opts:['stay the same size and channels','get smaller in width/height while the channel count grows','only get wider','disappear'],
+  ans:1, fb:'Right. Pooling shrinks width and height, and later convs add more channels — few big maps become many small ones.'},
+ {q:'3. Why do the convolution layers come before the dense layer?',
+  opts:['dense layers are slow','convolutions keep the neighbor structure; flattening first would throw it away','it looks nicer','dense layers cannot run on images'],
+  ans:1, fb:'Right. Convolutions use the fact that nearby pixels belong together; flatten only after those features are found.'},
+ {q:'4. What does the final dense layer output for a 10-class problem?',
+  opts:['a single image','10 scores, one per class','the flattened pixels','a bigger feature map'],
+  ans:1, fb:'Right. It maps the flattened features to 10 class scores; the biggest score is the guess.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

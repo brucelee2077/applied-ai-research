@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 6 · Day 8 — CLIP &amp; Contrastive Learning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf8-d08-clip">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M6 Day 8</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-07-object-detection-intuition.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection Intuition</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 6 · Represent · Day 8 (finale)</span>
+    <h1>CLIP &amp;<br>Contrastive Learning</h1>
+    <p class="lead">The module finale. Yesterday you turned an image into an embedding. What if text could become an embedding in the <b>same</b> space? Then a photo and its caption would land close together, and you could match pictures to words directly. CLIP does exactly this: it pulls matching image-caption pairs together and pushes mismatched ones apart, until images and text share one map of meaning.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain contrastive image-text training (CLIP) — pull matching image/caption embeddings together, push mismatched ones apart — and what a shared embedding space unlocks, like zero-shot classification.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">One shared space for images and text</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the image embedding from Day 6 (an image becomes a fixed-length list of numbers), and the idea of comparing embeddings by distance. Today we add a second encoder — for text — that lands in the same space.</div></div>
+
+      <h4>Two encoders, one space</h4>
+      <p><span class="term" data-tip="Contrastive Language-Image Pre-training, by OpenAI (2021). It trains an image encoder and a text encoder so matching image-caption pairs land close together in a shared embedding space.">CLIP</span> has two parts. An <span class="term" data-tip="The part of CLIP that turns an image into an embedding — a fixed-length list of numbers.">image encoder</span> turns a photo into an embedding. A <span class="term" data-tip="The part of CLIP that turns a sentence into an embedding, in the same space as the image encoder's output.">text encoder</span> turns a sentence into an embedding. Both outputs live in the same <span class="term" data-tip="A single space of embeddings where both images and text land, so a photo and its caption can be compared directly by distance.">shared embedding space</span>.</p>
+
+      <h4>The training goal</h4>
+      <p>CLIP learns with <span class="term" data-tip="A way of training that pulls matching pairs closer together and pushes non-matching pairs farther apart in embedding space.">contrastive learning</span>. Show it many image-caption pairs. For each real pair (a dog photo with "a photo of a dog"), pull the two embeddings together. For every wrong pair (that dog photo with "a photo of a car"), push them apart.</p>
+
+      <h4>What you get</h4>
+      <p>After training on hundreds of millions of pairs, a photo and its true caption sit close; a photo and a wrong caption sit far. Now you can compare any image to any text directly. This unlocks <span class="term" data-tip="Classifying an image into categories the model was never explicitly trained on, by comparing the image's embedding to the text embeddings of the category names.">zero-shot classification</span> — labeling images using only text descriptions of the classes. Keep going 👇</p>
+      <button class="gotit" type="button">Got the idea — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A memory game: match photos to captions</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🃏</span><h5>The matching game</h5><p>Lay out 4 photos in a row and 4 captions in a column. Your job: draw a line from each photo to the caption that describes it. Get every match right, and you have understood both the pictures and the words.</p></div>
+        <div class="card"><span class="big">🧲</span><h5>Pull matches, push mismatches</h5><p>CLIP plays this game with millions of cards. Each round it pulls the right photo-caption pairs closer in embedding space and pushes every wrong pairing apart. Over time, matching things become magnets and mismatches repel.</p></div>
+      </div>
+      <p><strong>In one line:</strong> CLIP learns to win a giant matching game — line up each image with its caption — and in doing so builds one shared space where meaning is measured by closeness.</p>
+      <p>Because it learned from natural captions, not fixed labels, it can later match a photo to <i>any</i> phrase you write — even categories it never saw as training labels. That is where zero-shot comes from.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: in a card game you truly understand each picture. CLIP does not understand a dog — it only learned that dog photos and the word "dog" tend to produce nearby embeddings. It is pattern-matching at huge scale, not real understanding.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Encode both, match the grid, classify with words</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Encode an image and some texts, see the similarity grid where the diagonal should win, then classify a new image using only text. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="encode" type="button">① encode image + text</button>
+          <button class="play-btn" data-demo="grid" type="button">② the matching grid</button>
+          <button class="play-btn" data-demo="zeroshot" type="button">③ zero-shot classify</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: CLIP compares embeddings with cosine similarity — the angle between two vectors — not raw distance. Close angle = high match.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The similarity grid, worked out</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Take a batch of N image-caption pairs. Encode all N images and all N captions. Now score every image against every caption, filling an N×N grid. The correct match for each image is the caption on the diagonal. Training pushes the diagonal scores up and the off-diagonal scores down.</p>
+
+      <h4>Step 2 — the similarity score</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        cos(a, b) = (a · b) / (|a| · |b|)<br>
+        <span class="dim"># dot product / (length of a × length of b)</span>
+      </div></div>
+      <p>Symbols: <span class="term" data-tip="Cosine similarity: the cosine of the angle between two vectors. 1 means same direction (very similar), 0 means perpendicular (unrelated), −1 means opposite.">cosine similarity</span> <code>cos(a,b)</code> measures the angle between two embeddings. <code>a · b</code> = the dot product (multiply matching numbers, add them). <code>|a|</code> = the length of <code>a</code>. Result 1 = same direction (great match), 0 = unrelated.</p>
+
+      <h4>Step 3 — a worked example</h4>
+      <p>Say an image embedding and two caption embeddings (kept short for clarity):</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        img       = [1, 0]<br>
+        "a dog"   = [0.8, 0.6]<br>
+        "a car"   = [0, 1]<br><br>
+        cos(img, "a dog") = (1·0.8 + 0·0.6) / (1 · 1) = <span class="hl">0.8</span><br>
+        cos(img, "a car") = (1·0   + 0·1)   / (1 · 1) = <span class="hl">0.0</span>
+      </div></div>
+      <p>(Both caption vectors have length 1 here.) The image scores 0.8 with "a dog" and 0.0 with "a car". So the model reads this image as a dog — the higher score wins. That is the whole matching decision.</p>
+
+      <h4>Why a shared space is powerful</h4>
+      <ul>
+        <li><strong>Zero-shot classification:</strong> to label an image, encode the class names as text ("a photo of a cat", "a photo of a dog"), and pick the one with the highest cosine score. No training on those classes needed.</li>
+        <li><strong>Text-to-image search:</strong> type a phrase, encode it, and find the images whose embeddings are closest — a search engine over pixels.</li>
+        <li><strong>A bridge to bigger models:</strong> CLIP's shared space feeds image generators and vision-language chat models.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> "encode two things into one space, then compare" is the same idea you met on Day 6, now spanning images and text. It is the foundation under image search, captioning, and the vision half of multimodal AI.</div></div>
+      <button class="gotit" type="button">Got the CLIP idea</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From two encoders to zero-shot magic — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is CLIP, built one step at a time: the two encoders, the shared space, the matching grid, the pull-and-push, and zero-shot classification. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Match images to text with CLIP (module capstone)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove the shared space to yourself — the finale of the whole module. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/foundations/m06_clip_zeroshot.py</code>. If you can install <code>open_clip</code> or <code>transformers</code>, load a small CLIP, encode one image and a few text labels ("a photo of a cat", "a photo of a dog", "a photo of a car"), compute cosine similarities, and print which label wins. If you cannot download a model, do a tiny NumPy version: make small fake image and text embeddings, normalize them, and compute the cosine-similarity grid by hand. Run with <code>python3 m06_clip_zeroshot.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 8 (finale) artifact.
+
+Create experiments/foundations/m06_clip_zeroshot.py that, with a comment on each step, demonstrates CLIP-style contrastive matching and zero-shot classification:
+1. If open_clip or transformers CLIP can be loaded, encodes one image plus a list of text prompts ("a photo of a cat/dog/car"), normalizes the embeddings, computes cosine similarities, and prints the winning label.
+2. Also builds a small pure-NumPy fallback: makes 3 fake image embeddings and 3 fake matching text embeddings, normalizes them, computes the 3x3 cosine-similarity grid, and asserts the diagonal (matching pairs) has the highest score in each row — this is the contrastive objective in miniature.
+3. Prints the similarity grid and clearly states which path (real CLIP or NumPy fallback) ran.
+Then run it and paste the winning label (or the grid) at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-08-log.md</code>: did the matching pair get the highest cosine score, and what surprised you about labeling an image with only text?</div></div>
+      <button class="gotit" type="button">Done — finish the module</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🏆</span>
+    <h3>Module 6 — all eight days complete!</h3>
+    <p>You went from a single filter sliding over pixels to a machine that matches photos to words. Convolution and pooling, output-size arithmetic, a full CNN classifier, batchnorm, augmentation, transfer-learning embeddings, detection, and finally CLIP's shared image-text space. You can now compute a conv output size, explain batchnorm, and describe how an image becomes an embedding.<br>Next: take the <b>Review Gate</b> to lock it in.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-07-object-detection-intuition.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection Intuition</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  encode:{html:'<span class="prompt">&gt;&gt;&gt;</span> img_emb  = image_encoder(photo)   <span class="dim"># a photo</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> txt_emb  = text_encoder(<span class="str">"a photo of a dog"</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> img_emb.shape, txt_emb.shape\n'+
+    '<span class="hl">((512,), (512,))</span>   <span class="dim"># same length, same space</span>',
+    take:'<b>①  Two encoders, one space.</b> The image encoder and text encoder each output a 512-number embedding. Crucially they live in the SAME space, so an image and a sentence can be compared directly.'},
+  grid:{html:'<span class="prompt">&gt;&gt;&gt;</span> cos(images, texts)   <span class="dim"># N images x N captions</span>\n'+
+    '<span class="dim">#            "dog"  "sunset" "pizza"</span>\n'+
+    '<span class="hl">dog img   [ 0.91    0.10     0.08 ]</span>\n'+
+    '<span class="hl">sun img   [ 0.12    0.88     0.09 ]</span>\n'+
+    '<span class="hl">pizza img [ 0.07    0.11     0.90 ]</span>',
+    take:'<b>②  The matching grid.</b> Score every image against every caption. The correct matches sit on the diagonal. Training pushes those diagonal scores high and every off-diagonal score low.'},
+  zeroshot:{html:'<span class="prompt">&gt;&gt;&gt;</span> labels = [<span class="str">"a cat"</span>, <span class="str">"a dog"</span>, <span class="str">"a bird"</span>]\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> sims = cos(new_image, encode(labels))\n'+
+    '<span class="hl">[0.15, 0.92, 0.08]</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> labels[argmax(sims)]\n'+
+    '<span class="hl">"a dog"</span>   <span class="dim"># never trained on these labels</span>',
+    take:'<b>③  Zero-shot classification.</b> To label a new image, encode the class names as text and pick the highest cosine score. It works even for categories CLIP never saw as training labels — because it learned from natural captions.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='An image encoder and a text encoder'><g font-family='monospace' font-size='10.5' text-anchor='middle'><rect x='40' y='30' width='160' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='120' y='49' fill='#1F6280'>🖼 image encoder</text><rect x='320' y='30' width='160' height='30' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='400' y='49' fill='#9A7208'>📝 text encoder</text><text x='120' y='85' fill='#6B645E'>photo → emb</text><text x='400' y='85' fill='#6B645E'>caption → emb</text></g></svg>",
+  note:"<b>Two encoders.</b> One turns a photo into an embedding (Day 6), the other turns a sentence into an embedding. Two separate networks, two kinds of input — but they are about to meet in one place."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Both embeddings land in one shared space'><g font-family='monospace' font-size='10.5' text-anchor='middle'><rect x='120' y='20' width='280' height='75' rx='10' fill='#FDF9F3' stroke='#7C6DAA' stroke-width='2'/><text x='260' y='16' fill='#5E5191' font-family='monospace' font-size='9'>shared embedding space</text><circle cx='200' cy='58' r='8' fill='#2A7B9B'/><circle cx='218' cy='50' r='8' fill='#C99A12'/><text x='300' y='60' fill='#6B645E' font-size='9'>image + caption, side by side</text></g></svg>",
+  note:"<b>One shared space.</b> Both encoders output into the SAME embedding space. Now a photo's dot and its caption's dot can be compared directly — the whole trick rests on this shared map."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='N by N similarity grid with a bright diagonal'><g font-family='monospace' font-size='9'><rect x='170' y='20' width='30' height='30' fill='#2D8B55'/><rect x='200' y='20' width='30' height='30' fill='#EDE9F8'/><rect x='230' y='20' width='30' height='30' fill='#EDE9F8'/><rect x='170' y='50' width='30' height='30' fill='#EDE9F8'/><rect x='200' y='50' width='30' height='30' fill='#2D8B55'/><rect x='230' y='50' width='30' height='30' fill='#EDE9F8'/><rect x='170' y='80' width='30' height='30' fill='#EDE9F8'/><rect x='200' y='80' width='30' height='30' fill='#EDE9F8'/><rect x='230' y='80' width='30' height='30' fill='#2D8B55'/><text x='300' y='68' fill='#6B645E' font-family='monospace'>diagonal = correct pairs</text></g></svg>",
+  note:"<b>Score every pair.</b> Line up N images against N captions in a grid. The correct match for each image is on the diagonal (green). The scoring uses cosine similarity — the angle between two embeddings."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Pull matches together and push mismatches apart'><g font-family='monospace' font-size='10' text-anchor='middle'><circle cx='150' cy='55' r='8' fill='#2A7B9B'/><circle cx='185' cy='55' r='8' fill='#C99A12'/><text x='167' y='85' fill='#2D8B55'>pull together ↔</text><circle cx='330' cy='40' r='8' fill='#2A7B9B'/><circle cx='420' cy='75' r='8' fill='#C99A12'/><text x='375' y='95' fill='#C93B3B'>push apart →←</text></g></svg>",
+  note:"<b>Pull and push (contrastive).</b> Training raises the diagonal scores (pull each image toward its true caption) and lowers the off-diagonal ones (push mismatches apart). Do this over hundreds of millions of pairs and the space organizes itself by meaning."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Zero-shot classification with text prompts'><g font-family='monospace' font-size='10' text-anchor='middle'><rect x='40' y='42' width='90' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B'/><text x='85' y='61' fill='#1F6280'>new image</text><text x='150' y='61' fill='#6B645E'>vs</text><rect x='180' y='30' width='150' height='22' rx='4' fill='#FCF3DC' stroke='#C99A12'/><text x='255' y='45' fill='#9A7208'>\"a photo of a cat\"</text><rect x='180' y='58' width='150' height='22' rx='4' fill='#E8F5EE' stroke='#2D8B55'/><text x='255' y='73' fill='#1a5c38'>\"a photo of a dog\" ✓</text><text x='420' y='61' fill='#6B645E'>pick top</text></g></svg>",
+  note:"<b>Zero-shot classification.</b> To label a new image, write the class names as text, encode them, and pick the highest cosine score. No training on those exact classes — the shared space already knows how words and pictures relate."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='CLIP powers search, captioning, and multimodal models'><g font-family='monospace' font-size='10' text-anchor='middle'><rect x='30' y='40' width='160' height='30' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='110' y='60' fill='#5E5191'>shared image+text space</text><text x='210' y='60' fill='#6B645E'>powers →</text><rect x='280' y='40' width='210' height='30' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='385' y='60' fill='#1a5c38'>search · captioning · VLMs</text></g></svg>",
+  note:"<b>The finale.</b> This shared space powers image search, captioning, and the vision half of multimodal chat models. From one sliding filter to matching pictures with words — Module 6 complete. You can compute a conv size, explain batchnorm, and trace an image to an embedding."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What does CLIP have that a plain image classifier does not?',
+  opts:['a bigger image encoder only','a text encoder too, so images and text share one embedding space','no training data','a fixed set of 10 classes'],
+  ans:1, fb:'Right. CLIP pairs an image encoder with a text encoder, both outputting into the same space so images and captions can be compared.'},
+ {q:'2. How does contrastive training shape the embedding space?',
+  opts:['it makes all embeddings equal','it pulls matching image-caption pairs together and pushes mismatched pairs apart','it deletes the text','it lowers the image resolution'],
+  ans:1, fb:'Right. Matching pairs become close, mismatches become far — that is the contrastive objective, run over the N×N grid.'},
+ {q:'3. Cosine similarity of 1 between an image and a text embedding means:',
+  opts:['they are unrelated','they point the same way — a strong match','the image is blank','the text is empty'],
+  ans:1, fb:'Right. Cosine measures the angle between vectors; 1 means same direction, so the image and caption match well.'},
+ {q:'4. Why can CLIP do zero-shot classification?',
+  opts:['it was trained on every class','you can describe any class as text and compare it to the image embedding, even for unseen classes','it guesses randomly','it only works on training images'],
+  ans:1, fb:'Right. Encode the class names as text and pick the highest cosine score — no training on those specific categories needed.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 5b · Day 1 — Images as Patches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf7-d01-patches">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M5b Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-patch-embeddings.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Patch Embeddings</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 5b · Represent · Day 1</span>
+    <h1>Images as Patches</h1>
+    <p class="lead">A transformer reads a list — like the words in a sentence. But a photo is a grid of pixels, not a list. So how does a transformer ever look at a picture? Today you learn the one simple trick: cut the image into small squares, unroll each square into a row of numbers, and line them up. The photo becomes a sequence — exactly the food a transformer likes to eat.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> split an image into fixed-size square patches, flatten each patch into a vector, and explain why this turns a picture into a sequence of tokens a transformer can read.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Turning a picture into a list of tokens</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> arrays and shapes from M1, and the transformer block you built in M5a. You know a transformer reads a sequence of vectors. Today you learn how to turn an image into that sequence. No computer-vision background needed — this starts from zero.</div></div>
+
+      <h4>The problem: transformers read lists, images are grids</h4>
+      <p>A <span class="term" data-tip="The neural-network design behind most modern language models. It reads a sequence of vectors and lets each one look at all the others.">transformer</span> reads a <span class="term" data-tip="An ordered list of items the model reads one after another, like the words in a sentence.">sequence</span> of <span class="term" data-tip="One unit the model reads at a time, turned into a list of numbers. A word can be a token; here a small image square is a token.">tokens</span>. Each token is one list of numbers. The model never sees "an image" directly — it only knows how to walk down a list of vectors, one by one.</p>
+      <p>An image is not a list. It is a grid. A small color photo of size <code>32×32</code> has 32 rows and 32 columns of pixels, and each pixel holds 3 numbers — how much red, green, and blue it has. So the image has shape <code>(32, 32, 3)</code>. A grid does not fit into something built for lists. You need to reshape it.</p>
+
+      <h4>The trick: cut into patches, then flatten each one</h4>
+      <p>A <span class="term" data-tip="A small square block cut out of an image, for example a 4x4 group of pixels. It becomes one token.">patch</span> is a small square cut from the image — say a <code>4×4</code> block of pixels. Cut a <code>32×32</code> image into <code>4×4</code> squares and you get an <code>8×8</code> grid of patches, because <code>32 ÷ 4 = 8</code>. That is <strong>64 patches in total</strong>.</p>
+      <p>Each patch holds <code>4×4×3 = 48</code> numbers (4 pixels wide, 4 pixels tall, 3 color channels). Now <span class="term" data-tip="To unroll the numbers in a grid or box into one long single row of numbers, a vector.">flatten</span> each patch: unroll its 48 numbers into one flat row. Each patch is now a vector of length 48 — one token. Line up all 64, and the image is a sequence of 64 tokens.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>One <code>32×32×3</code> image &nbsp;→&nbsp; cut into 64 squares of <code>4×4×3</code> &nbsp;→&nbsp; flatten each &nbsp;→&nbsp; a sequence of 64 vectors, each length 48.<br><span style="font-size:.85rem;color:var(--text2)">This is exactly what a sentence looks like to a language model: a list of vectors. The picture just became "a sentence made of patches."</span></div></div>
+
+      <h4>Why patches, and not one pixel per token?</h4>
+      <p>You could treat every single pixel as a token. But a <code>32×32</code> image has 1024 pixels, and attention cost grows fast with the number of tokens. Patches shrink 1024 pixels down to 64 tokens — far cheaper — while each token still carries a whole little region of the image, not just one dot. You will feel exactly why the count matters in M5a's attention math. Keep going 👇</p>
+      <button class="gotit" type="button">Got the trick — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Cutting a photo into a grid of stickers</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Imagine you have one big photo. You take scissors and cut it into a neat grid of small square stickers, all the same size. Then you peel each sticker off and lay them out in a row on your desk, left to right, top to bottom. The photo is now a line of stickers instead of one big picture.</p>
+      <div class="relate">
+        <div class="card"><span class="big">✂️🖼️</span><h5>cutting = patchify</h5><p>Slicing the photo into equal squares is exactly cutting the image into <code>4×4</code> patches. Same size every time, no overlaps, nothing left over.</p></div>
+        <div class="card"><span class="big">🏷️➡️🔢</span><h5>one sticker = one token</h5><p>Peel a sticker off and flatten it into a row of numbers. That row is one token — the same kind of thing a transformer reads for one word.</p></div>
+      </div>
+      <p><strong>In one line:</strong> patchify cuts the photo into equal stickers and lays them in a row, so a grid becomes a sequence the transformer already knows how to read.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real stickers on a desk still show you the picture, so your eyes know where each one belongs. A flattened patch is just a row of numbers — the transformer has no idea a patch came from the top-left corner or the bottom-right. That lost "where" is a problem you fix tomorrow, on Day 2, with position information.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch a grid become a sequence of tokens</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal with real shapes. See the raw image, cut it into patches, then flatten each patch into a token. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="image" type="button">① the raw image grid</button>
+          <button class="play-btn" data-demo="patchify" type="button">② cut into patches</button>
+          <button class="play-btn" data-demo="flatten" type="button">③ flatten to tokens</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the patch size must divide the image size evenly. <code>32 ÷ 4 = 8</code> works; a patch size of 5 would leave leftover pixels with nowhere to go.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The patch math, in three small steps</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in words</h4>
+      <p>Take an image of size <code>H×W×C</code> (height, width, color channels). Pick a patch size <code>P</code>. Slide a <code>P×P</code> window across the image with no overlap. Count how many windows fit across and down — that is your number of patches. Each window's pixels get flattened into one vector. Stack all the vectors into a list.</p>
+
+      <h4>Step 2 — the formula, every symbol labeled</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        num_patches = (H / P) × (W / P)<br>
+        patch_dim   = P × P × C<br>
+        <span class="dim"># output shape after patchify: (num_patches, patch_dim)</span>
+      </div></div>
+      <ul>
+        <li><code>H</code> = image height in pixels · <code>W</code> = image width in pixels</li>
+        <li><code>C</code> = number of color channels (3 for red, green, blue)</li>
+        <li><code>P</code> = patch size (one side of the square, in pixels)</li>
+        <li><code>num_patches</code> = how many tokens you end up with · <code>patch_dim</code> = numbers inside each token</li>
+      </ul>
+
+      <h4>Step 3 — a worked example with small numbers</h4>
+      <p>Use a CIFAR-10 image: <code>H = 32</code>, <code>W = 32</code>, <code>C = 3</code>, and pick <code>P = 4</code>.</p>
+      <ul>
+        <li><code>num_patches = (32 / 4) × (32 / 4) = 8 × 8 = 64</code> tokens.</li>
+        <li><code>patch_dim = 4 × 4 × 3 = 48</code> numbers per token.</li>
+        <li>Output shape: <code>(64, 48)</code> — a sequence of 64 vectors, each length 48. That is your image as tokens.</li>
+      </ul>
+
+      <h4>⚠️ The one rule that bites people</h4>
+      <ul>
+        <li><strong>The patch size must divide the image size exactly.</strong> Always check <code>H % P == 0</code> and <code>W % P == 0</code>. With <code>P = 4</code> and <code>H = 32</code>, <code>32 % 4 = 0</code>, so it fits. A patch size like <code>5</code> gives <code>32 % 5 = 2</code> leftover pixels with nowhere to go — a common shape bug.</li>
+        <li><strong>Color channels ride along inside the patch.</strong> The <code>×C</code> in <code>patch_dim</code> is easy to forget. A <code>4×4</code> patch is not 16 numbers — it is <code>4×4×3 = 48</code>, because each pixel carries 3 color values.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Why this matters:</b> this single reshape is the whole bridge between vision and transformers. Once the image is a <code>(64, 48)</code> sequence, every transformer tool you built in M5a works on it unchanged. Tomorrow you turn these raw patch vectors into proper learned embeddings.</div></div>
+      <button class="gotit" type="button">Got the patch math</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch a grid turn into a sequence — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole patchify idea, built one step at a time: the grid, the cut, one square flattened, and the final sequence of tokens. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Write a patchify function and prove the shapes (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove patchify to yourself with a tiny script — that's what makes it stick. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/foundations/m05b_patchify.py</code>. Make a fake image of shape <code>(32, 32, 3)</code> with <code>numpy</code> (random numbers are fine). Write a <code>patchify(img, patch_size=4)</code> function using <code>reshape</code> and <code>transpose</code> that returns an array of shape <code>(64, 48)</code>. Print the input shape, the output shape, and assert the output is <code>(64, 48)</code>. Then check the rule: assert that <code>32 % 4 == 0</code>. Run with <code>python3 m05b_patchify.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5b Day 1 artifact.
+
+Create experiments/foundations/m05b_patchify.py that, with a comment on each step, turns an image into patch tokens:
+1. Makes a fake CIFAR-10-sized image with numpy: img of shape (32, 32, 3).
+2. Defines patchify(img, patch_size): asserts H % patch_size == 0 and W % patch_size == 0, then uses reshape and transpose to cut the image into non-overlapping patch_size x patch_size patches and flatten each into a vector. For patch_size=4 the result must be shape (64, 48).
+3. Prints the input shape and output shape, and asserts the output shape is exactly (64, 48).
+4. Also runs it with patch_size=8 and prints that shape (should be (16, 192)) to show num_patches = (H/P)*(W/P) and patch_dim = P*P*C.
+Then run it and paste the printed shapes at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f7/day-01-log.md</code>: what output shape did you get for patch size 4, and what shape did patch size 8 give?</div></div>
+      <button class="gotit" type="button">Done — on to Day 2</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete — you can turn a picture into tokens!</h3>
+    <p>You learned the one trick that lets a transformer look at images: cut the picture into equal square patches, flatten each into a vector, and line them up as a sequence. A <code>32×32×3</code> image became a clean <code>(64, 48)</code> list of tokens.<br>Next: <b>Day 2</b> — give each patch a proper learned embedding and an ID card so the model knows where it came from.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-02-patch-embeddings.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Patch Embeddings</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  image:{html:'<span class="prompt">&gt;&gt;&gt;</span> img.shape          <span class="dim"># one small color photo</span>\n'+
+    '<span class="ok">(32, 32, 3)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># 32 rows x 32 columns of pixels, 3 color numbers each (R,G,B)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> img.size            <span class="dim"># total numbers in the image</span>\n'+
+    '<span class="hl">3072</span>   <span class="dim"># 32 * 32 * 3 — a grid, not a list</span>',
+    take:'<b>①  The raw grid.</b> An image is <code>(32, 32, 3)</code> — a grid of pixels, each with 3 color numbers. A transformer cannot read a grid. You need to turn it into a list.'},
+  patchify:{html:'<span class="prompt">&gt;&gt;&gt;</span> patches = patchify(img, patch_size=<span class="num">4</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> patches.shape       <span class="hl"># 8x8 = 64 patches, each 4x4x3</span>\n'+
+    '<span class="ok">(64, 4, 4, 3)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="num">32</span> % <span class="num">4</span>              <span class="dim"># patch size must divide image size</span>\n'+
+    '<span class="hl">0</span>   <span class="dim"># fits exactly: 32 / 4 = 8, nothing left over</span>',
+    take:'<b>②  Cut into patches.</b> Slide a <code>4×4</code> window with no overlap: <code>32 ÷ 4 = 8</code> across and down, so 64 patches. Each patch is still a little <code>4×4×3</code> block.'},
+  flatten:{html:'<span class="prompt">&gt;&gt;&gt;</span> tokens = patches.reshape(<span class="num">64</span>, -<span class="num">1</span>)  <span class="dim"># flatten each patch</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> tokens.shape        <span class="hl"># 4*4*3 = 48 numbers per patch</span>\n'+
+    '<span class="ok">(64, 48)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># 64 tokens in a row — exactly what a transformer reads</span>',
+    take:'<b>③  Flatten to tokens.</b> Unroll each <code>4×4×3</code> patch into one row of 48 numbers. The result <code>(64, 48)</code> is a sequence of 64 tokens — the picture is now "a sentence made of patches."'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 320 200' role='img' aria-label='A 32 by 32 by 3 image is a grid of pixels'><rect x='80' y='20' width='160' height='160' fill='#FFFFFF' stroke='#2C2A28' stroke-width='1.5'/><g stroke='#E5DFD6' stroke-width='0.8'><line x1='120' y1='20' x2='120' y2='180'/><line x1='160' y1='20' x2='160' y2='180'/><line x1='200' y1='20' x2='200' y2='180'/><line x1='80' y1='60' x2='240' y2='60'/><line x1='80' y1='100' x2='240' y2='100'/><line x1='80' y1='140' x2='240' y2='140'/></g><rect x='80' y='20' width='40' height='40' fill='#2A7B9B' opacity='0.3'/><rect x='160' y='100' width='40' height='40' fill='#C93B3B' opacity='0.3'/><text x='160' y='196' text-anchor='middle' font-size='11' fill='#2C2A28' font-family='monospace'>(32, 32, 3) grid of pixels</text></svg>",
+  note:"<b>Start with the grid.</b> A small color photo has shape <code>(32, 32, 3)</code>: 32 rows, 32 columns, and 3 color numbers per pixel. This is a grid — a transformer cannot read it directly. It only reads lists."},
+ {viz:"<svg viewBox='0 0 320 200' role='img' aria-label='The image cut into an 8 by 8 grid of 4 by 4 patches'><rect x='80' y='20' width='160' height='160' fill='#FFFFFF' stroke='#2C2A28' stroke-width='1.5'/><g stroke='#2A7B9B' stroke-width='1.1'><line x1='100' y1='20' x2='100' y2='180'/><line x1='120' y1='20' x2='120' y2='180'/><line x1='140' y1='20' x2='140' y2='180'/><line x1='160' y1='20' x2='160' y2='180'/><line x1='180' y1='20' x2='180' y2='180'/><line x1='200' y1='20' x2='200' y2='180'/><line x1='220' y1='20' x2='220' y2='180'/><line x1='80' y1='40' x2='240' y2='40'/><line x1='80' y1='60' x2='240' y2='60'/><line x1='80' y1='80' x2='240' y2='80'/><line x1='80' y1='100' x2='240' y2='100'/><line x1='80' y1='120' x2='240' y2='120'/><line x1='80' y1='140' x2='240' y2='140'/><line x1='80' y1='160' x2='240' y2='160'/></g><rect x='80' y='20' width='20' height='20' fill='#2A7B9B' stroke='#1F6280' stroke-width='2'/><text x='160' y='196' text-anchor='middle' font-size='11' fill='#2C2A28' font-family='monospace'>8 x 8 = 64 patches of 4x4</text></svg>",
+  note:"<b>Cut into equal squares.</b> Slide a <code>4×4</code> window with no overlap. Because <code>32 ÷ 4 = 8</code> divides evenly, you get an <code>8×8</code> grid — exactly <strong>64 patches</strong>. The patch size must divide the image size, or you get leftover pixels."},
+ {viz:"<svg viewBox='0 0 460 130' role='img' aria-label='One 4 by 4 by 3 patch flattened into a length 48 vector'><rect x='20' y='30' width='72' height='72' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><g stroke='#2A7B9B' stroke-width='0.7' opacity='0.6'><line x1='38' y1='30' x2='38' y2='102'/><line x1='56' y1='30' x2='56' y2='102'/><line x1='74' y1='30' x2='74' y2='102'/><line x1='20' y1='48' x2='92' y2='48'/><line x1='20' y1='66' x2='92' y2='66'/><line x1='20' y1='84' x2='92' y2='84'/></g><text x='56' y='118' text-anchor='middle' font-size='10' fill='#2C2A28' font-family='monospace'>4x4x3 = 48 numbers</text><line x1='100' y1='66' x2='140' y2='66' stroke='#6B645E' stroke-width='2' marker-end='url(#a1)'/><defs><marker id='a1' markerWidth='8' markerHeight='8' refX='6' refY='4' orient='auto'><path d='M0,0 L8,4 L0,8 Z' fill='#6B645E'/></marker></defs><text x='120' y='58' text-anchor='middle' font-size='10' fill='#6B645E'>flatten</text><rect x='150' y='55' width='290' height='24' fill='none' stroke='#1F6280' stroke-width='1.5'/><g fill='#2A7B9B' opacity='0.5'><rect x='152' y='57' width='16' height='20'/><rect x='170' y='57' width='16' height='20'/><rect x='188' y='57' width='16' height='20'/><rect x='206' y='57' width='16' height='20'/><rect x='224' y='57' width='16' height='20'/><rect x='242' y='57' width='16' height='20'/><rect x='260' y='57' width='16' height='20'/><rect x='278' y='57' width='16' height='20'/></g><text x='295' y='95' text-anchor='middle' font-size='10' fill='#2C2A28' font-family='monospace'>one row vector, length 48</text></svg>",
+  note:"<b>Flatten each patch into a row.</b> A patch holds <code>4 × 4 × 3 = 48</code> numbers. Unroll them into one flat row and the patch becomes a length-48 vector — exactly the shape of one word embedding to a language model. Remember the <code>×3</code>: the color channels ride along inside every patch."},
+ {viz:"<div class='dgram col'><div class='dgram'><span class='node'>p1 (48)</span><span class='node'>p2 (48)</span><span class='node'>p3 (48)</span><span class='node dim'>...</span><span class='node'>p64 (48)</span></div><div class='dgram'><span class='node ok'>sequence: (64, 48)</span></div></div>",
+  note:"<b>Stack the tokens into a sequence.</b> Line up all 64 flattened patches in a row and you get a <code>(64, 48)</code> array: 64 tokens, each length 48. This is a sequence — the exact food the transformer block from M5a already knows how to eat."},
+ {viz:"<svg viewBox='0 0 460 110' role='img' aria-label='The patch sequence feeds into the same transformer block from M5a'><rect x='20' y='40' width='150' height='34' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2' rx='5'/><text x='95' y='62' text-anchor='middle' font-size='11' fill='#1a5c38' font-family='monospace'>patches (64, 48)</text><text x='195' y='62' text-anchor='middle' font-size='11' fill='#6B645E'>feeds →</text><rect x='250' y='40' width='190' height='34' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2' rx='5'/><text x='345' y='62' text-anchor='middle' font-size='11' fill='#5E5191' font-family='monospace'>transformer block (M5a)</text></svg>",
+  note:"<b>Vision meets the transformer.</b> Once the image is a sequence, nothing new is needed — the same transformer block you built for text works here unchanged. The next three days turn these raw patch rows into real embeddings, add position, run the block, and read out a class."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why can\'t a transformer read an image directly?',
+  opts:['Images are too colorful','A transformer reads a sequence (a list), but an image is a grid','Transformers only work on sound','Images have no numbers in them'],
+  ans:1, fb:'Right. A transformer walks down a list of vectors one by one. An image is a 2D grid of pixels, so you must first turn it into a sequence.'},
+ {q:'2. You cut a 32×32 image into 4×4 patches. How many patches do you get?',
+  opts:['16','64','128','1024'],
+  ans:1, fb:'Right. 32 ÷ 4 = 8 patches across and 8 down, so 8 × 8 = 64 patches total.'},
+ {q:'3. How many numbers are inside one 4×4 patch of a color image?',
+  opts:['16','32','48','64'],
+  ans:2, fb:'Right. 4 × 4 × 3 = 48. The ×3 is the color channels (red, green, blue) that ride along inside every pixel.'},
+ {q:'4. What is the one rule you must check before patchifying?',
+  opts:['The image must be square','The patch size must divide the image size exactly','The image must be black and white','The patch must be bigger than the image'],
+  ans:1, fb:'Right. Check H % P == 0 and W % P == 0. If the patch size does not divide evenly, some pixels are left over with nowhere to go.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>
