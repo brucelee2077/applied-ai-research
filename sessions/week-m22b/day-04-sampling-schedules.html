@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 22b · Day 4 — Sampling: DDPM vs DDIM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m22b-d04-sampling">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M22b Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-03-noise-prediction-loss.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Noise-Prediction Loss</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-latent-diffusion.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Latent Diffusion</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 22b · Generate · Day 4</span>
+    <h1>Sampling:<br>Developing the Photo Fast or Slow</h1>
+    <p class="lead">You have a trained denoiser. Now you must actually run the reverse walk to make a picture — and there is a choice hidden here. The classic way, DDPM, takes many small steps and adds a little fresh noise each time. A faster way, DDIM, skips steps and is fully repeatable, no random kick. Fewer steps is faster but can look rougher; more steps is slower but sharper. Today you learn to trade speed for quality by picking how many steps to take.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> tell DDPM (many steps, random) apart from DDIM (fewer steps, deterministic), explain how the step count trades speed for quality, and say why the schedule choice matters.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two ways to run the reverse walk</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 2 — the reverse process removes a little noise per step, run from pure noise down to a picture. Day 3 — the network was trained to guess the noise. Today you choose <em>how</em> to run that reverse walk when you actually generate.</div></div>
+
+      <h4>The choice: how to sample</h4>
+      <p>Generating a picture means running the reverse walk. But you get to pick the rules of that walk. This choice is called the <span class="term" data-tip="The rule you use to run the reverse walk when generating: how many steps to take and whether to add fresh random noise at each step.">sampler</span>. The trained network stays the same — you just decide how to use it.</p>
+
+      <h4>DDPM: many small, noisy steps</h4>
+      <p><span class="term" data-tip="Denoising Diffusion Probabilistic Models: the original sampler. It takes many steps (often 1000) and adds a little fresh random noise at each step.">DDPM</span> is the original way. It walks one timestep at a time, all T of them, and adds a small fresh random noise at each step. Because of that random kick, running it twice from the same start gives two different pictures. It is high quality but slow — 1000 network calls per image.</p>
+
+      <h4>DDIM: fewer, repeatable steps</h4>
+      <p><span class="term" data-tip="Denoising Diffusion Implicit Models: a faster sampler. It can skip timesteps (say use 50 instead of 1000) and adds no fresh noise, so the same starting noise always gives the same picture.">DDIM</span> is the faster way. It can skip timesteps — take 50 big steps instead of 1000 tiny ones — and it adds <em>no</em> fresh noise. Because there is no random kick, it is <span class="term" data-tip="Always giving the same output for the same input. DDIM is deterministic: the same starting noise produces exactly the same picture every time.">deterministic</span>: the same starting noise always makes the same picture. Far fewer network calls, so it is much faster.</p>
+
+      <h4>The trade you are making</h4>
+      <p>Fewer steps means the image is finished faster but each step is a bigger, rougher guess, so quality can drop. More steps means slower but smoother, sharper results. Picking the step count is the speed-versus-quality dial for generation. Keep going 👇</p>
+      <button class="gotit" type="button">Got the two samplers</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Developing a photo fast or slow</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🎞️</span><h5>The darkroom</h5><p>Old photos were developed in a darkroom: a blank sheet slowly reveals an image as it sits in chemicals. Leave it the full time and you get a crisp, rich photo. Pull it out early and you save time, but the image is grainier and less detailed. The reverse walk is that developing — and the number of steps is how long you leave the sheet in.</p></div>
+        <div class="card"><span class="big">🎲</span><h5>Same or different each time?</h5><p>DDPM shakes the tray a little at each moment (the random kick), so two developed sheets from the same start look slightly different. DDIM keeps a steady hand — no shaking — so the same start always develops into the exact same photo. Steady hand = repeatable.</p></div>
+      </div>
+      <p><strong>In one line:</strong> sampling is developing a photo — many slow steps (DDPM) give a rich result, fewer fast steps (DDIM) save time but can look rougher, and DDIM's steady hand makes the result repeatable.</p>
+      <p>Why would you ever want fewer steps? Speed. A single picture with 1000 steps means 1000 network calls — slow and costly. DDIM with 50 steps is 20 times faster and usually looks nearly as good. When you need many pictures quickly, you turn the step dial down and accept a little roughness.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real photo only reveals what the film already captured. Here nothing was captured — the network invents the picture from random noise. And unlike film, you can change the developing rule (DDPM vs DDIM) without changing anything about the trained network.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Run DDPM, run DDIM, then count the cost</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Watch a slow DDPM run, then a fast DDIM run that skips steps and repeats itself, then a count of how the step number sets the cost. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="ddpm" type="button">① DDPM — many noisy steps</button>
+          <button class="play-btn" data-demo="ddim" type="button">② DDIM — fewer, repeatable</button>
+          <button class="play-btn" data-demo="cost" type="button">③ steps set the cost</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: same trained network in both runs. The only change is the sampler — how many steps, and whether a random kick is added.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Counting the speed-vs-quality trade by hand</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Both samplers call the trained network once per step. So the cost of making one picture is simply the number of steps times the cost of one network call. DDPM uses all T steps and adds a random kick each time. DDIM uses a smaller chosen number of steps and adds no kick. Fewer steps means fewer network calls, which means less time — but each remaining step must cover more ground, so it is a rougher guess.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        network_calls_per_image = number_of_steps<br>
+        DDPM: steps = T (e.g. 1000), + random kick each step<br>
+        DDIM: steps = S (e.g. 50), no kick → deterministic<br>
+        speedup ≈ T / S
+      </div></div>
+      <p>Symbols: <code>T</code> = the full number of training timesteps (often 1000). <code>S</code> = the smaller number of steps you choose for DDIM. <code>network_calls_per_image</code> = how many times the network runs to make one picture, which sets the time. <code>speedup ≈ T / S</code> = roughly how much faster DDIM is than full DDPM.</p>
+
+      <h4>Step 3 — a worked example</h4>
+      <p>Say one network call takes <code>20 ms</code>. Compare full DDPM at <code>T = 1000</code> steps to DDIM at <code>S = 50</code> steps:</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        DDPM time = 1000 × 20 ms = <span class="hl">20,000 ms</span> = 20 s<br>
+        DDIM time =   50 × 20 ms = <span class="hl">1,000 ms</span> = 1 s<br><br>
+        speedup = 1000 / 50 = <span class="hl">20×</span>   <span class="dim"># DDIM is 20 times faster</span>
+      </div></div>
+      <p>DDIM finishes in one second instead of twenty — a 20× speedup — for a small drop in sharpness. If you push <code>S</code> too low (say 10 steps), each step covers so much ground that the picture can look rough or lose fine detail. The right <code>S</code> balances your time budget against how crisp the result must be.</p>
+
+      <h4>Why the schedule choice also matters</h4>
+      <ul>
+        <li><strong>Where the steps land:</strong> with few steps, you space them along the noise schedule so more effort goes where the picture forms fastest — a smart schedule beats evenly-spaced steps.</li>
+        <li><strong>DDIM is repeatable:</strong> no random kick means the same seed gives the same image, which is great for debugging and for controllable generation.</li>
+        <li><strong>DDPM's kick adds variety:</strong> the random noise per step makes DDPM explore more, sometimes helping diversity at the cost of speed.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the trained network never changes — sampling is a runtime dial. Modern systems use fast samplers (DDIM-style, and newer ones) to make pictures in a handful of steps. Tomorrow you put it all inside a small latent space and add text control — the recipe behind Stable Diffusion.</div></div>
+      <button class="gotit" type="button">Got the trade-off</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">DDPM vs DDIM, side by side — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole sampling picture, built one piece at a time: the shared start, the DDPM path, the DDIM path, the step-count dial, the cost count, and the quality trade. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Compare DDPM vs DDIM step counts (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove the speed-vs-quality trade to yourself with a tiny sampler. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/generative/m22b_samplers.py</code>. Reuse the Day 2 cheat-denoiser and reverse loop. Write two samplers: a DDPM loop over all T steps with a random kick, and a DDIM loop over a chosen S steps (say 50) with no kick. For each, count the network calls and measure the mean squared error to the target <code>x0</code>. Print the calls and error for a few values of S. Run with <code>python3 m22b_samplers.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 22b Day 4 artifact.
+
+Create experiments/generative/m22b_samplers.py that, with a comment on each step, compares DDPM and DDIM sampling from scratch in NumPy, reusing a cheat denoiser that returns the known noise eps:
+1. Builds a tiny clean image x0, an alphaBar schedule, and a very noisy x_T from the Day 1 closed form.
+2. ddpm_sample(): loops over all T steps, subtracting a little guessed noise each step AND adding a small fresh random kick (zero on the last step). Counts network calls.
+3. ddim_sample(S): picks S evenly spaced timesteps out of T, takes bigger deterministic steps with NO random kick. Counts network calls.
+4. Runs DDPM (all T steps) and DDIM with S = 10, 50, 200 steps.
+5. For each run prints: number of network calls, and the mean squared error between the final image and x0.
+Then run it and paste the results at the bottom as a comment, showing DDIM uses far fewer calls and how the error changes as S grows.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m22b/day-04-log.md</code>: how many network calls did DDIM with 50 steps save versus full DDPM, and what happened to the error when you dropped S to 10?</div></div>
+      <button class="gotit" type="button">Done — on to Day 5</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎞️</span>
+    <h3>Day 4 complete — you can trade speed for quality!</h3>
+    <p>You now know the two samplers: DDPM takes many small steps with a random kick, DDIM skips steps and is deterministic. The step count is your speed-vs-quality dial — fewer steps is faster but rougher, more steps is slower but sharper. Same trained network, different developing recipe.<br>Next: <b>Day 5</b> — the finale: latent diffusion and text control.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-03-noise-prediction-loss.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Noise-Prediction Loss</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-05-latent-diffusion.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Latent Diffusion</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  ddpm:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = random_noise()   <span class="dim"># start</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> t <span class="kw">in</span> range(<span class="num">1000</span>, <span class="num">0</span>, -<span class="num">1</span>):   <span class="dim"># all T steps</span>\n'+
+    '<span class="prompt">...</span>     eps = network(x, t)\n'+
+    '<span class="prompt">...</span>     x   = step_back(x, eps, t) + kick   <span class="dim"># random kick</span>\n'+
+    '<span class="dim">#  1000 network calls · different each run</span>\n'+
+    '<span class="hl">high quality, ~20s per image</span>',
+    take:'<b>①  DDPM: slow and random.</b> It walks all 1000 steps and adds a small fresh random kick each step. Rich, high-quality pictures — but 1000 network calls, and two runs from the same start differ.'},
+  ddim:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = random_noise()   <span class="dim"># same start</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> steps = pick_50_of(<span class="num">1000</span>)   <span class="dim"># skip most</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> t <span class="kw">in</span> steps:   <span class="dim"># only 50 steps</span>\n'+
+    '<span class="prompt">...</span>     eps = network(x, t)\n'+
+    '<span class="prompt">...</span>     x   = ddim_step(x, eps, t)   <span class="dim"># NO kick</span>\n'+
+    '<span class="hl">same start -> same picture, ~1s</span>   <span class="dim"># repeatable</span>',
+    take:'<b>②  DDIM: fast and repeatable.</b> It uses 50 steps instead of 1000 and adds no random kick, so it is deterministic — the same seed always makes the same image. About 20× faster for a small quality drop.'},
+  cost:{html:'<span class="prompt">&gt;&gt;&gt;</span> call_ms = <span class="num">20</span>   <span class="dim"># one network call</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> ddpm = 1000 * 20   <span class="dim"># all steps</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> ddim = 50 * 20     <span class="dim"># 50 steps</span>\n'+
+    '<span class="hl">ddpm = 20000 ms, ddim = 1000 ms</span>\n'+
+    '<span class="dim"># speedup = 1000 / 50 = 20x</span>',
+    take:'<b>③  Steps set the cost.</b> Time per image = steps × one call. Drop from 1000 to 50 steps and you go from 20s to 1s — a 20× speedup. Push too low (say 10) and each step covers too much ground, so the picture gets rough.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The shared starting point: pure noise'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>both samplers start from the same pure noise</text><rect x='200' y='32' width='120' height='70' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='260' y='73' fill='#5E5191'>random static</text></g></svg>",
+  note:"<b>Same start, same network.</b> Both DDPM and DDIM begin from the same random noise and use the same trained denoiser. The only thing that changes is the sampling rule — how they walk from noise to a picture."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='DDPM taking many small noisy steps'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>DDPM — many small steps, + random kick</text><g fill='#C93B3B'><circle cx='40' cy='60' r='4'/><circle cx='75' cy='60' r='4'/><circle cx='110' cy='60' r='4'/><circle cx='145' cy='60' r='4'/><circle cx='180' cy='60' r='4'/><circle cx='215' cy='60' r='4'/><circle cx='250' cy='60' r='4'/><circle cx='285' cy='60' r='4'/><circle cx='320' cy='60' r='4'/><circle cx='355' cy='60' r='4'/><circle cx='390' cy='60' r='4'/><circle cx='425' cy='60' r='4'/><circle cx='460' cy='60' r='4'/></g><text x='260' y='92' fill='#C93B3B'>1000 steps → 1000 network calls</text></g></svg>",
+  note:"<b>DDPM: many noisy steps.</b> It walks every timestep, adding a small fresh random kick each time. That is 1000 network calls per image — slow, but rich and high quality. The kick makes each run a little different."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='DDIM taking fewer deterministic steps'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>DDIM — fewer big steps, no kick</text><g fill='#2A7B9B'><circle cx='60' cy='60' r='5'/><circle cx='160' cy='60' r='5'/><circle cx='260' cy='60' r='5'/><circle cx='360' cy='60' r='5'/><circle cx='460' cy='60' r='5'/></g><text x='260' y='92' fill='#1F6280'>50 steps → 50 network calls, repeatable</text></g></svg>",
+  note:"<b>DDIM: fewer, bigger steps.</b> It skips most timesteps — say 50 instead of 1000 — and adds no random kick. No kick means it is deterministic: the same start always makes the same picture. Far fewer calls, so much faster."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The step count dial'><g font-family='monospace' font-size='11' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>the step-count dial (speed ↔ quality)</text><line x1='60' y1='60' x2='460' y2='60' stroke='#E5DFD6' stroke-width='4' stroke-linecap='round'/><circle cx='180' cy='60' r='9' fill='#2A7B9B' stroke='#fff' stroke-width='2'/><text x='80' y='95' fill='#2D8B55'>fast · few steps</text><text x='430' y='95' fill='#C93B3B'>sharp · many steps</text></g></svg>",
+  note:"<b>The step count is a dial.</b> Turn it toward few steps for speed; turn it toward many steps for sharpness. You set it at runtime — no retraining. Where the few steps land on the noise schedule also matters, so smart spacing beats even spacing."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Counting the cost in time'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='22' fill='#6B645E'>time = steps × one network call</text><rect x='40' y='40' width='200' height='50' rx='8' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='140' y='60' fill='#C93B3B'>DDPM 1000×20ms</text><text x='140' y='80' fill='#C93B3B'>= 20 s</text><rect x='280' y='40' width='200' height='50' rx='8' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='380' y='60' fill='#1a5c38'>DDIM 50×20ms</text><text x='380' y='80' fill='#1a5c38'>= 1 s → 20× faster</text></g></svg>",
+  note:"<b>Count the cost.</b> Time per image is just steps times the cost of one call. 1000 steps at 20 ms is 20 seconds; 50 steps is 1 second — a 20× speedup from DDIM, for only a small drop in quality."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The quality trade-off at very few steps'><g font-family='monospace' font-size='11' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>too few steps → rough picture</text><rect x='50' y='40' width='120' height='50' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='110' y='62' fill='#C93B3B'>10 steps</text><text x='110' y='80' fill='#C93B3B'>rough</text><rect x='200' y='40' width='120' height='50' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='260' y='62' fill='#9A7208'>50 steps</text><text x='260' y='80' fill='#9A7208'>good</text><rect x='350' y='40' width='120' height='50' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='410' y='62' fill='#1a5c38'>200 steps</text><text x='410' y='80' fill='#1a5c38'>sharp</text></g></svg>",
+  note:"<b>The quality trade.</b> Very few steps (10) force each step to cover too much ground, so the picture looks rough. Around 50 is a sweet spot for many models; 200 is sharper but slower. The right choice depends on your time budget."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Compared with DDPM, DDIM:',
+  opts:['uses more steps and more randomness','can use fewer steps and adds no fresh noise, so it is faster and deterministic','trains a different network','changes the picture size'],
+  ans:1, fb:'Right. DDIM skips steps (say 50 instead of 1000) and adds no random kick, so it is much faster and gives the same picture from the same start.'},
+ {q:'2. What sets the time to generate one image?',
+  opts:['the image color','the number of steps times the cost of one network call','the size of the training set','the schedule name only'],
+  ans:1, fb:'Right. Each step is one network call, so time = steps × cost-per-call. Fewer steps means less time.'},
+ {q:'3. With one call at 20 ms, DDIM at 50 steps vs DDPM at 1000 steps is about:',
+  opts:['the same speed','20× faster','2× slower','1000× faster'],
+  ans:1, fb:'Right. 1000/50 = 20, so DDIM is roughly 20× faster (1 s vs 20 s) for a small quality drop.'},
+ {q:'4. What is the main risk of using too few sampling steps?',
+  opts:['the network forgets training','each step covers too much ground, so the picture looks rough','it uses more memory','it needs new labels'],
+  ans:1, fb:'Right. With very few steps each remaining step is a bigger, rougher guess, so fine detail and sharpness can suffer.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

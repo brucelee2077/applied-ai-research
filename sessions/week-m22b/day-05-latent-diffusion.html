@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 22b · Day 5 — Latent Diffusion &amp; Text Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m22b-d05-latent">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M22b Day 5</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-04-sampling-schedules.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sampling Schedules</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Module 22b Review Gate</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 22b · Generate · Day 5</span>
+    <h1>Latent Diffusion<br>&amp; Text Control</h1>
+    <p class="lead">This is the finale — the recipe behind Stable-Diffusion-class image makers. Two big ideas join here. First, run diffusion inside a small VAE latent (from Module 22a) instead of on giant raw pixels, so it is far faster. Second, steer the picture with words: turn a text prompt into an embedding, feed it to the denoiser, and mix its "with-text" and "without-text" guesses to push the picture toward the prompt. That last trick is classifier-free guidance.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why diffusion runs in a VAE latent for speed, describe text conditioning with CLIP/T5 embeddings, and say what classifier-free guidance does (mix conditional and unconditional predictions to steer).
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Diffusion in a small latent, steered by words</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–4 — the forward/reverse diffusion loop and ε-prediction training. From Module 22a — a <span class="term" data-tip="Variational Autoencoder: a network with an encoder that compresses an image into a small code (latent), and a decoder that rebuilds the image from that code.">VAE</span> squeezes an image into a small code (a latent) and can rebuild the image from it.</div></div>
+
+      <h4>The speed problem</h4>
+      <p>Doing diffusion on raw pixels is slow. A 512×512 color image is nearly 800,000 numbers, and you run the network hundreds of times to make one picture. That is expensive. The fix from <span class="term" data-tip="Diffusion run inside a small compressed latent space (from a VAE) instead of on raw pixels. Far fewer numbers, so it is much faster. This is the Stable Diffusion idea.">latent diffusion</span> is to shrink the problem first.</p>
+
+      <h4>Idea 1 — diffuse in the latent</h4>
+      <p>Use the VAE encoder to squeeze the image into a small <span class="term" data-tip="The small compressed code a VAE produces from an image. It keeps the meaning of the image in far fewer numbers than the raw pixels.">latent</span> — say 64×64 instead of 512×512, dozens of times fewer numbers. Run the whole forward/reverse diffusion there. At the end, the VAE decoder turns the finished latent back into a full picture. Same diffusion, tiny playground, big speedup.</p>
+
+      <h4>Idea 2 — steer with text</h4>
+      <p>To make "a red bicycle", you turn the words into numbers with a text encoder like <span class="term" data-tip="A model that maps text and images into the same embedding space. Its text encoder turns a prompt into a vector the diffusion model can read.">CLIP</span> or <span class="term" data-tip="A large text model whose encoder turns a prompt into a rich embedding. Used to give the diffusion model detailed text understanding.">T5</span>. That gives a <span class="term" data-tip="A list of numbers that captures the meaning of the text prompt. Feeding it to the denoiser tells it what to draw.">text embedding</span>. You feed this embedding into the denoiser at every step, so its noise guesses lean toward the prompt. This is <span class="term" data-tip="Guiding the generation with an extra input, such as a text prompt, so the picture matches what you asked for.">conditioning</span>.</p>
+
+      <h4>Idea 3 — push harder toward the prompt</h4>
+      <p>To make the prompt really stick, you use <span class="term" data-tip="A way to strengthen how much a text prompt steers the image: mix the model's with-text guess and its no-text guess, pushing further in the with-text direction.">classifier-free guidance</span>. The model makes two guesses — one with the text, one without — and you push the result further along the "with-text minus without-text" direction. Turn that push up and the picture follows the prompt more strongly. Keep going 👇</p>
+      <button class="gotit" type="button">Got the three ideas</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Painting in a small sketchbook, then enlarging</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">📓</span><h5>The tiny sketchbook</h5><p>Painting a huge mural is slow. So you sketch the whole idea small, in a pocket sketchbook — same picture, far fewer strokes. When the sketch is right, a machine blows it up to full size. Latent diffusion does this: it does all the hard work in a tiny latent, then the VAE decoder enlarges it into a full image.</p></div>
+        <div class="card"><span class="big">🗣️</span><h5>An order to the painter</h5><p>You also tell the painter what to draw: "a red bicycle at sunset." Those words become an embedding the model can read. And if you want the bicycle to really show up, you say it louder — you emphasize the difference between "with the order" and "no order at all." That emphasis is classifier-free guidance.</p></div>
+      </div>
+      <p><strong>In one line:</strong> latent diffusion paints in a tiny sketchbook (the VAE latent) for speed, follows a spoken order (the text embedding), and turns up the volume on that order with classifier-free guidance.</p>
+      <p>Why does painting small still give a good final picture? Because the VAE latent is not just a shrunken image — it keeps the <em>meaning</em>: shapes, colors, layout. The decoder learned how to expand that meaning back into sharp pixels. So the diffusion model only has to get the meaning right, and the decoder handles the fine detail.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real sketch and its enlargement are the same drawing scaled up. Here the latent is a learned code, not a small picture — you cannot look at it and see the image. Only the trained VAE decoder can turn it back into something you can see.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Encode to a latent, add text, then guide the guess</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Watch an image shrink into a latent, a text prompt become an embedding fed to the denoiser, and classifier-free guidance mix two guesses to push toward the prompt. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="encode" type="button">① encode to a small latent</button>
+          <button class="play-btn" data-demo="condition" type="button">② feed the text embedding</button>
+          <button class="play-btn" data-demo="guidance" type="button">③ classifier-free guidance</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the guidance scale <code>w</code> is the "volume knob" for the prompt. Higher <code>w</code> follows the words harder; too high can look over-baked.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Classifier-free guidance, worked out by hand</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>At each denoising step the network makes two noise guesses. One uses the text prompt (the conditional guess). One uses no prompt at all — a blank input (the unconditional guess). The difference between them points in the "make it match the words" direction. You take the no-prompt guess and push it further along that direction by a factor called the guidance scale. A bigger push makes the prompt show up more strongly.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        ε_text   = network(x_t, t, prompt)   <span class="dim"># with the words</span><br>
+        ε_none   = network(x_t, t, blank)    <span class="dim"># without the words</span><br>
+        ε_guided = ε_none + w · ( ε_text − ε_none )<br>
+        <span class="dim"># w = guidance scale (the volume knob)</span>
+      </div></div>
+      <p>Symbols: <code>ε_text</code> = the noise guess when the prompt is given. <code>ε_none</code> = the guess with no prompt. <code>(ε_text − ε_none)</code> = the direction that pushes toward the prompt. <code>w</code> = the guidance scale, a number like 1 (no push) up to 7 or more (strong push). <code>ε_guided</code> = the final noise used in the reverse step. When <code>w = 1</code>, ε_guided equals ε_text (plain conditioning). Bigger <code>w</code> exaggerates the prompt direction.</p>
+
+      <h4>Step 3 — a worked example on one pixel</h4>
+      <p>Say for one pixel the two guesses are <code>ε_text = 0.9</code> and <code>ε_none = 0.5</code>, and the guidance scale is <code>w = 3</code>:</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        direction = ε_text − ε_none = 0.9 − 0.5 = 0.4<br>
+        ε_guided  = ε_none + w · direction<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = 0.5 + 3 · 0.4<br>
+        ε_guided  = 0.5 + 1.2 = <span class="hl">1.7</span>   <span class="dim"># pushed well past the with-text guess</span>
+      </div></div>
+      <p>With <code>w = 3</code> the guided guess (1.7) is pushed far beyond the plain with-text guess (0.9), so the prompt's influence on this pixel is tripled. If you set <code>w = 1</code>, ε_guided would just equal ε_text = 0.9 — normal conditioning, no extra push.</p>
+
+      <h4>Why this design wins</h4>
+      <ul>
+        <li><strong>Latent = speed:</strong> running diffusion on a 64×64 latent instead of 512×512 pixels is dozens of times cheaper, which is why big models are affordable to run.</li>
+        <li><strong>One adjustable knob:</strong> the guidance scale <code>w</code> lets you dial prompt-faithfulness at generation time, no retraining. Low <code>w</code> = more varied and natural; high <code>w</code> = closer to the words but can look over-saturated.</li>
+        <li><strong>"Classifier-free":</strong> you get strong steering without training a separate classifier — the same denoiser just runs twice (with and without the prompt).</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> latent diffusion + text embeddings + classifier-free guidance is the exact recipe behind Stable-Diffusion-class systems. You now understand, end to end, how a sentence becomes a picture. Next up is the review gate to lock it in.</div></div>
+      <button class="gotit" type="button">Got classifier-free guidance</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Prompt to picture, end to end — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole Stable-Diffusion-class pipeline, built one piece at a time: encode to a latent, read the text prompt, run guided diffusion in the latent, mix the two guesses, and decode back to pixels. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Show classifier-free guidance mixing two guesses (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove classifier-free guidance to yourself with a tiny mix. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/generative/m22b_cfg.py</code>. Make two stand-in noise guesses as NumPy arrays: <code>eps_text</code> (with prompt) and <code>eps_none</code> (no prompt). Write <code>guided = eps_none + w*(eps_text - eps_none)</code>. Print <code>guided</code> for <code>w = 0, 1, 3, 7</code> and show how it moves further along the prompt direction as <code>w</code> grows. Also add a tiny fake VAE round-trip (a downsample then upsample) to show the latent idea. Run with <code>python3 m22b_cfg.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 22b Day 5 artifact.
+
+Create experiments/generative/m22b_cfg.py that, with a comment on each step, shows latent diffusion's text control from scratch in NumPy:
+1. Fakes a VAE round-trip on a small image x0: downsample it (average 2x2 blocks) into a "latent", print how many fewer numbers the latent has, then upsample back and note the speed idea.
+2. Makes two stand-in noise guesses as arrays: eps_text (with the prompt) and eps_none (no prompt / blank).
+3. Implements classifier-free guidance: guided = eps_none + w*(eps_text - eps_none).
+4. Prints guided for w = 0, 1, 3, 7 and shows, on one example pixel, that the guided value moves further along the (eps_text - eps_none) direction as w grows.
+5. Prints shapes at every step (image, latent, guesses).
+Then run it and paste the guided values for each w at the bottom as a comment, plus one line saying what classifier-free guidance does.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m22b/day-05-log.md</code>: how many fewer numbers was your latent than the raw image, and what happened to the guided guess as you raised <code>w</code> from 1 to 7?</div></div>
+      <button class="gotit" type="button">Done — on to the Review Gate</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎨</span>
+    <h3>Day 5 complete — you understand Stable-Diffusion-class generation!</h3>
+    <p>You just closed the loop: diffusion runs in a small VAE latent for speed, a text prompt becomes an embedding that steers the denoiser, and classifier-free guidance mixes the with-text and no-text guesses to push toward the words. That is the whole recipe behind modern text-to-image. All five days lived in one offline file.<br>Next: the <b>Review Gate</b> — prove you can write the forward closed form, explain ε-prediction, and say what guidance does.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-04-sampling-schedules.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sampling Schedules</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Module 22b Review Gate</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  encode:{html:'<span class="prompt">&gt;&gt;&gt;</span> image.shape\n'+
+    '<span class="hl">(512, 512, 3)</span>   <span class="dim"># 786,432 numbers — big</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> latent = vae.encode(image)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> latent.shape\n'+
+    '<span class="hl">(64, 64, 4)</span>   <span class="dim"># 16,384 numbers — ~48x fewer</span>',
+    take:'<b>①  Shrink into a latent.</b> The VAE encoder squeezes the image from ~786k numbers to ~16k. Diffusion runs in this tiny space, so every network call is dozens of times cheaper. The decoder enlarges it back at the end.'},
+  condition:{html:'<span class="prompt">&gt;&gt;&gt;</span> prompt = <span class="str">"a red bicycle at sunset"</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> text_emb = clip_encode(prompt)   <span class="dim"># words -> numbers</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps = network(latent_t, t, text_emb)\n'+
+    '<span class="dim">#  the denoiser now leans toward the prompt</span>\n'+
+    '<span class="hl">guesses steer toward "red bicycle"</span>',
+    take:'<b>②  Feed the text embedding.</b> A text encoder (CLIP or T5) turns the prompt into a vector. Pass it to the denoiser at every step and its noise guesses bend toward matching the words. That is conditioning.'},
+  guidance:{html:'<span class="prompt">&gt;&gt;&gt;</span> eps_text = network(z, t, prompt)   <span class="dim"># with words</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps_none = network(z, t, blank)    <span class="dim"># no words</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">3</span>   <span class="dim"># guidance scale (volume knob)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps = eps_none + w*(eps_text - eps_none)\n'+
+    '<span class="dim">#  0.5 + 3*(0.9-0.5) = 0.5 + 1.2</span>\n'+
+    '<span class="hl">eps = 1.7</span>   <span class="dim"># pushed hard toward the prompt</span>',
+    take:'<b>③  Classifier-free guidance.</b> Guess twice — with and without the prompt — and push along their difference by w. Bigger w follows the words harder. This one knob controls how strictly the picture obeys the prompt.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Encoding a big image into a small latent'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='34' width='150' height='72' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='105' y='28' fill='#6B645E'>image 512×512</text><text x='105' y='74' fill='#1F6280'>~786k numbers</text><text x='205' y='72' fill='#6B645E'>VAE encode →</text><rect x='320' y='50' width='90' height='42' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='365' y='44' fill='#6B645E'>latent 64×64</text><text x='365' y='76' fill='#5E5191'>~16k</text></g></svg>",
+  note:"<b>Shrink into a latent.</b> The VAE encoder squeezes the big image into a small code — dozens of times fewer numbers. All the heavy diffusion work will happen in this tiny space, so it is far cheaper to run."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Turning a text prompt into an embedding'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='44' width='190' height='42' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='125' y='70' fill='#9A7208'>\"a red bicycle\"</text><text x='250' y='70' fill='#6B645E'>CLIP/T5 →</text><rect x='340' y='44' width='150' height='42' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='415' y='70' fill='#1F6280'>text embedding</text></g></svg>",
+  note:"<b>Read the prompt.</b> A text encoder (CLIP or T5) turns your words into a vector of numbers — the text embedding. This is how the model understands what you asked for. It gets fed into the denoiser at every step."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The denoiser making two guesses, with and without the prompt'><g font-family='monospace' font-size='10' text-anchor='middle'><rect x='170' y='30' width='180' height='34' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='52' fill='#1F6280'>denoiser (in the latent)</text><text x='120' y='90' fill='#6B645E'>+ prompt →</text><rect x='200' y='78' width='130' height='34' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='265' y='100' fill='#1a5c38'>ε_text · ε_none</text><text x='420' y='90' fill='#6B645E'>← blank</text></g></svg>",
+  note:"<b>Guess twice.</b> At each step the denoiser runs once with the prompt (ε_text) and once with a blank input (ε_none). The difference between them points in the \"make it match the words\" direction."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The classifier-free guidance formula'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='22' fill='#6B645E'>classifier-free guidance — push toward the prompt</text><rect x='30' y='42' width='460' height='50' rx='8' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='260' y='73' fill='#9A7208' font-size='13'>&#949; = &#949;_none + w·(&#949;_text &#8722; &#949;_none)</text></g></svg>",
+  note:"<b>Mix the two guesses.</b> Take the no-prompt guess and push it further along the prompt direction by the guidance scale <b>w</b>. Bigger w = the picture follows the words harder. w = 1 is plain conditioning; higher w exaggerates the prompt."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Running the guided reverse loop in the latent'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>run the guided reverse loop — in the small latent</text><g fill='#2A7B9B'><circle cx='70' cy='58' r='5'/><circle cx='170' cy='58' r='5'/><circle cx='270' cy='58' r='5'/><circle cx='370' cy='58' r='5'/><circle cx='460' cy='58' r='5'/></g><text x='260' y='92' fill='#1F6280'>each step uses the guided ε — fast, because latent is tiny</text></g></svg>",
+  note:"<b>Denoise in the latent.</b> Run the Day 2 reverse loop with the guided noise, all inside the tiny latent. Because the latent is small, each of the many steps is cheap — this is why big text-to-image models are affordable to run."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Decoding the finished latent back to a full picture'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='50' width='90' height='42' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='75' y='44' fill='#6B645E'>final latent</text><text x='75' y='76' fill='#5E5191'>64×64</text><text x='160' y='74' fill='#6B645E'>VAE decode →</text><rect x='300' y='34' width='170' height='72' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='385' y='28' fill='#6B645E'>a red bicycle 🚲</text><text x='385' y='74' fill='#1a5c38'>512×512 picture</text></g></svg>",
+  note:"<b>Decode back to pixels.</b> The VAE decoder enlarges the finished latent into a full-size picture that matches your prompt. Latent + text embedding + classifier-free guidance = the whole Stable-Diffusion-class recipe. You built it end to end."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why does latent diffusion run diffusion inside a VAE latent instead of on raw pixels?',
+  opts:['it looks nicer','the latent has far fewer numbers, so every step is much cheaper and faster','pixels cannot be denoised','it needs no training'],
+  ans:1, fb:'Right. A 64×64 latent has dozens of times fewer numbers than a 512×512 image, so the same diffusion runs far faster. The VAE decoder enlarges the finished latent back to pixels.'},
+ {q:'2. How does a text prompt steer the image?',
+  opts:['it is drawn as pixels','a text encoder (CLIP/T5) turns it into an embedding fed to the denoiser at every step','it renames the file','it changes the schedule'],
+  ans:1, fb:'Right. The words become a text embedding, which is fed into the denoiser so its noise guesses lean toward matching the prompt. That is conditioning.'},
+ {q:'3. What does classifier-free guidance do?',
+  opts:['trains a separate classifier','mixes the with-text and no-text guesses, pushing further in the with-text direction to steer harder','removes the text','makes the image smaller'],
+  ans:1, fb:'Right. It computes ε_none + w·(ε_text − ε_none): guess with and without the prompt, then push along their difference by the guidance scale w.'},
+ {q:'4. With ε_text=0.9, ε_none=0.5, and guidance scale w=3, the guided guess is:',
+  opts:['0.9','1.7','0.4','1.2'],
+  ans:1, fb:'Right. ε_guided = 0.5 + 3·(0.9−0.5) = 0.5 + 1.2 = 1.7 — pushed well past the plain with-text guess.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

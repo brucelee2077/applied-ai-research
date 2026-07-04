@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forward Diffusion — Adding Noise Step by Step</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+/* top bar */
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
+.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
+.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+.schedule-row{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.15rem}
+.seg-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.35rem .7rem;cursor:pointer;transition:background .15s,color .15s}
+.seg-btn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.sig{color:var(--ok)}.ro-v.noise{color:var(--bad)}
+@media(max-width:560px){.readouts{grid-template-columns:1fr}}
+
+/* signal:noise bar */
+.mix{margin-top:.5rem}
+.mix-bar{display:flex;height:16px;border-radius:var(--r-full);overflow:hidden;border:1px solid var(--border)}
+.mix-sig{background:var(--ok);transition:width .2s var(--ease)}
+.mix-noise{background:var(--bad);transition:width .2s var(--ease)}
+.mix-key{display:flex;gap:1.1rem;margin-top:.4rem;font-size:.78rem;color:var(--muted)}
+.mix-key b{font-weight:600}
+.mix-key .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+.dot.sig{background:var(--ok)}.dot.noise{background:var(--bad)}
+
+/* figure */
+.figwrap{width:100%;display:flex;justify-content:center}
+svg#diff{width:auto;max-width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+.cell-outline{stroke:var(--border2);stroke-width:.5}
+
+/* takeaway */
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+.k-sig{color:var(--ok);font-weight:600}.k-noise{color:var(--bad);font-weight:600}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Forward Diffusion</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Diffusion models</span>
+    <h1>Forward Diffusion: Adding Noise Step by Step</h1>
+    <p><b>What am I looking at?</b> A tiny 8&times;8 "image" of a simple shape. Drag the timestep slider and watch
+    the clean picture slowly dissolve into random speckle. That is the <em>forward</em> diffusion process: at each
+    step it mixes in a little more noise, following a fixed recipe (the schedule). By the last step there is nothing
+    left but static. A diffusion model is trained to run this backwards &mdash; to turn the static back into a picture.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Timestep <span class="ctrl-hint">(t, from 0 = clean to T = pure noise)</span></span>
+          <span class="ctrl-val" id="val-t">t = 0 / 1000</span>
+        </div>
+        <input type="range" id="tstep" min="0" max="1000" step="1" value="0"
+               aria-label="Diffusion timestep, from 0 clean to 1000 pure noise">
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">Noise schedule <span class="ctrl-hint">(how fast signal is destroyed)</span></span>
+        </div>
+        <div class="schedule-row" role="group" aria-label="Noise schedule">
+          <button class="seg-btn" id="sched-cosine" data-sched="cosine" aria-pressed="true">Cosine</button>
+          <button class="seg-btn" id="sched-linear" data-sched="linear" aria-pressed="false">Linear</button>
+        </div>
+      </div>
+
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Jump to:</span>
+        <button class="preset-btn" data-t="0">t = 0 &middot; clean image</button>
+        <button class="preset-btn" data-t="500">t = T/2 &middot; half-noised</button>
+        <button class="preset-btn" data-t="1000">t = T &middot; pure noise</button>
+      </div>
+
+      <div class="readouts">
+        <div class="ro">
+          <div class="ro-k">Timestep t</div>
+          <div class="ro-v" id="ro-t">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Signal fraction &radic;&alpha;&#772;<sub>t</sub></div>
+          <div class="ro-v sig" id="ro-alpha">&mdash;</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">Signal : Noise</div>
+          <div class="ro-v" id="ro-split">&mdash;</div>
+        </div>
+      </div>
+
+      <div class="mix">
+        <div class="mix-bar" aria-hidden="true">
+          <div class="mix-sig" id="mix-sig" style="width:100%"></div>
+          <div class="mix-noise" id="mix-noise" style="width:0%"></div>
+        </div>
+        <div class="mix-key">
+          <span><span class="dot sig"></span><b>signal</b> = &radic;&alpha;&#772;<sub>t</sub> &middot; original</span>
+          <span><span class="dot noise"></span><b>noise</b> = &radic;(1&minus;&alpha;&#772;<sub>t</sub>) &middot; Gaussian</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>The image as it gets noised</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="diff" viewBox="0 0 420 420" role="img"
+           aria-label="An 8 by 8 pixel image. At timestep 0 it shows a clean shape. As the timestep rises the pixels mix in random noise until, at the final timestep, the image is pure random static.">
+      </svg>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);margin-top:.6rem;text-align:center">
+      Each cell = one pixel. Formula per pixel:
+      <span style="font-family:var(--mono)">x<sub>t</sub> = &radic;&alpha;&#772;<sub>t</sub> &middot; x<sub>0</sub> + &radic;(1&minus;&alpha;&#772;<sub>t</sub>) &middot; &epsilon;</span>,
+      where &epsilon; is fixed random noise.
+    </p>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>Noise is <b>added gradually</b> by a fixed <b>schedule</b>. Early steps barely change the image;
+        later steps swamp it. The schedule (cosine vs linear) decides how fast the
+        <span class="k-sig">signal</span> gives way to <span class="k-noise">noise</span> &mdash; cosine keeps
+        signal alive longer near the start.</li>
+      <li>The whole path is one closed-form equation:
+        <b>x<sub>t</sub> = &radic;&alpha;&#772;<sub>t</sub>&middot;x<sub>0</sub> + &radic;(1&minus;&alpha;&#772;<sub>t</sub>)&middot;&epsilon;</b>.
+        You never have to step through all t values &mdash; you can jump straight to any timestep.</li>
+      <li>At <b>t = T</b> the signal fraction is essentially 0, so the image is <span class="k-noise">pure Gaussian
+        noise</span> &mdash; every trace of the original shape is gone.</li>
+      <li>Training <b>reverses</b> this: the model learns to look at a noisy image and undo <b>one step at a time</b>,
+        turning random static back into a clean picture. That reverse walk is how diffusion models generate images.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById("diff");
+
+  // Graceful degradation if D3 failed to load.
+  if (typeof window.d3 === "undefined") {
+    console.warn("[diffusion-noising] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) {
+      svgEl.outerHTML =
+        '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>' +
+        'Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>';
+    }
+    return;
+  }
+
+  var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = reduceMotion ? 0 : 160;
+
+  // ---- config ------------------------------------------------------------
+  var GRID = 8;           // 8x8 image
+  var T_MAX = 1000;       // final timestep
+  var W = 420, H = 420;
+  var PAD = 10;           // outer padding inside the svg
+  var CELL = (W - 2 * PAD) / GRID;
+
+  var svg = d3.select(svgEl);
+  var root = svg.append("g").attr("transform", "translate(" + PAD + "," + PAD + ")");
+
+  // ---- deterministic per-cell base image (x0) ---------------------------
+  // Draw a simple shape: a filled diamond on a dark background so the noising
+  // is easy to see. Values are grayscale in [0, 1].
+  function baseImage(){
+    var img = [];
+    var c = (GRID - 1) / 2;              // center coordinate
+    for (var r = 0; r < GRID; r++){
+      var row = [];
+      for (var col = 0; col < GRID; col++){
+        // Manhattan distance from center makes a diamond.
+        var d = Math.abs(r - c) + Math.abs(col - c);
+        // Bright inside the diamond, dark outside. Smooth edge.
+        var v = 1 - (d / (GRID * 0.62));
+        row.push(Math.max(0.06, Math.min(1, v)));
+      }
+      img.push(row);
+    }
+    return img;
+  }
+  var X0 = baseImage();
+
+  // ---- deterministic Gaussian noise per cell ----------------------------
+  // Seed from cell index so the page renders identically without Math.random.
+  // Small hash -> uniform in (0,1), then Box-Muller for a Gaussian sample.
+  function hashUnit(n){
+    // integer hash, then map to (0,1). Constants are arbitrary but fixed.
+    var x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    x = x - Math.floor(x);               // fractional part in [0,1)
+    // avoid exactly 0 for the log in Box-Muller
+    return Math.min(1 - 1e-6, Math.max(1e-6, x));
+  }
+  function gaussian(idx){
+    var u1 = hashUnit(idx * 2 + 1);
+    var u2 = hashUnit(idx * 2 + 2);
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+  // Precompute one fixed noise sample per cell.
+  var NOISE = [];
+  for (var r = 0; r < GRID; r++){
+    var nr = [];
+    for (var col = 0; col < GRID; col++){
+      nr.push(gaussian(r * GRID + col));
+    }
+    NOISE.push(nr);
+  }
+
+  // ---- alphaBar schedules ------------------------------------------------
+  // alphaBar_t is the cumulative "how much original survives" factor.
+  // At t=0 alphaBar=1 (all signal); at t=T alphaBar~0 (all noise).
+  var currentSchedule = "cosine";
+
+  // Cosine schedule (Nichol & Dhariwal 2021): smooth, keeps signal longer early.
+  function alphaBarCosine(t){
+    var s = 0.008;
+    var frac = t / T_MAX;
+    var f = function(x){
+      var a = (x + s) / (1 + s) * Math.PI / 2;
+      var c = Math.cos(a);
+      return c * c;
+    };
+    return f(frac) / f(0);
+  }
+
+  // Linear beta schedule (Ho et al. 2020): betas linear from 1e-4 to 0.02,
+  // alphaBar = product of (1 - beta) up to t.
+  var beta0 = 1e-4, betaT = 0.02;
+  var linCum = (function(){
+    // Precompute cumulative product over integer steps 1..T_MAX.
+    var arr = new Float64Array(T_MAX + 1);
+    arr[0] = 1;
+    var prod = 1;
+    for (var i = 1; i <= T_MAX; i++){
+      var beta = beta0 + (betaT - beta0) * ((i - 1) / (T_MAX - 1));
+      prod *= (1 - beta);
+      arr[i] = prod;
+    }
+    return arr;
+  })();
+  function alphaBarLinear(t){
+    var i = Math.round(t);
+    if (i < 0) i = 0; if (i > T_MAX) i = T_MAX;
+    return linCum[i];
+  }
+
+  function alphaBar(t){
+    return currentSchedule === "linear" ? alphaBarLinear(t) : alphaBarCosine(t);
+  }
+
+  // ---- cells (created once, updated on change) --------------------------
+  var cellData = [];
+  for (var r = 0; r < GRID; r++){
+    for (var col = 0; col < GRID; col++){
+      cellData.push({ r: r, col: col });
+    }
+  }
+  var rects = root.selectAll("rect.cell")
+      .data(cellData)
+      .enter().append("rect")
+      .attr("class", "cell cell-outline")
+      .attr("x", function(d){ return d.col * CELL; })
+      .attr("y", function(d){ return d.r * CELL; })
+      .attr("width", CELL)
+      .attr("height", CELL);
+
+  // ---- element refs ------------------------------------------------------
+  var elT      = document.getElementById("tstep");
+  var valT     = document.getElementById("val-t");
+  var roT      = document.getElementById("ro-t");
+  var roAlpha  = document.getElementById("ro-alpha");
+  var roSplit  = document.getElementById("ro-split");
+  var mixSig   = document.getElementById("mix-sig");
+  var mixNoise = document.getElementById("mix-noise");
+
+  // Grayscale color: v in [0,1] -> dark navy (0) to warm cream (1).
+  var color = d3.scaleLinear()
+      .domain([0, 1])
+      .range(["#1c2b33", "#f4ede0"])
+      .clamp(true);
+
+  function draw(){
+    var t = +elT.value;
+    var ab = alphaBar(t);                  // signal fraction (variance form)
+    var sqrtAb = Math.sqrt(ab);            // signal amplitude weight
+    var sqrtOneMinus = Math.sqrt(1 - ab);  // noise amplitude weight
+
+    // ---- per-cell noised value ----
+    // x_t = sqrt(alphaBar)*x0 + sqrt(1-alphaBar)*noise
+    // Center x0 around 0 so Gaussian noise mixes symmetrically, then shift back.
+    rects.transition().duration(DUR)
+        .attr("fill", function(d){
+          var x0 = X0[d.r][d.col];
+          var eps = NOISE[d.r][d.col];
+          var xt = sqrtAb * (x0 - 0.5) + sqrtOneMinus * (eps * 0.32);
+          return color(xt + 0.5);
+        });
+
+    // ---- readouts ----
+    valT.textContent = "t = " + t + " / " + T_MAX;
+    roT.textContent  = t + " / " + T_MAX;
+    roAlpha.textContent = sqrtAb.toFixed(3);
+
+    // Signal:noise expressed as percentages of the two amplitude weights.
+    var sigPct = sqrtAb / (sqrtAb + sqrtOneMinus) * 100;
+    var noisePct = 100 - sigPct;
+    roSplit.textContent = sigPct.toFixed(0) + " : " + noisePct.toFixed(0);
+    roSplit.className = "ro-v " + (sigPct >= noisePct ? "sig" : "noise");
+
+    mixSig.style.width = sigPct.toFixed(1) + "%";
+    mixNoise.style.width = noisePct.toFixed(1) + "%";
+  }
+
+  // ---- wire up controls --------------------------------------------------
+  ["input", "change"].forEach(function(evt){
+    elT.addEventListener(evt, draw);
+  });
+
+  // preset buttons set the timestep
+  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      elT.value = +btn.getAttribute("data-t");
+      draw();
+    });
+  });
+
+  // schedule toggle
+  Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      currentSchedule = btn.getAttribute("data-sched");
+      Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function(b){
+        b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+      });
+      draw();
+    });
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>
