@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 27b · Day 4 — Robustness Eval & Constitutional AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-badge.s-check{background:#1F6280}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+.gotit:disabled{opacity:.55;cursor:not-allowed}
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+.q-score{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-top:.4rem}
+.check{display:flex;flex-direction:column;gap:.6rem;margin:1.1rem 0}
+.check-item{display:flex;align-items:flex-start;gap:.7rem;padding:.7rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-md);background:var(--surface2);cursor:pointer;transition:all .15s}
+.check-item:hover{border-color:var(--accent)}
+.check-item.on{border-color:var(--ok);background:var(--ok-l)}
+.check-box{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.8rem}
+.check-item.on .check-box{background:var(--ok);border-color:var(--ok)}
+.check-item .ct{font-size:.92rem}.check-item .ct b{color:var(--text)}
+.check-lesson{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:480px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+.fin .cta{display:inline-block;margin-top:1rem;font-family:var(--body);font-weight:700;color:#fff;background:var(--ok);border-radius:var(--r-md);padding:.6rem 1.2rem;text-decoration:none;border-bottom:none}
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m27b-d04-robust">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M27b Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-03-automated-attacks.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Automated Attack Generation</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 27b · Launch Gate · Day 4</span>
+    <h1>Measuring Robustness & Constitutional AI</h1>
+    <p class="lead">You have a map of attacks and a way to generate them. Now two questions decide the launch: how do you measure whether the model is robust, and how do you make it safer without a human labeling every case? The measure is attack success rate. The scalable defense is Constitutional AI — the model critiques and revises its own answers against a written set of principles. Together they turn 'is it safe?' into something you can gate on.</p>
+    <div class="goal"><b>🎯 By the end, you'll be able to:</b> compute attack success rate (ASR), explain Constitutional AI / RLAIF and why it scales oversight, work an ASR example, and name the false-safety trap where your eval only covers known attacks.</div>
+  </header>
+
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Measure, then defend</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> automated attack generation (Day 3) and RLHF — training a model from preference feedback (M26/M21a). Today swaps the human feedback for model feedback and turns attack counts into a metric.</div></div>
+     <h4>The metric: attack success rate</h4>
+     <p>To gate a launch you need one honest number. <span class="term" data-tip="Attack success rate = the fraction of attack attempts that succeed in making the model produce disallowed output. Lower is more robust.">Attack success rate (ASR)</span> is the fraction of attack attempts that succeed. Lower ASR = more robust. You run your whole attack set (Day 3's output) against the model and count how many break it.</p>
+     <h4>The scalable defense: Constitutional AI</h4>
+     <p>RLHF needs humans to label which answers are safe — slow and expensive. <span class="term" data-tip="A training method where the model critiques and revises its own answers against a written list of principles (a 'constitution'), so a model — not a human — provides the safety feedback.">Constitutional AI</span> replaces most of that human labeling. You give the model a short written <span class="term" data-tip="A short written list of principles (rules/values) the model checks its answers against — e.g. 'do not help with X', 'be honest'.">constitution</span> — a list of principles. The model reads its own draft answer, critiques it against the principles, and rewrites it. Those self-revised answers become the training signal.</p>
+     <h4>RLAIF and scalable oversight</h4>
+     <p>Using model feedback instead of human feedback is called <span class="term" data-tip="Reinforcement Learning from AI Feedback — using a model's judgments (instead of human labels) as the reward signal for training.">RLAIF</span> (RL from AI Feedback). It is one answer to <span class="term" data-tip="The problem of supervising a model on far more cases than humans can label — using models to help judge, so oversight scales with capability.">scalable oversight</span>: the problem of supervising a model on more cases than any human team could ever label by hand.</p>
+      <button class="gotit" type="button">Got the two ideas</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A written rulebook and a self-check</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+       <div class="card"><span class="big">📋</span><h5>A checklist you grade yourself against</h5><p>A careful writer keeps a checklist ("no personal attacks, cite sources, stay on topic") and reads their own draft against it before sending. Constitutional AI gives the model that checklist — the constitution — and has it self-correct.</p></div>
+       <div class="card"><span class="big">📉</span><h5>A safety score you can track</h5><p>A factory tracks its defect rate to know if a change helped. ASR is the model's defect rate under attack: run the attacks, count the breaks, watch the number drop as you harden. One number to gate the launch.</p></div>
+     </div>
+     <p><strong>In one line:</strong> ASR tells you how often attacks win, and Constitutional AI lowers it by letting the model police itself against written principles — so oversight scales without a human on every case.</p>
+     <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a human writer understands <i>why</i> each checklist item matters and can catch a new problem the list never mentioned. A model applies its constitution literally; if a principle is missing or vague, the self-critique sails right past the gap. The rulebook is only as good as what's written on it.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Compute ASR and self-critique</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Watch ASR computed from attack counts, a model critiquing its own draft against a principle, and the revised answer. <strong>Click all three.</strong></p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="asr" type="button">① compute ASR</button>
+          <button class="play-btn" data-demo="critique" type="button">② model critiques its draft</button>
+          <button class="play-btn" data-demo="revise" type="button">③ revise & train</button>
+          </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">ASR and the self-critique loop</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+     <p>ASR is just a fraction: of all the attacks you tried, how many worked. For the defense, the model does three moves on each draft: <b>answer</b>, <b>critique</b> against a principle, <b>revise</b>. The revised answers train the model, so next time it produces the safe version directly.</p>
+     <h4>Step 2 — the formulas</h4>
+     <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+       ASR = (attacks that produced disallowed output) / (total attacks)   <span class="dim"># lower is safer</span><br><br>
+       Constitutional AI, per example:<br>
+       &nbsp;&nbsp;draft   = model(prompt)<br>
+       &nbsp;&nbsp;critique = model("does draft break a principle?", constitution, draft)<br>
+       &nbsp;&nbsp;revision = model("rewrite draft to follow the principles", critique)<br>
+       &nbsp;&nbsp;train on (prompt → revision)          <span class="dim"># RLAIF: the model, not a human, judged</span>
+     </div></div>
+     <h4>Step 3 — worked example</h4>
+     <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+       before Constitutional-AI hardening:<br>
+       &nbsp;&nbsp;500 attacks, 150 succeeded → ASR = 150/500 = <span class="hl">0.30 = 30%</span><br>
+       after hardening on self-revised answers:<br>
+       &nbsp;&nbsp;500 attacks, 20 succeeded  → ASR = 20/500 = <span class="hl">0.04 = 4%</span><br>
+       drop in ASR = 30% − 4% = 26 points  <span class="dim"># big improvement… on THIS attack set</span>
+     </div></div>
+     <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Silent failure — false safety from a stale eval.</b> Your ASR is only measured over the attacks you <i>have</i>. A 4% ASR means "4% of the attacks we know about still work" — it says nothing about attacks you never generated. A team can chase ASR to near zero on a fixed benchmark, ship with confidence, and get broken on day one by a new attack category the eval never contained. Low ASR on a stale set is a comfortable lie. Robustness numbers must ride a constantly refreshed, diverse attack set, and be read as a floor on danger, never a proof of safety.</div></div>
+     <div class="callout c-warn"><span class="ic">⚖️</span><div><b>Trade-off — measured robustness vs. unknown-unknowns.</b> Every eval measures the <i>known</i> risk surface. Investing more in the same benchmark sharpens a number you already trust and does nothing for the risks you cannot name — the unknown-unknowns. The staff-level move is to spend some budget widening the surface (new attack categories, human red-teamers, bug bounties, monitoring live traffic) even though it makes the headline ASR temporarily <i>worse</i>. A rising ASR after adding new attack types is often good news: your eval finally sees more of reality.</div></div>
+      <button class="gotit" type="button">Got ASR and the loop</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">The eval + defense, built up</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here it is assembled: an attack set, ASR measured, the constitution, the answer-critique-revise loop, RLAIF training, and the honest caveat about coverage. <strong>Scroll slowly.</strong></p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Check yourself</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four.</strong></p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Measure and defend</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Pick one:</p>
+     <h4>Option A · write it yourself</h4>
+     <p>Create <code>experiments/foundations/m27b_asr_and_cai.py</code>. Part 1: given a list of attack results (pass/fail), compute ASR and plot how ASR drops as you add a defense. Part 2: mock a Constitutional-AI loop with a harmless "constitution" (e.g. "answers must not contain the word SECRET") — a fake model drafts, critiques its draft against the rule, and revises; show the revised answers obey the rule. Then demonstrate false safety: report near-zero ASR on the fixed attack set, add one <i>new</i> attack category, and watch ASR jump — proving the old number was a floor, not a proof.</p>
+     <h4>Option B · let Claude build it</h4>
+     <div class="prompt">
+       <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+       <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 27b Day 4 artifact.
+Create experiments/foundations/m27b_asr_and_cai.py: (1) a function that computes attack success rate ASR = successes/attempts from a list of attack results, and a plot of ASR falling as a defense is added. (2) A HARMLESS mock Constitutional-AI loop: a tiny "constitution" (e.g. "answer must not contain the word SECRET"), a fake model that drafts → critiques its own draft against the rule → revises, showing the revision obeys the rule (RLAIF-style, model judges itself). (3) A false-safety demo: report near-zero ASR on a fixed attack set, then add a NEW attack category and show ASR jumps — the old number was a floor, not proof. Add comments on scalable oversight and unknown-unknowns. No real harmful content.</pre>
+     </div>
+     <div class="callout c-info"><span class="ic">📝</span><div>Write one line in <code>sessions/week-m27b/day-04-log.md</code>: after adding a new attack category, how did ASR change, and why does that make "low ASR" a floor rather than a proof of safety?</div></div>
+      <button class="gotit" type="button">Done — on to the review</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">📉</span>
+    <h3>Day 4 complete — you can gate a launch!</h3>
+    <p>You now have the launch-gate toolkit: ASR (successes/attempts) as the one honest robustness number, and Constitutional AI / RLAIF — the model critiques and revises its own answers against a written constitution — as the scalable defense that supervises far more cases than humans could label. The trap is false safety from a stale eval; low ASR is a floor on known danger, not proof. Next: the <b>review gate</b> — prove you can hold the whole map together.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-03-automated-attacks.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Automated Attack Generation</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ if(btn.disabled) return; markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {"asr": {"html": "<span class=\"prompt\">&gt;&gt;&gt;</span> attacks = 500 ; succeeded = 150\n<span class=\"prompt\">&gt;&gt;&gt;</span> asr = succeeded / attacks\n<span class=\"hl\">asr = 0.30  # 30% of known attacks still work</span>", "take": "<b>①  ASR = successes / attempts.</b> One honest number for the launch gate. Lower is safer — but only over the attacks you actually tested."}, "critique": {"html": "<span class=\"prompt\">&gt;&gt;&gt;</span> draft = model(prompt)\n<span class=\"prompt\">&gt;&gt;&gt;</span> critique = model(&quot;does this break a principle?&quot;, constitution, draft)\n<span class=\"hl\">critique: &quot;draft violates principle 2 (reveals a secret)&quot;</span>", "take": "<b>②  The model judges itself.</b> Given a written constitution, the model reads its own draft and flags which principle it breaks. No human label needed — that is RLAIF."}, "revise": {"html": "<span class=\"prompt\">&gt;&gt;&gt;</span> revision = model(&quot;rewrite to follow the principles&quot;, critique)\n<span class=\"hl\">revision: a safe answer that obeys the constitution</span>\n<span class=\"dim\"># train on (prompt → revision); ASR drops 0.30 → 0.04</span>", "take": "<b>③  Revise, then learn.</b> The self-corrected answer becomes training data. After hardening, ASR falls sharply — on this attack set. Coverage still limits what the number means."}};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=Object.keys(DEMOS).length){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw them all — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD = [{"viz": "<svg viewBox='0 0 520 56'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='140' y='14' width='240' height='28' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='260' y='33' fill='#5E5191'>attack set (from Day 3)</text></g></svg>", "note": "<b>Start with an attack set.</b> The many failing prompts your red-team loop produced. This is what you measure against."}, {"viz": "<svg viewBox='0 0 520 56'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='120' y='14' width='280' height='28' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='33' fill='#1F6280'>ASR = successes / attempts</text></g></svg>", "note": "<b>Measure ASR.</b> Run the set, count the breaks, divide. 150/500 = 0.30. One number — but only over known attacks."}, {"viz": "<svg viewBox='0 0 520 74'><g font-family='monospace' font-size='9.5' text-anchor='middle'><rect x='30' y='24' width='90' height='24' rx='5' fill='#F5F0E8' stroke='#6B645E'/><text x='75' y='40' fill='#5A544E'>answer</text><text x='128' y='40' fill='#6B645E'>→</text><rect x='145' y='24' width='95' height='24' rx='5' fill='#FCF3DC' stroke='#C99A12'/><text x='192' y='40' fill='#9A7208'>critique</text><text x='248' y='40' fill='#6B645E'>→</text><rect x='265' y='24' width='95' height='24' rx='5' fill='#E8F5EE' stroke='#2D8B55'/><text x='312' y='40' fill='#1a5c38'>revise</text><text x='378' y='40' fill='#6B645E'>vs constitution</text></g></svg>", "note": "<b>Constitutional AI loop.</b> The model answers, critiques its own draft against the written principles, then revises. The model — not a human — supplies the feedback."}, {"viz": "<svg viewBox='0 0 520 60'><g font-family='monospace' font-size='10.5' text-anchor='middle'><rect x='90' y='16' width='150' height='28' rx='6' fill='#E8F5EE' stroke='#2D8B55'/><text x='165' y='34' fill='#1a5c38'>train on revisions</text><text x='262' y='34' fill='#6B645E'>→</text><rect x='285' y='16' width='170' height='28' rx='6' fill='#E4F2F7' stroke='#2A7B9B'/><text x='370' y='34' fill='#1F6280'>ASR drops 0.30 → 0.04</text></g></svg>", "note": "<b>RLAIF training lowers ASR.</b> The self-revised answers become the signal (RL from AI Feedback) — scalable oversight, since no human labeled each case."}, {"viz": "<svg viewBox='0 0 520 58'><g font-family='monospace' font-size='9.5' text-anchor='middle'><rect x='70' y='16' width='380' height='30' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='260' y='35' fill='#C93B3B'>low ASR = floor on KNOWN attacks, not proof of safety</text></g></svg>", "note": "<b>Read the number honestly.</b> ASR only covers attacks you have. Keep the attack set fresh and diverse; a rising ASR after adding new categories often means your eval finally sees more of reality."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS = [{"q": "1. Attack success rate (ASR) is:", "opts": ["the model's accuracy on a normal test set", "the fraction of attack attempts that succeed in producing disallowed output", "the number of parameters", "the training loss"], "ans": 1, "fb": "ASR = successful attacks / total attacks. Lower is more robust — but only over the attacks you actually tested."}, {"q": "2. What does Constitutional AI replace, and with what?", "opts": ["it replaces the model with a bigger one", "it replaces most human safety labeling with the model critiquing its own answers against written principles", "it replaces tokens with images", "it replaces gradients with search"], "ans": 1, "fb": "Instead of humans labeling each answer, the model reads a written constitution, critiques its own draft, and revises. Model feedback instead of human feedback = RLAIF."}, {"q": "3. Before hardening: 500 attacks, 150 succeed. After: 500 attacks, 20 succeed. What are the two ASRs?", "opts": ["30% then 4%", "15% then 2%", "150 then 20", "3% then 0.4%"], "ans": 0, "fb": "150/500 = 0.30 = 30%, and 20/500 = 0.04 = 4%. A 26-point drop — but only on this fixed attack set."}, {"q": "4. Your model shows 4% ASR on a fixed benchmark. Why is 'ship it, it's safe' premature?", "opts": ["4% is too high to ship anything", "the eval only covers known attacks; a new attack category never in the set can still break it (false safety)", "ASR can never go below 5%", "the benchmark is too large"], "ans": 1, "fb": "Low ASR on a stale set is a floor on KNOWN danger, not proof of safety. Robustness must ride a fresh, diverse attack set — and a rising ASR after adding new categories often means you finally see more of reality (unknown-unknowns)."}];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

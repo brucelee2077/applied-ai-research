@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 2 · Day 5 — Memory Footprint: Where Your GPU RAM Goes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w02-d05-memory">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 2 Day 5</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-distributed-checkpointing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 1 · Week 2 · Day 5 (Fri)</span>
+    <h1>Memory Footprint<br>Where Your GPU RAM Goes</h1>
+    <p class="lead">Your model has 1 billion parameters. That sounds like 4 GB of weights. So why does training crash on a 16 GB GPU before you even feed it data? Because training memory is <em>four</em> things, not one — and one of them is a hidden 2x multiplier. Today: exactly where every byte goes.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> name the four things that eat memory during training (weights, gradients, optimizer state, activations), compute the "static" cost of <code>~16N</code> bytes for the Adam optimizer, and explain why activations are often the biggest term of all.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What actually uses memory when you train a model?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can write a training loop and you know a model has parameters (numbers it learns). <b>No prior knowledge of memory accounting needed.</b> We define every term as it appears.</div></div>
+
+      <h4>The puzzle: 4 GB of weights, 16 GB crash</h4>
+      <p>A model's size is usually reported as its parameter count — say <strong>1 billion parameters</strong> (we write this <code>N = 1e9</code>). Each number in fp32 (32-bit floating point) takes <strong>4 bytes</strong>. So the weights are <code>4 × 1e9 = 4 GB</code>. Yet training that model on a 16 GB GPU often fails immediately. Where did the other 12+ GB go?</p>
+      <p>The answer: <strong>"the model" is only one of four things living in memory during training.</strong> Let's name all four.</p>
+
+      <h4>The four memory tenants</h4>
+      <ul>
+        <li><strong>Weights</strong> — the parameters themselves, the numbers the model learned. This is what you think of as "the model." Cost in fp32: <code>4N</code>.</li>
+        <li><strong>Gradients</strong> — for every weight, training computes one number saying "nudge this weight up or down." So gradients are a same-size mirror of the weights. A <span class="term" data-tip="One number for a weight that says which way to change it, up or down, to make the model less wrong.">gradient</span> is the slope of the loss with respect to one weight. Cost: another <code>4N</code>.</li>
+        <li><strong>Optimizer state</strong> — extra bookkeeping the optimizer keeps <em>per weight</em>. The <span class="term" data-tip="The rule that takes gradients and decides how to change each weight during training.">optimizer</span> is the rule that turns gradients into weight updates. The popular <strong>Adam</strong> optimizer keeps <em>two</em> running averages per weight (called the first moment <code>m</code> and second moment <code>v</code>). That is the famous <strong>Adam 2x</strong>: two full copies of the weights. Cost: <code>2 × 4N = 8N</code>.</li>
+        <li><strong>Activations</strong> — the intermediate outputs of each layer, saved during the forward pass so the backward pass can compute gradients. An <span class="term" data-tip="The output of a layer, kept in memory during the forward pass so the backward pass can use it later.">activation</span> is a layer's output that must be kept around until backprop uses it. This term does <em>not</em> scale with <code>N</code> — it scales with <strong>batch size × sequence length × number of layers</strong>, and it is often the <em>biggest</em> term of all.</li>
+      </ul>
+
+      <div class="callout c-info"><span class="ic">📦</span><div><b>The static budget (before activations):</b> weights <code>4N</code> + gradients <code>4N</code> + Adam state <code>8N</code> = <code>16N</code> bytes.<br><span style="font-size:.85rem;color:var(--text2)">For 1B params in fp32 that is <code>16 GB</code> — already at the limit of a 16 GB card, and we haven't stored a single activation yet.</span></div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>The catch is that people size their GPU by the weights alone (<code>4N</code>) and forget the other three tenants. The static cost is <code>16N</code> with Adam, and then activations pile on top — and activations grow with your batch. Knowing this lets you predict crashes before they happen.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook" target="_blank" rel="noopener">The Ultra-Scale Playbook (Hugging Face / nanotron)</a> — the memory-accounting sections walk through exactly these four terms.</div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Packing a suitcase for a training trip</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Think of training as packing for a long trip. The clothes you fold in are the model. But a suitcase always ends up holding much more than just the clothes.</p>
+      <div class="relate">
+        <div class="card"><span class="big">👕</span><h5>Clothes = weights (4N)</h5><p>The actual thing you came to bring — your parameters. One clean copy. This is the number everyone quotes.</p></div>
+        <div class="card"><span class="big">🧺</span><h5>Laundry bag = gradients (4N)</h5><p>A mirror-image dirty-laundry bag: one dirty item for every clean item. Gradients are a same-size shadow of the weights.</p></div>
+        <div class="card"><span class="big">🧴🧴</span><h5>Two toiletry kits = Adam state (8N)</h5><p>Adam insists on packing <em>two</em> full kits — the moments <code>m</code> and <code>v</code>. That doubles the weight-sized load. This is the 2x multiplier.</p></div>
+        <div class="card"><span class="big">🧳</span><h5>Unpacked stuff = activations</h5><p>Everything you spread out during the trip and can't fold back until you're done. It grows with how much you do (batch × sequence × layers) and often fills the whole room.</p></div>
+      </div>
+      <p><strong>In one line:</strong> the clothes are only a quarter of the load. Weights + gradients + two Adam kits are the fixed <code>16N</code>; the unpacked activations pile on top and often dwarf the rest.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a suitcase has a fixed size, but activations are not fixed — you choose them. A bigger batch or longer sequence unpacks more stuff, so activation memory can balloon far past everything else.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch the budget grow as you add each tenant</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. Our model is <code>N = 1e9</code> parameters in fp32 (4 bytes each). Click each button to add the next memory tenant and watch the total climb. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="weights" type="button">① weights only (4N)</button>
+          <button class="play-btn" data-demo="static" type="button">② + gradients + Adam → 16N</button>
+          <button class="play-btn" data-demo="activations" type="button">③ + activations (batch-dependent)</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The arithmetic of the four terms</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules (fp32, 4 bytes per number)</h4>
+      <ul>
+        <li><strong>Weights</strong> = <code>bytes_per_param × N</code> = <code>4N</code>. In fp32 each parameter is 4 bytes.</li>
+        <li><strong>Gradients</strong> = <code>4N</code>. One gradient per weight, same dtype, so it matches the weights exactly.</li>
+        <li><strong>Optimizer state (Adam)</strong> = <code>2 × 4N = 8N</code>. Adam keeps two per-weight buffers, <code>m</code> and <code>v</code>. That is the <strong>2x multiplier</strong>. (Plain SGD keeps none → 0; SGD with momentum keeps one → <code>4N</code>.)</li>
+        <li><strong>Static total with Adam</strong> = <code>4N + 4N + 8N = 16N</code>, independent of batch size.</li>
+        <li><strong>Activations</strong> ≈ (a per-token cost that depends on the architecture) × <code>batch × sequence × layers</code>. It scales with what you feed the model, not with <code>N</code>.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>static = 16 × N × (bytes_per_param / 4)</code><br><span style="font-size:.85rem;color:var(--text2)">For 1B params in fp32: <code>16 × 1e9 = 16 GB</code> before a single activation. Switch to bf16 (2 bytes) and the static term roughly halves — but activations may still dominate.</span></div></div>
+
+      <h4>Why activations often win</h4>
+      <ul>
+        <li><strong>They scale with your workload.</strong> Double the batch, roughly double the activations. The other three terms don't budge.</li>
+        <li><strong>They stack per layer.</strong> A deep model saves an activation at every layer for the backward pass, so long networks accumulate a lot.</li>
+        <li><strong>The escape hatch: gradient checkpointing.</strong> Instead of saving every activation, you save a few "checkpoints" and <em>recompute</em> the rest during the backward pass. You trade <strong>more compute</strong> for <strong>less activation memory</strong>.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> parameters need a value (weights) → training needs a slope per value (gradients) → Adam needs two running averages per value (8N, the 2x) → the forward pass must remember its outputs for backprop (activations, batch-dependent) → total memory = <code>16N + activations</code>.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Memory math is where a "why did this run out of memory?" question gets answered before you launch, and the classic mistake is counting only the weights.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): budgeting for weights alone and forgetting the 4x.</b> A beginner sizes the job by parameters times bytes — 1B params in fp32 = 4 GB — and picks hardware around that. But training also stores gradients (another 4N) and Adam's two buffers (8N), so the real static cost is <code>16N</code>, four times the weights, before a single activation. This is not a code bug that throws early: your notebook may run on a tiny batch, look fine, then blow up only at the real batch size or later in training when activations pile on top. In <b>code review</b>, a senior engineer checks that the memory estimate includes gradients, optimizer state (Adam = 2x weights), and activations — not just the parameter count — and that it uses the actual training dtype.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast, stable convergence vs. 2x the weight memory.</b> Adam keeps a per-weight momentum <code>m</code> and variance <code>v</code>, which is why it trains reliably with little tuning — but those two buffers cost <code>8N</code>, the whole 2x optimizer-state term. Plain SGD keeps none (0) and momentum-SGD keeps one (4N), so they free memory you could spend on a bigger model or batch. In a <b>design review</b>, choosing the optimizer is partly a memory decision: you weigh Adam's convergence quality against the parameters or batch size that its extra state forces you to give up.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a training-memory calculator</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): write a small script that takes a model's size and prints the full memory breakdown — weights, gradients, optimizer state, and activations — so you can predict a crash before it happens.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Inputs: <code>params</code> (parameter count <code>N</code>), <code>bytes_per_param</code> (dtype size, e.g. 4 for fp32, 2 for bf16), and <code>batch</code>, <code>seq</code>, <code>layers</code> for the activation estimate.</li>
+        <li>Compute <strong>weights</strong> = <code>bytes_per_param × N</code>, <strong>gradients</strong> = <code>bytes_per_param × N</code>, <strong>optimizer state (Adam)</strong> = <code>2 × bytes_per_param × N</code>.</li>
+        <li>Compute an <strong>activations</strong> estimate that scales with <code>batch × seq × layers</code> (a simple per-token coefficient is fine).</li>
+        <li>Print each term in GB and a total. Confirm that for <code>N = 1e9</code>, fp32, the static part (weights + grads + Adam) is <code>16 GB</code>.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m09a-hardware-physics/day-05-memory-footprint/experiment.py</code> with the four bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Day 5 artifact.
+
+Create sessions/m09a-hardware-physics/day-05-memory-footprint/experiment.py that:
+1. Takes inputs: params (N), bytes_per_param (e.g. 4 for fp32, 2 for bf16), and batch, seq, layers.
+2. Computes weights = bytes_per_param * N, gradients = bytes_per_param * N, and Adam optimizer state = 2 * bytes_per_param * N (the m and v moments — the 2x multiplier).
+3. Estimates activations as a per-token coefficient * batch * seq * layers (state the coefficient you chose in a comment).
+4. Prints a clean breakdown in GB for each of the four terms plus a total, and prints the static-only subtotal (weights + grads + optstate).
+5. Includes a sanity check: assert the static subtotal for N=1e9, fp32 equals 16 GB.
+Add a brief comment on each term explaining what it is, then run it on a 1B-param fp32 example to confirm the 16 GB static figure.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-05-memory-footprint/log.md</code>: for your calculator, at what <code>batch</code> does the activations term overtake the <code>16N</code> static cost? What would gradient checkpointing change?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 5 complete!</h3>
+    <p>You can now predict a training crash before it happens: weights <code>4N</code> + gradients <code>4N</code> + Adam <code>8N</code> = <code>16N</code> static, plus activations that scale with your batch. You know the Adam 2x and the checkpointing trade-off.<br>Next week: <code>start today</code> → Week 3 Day 1 is <code>Transformer Arithmetic</code> (counting the params and FLOPs of a real block).</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-distributed-checkpointing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  weights:{html:'<span class="prompt">&gt;&gt;&gt;</span> N = <span class="num">1e9</span>            <span class="dim"># 1 billion parameters</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> weights = <span class="num">4</span> * N     <span class="dim"># fp32: 4 bytes each</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> gb(weights)\n<span class="ok">4 GB</span>   <span class="hl"># this is what people quote as "the model size"</span>\n'+
+    '<span class="dim"># looks fine on a 16 GB card... so far.</span>',
+    take:'<b>①  Weights alone = 4N.</b> Just the parameters, one clean copy. This is the number in the model card — and the trap, because it is only a quarter of the story.'},
+  static:{html:'<span class="prompt">&gt;&gt;&gt;</span> grads = <span class="num">4</span> * N       <span class="dim"># one slope per weight</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> adam = <span class="num">2</span> * <span class="num">4</span> * N    <span class="dim"># m and v: the Adam 2x</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> gb(weights + grads + adam)\n<span class="ok">16 GB</span>   <span class="hl"># 4N + 4N + 8N = 16N</span>\n'+
+    '<span class="bad"># a 16 GB GPU is already full — and no data has been fed yet.</span>',
+    take:'<b>②  Static cost = 16N.</b> Gradients add another 4N; Adam keeps two moments, adding 8N. That 2x from Adam is why 4 GB of weights becomes 16 GB before training even starts.'},
+  activations:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># activations scale with batch × seq × layers</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> act(batch=<span class="num">1</span>)\n<span class="ok">~2 GB</span>    <span class="dim"># small batch: fits under the 16N static</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> act(batch=<span class="num">16</span>)\n<span class="bad">~32 GB</span>   <span class="hl"># now activations DWARF the 16 GB static</span>\n'+
+    '<span class="dim"># fix: gradient checkpointing — recompute instead of store.</span>',
+    take:'<b>③  Activations often win.</b> Unlike the fixed 16N, activations grow with your batch and sequence. Push the batch up and they can overtake everything else — the usual real cause of out-of-memory.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"One clean bar for the weights, 4N bytes\"><rect x=\"20\" y=\"20\" width=\"480\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><rect x=\"20\" y=\"20\" width=\"120\" height=\"36\" rx=\"6\" fill=\"#2A7B9B\"/><text x=\"80\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"13\" fill=\"#FFFFFF\" font-weight=\"700\">weights</text><text x=\"80\" y=\"78\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"13\" fill=\"#2C2A28\">4N bytes</text><text x=\"80\" y=\"98\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#6B645E\">N = 1e9, fp32 = 4 bytes</text><text x=\"80\" y=\"120\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" fill=\"#2A7B9B\" font-weight=\"700\">= 4 GB</text><text x=\"280\" y=\"43\" font-family=\"monospace\" font-size=\"12\" fill=\"#6B645E\">empty bar &#8594; nothing else counted yet</text></svg>", "note": "<b>Start with the number everyone quotes.</b> A 1-billion-parameter model in fp32 (4 bytes per number) is <code>4N = 4 GB</code> of weights. This is the one term most people budget for."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Gradients bar of equal size stacked next to weights\"><rect x=\"20\" y=\"20\" width=\"480\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><rect x=\"20\" y=\"20\" width=\"120\" height=\"36\" fill=\"#2A7B9B\"/><rect x=\"140\" y=\"20\" width=\"120\" height=\"36\" fill=\"#1F6280\"/><text x=\"80\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#FFFFFF\">weights</text><text x=\"200\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#FFFFFF\">grads</text><line x1=\"20\" y1=\"70\" x2=\"140\" y2=\"70\" stroke=\"#6B645E\" stroke-dasharray=\"3,3\"/><line x1=\"140\" y1=\"70\" x2=\"260\" y2=\"70\" stroke=\"#6B645E\" stroke-dasharray=\"3,3\"/><text x=\"140\" y=\"92\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#6B645E\">same size &#8594; a mirror</text><text x=\"140\" y=\"122\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" fill=\"#1F6280\" font-weight=\"700\">4N + 4N = 8 GB</text></svg>", "note": "<b>Every weight needs a slope.</b> A <b>gradient</b> is the slope of the loss with respect to one weight — training keeps exactly one gradient per weight, so it is a same-size shadow: another <code>4N</code>, doubling the running total to <code>8 GB</code>."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Adam adds two moment buffers, doubling the block\"><rect x=\"20\" y=\"20\" width=\"480\" height=\"36\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><rect x=\"20\" y=\"20\" width=\"120\" height=\"36\" fill=\"#2A7B9B\"/><rect x=\"140\" y=\"20\" width=\"120\" height=\"36\" fill=\"#1F6280\"/><rect x=\"260\" y=\"20\" width=\"120\" height=\"36\" fill=\"#5E5191\"/><rect x=\"380\" y=\"20\" width=\"120\" height=\"36\" fill=\"#7C6DAA\"/><text x=\"80\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#FFFFFF\">weights</text><text x=\"200\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#FFFFFF\">grads</text><text x=\"320\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"13\" fill=\"#FFFFFF\">m</text><text x=\"440\" y=\"43\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"13\" fill=\"#FFFFFF\">v</text><path d=\"M260 66 h240\" stroke=\"#C99A12\" stroke-width=\"2\"/><path d=\"M260 66 v10 M500 66 v10\" stroke=\"#C99A12\" stroke-width=\"2\"/><text x=\"380\" y=\"92\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#9A7208\" font-weight=\"700\">Adam's 2x: two full copies</text><text x=\"260\" y=\"130\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" fill=\"#5E5191\" font-weight=\"700\">8N (Adam) added</text><text x=\"260\" y=\"155\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"16\" fill=\"#1F6280\" font-weight=\"700\">running total = 16 GB</text></svg>", "note": "<b>Adam keeps two extra copies per weight.</b> The <b>optimizer</b> is the rule that turns gradients into weight updates — Adam tracks a first moment <code>m</code> and second moment <code>v</code> for every weight, adding <code>2 &#215; 4N = 8N</code>. That is the famous <b>Adam 2x</b>."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Static budget bar chart, four segments summing to 16N\"><rect x=\"20\" y=\"20\" width=\"400\" height=\"40\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><rect x=\"20\" y=\"20\" width=\"100\" height=\"40\" fill=\"#2A7B9B\"/><rect x=\"120\" y=\"20\" width=\"100\" height=\"40\" fill=\"#1F6280\"/><rect x=\"220\" y=\"20\" width=\"100\" height=\"40\" fill=\"#5E5191\"/><rect x=\"320\" y=\"20\" width=\"100\" height=\"40\" fill=\"#7C6DAA\"/><text x=\"70\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#FFFFFF\">4N</text><text x=\"170\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#FFFFFF\">4N</text><text x=\"270\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#FFFFFF\">4N</text><text x=\"370\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#FFFFFF\">4N</text><rect x=\"440\" y=\"14\" width=\"60\" height=\"52\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"470\" y=\"36\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">16N</text><text x=\"470\" y=\"52\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#1F6280\">total</text><line x1=\"220\" y1=\"90\" x2=\"220\" y2=\"110\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"20\" y1=\"110\" x2=\"420\" y2=\"110\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><text x=\"220\" y=\"130\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"13\" fill=\"#2C2A28\" font-weight=\"700\">weights + grads + Adam(m,v) = 16N = 16 GB for N=1e9</text><text x=\"220\" y=\"155\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#C93B3B\">a 16 GB GPU is already full &#8212; before a single batch is loaded</text></svg>", "note": "<b>Four equal 4N blocks make the fixed budget.</b> Weights, gradients, and Adam's two moments are each <code>4N</code>, and none of them depend on batch size or sequence length. Add them up: <code>16N</code> bytes, independent of what you feed the model."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Activations curve rising steeply with batch size, crossing the static line\"><line x1=\"40\" y1=\"170\" x2=\"500\" y2=\"170\" stroke=\"#E5DFD6\" stroke-width=\"1.5\"/><line x1=\"40\" y1=\"20\" x2=\"40\" y2=\"170\" stroke=\"#E5DFD6\" stroke-width=\"1.5\"/><text x=\"270\" y=\"192\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">batch size &#8594;</text><line x1=\"40\" y1=\"90\" x2=\"500\" y2=\"90\" stroke=\"#1F6280\" stroke-width=\"2\" stroke-dasharray=\"5,4\"/><text x=\"455\" y=\"84\" font-family=\"monospace\" font-size=\"11\" fill=\"#1F6280\" font-weight=\"700\">static 16N</text><polyline points=\"40,160 130,140 220,100 300,60 380,25 440,10\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"3\"/><text x=\"400\" y=\"18\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"700\">activations</text><circle cx=\"230\" cy=\"93\" r=\"5\" fill=\"#C93B3B\"/><text x=\"230\" y=\"75\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"700\">crossover</text><text x=\"270\" y=\"200\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"transparent\">.</text></svg>", "note": "<b>Activations grow with your choices, not with N.</b> An <b>activation</b> is a layer's saved output kept for backprop; it scales with <code>batch &#215; sequence &#215; layers</code>. Push the batch up and the activations curve crosses the flat <code>16N</code> line &#8212; the real cause of most out-of-memory crashes."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Total memory stacked bar, static block plus a much taller activations block\"><rect x=\"170\" y=\"90\" width=\"90\" height=\"40\" fill=\"#1F6280\"/><text x=\"215\" y=\"114\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#FFFFFF\">16N static</text><rect x=\"170\" y=\"20\" width=\"90\" height=\"70\" fill=\"#C93B3B\"/><text x=\"215\" y=\"58\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#FFFFFF\">activations</text><text x=\"215\" y=\"10\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#C93B3B\" font-weight=\"700\">grows with batch</text><line x1=\"280\" y1=\"20\" x2=\"280\" y2=\"130\" stroke=\"#6B645E\"/><text x=\"350\" y=\"48\" font-family=\"monospace\" font-size=\"12\" fill=\"#2C2A28\">total = 16N + activations(batch, seq, layers)</text><text x=\"350\" y=\"72\" font-family=\"monospace\" font-size=\"12\" fill=\"#6B645E\">the second term is often the bigger one</text><rect x=\"350\" y=\"90\" width=\"140\" height=\"36\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"420\" y=\"113\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#9A7208\" font-weight=\"700\">size your GPU for BOTH</text></svg>", "note": "<b>Put the two halves together.</b> Total training memory is <code>16N + activations</code> &#8212; a fixed part you cannot shrink without changing dtype, and a variable part you control through batch size and sequence length."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Gradient checkpointing trade-off: recompute versus store\"><rect x=\"20\" y=\"20\" width=\"210\" height=\"120\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"125\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#C93B3B\" font-weight=\"700\">without checkpointing</text><rect x=\"40\" y=\"60\" width=\"20\" height=\"60\" fill=\"#C93B3B\"/><rect x=\"70\" y=\"60\" width=\"20\" height=\"60\" fill=\"#C93B3B\"/><rect x=\"100\" y=\"60\" width=\"20\" height=\"60\" fill=\"#C93B3B\"/><rect x=\"130\" y=\"60\" width=\"20\" height=\"60\" fill=\"#C93B3B\"/><rect x=\"160\" y=\"60\" width=\"20\" height=\"60\" fill=\"#C93B3B\"/><text x=\"125\" y=\"135\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">save every layer's activation</text><rect x=\"290\" y=\"20\" width=\"210\" height=\"120\" rx=\"8\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"395\" y=\"45\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#2D8B55\" font-weight=\"700\">with checkpointing</text><rect x=\"310\" y=\"60\" width=\"20\" height=\"60\" fill=\"#2D8B55\"/><rect x=\"340\" y=\"85\" width=\"20\" height=\"5\" fill=\"#2D8B55\" stroke=\"#2D8B55\" stroke-dasharray=\"2,2\"/><rect x=\"370\" y=\"85\" width=\"20\" height=\"5\" fill=\"#2D8B55\" stroke=\"#2D8B55\" stroke-dasharray=\"2,2\"/><rect x=\"400\" y=\"85\" width=\"20\" height=\"5\" fill=\"#2D8B55\" stroke=\"#2D8B55\" stroke-dasharray=\"2,2\"/><rect x=\"430\" y=\"60\" width=\"20\" height=\"60\" fill=\"#2D8B55\"/><text x=\"395\" y=\"135\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#2D8B55\">keep a few, recompute the rest</text><text x=\"260\" y=\"90\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"18\" fill=\"#6B645E\">&#8594;</text><text x=\"260\" y=\"165\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#2C2A28\" font-weight=\"700\">trade more compute for less activation memory</text></svg>", "note": "<b>The interview punchline: memory and compute are exchangeable.</b> Frontier labs use <b>gradient checkpointing</b> to keep only a handful of activations and recompute the rest during backprop &#8212; a deliberate trade of extra FLOPs for a smaller memory footprint, which is exactly how billion-parameter models fit on fixed hardware."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[{"q": "You train a 1B-param model in fp32 with Adam on a 24 GB GPU. It OOMs the instant you increase batch size from 4 to 32, even though nvidia-smi showed only 16 GB used at batch 4. What is the most likely cause?", "opts": ["The weights got re-copied to a new memory location when the batch size changed", "Activations scale with batch size while weights, gradients, and Adam state (the fixed 16N) do not, so the growing term crossed the remaining ~8 GB headroom", "Adam's learning rate schedule allocates a new moment buffer for every batch size", "fp32 weights silently upcast to fp64 once the batch exceeds a threshold"], "ans": 1, "fb": "Right: the 16N static term (weights 4N + grads 4N + Adam 8N = 16 GB here) is fixed regardless of batch, so the 16 GB baseline at batch 4 was almost entirely static cost, with only a small activation slice. Raising batch 8x scales the activation term roughly 8x, and it blows through the remaining 8 GB. The tempting wrong answer confuses 'memory looked constant at low batch' with 'memory is capped' — but 16 GB at batch 4 already included the full static budget, so there was very little headroom left, and it was the batch-dependent activation term (not the weights) that grew and caused the crash."}, {"q": "A teammate switches optimizer from Adam to plain SGD (no momentum) to 'save memory' but keeps everything else the same. Static memory drops from 16N to 8N. Which term actually got smaller, and why doesn't switching optimizers touch the activation memory at all?", "opts": ["The gradients term shrinks, because SGD computes gradients less precisely than Adam", "The optimizer-state term shrinks from 8N to 0 (SGD keeps no per-weight buffers), and activations depend only on batch × sequence × layers — the optimizer never touches them", "The weights term shrinks, because SGD stores weights in a compressed format", "The activations term shrinks proportionally, since fewer optimizer buffers means fewer values to cache during the forward pass"], "ans": 1, "fb": "Right: Adam's 8N came entirely from the two per-weight moment buffers (m and v); plain SGD keeps none of that state, so optimizer-state memory goes from 8N to 0, and weights (4N) plus gradients (4N) stay untouched, giving 8N static. Activations are produced by the forward pass and sized by batch/sequence/layers — the choice of optimizer never enters that computation, so the activation term is completely unaffected. The tempting wrong answers assume the optimizer touches weights, gradients, or activations directly, but the optimizer only adds bookkeeping on top of the gradients — it doesn't change how they're computed or how activations are cached."}, {"q": "You enable gradient checkpointing on a model that was OOM-ing during training. Memory usage drops and training now fits, but each step takes noticeably longer. What is being traded, and where does the extra time come from?", "opts": ["Checkpointing trades gradient precision for memory — it rounds gradients to a lower precision to save space, which slows down the optimizer step", "Checkpointing trades activation memory for compute — instead of storing every layer's activation, only a few are kept and the rest are recomputed during the backward pass, adding a second forward pass through those layers", "Checkpointing trades weight memory for disk I/O — weights are paged to disk and reloaded on demand, and the extra time is disk latency", "Checkpointing trades batch size for sequence length automatically, and the slowdown comes from the longer sequences"], "ans": 1, "fb": "Right: checkpointing keeps only a handful of activations and, during backprop, recomputes the missing ones by re-running the forward pass for that segment — extra FLOPs in exchange for a smaller activation footprint, which is exactly why wall-clock time per step increases even though memory drops. The tempting wrong answer invokes precision loss or disk paging, which sound like plausible memory-saving tricks in general, but checkpointing doesn't touch numeric precision or storage location at all — it strictly recomputes rather than caches, and weights/gradients/optimizer state are never checkpointed since they don't scale with batch or sequence anyway."}, {"q": "Two teams both train the same 1B-param model with Adam. Team A uses fp32 (4 bytes/param) and reports a 16 GB static footprint. Team B switches to bf16 (2 bytes/param) for weights, gradients, and optimizer state, expecting the static footprint to halve to 8 GB, but their total memory usage barely drops. What is the most likely explanation, and what should Team B check first?", "opts": ["bf16 doesn't actually reduce memory, it only changes numeric range, so the lack of improvement is expected and nothing is wrong", "The static term probably did shrink to roughly 8 GB as predicted, but activations — which scale with batch × sequence × layers and were likely left in fp32 or are simply large at their chosen batch/sequence — now dominate the total, so Team B should check the activation memory and its dtype, not the static term", "Adam's momentum buffers cannot be stored in bf16 under any circumstances, so the optimizer silently upcast everything back to fp32, canceling the savings", "The GPU driver caches the fp32 weights alongside the bf16 weights for safety, doubling memory regardless of dtype choice"], "ans": 1, "fb": "Right: bf16 does halve the bytes-per-param, so the static term (weights+grads+Adam state) should indeed drop toward ~8 GB — the arithmetic in the lesson (static = 16 × N × bytes_per_param/4) confirms this. But the lesson stresses that activations don't scale with N or dtype-of-weights, they scale with batch × sequence × layers, and are 'often the biggest term of all' — so if Team B's batch/sequence is large, or their activations are still stored in fp32, the activation term can dwarf the static savings, explaining the flat total. The tempting wrong answers claim bf16 has no memory benefit or gets silently reverted — both false; the real diagnostic move is to break down the total into static vs. activation terms rather than assume the optimizer or driver undid the dtype change."}];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 1 · Day 4 — Matmul &amp; Shapes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf1-d04-matmul">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M1 Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-03-broadcasting-dtypes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 1 · Represent · Day 4</span>
+    <h1>Matmul &amp; Shapes<br>The One Operation Every Layer Is Built From</h1>
+    <p class="lead">Almost all of the arithmetic in a neural network is a single operation: <strong>matrix multiplication</strong>. Learn its shape rule — <code>(m, k) @ (k, n) = (m, n)</code> — and you can read what any layer does to its data, and why chips are built the way they are.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> read a matmul's output shape from its two input shapes, say why the inner dimensions must match, and explain why a neural-network layer <em>is</em> a matmul.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What matrix multiplication is</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Days 1–3 — arrays, shape, and element-wise math. <b>No new tools</b>. If you multiplied two numbers and summed on Day 1, you already did the core step.</div></div>
+
+      <h4>What is a matmul?</h4>
+      <p><span class="term" data-tip="Matrix multiplication: combine two 2-D arrays so each output entry is the dot product of a row of the first and a column of the second. Written with @.">Matmul</span> (matrix multiplication) combines two 2-D arrays into a new one. Each entry of the result is a <span class="term" data-tip="Multiply two equal-length lists element by element, then add up all the products — one number out.">dot product</span>: take a <strong>row</strong> from the first array and a <strong>column</strong> from the second, multiply them pairwise, and add. In code it's the <code>@</code> operator (or <code>np.matmul</code>).</p>
+
+      <h4>The shape rule (the whole lesson in one line)</h4>
+      <div class="callout c-ok"><span class="ic">📐</span><div><code>(m, k) @ (k, n) = (m, n)</code> — the <strong>inner</strong> dimensions (<code>k</code>) must match and vanish; the <strong>outer</strong> dimensions (<code>m</code>, <code>n</code>) form the result.</div></div>
+
+      <h4>How does it relate to what you know?</h4>
+      <p>On Day 1 you did element-wise math with <code>*</code>. Matmul is different: <code>@</code> does rows-times-columns, not element-by-element. Why care? A neural-network layer <em>is</em> a matmul: <code>y = x @ W</code> (plus a bias). Learn the shape rule and you can trace data through an entire network. Keep going 👇</p>
+      <button class="gotit" type="button">Got what a matmul is — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A mixing board</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🎛️</span><h5>Weights = a mixing board</h5><p>Each output channel is a <strong>weighted blend</strong> of all input channels. The weight matrix says how much each input feeds each output. Matmul does every blend at once.</p></div>
+        <div class="card"><span class="big">🔀</span><h5>A size-changing machine</h5><p>Feed in a vector of size <code>k</code>, get out a vector of size <code>n</code>. The <code>k × n</code> weight table is the machine; the <code>m</code> is just "do this for <code>m</code> examples at once."</p></div>
+      </div>
+      <p><strong>In one line:</strong> matmul turns an input of width <code>k</code> into an output of width <code>n</code> using a <code>k × n</code> table of weights, for all <code>m</code> rows at once.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where it trips people: <code>*</code> is <strong>element-wise</strong> (needs matching shapes, from Day 3), while <code>@</code> is <strong>matmul</strong> (needs matching inner dims). They look similar and do totally different things — mixing them up is a classic bug.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three cases and watch the shapes</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Click each button and track how the inner dimension matches (or doesn't). <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="mm" type="button">① (2,3) @ (3,2)</button>
+          <button class="play-btn" data-demo="bad" type="button">② mismatch (2,3) @ (2,3)</button>
+          <button class="play-btn" data-demo="layer" type="button">③ a dense layer x@W+b</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: read the two shapes side by side — the <em>touching</em> inner numbers must be equal; the <em>outer</em> two become the result.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">The rule exactly — and why chips are matmul machines</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rule, precisely</h4>
+      <ul>
+        <li>To compute <code>A @ B</code>: <code>A</code>'s number of columns must equal <code>B</code>'s number of rows (the inner dims).</li>
+        <li>The result has shape <code>(A rows, B columns)</code>.</li>
+        <li>Each <code>result[i, j]</code> = the dot product of row <code>i</code> of <code>A</code> with column <code>j</code> of <code>B</code>.</li>
+        <li><code>@</code> is matmul; <code>*</code> is element-wise. Never confuse them.</li>
+      </ul>
+
+      <h4>Why a frontier lab cares</h4>
+      <p>A <span class="term" data-tip="A dense (fully-connected / linear) layer: it maps inputs to outputs by y = xW + b, a matmul plus a bias.">dense layer</span> is literally <code>y = x @ W + b</code>. Attention is matmuls too: scores <code>= Q @ Kᵀ</code>, then output <code>= scores @ V</code>. Matmul is where almost all the <span class="term" data-tip="Floating-point operations — a count of the multiply/add work a computation does. Roughly 2·m·k·n for an (m,k)@(k,n) matmul.">FLOPs</span> go, which is exactly why the compute formula <code>C ≈ 6ND</code> (that you'll meet in the scaling-law modules) is really a matmul count — and why GPUs and TPUs are, at heart, giant matmul machines.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> a layer is a matmul → matmul dominates the FLOPs → chips are built to do matmuls fast → the whole scaling story becomes "how many matmuls can you afford." And the most common runtime crash in ML is a matmul with mismatched inner dims.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A mismatched matmul crashes loudly, which is easy to fix. The dangerous matmul bug is the one where the shapes happen to line up but the math is wrong — no crash, no error, just quietly wrong numbers.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a legal matmul that computes the wrong thing (a bug that doesn't announce itself).</b> Two traps. First, writing <code>*</code> when you meant <code>@</code>: with a bias vector <code>(features,)</code> and an activation <code>(batch, features)</code>, <code>*</code> does not error — it broadcasts an element-wise multiply and returns the right-shaped array full of wrong numbers. Second, matmul on a <strong>square</strong> weight, or feeding the un-transposed operand: <code>A @ B</code> and a wrongly-oriented version can both have legal inner dims, so both run, but only one is the layer you meant. A senior engineer catches this in <b>code review</b> by checking that <code>@</code> (not <code>*</code>) is used for layers and by tracing one <code>result[i, j]</code> against "row <code>i</code> of A dotted with column <code>j</code> of B" — if that dot product isn't the quantity you wanted, the orientation is wrong even though the shape is fine.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batching more matmul work vs. memory and latency.</b> Because matmul is where almost all the FLOPs go, chips run it fastest when you hand them big matrices at once — larger batches and wider layers keep the hardware busy and cost less per number. What you pay: bigger matmuls need more memory for their inputs and outputs, and a single huge matmul finishes later than a small one, so interactive latency suffers. In a <b>design review</b> this is the batch-size decision — trade throughput (fill the matmul units) against memory budget and response time.</div></div>
+      <button class="gotit" type="button">Got the rule</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From one dot product to a neural-net layer — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is matmul built one step at a time. First, <strong>play with the live tool</strong> below — set the shapes and click a result cell to see the exact dot product that fills it. Then <strong>scroll down slowly</strong> through the static build underneath, where each piece fades in with a short note. By the bottom you'll read any matmul shape and see the layer hiding inside it.</p>
+      <div class="build-embed"><iframe src="../../viz/matmul.html" title="Interactive matrix multiply" loading="lazy"></iframe>
+      <div class="cap">↑ interactive — drag the m, k, n sliders and click a cell of C. <a href="../../viz/matmul.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Multiply a few matrices and build a layer yourself — that's what makes the day count. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py</code>. Multiply a <code>(2,3)</code> by a <code>(3,2)</code> with <code>@</code> and print the result's shape; try a mismatched <code>(2,3) @ (2,3)</code> in a <code>try/except</code> and print the error; build a dense layer <code>x @ W + b</code> with <code>x</code> shape <code>(1,3)</code> and <code>W</code> shape <code>(3,4)</code>; and show that <code>@</code> and <code>*</code> give different results. Run it with <code>python3 sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 4 artifact.
+
+Create sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py that, with a comment on each step:
+1. Makes A (2,3) and B (3,2); prints (A @ B).shape (expect (2,2)) and the result, noting the inner 3 matched and vanished.
+2. Wraps A @ np.ones((2,3)) in try/except and prints the shape-mismatch error (inner 3 vs 2).
+3. Builds a dense layer: x (1,3), W (3,4), b (4,); prints (x @ W + b) and its shape (1,4), with a comment 'this is a neural-net layer'.
+4. Shows @ vs *: print A @ B (matmul) and A * A (element-wise) to make the difference obvious.
+Then run it and paste the output at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-04-matmul-and-shapes/log.md</code>: in your own words, why must the inner dimensions match?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Module 1 · Day 4 complete!</h3>
+    <p>You can read any matmul's output shape and you know a dense layer is just <code>x @ W + b</code>.<br>Next up: <b>Logs &amp; Exponents</b> — the little bit of math that lets you read a scaling-law plot.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-03-broadcasting-dtypes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  mm:{html:'<span class="prompt">&gt;&gt;&gt;</span> A = np.array([[<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], [<span class="num">4</span>,<span class="num">5</span>,<span class="num">6</span>]])   <span class="dim"># (2,3)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> B = np.array([[<span class="num">1</span>,<span class="num">0</span>], [<span class="num">0</span>,<span class="num">1</span>], [<span class="num">1</span>,<span class="num">0</span>]])   <span class="dim"># (3,2)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> (A @ B).shape      <span class="dim"># inner 3 matches → (2,2)</span>\n'+
+    '<span class="hl">(2, 2)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> A @ B\n<span class="ok">array([[ 4,  2],\n       [10,  5]])</span>',
+    take:'<b>①  The inner dim matches and vanishes.</b> (2,<b>3</b>) @ (<b>3</b>,2) → the 3\'s touch and disappear; the outer 2 and 2 form the result (2,2). Each entry is a row·column dot product.'},
+  bad:{html:'<span class="prompt">&gt;&gt;&gt;</span> A = np.array([[<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], [<span class="num">4</span>,<span class="num">5</span>,<span class="num">6</span>]])   <span class="dim"># (2,3)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> C = np.array([[<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], [<span class="num">4</span>,<span class="num">5</span>,<span class="num">6</span>]])   <span class="dim"># (2,3)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> A @ C\n'+
+    '<span class="bad">ValueError: matmul: Input operand 1 has a\n'+
+    'mismatch in its core dimension ... (size 3 is\n'+
+    'different from 2)</span>',
+    take:'<b>②  Inner dims must match.</b> (2,<b>3</b>) @ (<b>2</b>,3): the touching numbers are 3 and 2 — not equal — so matmul refuses. This exact crash is the #1 shape bug in ML code.'},
+  layer:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([[<span class="num">1.</span>, <span class="num">2.</span>, <span class="num">3.</span>]])        <span class="dim"># (1,3) one input, 3 features</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> W = np.random.rand(<span class="num">3</span>, <span class="num">4</span>)         <span class="dim"># (3,4) weights</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> b = np.zeros(<span class="num">4</span>)                 <span class="dim"># (4,) bias</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> (x @ W + b).shape       <span class="dim"># (1,3)@(3,4)=(1,4), bias broadcast</span>\n'+
+    '<span class="hl">(1, 4)</span>',
+    take:'<b>③  This IS a neural-net layer.</b> y = x @ W + b turned 3 inputs into 4 outputs via a 3×4 weight table, then broadcast the bias (Day 3!) across the row. Every dense layer in every model is this line.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Dot product of two length-3 vectors equals 32'><g font-family='monospace' font-size='14' text-anchor='middle'><text x='90' y='40' fill='#1F6280'>[1, 2, 3]</text><text x='90' y='66' fill='#9A7208'>[4, 5, 6]</text><text x='210' y='53' font-size='16' fill='#6B645E'>→</text><text x='330' y='40' fill='#2C2A28'>1·4 + 2·5 + 3·6</text><text x='330' y='66' fill='#2C2A28'>= 4 + 10 + 18</text><text x='430' y='53' font-size='16' fill='#6B645E'>=</text><rect x='455' y='36' width='44' height='34' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='477' y='59' fill='#1a5c38' font-weight='bold'>32</text><text x='260' y='108' fill='#6B645E' font-size='12'>dot product: multiply pairwise, then add → ONE number</text></g></svg>",
+  note:"<b>Start with a dot product.</b> Multiply two equal-length lists element-by-element, then sum: <code>[1,2,3]·[4,5,6] = 32</code>. One number out. A matmul is just many of these done at once."},
+ {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='A row dotted against each column of a matrix produces a row of outputs'><g font-family='monospace' font-size='13' text-anchor='middle'><text x='70' y='70' fill='#1F6280'>row</text><text x='70' y='88' fill='#1F6280'>[1 2 3]</text><text x='160' y='79' fill='#6B645E'>·</text><rect x='195' y='40' width='36' height='80' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><rect x='235' y='40' width='36' height='80' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='213' y='75' fill='#5E5191'>c</text><text x='213' y='95' fill='#5E5191'>o</text><text x='253' y='75' fill='#5E5191'>c</text><text x='253' y='95' fill='#5E5191'>o</text><text x='233' y='134' fill='#6B645E' font-size='11'>each column</text><text x='320' y='79' fill='#6B645E'>→</text><rect x='360' y='63' width='40' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><rect x='402' y='63' width='40' height='34' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='380' y='86' fill='#1a5c38'>o1</text><text x='422' y='86' fill='#1a5c38'>o2</text><text x='401' y='118' fill='#6B645E' font-size='11'>one output per column</text></g></svg>",
+  note:"<b>One row against many columns.</b> Dot the row with column 1 → first output; with column 2 → second output. A row times a matrix gives a whole row of results — one number per column."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Shape rule (2,3)@(3,4)=(2,4), the inner 3s match and vanish'><g font-family='monospace' font-size='16' text-anchor='middle'><text x='90' y='60' fill='#1F6280'>( 2 ,</text><text x='140' y='60' fill='#C99A12' font-weight='bold'>3</text><text x='158' y='60' fill='#1F6280'>)</text><text x='210' y='60' fill='#6B645E'>@</text><text x='262' y='60' fill='#1F6280'>(</text><text x='282' y='60' fill='#C99A12' font-weight='bold'>3</text><text x='320' y='60' fill='#1F6280'>, 4 )</text><text x='400' y='60' fill='#6B645E'>=</text><rect x='430' y='42' width='72' height='34' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='466' y='65' fill='#1a5c38' font-weight='bold'>(2, 4)</text><line x1='140' y1='68' x2='282' y2='68' stroke='#C99A12' stroke-width='1.5' stroke-dasharray='4,3'/><text x='211' y='90' fill='#9A7208' font-size='11'>inner must match → vanishes</text><text x='260' y='116' fill='#2D8B55' font-size='12' font-weight='bold'>outer dims (2 and 4) survive as the result</text></g></svg>",
+  note:"<b>The shape rule.</b> <code>(2,3) @ (3,4)</code>: the inner 3's match, cancel out, and the outer 2 and 4 become the result <code>(2,4)</code>. This one rule is all you need to trace shapes through a network."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Mismatch (2,3)@(2,3) inner 3 vs 2 raises an error'><g font-family='monospace' font-size='16' text-anchor='middle'><text x='110' y='55' fill='#1F6280'>( 2 ,</text><text x='160' y='55' fill='#C93B3B' font-weight='bold'>3</text><text x='178' y='55' fill='#1F6280'>)</text><text x='220' y='55' fill='#6B645E'>@</text><text x='262' y='55' fill='#1F6280'>(</text><text x='282' y='55' fill='#C93B3B' font-weight='bold'>2</text><text x='320' y='55' fill='#1F6280'>, 3 )</text><text x='215' y='80' fill='#C93B3B' font-size='12'>3 ≠ 2</text><rect x='120' y='92' width='280' height='20' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='1.5'/><text x='260' y='106' font-size='10.5' fill='#C93B3B'>ValueError: matmul core dimension mismatch</text></g></svg>",
+  note:"<b>When it crashes.</b> <code>(2,3) @ (2,3)</code>: the inner numbers are 3 and 2 — not equal — so matmul errors before doing anything. Reading the two inner numbers first is how you catch this instantly."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='A dense layer x(1,3) @ W(3,4) + b = (1,4)'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='40' y='46' width='70' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='75' y='66' fill='#1F6280'>x (1,3)</text><text x='125' y='66' fill='#6B645E'>@</text><rect x='145' y='40' width='80' height='42' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='185' y='65' fill='#5E5191'>W (3,4)</text><text x='240' y='66' fill='#6B645E'>+</text><rect x='258' y='48' width='60' height='28' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='288' y='67' fill='#9A7208'>b (4,)</text><text x='335' y='66' fill='#6B645E'>=</text><rect x='358' y='46' width='72' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='394' y='66' fill='#1a5c38' font-weight='bold'>y (1,4)</text><text x='260' y='108' fill='#2D8B55' font-size='12' font-weight='bold'>y = x @ W + b  —  this is one neural-network layer</text></g></svg>",
+  note:"<b>The layer hiding inside.</b> <code>y = x @ W + b</code>: a matmul turns 3 inputs into 4 outputs, then the bias broadcasts across (Day 3). Stack layers like this and you have a neural network. It's matmuls all the way down."},
+ {viz:"<svg viewBox='0 0 520 140' role='img' aria-label='Attention is matmuls and matmul dominates the FLOPs on matmul-machine chips'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='34' width='130' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='105' y='54' fill='#1F6280'>scores = Q @ Kᵀ</text><rect x='40' y='72' width='130' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='105' y='92' fill='#1F6280'>out = scores @ V</text><text x='195' y='72' fill='#6B645E'>→</text><rect x='230' y='40' width='250' height='58' rx='8' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='355' y='63' fill='#9A7208' font-weight='bold'>matmul ≈ most of the FLOPs</text><text x='355' y='84' fill='#9A7208'>(so C ≈ 6ND is a matmul count)</text><text x='260' y='126' fill='#2C2A28'>GPUs and TPUs are, at heart, giant matmul machines</text></g></svg>",
+  note:"<b>Why it matters at frontier scale.</b> Attention is matmuls (<code>Q @ Kᵀ</code>, then <code>@ V</code>), and matmul is where nearly all the compute goes — that's why the scaling-law formula <code>C ≈ 6ND</code> is really counting matmul work, and why accelerators are designed as matmul engines. Everything you optimize later is about doing matmuls faster or cheaper."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. What is the output shape of <code>(2, 3) @ (3, 4)</code>?',
+  opts:['(3, 3)','(2, 4)','(2, 3)','error'],
+  ans:1, fb:'Right. Inner 3\'s match and vanish; outer 2 and 4 form the result → (2, 4).'},
+ {q:'2. For <code>A @ B</code> to work, what must match?',
+  opts:['A\'s rows and B\'s rows','A\'s columns and B\'s rows (the inner dims)','The dtypes','Nothing — matmul always works'],
+  ans:1, fb:'Right. A\'s column count must equal B\'s row count — the two inner dimensions.'},
+ {q:'3. A dense (linear) layer computes:',
+  opts:['y = x * W (element-wise)','y = x @ W + b (a matmul plus a bias)','y = x + W','y = W only'],
+  ans:1, fb:'Right. y = x @ W + b — a matmul that maps inputs to outputs, plus a broadcast bias.'},
+ {q:'4. A teammate\'s layer runs with no error and the output has the shape they expected, but the model never learns — loss barely moves. You look at the layer and see <code>y = x * W + b</code> where <code>x</code> is <code>(batch, features)</code> and <code>W</code> is also <code>(batch, features)</code>. Where do you look first, and why?',
+  opts:['The learning rate — a stuck loss is always an optimizer problem','The <code>*</code>: it does an element-wise multiply (broadcasting), not the matmul a layer needs, so the shape looks right but every output is the wrong quantity','The dtype — element-wise vs matmul is only a precision issue','Nothing is wrong; <code>*</code> and <code>@</code> are interchangeable when shapes match'],
+  ans:1, fb:'Right. <code>*</code> multiplies element by element and broadcasts, so <code>x * W</code> can produce a plausibly-shaped array without ever mixing features the way <code>x @ W</code> does. A real dense layer is <code>y = x @ W + b</code>. The shape check passes, so the bug is silent — you catch it by confirming the operator is <code>@</code>, not <code>*</code>, before blaming the optimizer.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

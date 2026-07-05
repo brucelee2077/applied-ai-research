@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 11 · Day 1 — Plotting the Parabolas: IsoFLOP Curve Fitting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w11-d01-parabolas">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 11 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-03-execution-data-aggregation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-deriving-scaling-law/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 3 · Week 11 · Day 1 (Mon)</span>
+    <h1>Plotting<br>the Parabolas</h1>
+    <p class="lead">Over the weekend you trained a whole matrix of small addition-transformers, sweeping both parameter count <code>N</code> and token budget <code>D</code>, and you saved every run's final loss. Today you group those runs by compute budget and fit a parabola to each group with <code>scipy.optimize.curve_fit</code> — this is Chinchilla's "Approach 2," and it hands you the exact compute-optimal model size for each budget.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> group your Week 10 training runs into IsoFLOP slices, fit <code>a·log10(N)² + b·log10(N) + c</code> to each slice with <code>curve_fit</code>, find each slice's vertex analytically, and produce a clean (C, N*, D*, L_min) results table for tomorrow's power-law fit.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is an IsoFLOP slice, and what is curve_fit?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Week 10's training matrix — you trained many small addition-transformers, sweeping parameter count <code>N</code> (roughly 1M–15M) and token budget <code>D</code>, and saved every run's compute cost <code>C</code> and final loss <code>L</code>. <b>No prior SciPy or curve-fitting experience needed.</b></div></div>
+
+      <h4>What you already have</h4>
+      <p>Saturday you ran the matrix. Sunday you aggregated it into one clean table of rows: <code>(N, D, C, L)</code>. Here, <span class="term" data-tip="The number of parameters in a model, meaning how many changeable values it has learned.">N</span> is the parameter count, <span class="term" data-tip="The number of training tokens, meaning how many pieces of text the model was trained on.">D</span> is the number of training tokens, <span class="term" data-tip="The total training compute, counted in FLOPs (math operations). For a normal transformer, about 6 times parameters times tokens.">C</span> is the total training compute in FLOPs (floating-point operations) — approximately <code>C = 6 * N * D</code> for a dense transformer's forward-plus-backward pass — and <span class="term" data-tip="The final training loss: one number showing how badly the model still predicts after training. Lower is better.">L</span> is the final training loss.</p>
+
+      <h4>The new idea: an IsoFLOP slice</h4>
+      <p>An <span class="term" data-tip="A group of training runs that all used the same total compute, but split it differently between model size and training tokens.">IsoFLOP slice</span> is a group of runs that all spent the <strong>same</strong> total compute <code>C</code>, but reached it with different <code>(N, D)</code> splits. Example: a big model trained on few tokens, and a small model trained on many tokens, both burning exactly <code>6×10¹⁸</code> FLOPs. "Iso" means "same" — same FLOPs, different shape.</p>
+      <p>Chinchilla's finding (Hoffmann et al. 2022): if you plot final loss against <code>log(N)</code> for one fixed <code>C</code>, you get a <strong>U-shaped curve</strong>, not a straight line down. Too few parameters, and the model is too weak to use even unlimited tokens well. Too many parameters, and — at fixed compute — you starve it of tokens, so it undertrains. Somewhere in between is a genuine minimum: the <span class="term" data-tip="The best number of parameters for one fixed compute budget, giving the lowest possible loss.">compute-optimal N</span> for that exact FLOP budget.</p>
+
+      <h4>Today's tool: curve_fit</h4>
+      <p><code>scipy.optimize.curve_fit</code> is SciPy's general-purpose curve fitter. You give it three things: (1) a function <code>f(x, *params)</code> describing the shape you believe your data follows, (2) your x data, (3) your y data. It hands back <code>popt</code> — the best-fit values for those params — and <code>pcov</code>, a covariance matrix (useful later for error bars).</p>
+      <p>Today's <code>f</code> is nothing exotic — it's a plain second-degree polynomial, a <span class="term" data-tip="A U-shaped curve from the equation y = a*x^2 + b*x + c. Its lowest point marks the best value.">parabola</span>: <code>f(x, a, b, c) = a·x² + b·x + c</code>. You fit about nine of these tiny 3-parameter parabolas, one per FLOP budget, and from each one's <span class="term" data-tip="The lowest point of a parabola (a U-shaped curve). It shows where loss is smallest.">vertex</span> (its lowest point) you read off exactly one number: the loss-optimal <code>N</code> for that compute level.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://matplotlib.org/stable/" target="_blank" rel="noopener">Matplotlib</a> · <a href="https://seaborn.pydata.org/" target="_blank" rel="noopener">Seaborn</a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html" target="_blank" rel="noopener">scipy.optimize.curve_fit</a> · <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Chinchilla paper (Hoffmann et al. 2022)</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Same dough, different pans</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Think of one IsoFLOP slice like baking the <strong>same amount of dough</strong> (fixed compute budget) in different pan shapes (different N/D splits), then tasting which shape browns best.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🥘</span><h5>huge shallow pan = big N, few tokens</h5><p>The dough spreads too thin and never develops flavor. A big model trained on too few tokens — undertrained, no matter how big it is.</p></div>
+        <div class="card"><span class="big">🍮</span><h5>tiny deep pan = small N, tons of tokens</h5><p>It stays gooey in the middle no matter how long you bake it. A small model can't absorb all that data — it's just too weak to use the tokens.</p></div>
+      </div>
+      <p><strong>In one line:</strong> somewhere between those two extremes is a pan shape that bakes best for that exact amount of dough — and you find it by baking six or seven test pans (six or seven values of N), tasting each (measuring loss), and fitting a smooth curve through the results.</p>
+      <p><code>curve_fit</code> is you taking that scatter of taste scores and drawing a parabola through it with a pencil, so you can point exactly at the bottom of the U — even though you never actually baked a pan at that exact precise width.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: dough doesn't come with a convexity guarantee. Your real loss curves might be noisy, slightly asymmetric, or under-sampled near the true minimum, so the "U-shape" you fit is a mathematical idealization of data a baker would call "pretty U-shaped, mostly." The parabola is a good local approximation near the minimum — not a claim that loss is quadratic in log(N) everywhere.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three views of the same fit</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. Our slice is fixed compute <code>C = 6e18</code> FLOPs, with six sampled parameter counts <code>N</code> from 1M to 32M. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="rawspace" type="button">① raw N vs. log(N)</button>
+          <button class="play-btn" data-demo="fit" type="button">② curve_fit + the vertex</button>
+          <button class="play-btn" data-demo="p0" type="button">③ before/after — why you need the fit</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of the fit, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>Group runs by (rounded) target FLOP budget <code>C</code> first — <strong>always</strong>. Never fit a parabola across different budgets; that throws away the IsoFLOP structure entirely (more on this in the gotcha below).</li>
+        <li>Within one slice, transform the x-axis: fit against <code>logN = np.log10(N)</code>, not raw <code>N</code>. N spans orders of magnitude, so raw-space loss curves are skewed and hard to fit; log-space curves are a clean, symmetric bowl.</li>
+        <li><code>curve_fit(parabola, logN, L)</code> returns <code>popt = [a, b, c]</code> — the best-fit curvature, slope, and intercept — and <code>pcov</code>, whose diagonal gives rough parameter uncertainty.</li>
+        <li>The vertex — the parabola's lowest point — sits where the derivative <code>2a·x + b</code> is zero: <code>logN* = -b / (2a)</code>. Exponentiate to get back an actual parameter count: <code>N* = 10 ** logN*</code>.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>D_star = C / (6 * N_star)</code><br><span style="font-size:.85rem;color:var(--text2)">Once you know the compute-optimal N* for this budget, the same <code>C ≈ 6ND</code> approximation used to design the matrix hands you the matching optimal token budget D* for free.</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>One number per budget</strong> — instead of six or nine noisy dots, each FLOP budget collapses to a clean triple: <code>(C, N*, L_min)</code>. That table is exactly what tomorrow's cross-budget power-law fit needs as input.</li>
+        <li><strong>Sign check is a built-in sanity test</strong> — <code>a</code> must come out positive (a smiling U). If it's negative or near zero, this slice's sampled N values didn't actually bracket a real minimum, and you should flag it, not trust its vertex.</li>
+        <li><strong>Composable</strong> — this is the same <code>curve_fit</code> you'll reuse Tuesday for the harder two-variable Chinchilla loss surface, just with a friendlier 3-parameter shape today.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Week 10's training matrix → group by fixed compute C → per-slice loss-vs-log(N) is genuinely U-shaped → fit a parabola per slice → read off the vertex → (C, N*, D*, L_min) table → Tuesday's power-law fit across all budgets.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common mistake:</b> pooling every run together and fitting one giant parabola against log(N) regardless of compute budget. That throws away the whole IsoFLOP structure — you'd just see that bigger overall runs (more N <em>and</em> more D at once) tend to have lower loss, a mostly-monotonic trend, not the intended U-shaped valley. Always <code>groupby</code> the fixed budget first, one parabola per group.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The fit always returns three numbers and a vertex, so it never crashes even when the vertex is nonsense — that gap between "ran fine" and "answered correctly" is exactly what a staff engineer guards.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the vertex sits outside your sampled range.</b> <code>curve_fit</code> happily returns <code>logN* = -b/(2a)</code> even when that minimum lies past your smallest or largest sampled <code>N</code>. The formula just extrapolates the parabola beyond the data, so you get a clean-looking <code>N*</code> that was never bracketed by a real run. Your compute-optimal frontier then bends toward a point you have zero evidence for, and nothing errors. In <b>code review</b>, a senior engineer checks that every reported <code>logN*</code> falls <em>inside</em> <code>[min(logN), max(logN)]</code> for its slice — a vertex outside the sampled window is flagged and re-sampled, not trusted.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a rigid parabola vs. a flexible fit.</b> A 3-parameter parabola is stable — it fits reliably from just six noisy points and gives a closed-form vertex. But it assumes loss is truly quadratic in <code>log(N)</code>, which only holds locally near the bottom of the bowl. If your slice is asymmetric or the true curve is flatter on one side, the parabola pulls the vertex off the real minimum. In a <b>design review</b> you decide: keep the parabola for its stability with sparse data, or spend more runs near the minimum (or use a richer curve) to buy accuracy you can only afford with a denser sweep.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Fit a parabola to every IsoFLOP slice in your real data</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): load Week 10's aggregated <code>(N, D, C, L)</code> dataset, group it into IsoFLOP slices, and fit one parabola per slice with <code>scipy.optimize.curve_fit</code> to find each budget's compute-optimal N.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Script runs end-to-end against the real Week 10 aggregated data file (not placeholder numbers) and exits without error.</li>
+        <li>Every FLOP budget present in the dataset produces exactly one fitted parabola with <code>a &gt; 0</code> (a genuine convex minimum) — any slice failing this check is flagged explicitly in the console output, not silently included in the results table.</li>
+        <li><code>isoflop_minima.csv</code> exists with one row per valid FLOP budget, columns <code>C, N_star, D_star, L_min, a, b, c</code>, and non-null <code>N_star</code>, <code>D_star</code>, <code>L_min</code>.</li>
+        <li>The figure shows, for at least 3 different FLOP budgets, a clear U-shaped scatter with the fitted curve passing close to the sampled points and the vertex marked at or near the visual minimum.</li>
+        <li>This CSV is exactly the file Tuesday's session loads as its starting input — confirm the column names and format are stable before ending the session.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/experiment.py</code> that groups by (rounded) target FLOP budget, fits <code>a·log10(N)² + b·log10(N) + c</code> per group, computes the vertex, and saves the results table and figure under <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 11 Day 1 artifact.
+
+Create sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/experiment.py that:
+1. Loads the Week 10 aggregated (N, D, C, L) dataset, groups rows into IsoFLOP slices by (rounded) target FLOP budget C, and for each slice fits a*log10(N)^2 + b*log10(N) + c via scipy.optimize.curve_fit.
+2. For each slice, checks the sign of the fitted a: if a <= 0, flags that budget explicitly in console output and excludes it from the results table (do not silently include it).
+3. For each valid slice, computes logN_star = -b/(2a), N_star = 10**logN_star, L_min = parabola(logN_star, a, b, c), and D_star = C / (6 * N_star).
+4. Saves sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/isoflop_minima.csv with one row per valid FLOP budget, columns [C, N_star, D_star, L_min, a, b, c].
+5. Saves sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/isoflop_parabolas.png: a Matplotlib/Seaborn small-multiples figure, one subplot per FLOP budget, showing the raw scatter of loss vs. log10(N) with the fitted parabola overlaid and the vertex (N_star, L_min) marked.
+Add a brief comment on each step explaining the IsoFLOP method, then run it to confirm it works end-to-end on the real data.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/log.md</code>: for your smallest FLOP budget, did the fitted <code>a</code> come out positive? If not, what does that tell you about how many distinct <code>N</code> values you sampled at that budget?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete!</h3>
+    <p>You can group training runs into IsoFLOP slices and fit a parabola to each one with <code>curve_fit</code>, reading off the compute-optimal N* and D* straight from the vertex. That's Chinchilla's Approach 2, done by hand.<br>Next: <code>start today</code> → Day 2 is deriving the cross-budget power law.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-03-execution-data-aggregation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-deriving-scaling-law/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  rawspace:{html:'<span class="prompt">&gt;&gt;&gt;</span> Ns = np.array([<span class="num">1e6</span>, <span class="num">2e6</span>, <span class="num">4e6</span>, <span class="num">8e6</span>, <span class="num">16e6</span>, <span class="num">32e6</span>])\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> losses = np.array([<span class="num">1.2739</span>, <span class="num">1.2321</span>, <span class="num">1.2107</span>, <span class="num">1.2004</span>, <span class="num">1.2060</span>, <span class="num">1.2341</span>])\n'+
+    '<span class="dim"># plotted against raw N: points bunch up near 0, skewed, hard to see a bowl</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> logN = np.log10(Ns)\n<span class="ok">[6.0  6.301  6.602  6.903  7.204  7.505]</span>\n'+
+    '<span class="dim"># same points, log-space: evenly spaced, and now they trace a clean U</span>',
+    take:'<b>①  Raw N vs. log(N).</b> N spans orders of magnitude (1M to 32M), so raw-space is skewed. Taking <code>log10(N)</code> spreads the points evenly and turns the loss curve into a symmetric bowl worth fitting.'},
+  fit:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">parabola</span>(x, a, b, c): <span class="kw">return</span> a * x**<span class="num">2</span> + b * x + c\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> popt, pcov = curve_fit(parabola, logN, losses)\n<span class="ok">popt = [0.0902, -1.2448, 5.4975]</span>   <span class="hl"># (a, b, c)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> logN_star = -popt[1] / (<span class="num">2</span> * popt[0])\n<span class="ok">6.9040</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> N_star = <span class="num">10</span> ** logN_star\n<span class="ok">≈ 8.02e6</span>   <span class="hl"># the vertex — compute-optimal N for this budget</span>',
+    take:'<b>②  curve_fit + the vertex.</b> <code>a &gt; 0</code> confirms a genuine U. The vertex <code>-b/(2a)</code> gives the exact loss-minimizing <code>log(N)</code> even though 8.02e6 was never one of the six sampled points.'},
+  p0:{html:'<span class="prompt">&gt;&gt;&gt;</span> best_sampled = losses.min()\n<span class="ok">1.2004</span>   <span class="dim"># the best of only six noisy dots you actually measured</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> L_min = parabola(logN_star, *popt)\n<span class="ok">1.2003</span>   <span class="hl"># the fitted curve\'s minimum — smoother, and lower</span>\n'+
+    '<span class="dim"># without the fit you\'d just report N=8e6 (the closest sample) as "optimal"</span>\n'+
+    '<span class="dim"># with the fit you get the continuous optimum: N*≈8.02e6, not limited to your grid</span>',
+    take:'<b>③  Before/after — why you need the fit.</b> Picking the best raw sample only tells you the best of what you happened to try. The fit interpolates between samples and reads off the true minimum of the underlying curve.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Six training runs spend the same compute C by trading model size N for tokens D\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"190\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"22\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#2C2A28\">One IsoFLOP slice — all six runs cost C = 6e18 FLOPs</text><rect x=\"30\" y=\"55\" width=\"70\" height=\"90\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"65\" y=\"50\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">N=1M</text><rect x=\"110\" y=\"75\" width=\"70\" height=\"70\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"145\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">N=4M</text><rect x=\"190\" y=\"95\" width=\"70\" height=\"50\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"2\"/><text x=\"225\" y=\"90\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"700\" fill=\"#1a5c38\">N=8M</text><rect x=\"270\" y=\"105\" width=\"70\" height=\"40\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"305\" y=\"100\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">N=16M</text><rect x=\"350\" y=\"115\" width=\"70\" height=\"30\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"385\" y=\"110\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">N=32M</text><rect x=\"430\" y=\"120\" width=\"60\" height=\"25\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"460\" y=\"115\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\">N=48M</text><line x1=\"30\" y1=\"160\" x2=\"490\" y2=\"160\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"178\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">width = tokens D  ·  height = params N  ·  every box has the same area = C</text></svg>", "note": "<b>An IsoFLOP slice fixes the total compute C</b> and varies how it is split between model size N and token count D. Small-N boxes must stretch wide (more tokens) to reach the same area; big-N boxes stay narrow (fewer tokens) — same FLOPs, different shape."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Raw N axis bunches points near zero versus log10 N axis spacing them evenly\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"200\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"20\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">Why fit against log10(N), not raw N</text><line x1=\"40\" y1=\"55\" x2=\"480\" y2=\"55\" stroke=\"#E5DFD6\" stroke-width=\"2\"/><circle cx=\"46\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><circle cx=\"49\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><circle cx=\"55\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><circle cx=\"70\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><circle cx=\"110\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><circle cx=\"200\" cy=\"55\" r=\"4\" fill=\"#C93B3B\"/><text x=\"40\" y=\"75\" font-size=\"10\" fill=\"#C93B3B\">raw N: 1M 2M 4M 8M 16M 32M — squeezed together, skewed</text><line x1=\"40\" y1=\"140\" x2=\"480\" y2=\"140\" stroke=\"#E5DFD6\" stroke-width=\"2\"/><circle cx=\"55\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><circle cx=\"128\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><circle cx=\"201\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><circle cx=\"274\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><circle cx=\"347\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><circle cx=\"420\" cy=\"140\" r=\"4\" fill=\"#2D8B55\"/><text x=\"40\" y=\"160\" font-size=\"10\" fill=\"#2D8B55\">log10(N): 6.0  6.3  6.6  6.9  7.2  7.5 — evenly spaced</text><text x=\"40\" y=\"185\" font-size=\"10\" fill=\"#6B645E\">Evenly spaced points trace a clean symmetric bowl. A parabola can actually fit that.</text></svg>", "note": "<b>N spans orders of magnitude, so the raw scale is skewed.</b> Taking <code>logN = np.log10(N)</code> spreads the six sample points evenly, turning the loss curve into a clean, symmetric bowl worth fitting a parabola to."}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Scatter of six loss points plotted against log10 N tracing a U shape\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"220\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"18\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">The measured data: loss vs. log10(N), six noisy dots</text><line x1=\"50\" y1=\"180\" x2=\"480\" y2=\"180\" stroke=\"#2C2A28\" stroke-width=\"1\"/><line x1=\"50\" y1=\"30\" x2=\"50\" y2=\"180\" stroke=\"#2C2A28\" stroke-width=\"1\"/><text x=\"260\" y=\"205\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">log10(N)  →</text><text x=\"20\" y=\"105\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\" transform=\"rotate(-90 20 105)\">loss L</text><circle cx=\"80\" cy=\"120\" r=\"5\" fill=\"#2A7B9B\"/><circle cx=\"150\" cy=\"75\" r=\"5\" fill=\"#2A7B9B\"/><circle cx=\"220\" cy=\"45\" r=\"5\" fill=\"#2A7B9B\"/><circle cx=\"290\" cy=\"38\" r=\"5\" fill=\"#2A7B9B\"/><circle cx=\"360\" cy=\"48\" r=\"5\" fill=\"#2A7B9B\"/><circle cx=\"430\" cy=\"90\" r=\"5\" fill=\"#2A7B9B\"/><text x=\"80\" y=\"135\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">1M</text><text x=\"150\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">2M</text><text x=\"220\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">4M</text><text x=\"290\" y=\"53\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">8M</text><text x=\"360\" y=\"63\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">16M</text><text x=\"430\" y=\"105\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">32M</text><text x=\"470\" y=\"30\" text-anchor=\"end\" font-size=\"10\" fill=\"#C93B3B\">too small, weak</text><text x=\"470\" y=\"120\" text-anchor=\"end\" font-size=\"10\" fill=\"#C93B3B\">too big, undertrained</text></svg>", "note": "<b>Plot the six measured points and a U-shape appears.</b> Too little N and the model is too weak to use its tokens; too much N at fixed compute starves it of tokens. The minimum sits somewhere in between — but only at one of the six sampled points so far."}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"A smooth parabola drawn through the six scattered points via curve_fit\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"220\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"18\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">curve_fit draws a parabola through the scatter</text><line x1=\"50\" y1=\"180\" x2=\"480\" y2=\"180\" stroke=\"#2C2A28\" stroke-width=\"1\"/><line x1=\"50\" y1=\"30\" x2=\"50\" y2=\"180\" stroke=\"#2C2A28\" stroke-width=\"1\"/><path d=\"M 60 130 Q 260 15 460 100\" fill=\"none\" stroke=\"#2A7B9B\" stroke-width=\"2.5\"/><circle cx=\"80\" cy=\"120\" r=\"4\" fill=\"#6B645E\"/><circle cx=\"150\" cy=\"75\" r=\"4\" fill=\"#6B645E\"/><circle cx=\"220\" cy=\"45\" r=\"4\" fill=\"#6B645E\"/><circle cx=\"290\" cy=\"38\" r=\"4\" fill=\"#6B645E\"/><circle cx=\"360\" cy=\"48\" r=\"4\" fill=\"#6B645E\"/><circle cx=\"430\" cy=\"90\" r=\"4\" fill=\"#6B645E\"/><text x=\"120\" y=\"210\" font-size=\"11\" font-family=\"monospace\" fill=\"#1F6280\">f(x,a,b,c) = a·x² + b·x + c</text><text x=\"330\" y=\"210\" font-size=\"11\" font-family=\"monospace\" fill=\"#2D8B55\">popt = [a, b, c]</text></svg>", "note": "<b><code>scipy.optimize.curve_fit(parabola, logN, L)</code> finds the best-fit smooth curve</b> through the noisy dots. It returns <code>popt = [a, b, c]</code> — three numbers describing the exact bowl shape that best explains what you measured."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"The parabola vertex marked at the bottom of the U, where the slope is zero\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"210\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"18\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">The vertex: where the slope 2a·x + b hits zero</text><line x1=\"50\" y1=\"170\" x2=\"480\" y2=\"170\" stroke=\"#2C2A28\" stroke-width=\"1\"/><path d=\"M 60 130 Q 260 15 460 100\" fill=\"none\" stroke=\"#2A7B9B\" stroke-width=\"2.5\"/><line x1=\"70\" y1=\"122\" x2=\"170\" y2=\"70\" stroke=\"#C99A12\" stroke-width=\"1.5\" stroke-dasharray=\"3,3\"/><line x1=\"350\" y1=\"70\" x2=\"450\" y2=\"106\" stroke=\"#C99A12\" stroke-width=\"1.5\" stroke-dasharray=\"3,3\"/><text x=\"90\" y=\"105\" font-size=\"9\" fill=\"#9A7208\">slope negative</text><text x=\"380\" y=\"95\" font-size=\"9\" fill=\"#9A7208\">slope positive</text><line x1=\"258\" y1=\"25\" x2=\"258\" y2=\"170\" stroke=\"#E5DFD6\" stroke-dasharray=\"4,3\"/><circle cx=\"258\" cy=\"29\" r=\"6\" fill=\"#C93B3B\" stroke=\"#fff\" stroke-width=\"1.5\"/><text x=\"258\" y=\"200\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" font-weight=\"700\" fill=\"#C93B3B\">logN* = -b / (2a)</text></svg>", "note": "<b>The parabola's lowest point is the vertex</b>, found where its derivative <code>2a·x + b</code> equals zero: <code>logN* = -b/(2a)</code>. Left of it the slope is negative (loss still falling), right of it positive (loss rising) — the vertex is the exact turning point."}, {"viz": "<div class=\"dgram col\"><div class=\"dgram\"><span class=\"node hot\">logN_star = 6.9040</span><span class=\"arrow\">&#8594;</span><span class=\"node ok\">N_star = 10**logN_star &#8776; 8.02e6</span></div><div class=\"dgram\"><span class=\"node ok\">N_star</span><span class=\"arrow\">&#8594;</span><span class=\"node\">D_star = C / (6 &#183; N_star)</span></div><div class=\"dgram\"><span class=\"node dim\">C, N_star, D_star</span><span class=\"arrow\">&#8594;</span><span class=\"node ok\">L_min = parabola(logN_star, a, b, c) &#8776; 1.2003</span></div></div>", "note": "<b>Exponentiate to leave log-space, then reuse <code>C ≈ 6ND</code>.</b> <code>N_star = 10**logN_star</code> gives the compute-optimal parameter count; the same FLOPs approximation used to build the training matrix hands you the matching <code>D_star</code> and the fitted minimum loss <code>L_min</code> for free."}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Comparing a genuine convex fit with a>0 against a broken fit with a≤0 that has no real minimum\"><rect x=\"0\" y=\"0\" width=\"520\" height=\"220\" fill=\"#FFFFFF\"/><text x=\"260\" y=\"18\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">The sanity check: a must come out positive</text><rect x=\"30\" y=\"35\" width=\"210\" height=\"165\" rx=\"8\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.5\"/><text x=\"135\" y=\"55\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1a5c38\">a &gt; 0 — smiling U</text><path d=\"M 55 150 Q 135 75 215 150\" fill=\"none\" stroke=\"#2D8B55\" stroke-width=\"2.5\"/><circle cx=\"135\" cy=\"90\" r=\"4\" fill=\"#1a5c38\"/><text x=\"135\" y=\"185\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">real minimum — keep this slice</text><rect x=\"280\" y=\"35\" width=\"210\" height=\"165\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"385\" y=\"55\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#C93B3B\">a &#8804; 0 — flat or frowning</text><path d=\"M 305 100 Q 385 145 465 90\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"2.5\" stroke-dasharray=\"5,4\"/><text x=\"385\" y=\"185\" text-anchor=\"middle\" font-size=\"9\" fill=\"#C93B3B\">no minimum bracketed — flag and exclude</text></svg>", "note": "<b>The interview punchline: sign of <code>a</code> is a built-in correctness test.</b> A frontier scaling-law pipeline runs this per budget across many slices unattended, so any slice whose sampled N values fail to bracket a real minimum (<code>a &#8804; 0</code>) must be flagged explicitly, never silently folded into the compute-optimal frontier that tomorrow's power-law fit depends on."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. What makes a group of runs one "IsoFLOP slice"?',
+  opts:['They all used the same parameter count N','They all spent the same total training compute C, with different (N, D) splits','They all trained for the same number of steps','They all reached the same final loss'],
+  ans:1, fb:'Right. "Iso" means "same" — an IsoFLOP slice is a set of runs that all burned the same FLOP budget C, achieved via different N/D splits.'},
+ {q:'2. Why fit the parabola against <code>log10(N)</code> instead of raw N?',
+  opts:['log10 makes curve_fit run faster','N spans orders of magnitude, so raw-space curves are skewed; log-space gives a clean, symmetric bowl to fit','curve_fit only accepts logged inputs','log10(N) removes noise from the loss measurements'],
+  ans:1, fb:'Right. N ranges over orders of magnitude (1M to 32M+), so plotting against raw N skews the curve. log10(N) spreads points evenly and produces the symmetric U-shape a parabola can fit well.'},
+ {q:'3. After <code>popt = [a, b, c]</code> comes back from <code>curve_fit</code>, how do you find the compute-optimal N*?',
+  opts:['N* = popt[2] (the intercept c)','Take logN_star = -b/(2a), the vertex where the derivative is zero, then N_star = 10**logN_star','N* is just the largest N in your samples','N* = a + b + c'],
+  ans:1, fb:'Right. The vertex of a·x²+b·x+c sits where its derivative 2a·x+b equals zero, i.e. x* = -b/(2a). Exponentiating logN_star with 10** converts back out of log-space to get N* in actual parameter count.'},
+ {q:'4. Your pipeline runs clean: every slice fits with <code>a &gt; 0</code> and prints an <code>N*</code>. But one slice reports a compute-optimal <code>N*</code> that is <em>larger</em> than the biggest model you ever trained in that slice. Nothing errored. Where do you look first, and why?',
+  opts:['Nowhere — a &gt; 0 already proved the fit is valid, so trust the N*','Check whether logN* = -b/(2a) fell OUTSIDE [min(logN), max(logN)] for that slice; if so the fit extrapolated the vertex past your data, so N* was never bracketed by a real run and must be re-sampled, not trusted','Re-run curve_fit with a higher iteration limit until N* lands inside the range','Switch that slice from log10(N) back to raw N so the vertex moves inward'],
+  ans:1, fb:'Right. a &gt; 0 only confirms the parabola smiles — it does not confirm the minimum sits inside your sampled window. curve_fit will happily extrapolate the vertex beyond your largest (or smallest) sampled N, giving a clean-looking N* backed by zero data. The first check is always whether logN* lies inside [min(logN), max(logN)] for that slice; a vertex outside the sampled range is flagged and re-sampled, never silently folded into the frontier. Raising the iteration limit or switching axes does not add the missing data point.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

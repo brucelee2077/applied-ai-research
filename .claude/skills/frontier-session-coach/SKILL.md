@@ -108,6 +108,8 @@ Engine hooks the inline JS depends on (copy from reference page, do not rename):
    the learner has interacted. This is the centerpiece — make it genuinely illuminating.
 4. **机制/为什么 Mechanism & why** — the precise rule + the reason it matters for frontier
    labs. Define every term (compiler, XLA, etc.) on first use. End with a one-line causal chain.
+   Include a named failure-mode callout and a named trade-off callout — see Staff Lens in
+   `TEACHING_PRINCIPLES.md`.
 5. **Build it up (scroll-reveal visual)** — `data-sec="build"`. NOT a click-through code
    stepper (the user dislikes clicking "Next" through 20 text steps — see the
    `lesson-walkthrough-scroll-reveal` memory). Instead: a data-driven `var BUILD=[{viz, note}, …]`
@@ -119,7 +121,8 @@ Engine hooks the inline JS depends on (copy from reference page, do not rename):
    the `.gotit` until all steps have scrolled into view. Prefer real diagrams over walls of code.
    Where a matching `sessions/viz/` visualization exists, embed it as the first build step.
 6. **自测 Quiz** — 4 clickable multiple-choice questions with instant feedback + explanation.
-   Gate `.gotit` until all answered.
+   Gate `.gotit` until all answered. At least one question must be diagnostic-style, not
+   recall — see Staff Lens in `TEACHING_PRINCIPLES.md`.
 7. **产出 Produce** — the day's artifact (file + path + acceptance criteria). Offer two paths:
    (A) do it yourself, (B) a copy-paste prompt that triggers the right skill to build it:
    - code/experiment → `frontier-experiment-lab`

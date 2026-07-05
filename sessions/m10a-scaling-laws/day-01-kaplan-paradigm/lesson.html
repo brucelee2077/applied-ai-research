@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 5 · Day 1 — The Kaplan Paradigm: Scaling Laws for Neural Language Models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w05-d01-kaplan">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 5 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../../week-m9e/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M9e · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-chinchilla-correction/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Chinchilla Correction</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 2 · Week 5 · Day 1 (Mon)</span>
+    <h1>The Kaplan Paradigm<br>Scaling Laws for Neural Language Models</h1>
+    <p class="lead">You now understand a transformer's mechanics inside and out — attention, training loops, the whole engine. Today's question is different: if you could only turn <em>one</em> knob to make a model better, which knob matters most — <em>how big</em> the model is, or <em>how much data</em> it sees? In 2020, Kaplan et al. measured this across hundreds of models and found a surprisingly clean, lopsided answer.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain what a power-law scaling curve is, state the Kaplan compute-optimal exponents (<code>N ∝ C<sup>0.73</sup></code>, <code>D ∝ C<sup>0.27</sup></code>), work a numeric example of splitting a compute budget, and name the key gotcha (C vs. C_min) before the Chinchilla correction arrives later this week.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is a scaling law, and what did Kaplan et al. find?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Weeks 1–4 — you know what a transformer's parameters (<code>N</code>) and training data (<code>D</code>) are, and roughly what a training run costs in compute. <b>No prior scaling-law experience needed.</b></div></div>
+
+      <h4>The question this paper asks</h4>
+      <p>You've now built and understood a transformer. A natural next question: if you want a <span class="term" data-tip="A smaller error score on text the model did not train on, meaning it predicts new text better.">lower test loss</span> (the model predicts held-out text better), what should you spend your money on? Two knobs, both of which help:</p>
+      <ul>
+        <li><strong>Model size <code>N</code></strong> — the number of parameters (weights) in the model. Bigger <code>N</code> means more capacity to represent patterns.</li>
+        <li><strong>Dataset size <code>D</code></strong> — how many tokens (roughly, words/word-pieces) the model trains on.</li>
+      </ul>
+      <p>In 2020, Jared Kaplan and collaborators at OpenAI trained hundreds of transformer language models — spanning more than <strong>6 orders of magnitude</strong> in parameter count and <strong>8 orders of magnitude</strong> in training compute — all on the same text corpus (WebText2), and measured the cross-entropy loss on held-out text for each one.</p>
+
+      <h4>The answer: loss follows a power law</h4>
+      <p>A <span class="term" data-tip="A relationship where y equals a constant times x raised to a fixed power. It looks like a straight line on a log-log plot.">power law</span> means: if you plot loss against <code>N</code> (or <code>D</code>, or compute <code>C</code>) on a <strong>log-log plot</strong> (both axes stretched so each step multiplies by 10 instead of adding 1), the points fall on a nearly straight line. That's a very clean, very unusual finding — it held almost independent of architecture details like depth or width.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>Because both <code>N</code> and <code>D</code> reduce loss, and because your total compute <code>C</code> is limited, the paper asks: for a <strong>fixed compute budget</strong>, how should you split it between "bigger model" and "more data"? <br><span style="font-size:.85rem;color:var(--text2)">Their headline answer is lopsided: grow <code>N</code> almost as fast as compute itself (<code>N ∝ C<sup>0.73</sup></code>), and grow <code>D</code> much more slowly (<code>D ∝ C<sup>0.27</sup></code>). This is the "Kaplan paradigm" — and it's part of the thinking that shaped GPT-3's design.</span></div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>The catch arrives later this week, not today: this 2020 finding was later revised by the 2022 Chinchilla paper. Hold today's conclusion clearly in mind first — you'll need it as the "before" picture when the correction shows up.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official sources (optional): <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">Kaplan et al. 2020, "Scaling Laws for Neural Language Models"</a> · <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Vlad Feinberg's Princeton talk slides on scaling laws</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A kitchen with a fixed one-time budget</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Imagine you're opening a new restaurant with a fixed, one-time budget. You can spend the money on two things.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🍳🧑‍🍳</span><h5>Kitchen size = model size N</h5><p>Bigger ovens, more stations, more cooks. This is the kitchen's raw capacity to represent and produce complex dishes — like a model's parameters.</p></div>
+        <div class="card"><span class="big">🥕📦</span><h5>Pantry size = dataset size D</h5><p>More ingredients, more practice services before opening night. This is the raw material the kitchen learns from — like a model's training tokens.</p></div>
+      </div>
+      <p><strong>Kaplan's finding, in one line:</strong> for a fixed total budget, you get a better result by spending most of the money on a much bigger kitchen and only a little more on extra ingredients. A huge kitchen with a modestly bigger pantry beats a modest kitchen with a huge pantry, dollar for dollar.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a kitchen's skill doesn't decay if it never uses all its ingredients. But Kaplan's models are deliberately stopped <em>before</em> they finish learning from all the data — it's less like leftover ingredients, and more like closing practice service early because the next dollar is better spent on equipment than on the next minute of practice. Also, unlike independent purchases, <code>N</code> and <code>D</code> interact: a kitchen too big for its pantry "overfits" — the paper captures this with a combined formula, coming up in Section 4.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three ways to read the exponents</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal, working through the paper's fitted numbers. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="allocation" type="button">① split a compute budget: N vs. D</button>
+          <button class="play-btn" data-demo="perparam" type="button">② loss per doubling of N</button>
+          <button class="play-btn" data-demo="sampleeff" type="button">③ sample efficiency: bigger models need less extra data</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The three power laws, and why "favor parameters" follows</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The three individual power laws</h4>
+      <ul>
+        <li><strong>Loss vs. model size:</strong> <code>L(N) = (N_c / N)^{α_N}</code>, with <code>α_N ≈ 0.076</code> and <code>N_c ≈ 8.8×10^13</code> (non-embedding parameters), holding <code>D</code> effectively infinite.</li>
+        <li><strong>Loss vs. dataset size:</strong> <code>L(D) = (D_c / D)^{α_D}</code>, with <code>α_D ≈ 0.103</code>, holding <code>N</code> effectively infinite and training to convergence.</li>
+        <li><strong>Loss vs. compute:</strong> a third power law in <code>C_min</code>, the compute you'd need if you trained at the compute-optimal <em>critical batch size</em> rather than an arbitrary fixed batch size (Section 5 of the paper).</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> <code>N_c</code>, <code>D_c</code> are normalization constants fit to WebText2 with a specific tokenizer — the paper is explicit that they have no fundamental meaning on their own. Only the exponents (<code>α_N</code>, <code>α_D</code>) are the transferable finding.</div></div>
+
+      <h4>Why "favor parameters" follows: the compute-optimal split</h4>
+      <p>Training compute is roughly <code>C ≈ 6·N·D</code> FLOPs (one forward+backward pass, standard accounting). Given a fixed <code>C_min</code> budget, the paper asks how to split it between model size <code>N</code>, batch size <code>B</code>, and training steps <code>S</code> to minimize loss. Their empirically-fit answer:</p>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>N ∝ C_min^0.73</code> &nbsp;·&nbsp; <code>B ∝ C_min^0.24</code> &nbsp;·&nbsp; <code>S ∝ C_min^0.03</code><br><span style="font-size:.85rem;color:var(--text2)">Since one epoch processes <code>D = S·B</code> tokens, this implies <code>D_opt ∝ C_min^{0.03+0.24} = C_min^0.27</code> — matching the paper's directly-fit result. Almost all extra compute buys a <strong>bigger model</strong>, barely any buys more <strong>training steps</strong>.</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>Stop before convergence</strong> — because <code>S</code> barely grows with compute, compute-optimal training means training a big model briefly, not training it to its loss floor.</li>
+        <li><strong>Sample efficiency</strong> — the overfitting-avoidance relation <code>D ∝ N^{α_N/α_D} ≈ N^0.74</code> (Section 6) means bigger models need proportionally less extra data per extra parameter than you'd naively expect.</li>
+        <li><strong>Shaped early LLM design</strong> — this reasoning is part of the intellectual lineage behind GPT-3's 175B-parameter, comparatively data-modest design.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> transformer mechanics (Weeks 1–4) → clean power laws in loss vs. N, D, C → fixed compute forces a trade-off → the fitted exponents say "grow N fast, D slowly" → GPT-3-era design choices.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Kaplan's exponents shaped a whole era of models — and then got corrected. A staff engineer knows why a clean-looking fit can mislead, and what the N-vs-D split really costs.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): trusting a scaling-law fit whose training procedure was biased.</b> Kaplan used one learning-rate-schedule length for every model size, so small models were stopped before annealing to their own loss floor. Nothing errors — the power laws look clean and authoritative — but that size-dependent bias tilted the exponents toward "always make the model bigger," steering the field into over-parameterized, under-trained models (the GPT-3 era) until Chinchilla caught it. A senior engineer checks <em>how</em> the curve was fit (schedule length, early stopping) before trusting the exponents.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: parameters now vs. serving cost forever.</b> At fixed compute <code>C ≈ 6ND</code>, every extra FLOP either grows <code>N</code> or grows <code>D</code>. Kaplan's answer (grow <code>N</code> fast, <code>D</code> slowly) minimizes <em>training</em> loss — but <code>N</code> sets inference cost for the life of the model, while <code>D</code> is paid once. Favoring parameters can win the training benchmark and lose the deployment budget. Which way to lean is a <b>design-review</b> call, not just a curve fit.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Write reading notes on the three power laws</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): this is a paper/blog reading day — read the Kaplan paper and the Feinberg slides, and capture the core numbers in your own notes. No coding task today.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Restate the three core power laws — <code>L(N)</code>, <code>L(D)</code>, <code>L(C_min)</code> — with their fitted exponents: <code>α_N ≈ 0.076</code>, <code>α_D ≈ 0.103</code>, pulled from the paper.</li>
+        <li>Reproduce the compute-optimal allocation table: <code>N ∝ C_min^0.73</code>, <code>B ∝ C_min^0.24</code>, <code>S ∝ C_min^0.03</code>, <code>D_opt ∝ C_min^0.27</code>.</li>
+        <li>Include the worked numeric example: a 100x compute increase → N grows ≈30x, D grows ≈3.7x; and a 10,000x compute increase → N grows ≈832x, D grows ≈12x.</li>
+        <li>End with a 3–5 sentence "what would change your mind" note flagging that this is the <strong>pre-Chinchilla</strong> view, to be revisited later this week.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m10a-scaling-laws/day-01-kaplan-paradigm/w05_d01_kaplan_scaling_laws_notes.md</code> with the four bullets above, verified against the arXiv paper text.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-paper-course</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-paper-course to build my Week 5 Day 1 artifact.
+
+Create sessions/m10a-scaling-laws/day-01-kaplan-paradigm/w05_d01_kaplan_scaling_laws_notes.md that:
+1. Restates the three core power laws L(N), L(D), L(C_min) with their fitted exponents (α_N≈0.076, α_D≈0.103) pulled from Kaplan et al. 2020 ("Scaling Laws for Neural Language Models", arXiv:2001.08361).
+2. Reproduces the compute-optimal allocation table N∝C_min^0.73, B∝C_min^0.24, S∝C_min^0.03, D_opt∝C_min^0.27, with a fully worked numeric example for both a 100x and a 10,000x compute scale-up.
+3. Ends with a 3-5 sentence "what would change your mind" note flagging that this is the pre-Chinchilla view, to be revisited later in Week 5.
+Verify every exponent against the paper text before writing it down.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After writing it, write one line in <code>sessions/m10a-scaling-laws/day-01-kaplan-paradigm/log.md</code>: why does the paper warn against quoting the compute exponent against ordinary fixed-batch compute <code>C</code> instead of <code>C_min</code>? (Hint: they're fit differently — one paper fit gives <code>N ∝ C^0.88</code> instead.)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete!</h3>
+    <p>You can now state the Kaplan compute-optimal split from memory — grow N fast (<code>C^0.73</code>), grow D slowly (<code>C^0.27</code>) — and you know exactly why it follows from three clean power laws. Hold this picture steady: it's the "before" for the correction coming later this week.<br>Next: <code>start today</code> → Day 2 is the Chinchilla Correction.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../../week-m9e/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M9e · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-chinchilla-correction/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Chinchilla Correction</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  allocation:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># paper\'s fitted compute-optimal exponents (Section 6)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> N_exp, B_exp, S_exp = <span class="num">0.73</span>, <span class="num">0.24</span>, <span class="num">0.03</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> D_exp = B_exp + S_exp   <span class="dim"># one epoch: D = S * B tokens</span>\n<span class="ok">0.27</span>   <span class="hl"># matches the paper\'s directly-fit D_opt ∝ C_min^0.27</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> compute_growth = <span class="num">100</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> compute_growth ** N_exp, compute_growth ** D_exp\n<span class="ok">(≈30x model growth, ≈3.7x data growth)</span>\n'+
+    '<span class="dim"># a 100x bigger compute budget → model grows ~30x, data grows only ~3.7x</span>',
+    take:'<b>①  Splitting a compute budget.</b> N ∝ C_min^0.73 and D ∝ C_min^0.27 mean nearly all extra compute should buy a bigger model, not more data — the paper\'s headline "favor parameters" result.'},
+  perparam:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># L(N) = (N_c / N)^alpha_N, alpha_N ≈ 0.076</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> alpha_N = <span class="num">0.076</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss_ratio_per_doubling = <span class="num">2</span> ** (-alpha_N)\n<span class="ok">0.949</span>   <span class="hl"># ~5% loss reduction each time N doubles</span>\n'+
+    '<span class="dim"># modest per-doubling gain — this is why the paper needed 6+ orders of magnitude of N to see the line clearly</span>',
+    take:'<b>②  Loss falls slowly per doubling.</b> Doubling N only cuts loss by ~5% (2^-0.076 ≈ 0.949). You need many orders of magnitude of scale to move loss substantially.'},
+  sampleeff:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># overfitting-avoidance relation: D ∝ N^(alpha_N/alpha_D) ≈ N^0.74</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> N_small, N_big = <span class="num">10e6</span>, <span class="num">1e9</span>   <span class="dim"># 100x bigger model</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> (N_big / N_small) ** <span class="num">0.74</span>\n<span class="ok">≈32x</span>   <span class="hl"># not 100x!</span>\n'+
+    '<span class="dim"># the 1B model needs only ~32x more data to match the 10M model\'s overfitting risk, not 100x more</span>',
+    take:'<b>③  Bigger models are more sample-efficient.</b> D ∝ N^0.74 is sub-linear — each extra parameter needs proportionally less extra data than you\'d naively expect.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Loss curves for N and D flatten on a linear plot\"><text x=\"10\" y=\"20\" font-family=\"DM Sans,sans-serif\" font-size=\"13\" fill=\"#2C2A28\" font-weight=\"600\">Two knobs reduce loss L (linear axes, linear scale)</text><line x1=\"50\" y1=\"160\" x2=\"500\" y2=\"160\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"50\" y1=\"160\" x2=\"50\" y2=\"30\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><text x=\"270\" y=\"180\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\" text-anchor=\"middle\">model size N (linear)</text><text x=\"20\" y=\"95\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\" transform=\"rotate(-90 20 95)\" text-anchor=\"middle\">loss L</text><path d=\"M60,40 Q120,120 480,150\" fill=\"none\" stroke=\"#2A7B9B\" stroke-width=\"2.5\"/><text x=\"330\" y=\"140\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2A7B9B\">L vs N &#8212; curve flattens, hard to read</text></svg>", "note": "<b>Two knobs shrink test loss: model size N and dataset size D.</b> Plotted on ordinary linear axes, the relationship looks like a flattening curve &#8212; useful, but it hides the pattern Kaplan et al. actually found."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Same data on log-log axes forms a straight line\"><text x=\"10\" y=\"20\" font-family=\"DM Sans,sans-serif\" font-size=\"13\" fill=\"#2C2A28\" font-weight=\"600\">Same data, log-log axes &#8594; a straight line</text><line x1=\"55\" y1=\"170\" x2=\"495\" y2=\"170\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"55\" y1=\"170\" x2=\"55\" y2=\"30\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><text x=\"140\" y=\"188\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\">10^6</text><text x=\"260\" y=\"188\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\">10^9</text><text x=\"400\" y=\"188\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\">10^12</text><text x=\"20\" y=\"100\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\" transform=\"rotate(-90 20 100)\">log(loss L)</text><line x1=\"70\" y1=\"50\" x2=\"480\" y2=\"150\" stroke=\"#2A7B9B\" stroke-width=\"2.5\"/><circle cx=\"110\" cy=\"62\" r=\"3.5\" fill=\"#1F6280\"/><circle cx=\"200\" cy=\"88\" r=\"3.5\" fill=\"#1F6280\"/><circle cx=\"300\" cy=\"112\" r=\"3.5\" fill=\"#1F6280\"/><circle cx=\"400\" cy=\"136\" r=\"3.5\" fill=\"#1F6280\"/><text x=\"480\" y=\"55\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2A7B9B\" text-anchor=\"end\">a power law: L(N)=(N_c/N)^&#945;_N</text></svg>", "note": "<b>A power law shows up as a straight line on log-log axes.</b> Stretch both axes so each step multiplies by 10 (not adds 1); hundreds of models spanning 6+ orders of magnitude in N line up almost perfectly &#8212; this straightness is the paper's core empirical finding."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Two separate power laws for N and D\"><rect x=\"20\" y=\"25\" width=\"230\" height=\"95\" rx=\"10\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"135\" y=\"48\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#1F6280\" font-weight=\"600\" text-anchor=\"middle\">Hold D infinite, vary N</text><text x=\"135\" y=\"72\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#2C2A28\" text-anchor=\"middle\">L(N) = (N_c / N)^&#945;_N</text><text x=\"135\" y=\"95\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\" text-anchor=\"middle\">&#945;_N &#8776; 0.076</text><text x=\"135\" y=\"112\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\" text-anchor=\"middle\">N_c &#8776; 8.8&#215;10^13</text><rect x=\"270\" y=\"25\" width=\"230\" height=\"95\" rx=\"10\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"385\" y=\"48\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#9A7208\" font-weight=\"600\" text-anchor=\"middle\">Hold N infinite, vary D</text><text x=\"385\" y=\"72\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#2C2A28\" text-anchor=\"middle\">L(D) = (D_c / D)^&#945;_D</text><text x=\"385\" y=\"95\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\" text-anchor=\"middle\">&#945;_D &#8776; 0.103</text></svg>", "note": "<b>Two clean power laws, one for each knob.</b> <code>N_c</code> and <code>D_c</code> are normalization constants tied to this tokenizer and corpus &#8212; the paper is explicit they carry no fundamental meaning. Only the exponents <code>&#945;_N</code> and <code>&#945;_D</code> transfer."}, {"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Compute budget C splits into N times D via C approx 6ND\"><rect x=\"190\" y=\"15\" width=\"140\" height=\"38\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"260\" y=\"39\" font-family=\"JetBrains Mono,monospace\" font-size=\"13\" fill=\"#C93B3B\" text-anchor=\"middle\" font-weight=\"700\">fixed budget C</text><line x1=\"260\" y1=\"53\" x2=\"260\" y2=\"78\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><text x=\"270\" y=\"70\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">C &#8776; 6&#183;N&#183;D FLOPs</text><line x1=\"260\" y1=\"78\" x2=\"120\" y2=\"105\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"260\" y1=\"78\" x2=\"400\" y2=\"105\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><rect x=\"40\" y=\"105\" width=\"160\" height=\"42\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"120\" y=\"131\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#1F6280\" text-anchor=\"middle\" font-weight=\"600\">bigger model N?</text><rect x=\"320\" y=\"105\" width=\"160\" height=\"42\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"400\" y=\"131\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#9A7208\" text-anchor=\"middle\" font-weight=\"600\">more data D?</text></svg>", "note": "<b>One budget, one trade-off.</b> Training compute is roughly <code>C &#8776; 6&#183;N&#183;D</code> FLOPs, so every extra dollar of compute is a fork in the road: spend it on a bigger model, or on more training tokens &#8212; you can't max out both."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Bar chart of compute-optimal scaling exponents for N B S D\"><text x=\"10\" y=\"18\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#2C2A28\" font-weight=\"600\">Compute-optimal scaling exponents (fit to C_min)</text><line x1=\"60\" y1=\"165\" x2=\"500\" y2=\"165\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><rect x=\"75\" y=\"46\" width=\"55\" height=\"119\" fill=\"#2A7B9B\"/><text x=\"102\" y=\"38\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#1F6280\" text-anchor=\"middle\" font-weight=\"700\">0.73</text><text x=\"102\" y=\"182\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2C2A28\" text-anchor=\"middle\">N</text><rect x=\"165\" y=\"126\" width=\"55\" height=\"39\" fill=\"#C99A12\"/><text x=\"192\" y=\"118\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#9A7208\" text-anchor=\"middle\" font-weight=\"700\">0.24</text><text x=\"192\" y=\"182\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2C2A28\" text-anchor=\"middle\">B</text><rect x=\"255\" y=\"160\" width=\"55\" height=\"5\" fill=\"#C93B3B\"/><text x=\"282\" y=\"152\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#C93B3B\" text-anchor=\"middle\" font-weight=\"700\">0.03</text><text x=\"282\" y=\"182\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2C2A28\" text-anchor=\"middle\">S</text><rect x=\"345\" y=\"122\" width=\"55\" height=\"43\" fill=\"#2D8B55\"/><text x=\"372\" y=\"114\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#1a5c38\" text-anchor=\"middle\" font-weight=\"700\">0.27</text><text x=\"372\" y=\"182\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#2C2A28\" text-anchor=\"middle\">D_opt = S&#183;B</text></svg>", "note": "<b>Kaplan's headline bar chart: N towers over B, S, and D.</b> As compute grows, model size <code>N &#8733; C_min^0.73</code> soaks up almost all the gain; training steps <code>S &#8733; C_min^0.03</code> barely move at all &#8212; nearly flat."}, {"viz": "<svg viewBox=\"0 0 520 180\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"100x compute growth gives 30x model growth but only 3.7x data growth\"><text x=\"10\" y=\"18\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#2C2A28\" font-weight=\"600\">Worked example: compute grows 100&#215;</text><rect x=\"20\" y=\"35\" width=\"60\" height=\"30\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"50\" y=\"55\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#C93B3B\" text-anchor=\"middle\">C &#215;100</text><line x1=\"80\" y1=\"50\" x2=\"140\" y2=\"50\" stroke=\"#6B645E\"/><polygon points=\"140,45 152,50 140,55\" fill=\"#6B645E\"/><rect x=\"160\" y=\"20\" width=\"330\" height=\"22\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><rect x=\"160\" y=\"20\" width=\"330\" height=\"22\" fill=\"#2A7B9B\"/><text x=\"325\" y=\"36\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#fff\" text-anchor=\"middle\">N grows &#8776; 30&#215; (100^0.73)</text><rect x=\"160\" y=\"55\" width=\"41\" height=\"22\" fill=\"#C99A12\"/><rect x=\"160\" y=\"55\" width=\"330\" height=\"22\" fill=\"none\" stroke=\"#C99A12\" stroke-dasharray=\"3,3\"/><text x=\"250\" y=\"71\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#9A7208\">D grows &#8776; 3.7&#215; (100^0.27)</text><text x=\"10\" y=\"105\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#2C2A28\" font-weight=\"600\">At GPT-2 &#8594; GPT-3 scale: compute grows 10,000&#215;</text><rect x=\"160\" y=\"120\" width=\"330\" height=\"22\" fill=\"#2A7B9B\"/><text x=\"325\" y=\"136\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#fff\" text-anchor=\"middle\">N grows &#8776; 832&#215;</text><rect x=\"160\" y=\"150\" width=\"52\" height=\"22\" fill=\"#C99A12\"/><rect x=\"160\" y=\"150\" width=\"330\" height=\"22\" fill=\"none\" stroke=\"#C99A12\" stroke-dasharray=\"3,3\"/><text x=\"250\" y=\"166\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#9A7208\">D grows &#8776; 12&#215;</text></svg>", "note": "<b>The gap widens as compute scales up.</b> A 100&#215; compute jump gives roughly 30&#215; more parameters but only 3.7&#215; more data; at GPT-3-scale (10,000&#215; compute) the model grows &#8776;832&#215; while data grows only &#8776;12&#215; &#8212; a widening, deliberate imbalance."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Chinchilla later corrects the split to equal exponents, Kaplan-era models undertrained on data\"><text x=\"10\" y=\"18\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#2C2A28\" font-weight=\"600\">The catch: this split gets revised in 2022</text><text x=\"10\" y=\"42\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\" font-weight=\"600\">Kaplan 2020 (today)</text><rect x=\"10\" y=\"50\" width=\"260\" height=\"20\" fill=\"#2A7B9B\"/><text x=\"140\" y=\"64\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#fff\" text-anchor=\"middle\">N&#8733;C^0.73</text><rect x=\"10\" y=\"73\" width=\"96\" height=\"20\" fill=\"#C99A12\"/><text x=\"58\" y=\"87\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#fff\" text-anchor=\"middle\">D&#8733;C^0.27</text><text x=\"10\" y=\"120\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\" font-weight=\"600\">Chinchilla 2022 (later this week)</text><rect x=\"10\" y=\"128\" width=\"180\" height=\"20\" fill=\"#2A7B9B\"/><text x=\"100\" y=\"142\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#fff\" text-anchor=\"middle\">N&#8733;C^0.5</text><rect x=\"10\" y=\"151\" width=\"180\" height=\"20\" fill=\"#C99A12\"/><text x=\"100\" y=\"165\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#fff\" text-anchor=\"middle\">D&#8733;C^0.5</text><rect x=\"300\" y=\"128\" width=\"210\" height=\"44\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"405\" y=\"146\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#C93B3B\" text-anchor=\"middle\" font-weight=\"700\">GPT-3-era models</text><text x=\"405\" y=\"162\" font-family=\"DM Sans,sans-serif\" font-size=\"10\" fill=\"#C93B3B\" text-anchor=\"middle\">undertrained on data</text></svg>", "note": "<b>This is the pre-Chinchilla view &#8212; hold it steady.</b> Hoffmann et al. 2022 later found N and D should scale together at roughly equal rates (&#8776;C^0.5 each), which means many Kaplan-era models, including GPT-3, were undertrained on data relative to their size. That correction is the interview-grade failure mode: a scaling law fit under one training recipe (fixed learning-rate schedules per run) doesn't automatically hold once the recipe is fixed."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. Your lab fits its own scaling law and, like Kaplan (2020), concludes "spend almost all new compute on a bigger model." A year later a Chinchilla-style redo shows the opposite. What in the original fitting procedure most likely biased it?',
+  opts:['The learning rate was too low, so every model underperformed equally','A fixed LR-schedule length across all model sizes cut small models off before their loss floor, making them look worse and tilting the fit toward bigger models','The compute budget used 6ND instead of 2ND','The test set was too small to measure loss accurately'],
+  ans:1, fb:'Right — a diagnostic read. Kaplan used one schedule length for every size, so small models were stopped before annealing to their own optimum. That systematic, size-dependent bias (not a crash, not noise) tilts the exponents toward "always bigger." Chinchilla retuned the schedule per size and found near-equal N/D scaling.'},
+ {q:'2. What does the curriculum\'s "D ~ C^0.27" figure represent?',
+  opts:['How fast test loss decreases as dataset size grows','How fast the optimal dataset size grows as total training compute grows, under compute-optimal allocation','The fraction of a model\'s parameters that come from the embedding layer','The ratio of validation loss to training loss at convergence'],
+  ans:1, fb:'Right. D ∝ C_min^0.27 (D_opt) is the paper\'s fitted relationship for how much data you should use as your compute budget grows, if you\'re allocating compute optimally between model size, batch size, and training steps.'},
+ {q:'3. Why does compute-optimal training, per Kaplan et al., involve stopping "significantly before convergence"?',
+  opts:['Because larger models are prone to numerical instability if trained too long','Because the optimal number of training steps S grows almost not at all with compute (S ∝ C_min^0.03), so you spend the budget on a bigger model instead of more steps','Because WebText2 is too small a dataset to train any model to convergence','Because early stopping is a regularization technique unrelated to compute allocation'],
+  ans:1, fb:'Right. The fitted exponents show S ∝ C_min^0.03 — training steps barely increase with more compute — so nearly all additional compute goes into a bigger N, and the model is deliberately undertrained relative to its convergence point.'},
+ {q:'4. Which statement correctly characterizes how the Kaplan (2020) picture was later revised?',
+  opts:['It was revised to say data matters far more than model size, and models should be made as small as possible','It was confirmed exactly as-is by all later scaling work, with no revisions','Hoffmann et al. (2022, Chinchilla) found that N and D should scale together at roughly equal rates (~C^0.5 each), implying many Kaplan-era models including GPT-3 were undertrained on data relative to their size','It was revised only for vision models, and the original conclusion still holds unmodified for all language models'],
+  ans:2, fb:'Right. Chinchilla\'s corrected experimental methodology (properly retuned learning-rate schedules per model size) found near-equal N and D scaling, correcting Kaplan\'s parameter-heavy conclusion — this is the historical arc the curriculum will cover later in the week.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

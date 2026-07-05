@@ -40,3 +40,48 @@ transforms (`jit`, `grad`, `vmap`) can treat array inputs as side-effect-free.
 Inspect the jaxpr / lowered HLO of a `jit`-ed function doing several
 `.at[].set()` calls to confirm the "copies" fuse away and no real copy remains
 in the compiled program.
+
+---
+
+# Experiment Log: MLP weights from split PRNG keys (Day 2)
+
+## What was tried
+Built `experiments/week01_jax/mlp_prng.py`, a tiny `4 -> 8 -> 2` MLP in raw
+`jax.numpy` whose weights are seeded from explicit, split PRNG keys:
+1. `key = random.PRNGKey(0)`, then `split` into an input key + a params key.
+2. params key `split` into one subkey per weight matrix; `W1` (4x8) and `W2`
+   (8x2) drawn with `random.normal`; biases `b1`, `b2` initialized to zeros.
+3. `forward(x) = tanh(x @ W1 + b1) @ W2 + b2`.
+4. `run_once(0)` called twice; asserted the two outputs are bit-for-bit equal.
+5. `demo_reuse_vs_split()` — drew two matrices from the same key (identical) and
+   from split keys (different).
+
+Ran with `python3 experiments/week01_jax/mlp_prng.py`, once inline and once more
+in a separate process; saved stdout to `results/mlp_prng_output.txt`.
+
+## What happened
+Exit code **0**. All assertions passed.
+- Input `x` (4,) = `[ 1.0040143 -0.9063372 -0.7481722 -1.1713669]`.
+- Output (2,) = `[-1.8783567  1.8897852]` on both in-process runs from seed 0.
+- A second, fresh process produced the identical output — reproducible across
+  processes, not just within one.
+- Same key twice -> identical draws (`True`); split first -> different draws
+  (`True`).
+
+Environment: system Python 3.11, jax 0.10.2, CPU backend.
+
+## Interpretation
+The key holds the entire random state, so `split` (not a hidden counter) is how
+you move forward. One split per layer gives each weight matrix independent
+randomness, and the fully deterministic seed -> split -> draw chain is what makes
+the network's initialization reproducible on any machine — the property JAX
+transforms rely on.
+
+## Limitations
+- One hidden layer, single input vector (batching via `vmap` is Day 3).
+- Uses legacy `PRNGKey`; newer JAX prefers `jax.random.key`.
+- Initialization only; no training step.
+
+## Next experiment
+Run this MLP over a batch with `jax.vmap` and check the batched outputs match a
+plain Python loop over single examples (Day 3).

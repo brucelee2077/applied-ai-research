@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 22b · Day 3 — The Training Objective (ε-Prediction)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m22b-d03-loss">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M22b Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-02-reverse-denoising.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reverse Process (Denoising)</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-sampling-schedules.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sampling: DDPM vs DDIM</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 22b · Generate · Day 3</span>
+    <h1>The Training Objective:<br>Guess the Noise You Added</h1>
+    <p class="lead">Yesterday the denoiser magically guessed the noise in a picture. Today you learn how it got that good. The training goal is beautifully simple: take a clean picture, sprinkle a known amount of noise onto it, then ask the network "which noise did I just add?" Score its guess against the truth. Do this millions of times and the network learns to name the noise at every noise level. This one trick — predicting ε — is the entire training recipe.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain ε-prediction (the model predicts the noise that was added), write the loss as plain MSE between true and predicted noise, and walk through one full training step by hand.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Train the network to name the noise it was given</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 1 — the forward closed form <code>x_t = √ᾱ_t · x0 + √(1−ᾱ_t) · ε</code> makes a noisy image from a known noise <code>ε</code>. Day 2 — the reverse process needs a network that guesses that noise. Today you learn how to train that network.</div></div>
+
+      <h4>The clever training setup</h4>
+      <p>Here is the trick. You <em>make</em> the training example yourself, so you already know the answer. Take a clean picture <code>x0</code>. Pick a random timestep <code>t</code>. Draw a random noise <code>ε</code>. Use the forward closed form to build the noisy image <code>x_t</code>. Now you know exactly which noise went in. The network's job is to look at <code>x_t</code> and guess that <code>ε</code>.</p>
+
+      <h4>ε-prediction</h4>
+      <p>This target — guessing the noise — is called <span class="term" data-tip="Training the network to output the noise ε that was added to a clean image, rather than the clean image itself. It is the standard diffusion training target.">ε-prediction</span> (epsilon-prediction). The network does not try to output the clean picture. It outputs the noise. That turns out to be an easier, more stable thing to learn, and you can always recover the clean picture from the noise using the closed form.</p>
+
+      <h4>The loss is just MSE</h4>
+      <p>How do you score the guess? With <span class="term" data-tip="Mean Squared Error: take the difference between the guess and the truth at each pixel, square it, and average. Zero means a perfect match.">mean squared error</span> (MSE) between the true noise <code>ε</code> and the network's guess. Subtract, square, average. If the guess is perfect, the loss is zero. There is no fancy objective — it is the same simple squared-error you have seen before.</p>
+
+      <h4>The schedule sets the difficulty</h4>
+      <p>The random timestep <code>t</code> picks the noise level, using the <span class="term" data-tip="The list of β (beta) values, one per step, that controls how much noise is added. From it you compute ᾱ_t (alpha-bar), the amount of clean picture kept at step t.">β / ᾱ schedule</span> from Day 1. Sometimes the network sees a barely-noised image (easy); sometimes near-pure static (hard). Training over all levels is why the same network can denoise every step later. Keep going 👇</p>
+      <button class="gotit" type="button">Got the training idea</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Guessing exactly what static was sprinkled on</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🧂</span><h5>The salt game</h5><p>Imagine a clean plate. You sprinkle a known pinch of salt on it, then hand it to a friend. Their job: tell you exactly where and how much salt you sprinkled. You already know the answer, so you can grade them precisely. Play this thousands of times and they get very good at spotting salt.</p></div>
+        <div class="card"><span class="big">🎯</span><h5>Score the guess</h5><p>To grade, you compare their guessed salt map to the real one, pinch by pinch, and add up how far off they were. A big total means a bad guess. Zero means perfect. The friend just wants to shrink that total — that is the whole game.</p></div>
+      </div>
+      <p><strong>In one line:</strong> training is the salt game — you add a known noise to a picture and the network guesses exactly what noise you added, scored by how far off it is.</p>
+      <p>Why guess the salt instead of the clean plate? Because you sprinkled the salt yourself, you know the perfect answer for free — no human labels needed. And once the friend can name the salt, removing it is easy: the clean plate is just "plate with salt, minus the salt". That is why ε-prediction, not picture-prediction, is the target.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real salt sits on top and is easy to see. Here the noise is blended into the pixels by math, and at high noise levels almost nothing of the picture is left — so guessing the exact noise is genuinely hard. That difficulty is why the network must be large and train for a long time.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Make an example, score the guess, take a gradient step</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Watch one training example get built, the loss (MSE) get computed against the true noise, and one weight update shrink that loss. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="makeexample" type="button">① build one noisy example</button>
+          <button class="play-btn" data-demo="loss" type="button">② score with MSE</button>
+          <button class="play-btn" data-demo="update" type="button">③ one step shrinks the loss</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the true noise <code>ε</code> is free — you drew it yourself when you built <code>x_t</code>. That is why diffusion training needs no human labels.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">One training step, worked out by hand</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Pick a clean picture and a random step <code>t</code>. Draw a random noise <code>ε</code>. Build the noisy image with the Day 1 closed form. Feed the noisy image and <code>t</code> into the network; it outputs a guessed noise <code>ε̂</code> (epsilon-hat). Measure how far <code>ε̂</code> is from the true <code>ε</code> by squaring the differences and averaging. That number is the loss. Nudge the weights to make it smaller.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        x_t = √ᾱ_t · x0 + √(1 − ᾱ_t) · ε &nbsp;<span class="dim"># build the example (Day 1)</span><br>
+        ε̂  = network(x_t, t)              &nbsp;<span class="dim"># the guess</span><br>
+        loss = mean( (ε − ε̂)² )           &nbsp;<span class="dim"># MSE, averaged over all pixels</span>
+      </div></div>
+      <p>Symbols: <code>x0</code> = clean picture. <code>ε</code> = the true noise you drew. <code>ε̂</code> = the network's guessed noise. <code>ᾱ_t</code> = the schedule number at step t. <code>mean(·)</code> = average over every pixel. <code>(ε − ε̂)²</code> = the squared miss at one pixel. The loss is just the average squared miss — plain MSE, nothing fancy.</p>
+
+      <h4>Step 3 — a worked example on three pixels</h4>
+      <p>Say for three pixels the true noise is <code>ε = [0.5, −1.0, 0.2]</code> and the network guesses <code>ε̂ = [0.3, −0.6, 0.4]</code>:</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        diffs   = ε − ε̂ = [0.2, −0.4, −0.2]<br>
+        squares = [0.04, 0.16, 0.04]<br>
+        loss = mean = (0.04 + 0.16 + 0.04) / 3 = 0.24 / 3 = <span class="hl">0.08</span><br><br>
+        <span class="dim"># the gradient nudges weights so next guess is closer to ε</span>
+      </div></div>
+      <p>The loss <code>0.08</code> says the guess was a bit off, mostly on the middle pixel (missed by 0.4). Training uses the gradient of this loss to shift the weights so the next guess on a similar input is closer. Do this over millions of (picture, t, ε) triples and the network learns to name the noise at every level.</p>
+
+      <h4>Why ε-prediction and MSE</h4>
+      <ul>
+        <li><strong>Free labels:</strong> you made the noise, so the target is known with no human labeling. Endless training data.</li>
+        <li><strong>Stable target:</strong> the noise <code>ε</code> is always a clean N(0,1) sample, so the network always predicts something with the same simple statistics, at every noise level.</li>
+        <li><strong>Simple loss:</strong> MSE is easy to compute and differentiate, and it matches the Gaussian noise assumption — the math lines up.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this is the entire diffusion training loop — build a noisy example, guess the noise, score with MSE, step. Once trained, the same network powers the reverse walk from Day 2. Tomorrow you learn how to sample smartly: fewer steps for speed, more for quality.</div></div>
+      <button class="gotit" type="button">Got the training step</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">One training step, assembled — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole training step, built one piece at a time: the clean picture, the random noise, the noisy example, the network's guess, the MSE loss, and the weight update. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Compute the ε-prediction loss by hand (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove the training step to yourself on a tiny grid. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/generative/m22b_eps_loss.py</code>. Make a tiny clean image <code>x0</code>. Build a β/ᾱ schedule. For a random <code>t</code>, draw noise <code>ε</code>, build <code>x_t</code> with the closed form, and make a fake network guess <code>ε̂</code> (start with a slightly-off copy of <code>ε</code>). Compute <code>loss = mean((ε − ε̂)²)</code>. Then improve the guess toward <code>ε</code> and show the loss drop. Run with <code>python3 m22b_eps_loss.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 22b Day 3 artifact.
+
+Create experiments/generative/m22b_eps_loss.py that, with a comment on each step, shows the diffusion training objective (epsilon-prediction) from scratch in NumPy:
+1. Builds a tiny clean image x0 (for example an 8x8 grid) with values in [0,1].
+2. Builds a beta schedule and the derived alphaBar (cumulative product of 1-beta).
+3. Picks a random timestep t, draws Gaussian noise eps, and builds x_t = sqrt(alphaBar[t])*x0 + sqrt(1-alphaBar[t])*eps.
+4. Makes a stand-in "prediction" eps_hat that is eps plus a small error, and computes loss = mean((eps - eps_hat)**2)  (MSE).
+5. Runs a tiny loop that shrinks eps_hat toward eps (a fake gradient step) and prints the loss each iteration, showing it fall toward 0.
+6. Prints shapes and the loss at every step.
+Then run it and paste the falling-loss numbers at the bottom as a comment, and one line explaining why the target is eps (the noise) rather than the clean image.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m22b/day-03-log.md</code>: what was the loss at the start vs. the end of your loop, and why does predicting the noise <code>ε</code> need no human labels?</div></div>
+      <button class="gotit" type="button">Done — on to Day 4</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🧂</span>
+    <h3>Day 3 complete — you know the whole training recipe!</h3>
+    <p>You now know ε-prediction: build a noisy example with a known noise, ask the network to guess that noise, and score the guess with plain MSE. The labels are free because you made the noise yourself. Millions of such steps teach one network to denoise at every level.<br>Next: <b>Day 4</b> — sampling smartly, trading steps for speed.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-02-reverse-denoising.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reverse Process (Denoising)</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-04-sampling-schedules.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sampling: DDPM vs DDIM</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  makeexample:{html:'<span class="prompt">&gt;&gt;&gt;</span> x0 = clean_image   <span class="dim"># a real training picture</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> t   = random_step()   <span class="dim"># say t = 400</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps = gaussian_noise()   <span class="dim"># YOU draw it, so YOU know it</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x_t = sqrt(abar_t)*x0 + sqrt(1-abar_t)*eps\n'+
+    '<span class="hl">example ready: (x_t, t) -> guess eps</span>   <span class="dim"># label is free</span>',
+    take:'<b>①  You build the example yourself.</b> Draw the noise ε, then use the closed form to make the noisy image x_t. Because you drew ε, you already know the perfect answer — no human labeling needed.'},
+  loss:{html:'<span class="prompt">&gt;&gt;&gt;</span> eps_hat = network(x_t, t)   <span class="dim"># the guess</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps      = [0.5, -1.0, 0.2]   <span class="dim"># truth (3 pixels)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> eps_hat  = [0.3, -0.6, 0.4]   <span class="dim"># guess</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss = mean((eps - eps_hat)**2)\n'+
+    '<span class="dim">#  squares: 0.04, 0.16, 0.04 -> mean 0.24/3</span>\n'+
+    '<span class="hl">loss = 0.08</span>   <span class="dim"># plain mean squared error</span>',
+    take:'<b>②  Score with MSE.</b> Subtract the guess from the truth, square each pixel, average. Here loss = 0.08 — a bit off, mostly on the middle pixel. Zero would mean a perfect noise guess.'},
+  update:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">4</span>):\n'+
+    '<span class="prompt">...</span>     loss = mse(eps, network(x_t, t))\n'+
+    '<span class="prompt">...</span>     weights -= lr * grad(loss)   <span class="dim"># shrink the loss</span>\n'+
+    '<span class="dim">#  loss: 0.080 -> 0.041 -> 0.019 -> 0.007</span>\n'+
+    '<span class="hl">guesses get closer to eps each step</span>',
+    take:'<b>③  One step shrinks the loss.</b> The gradient tells each weight which way to move so the next guess is closer to ε. Repeat over millions of examples and the network learns to name the noise at every level.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A clean training picture x0'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>x0 — a real training picture</text><rect x='195' y='30' width='130' height='80' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><g fill='#1F6280'><text x='222' y='58'>.8</text><text x='260' y='58'>.9</text><text x='298' y='58'>.8</text><text x='222' y='90'>.9</text><text x='260' y='90'>.7</text><text x='298' y='90'>.9</text></g></g></svg>",
+  note:"<b>Start with a real picture.</b> Training uses real pictures x0 from a dataset. This one clean image is the seed for one training example. You will corrupt it on purpose."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Draw a known random noise epsilon'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>ε — the noise YOU draw (so YOU know it)</text><rect x='195' y='30' width='130' height='80' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><g fill='#C93B3B'><text x='222' y='58'>.5</text><text x='260' y='58'>-1</text><text x='298' y='58'>.2</text><text x='222' y='90'>-.3</text><text x='260' y='90'>.8</text><text x='298' y='90'>-.6</text></g></g></svg>",
+  note:"<b>Draw the noise ε.</b> Sample a fresh Gaussian noise, one value per pixel. Because you drew it, you know it exactly — this is the free label the network must learn to guess. No human ever labels anything."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Build the noisy example x_t with the closed form'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='22' fill='#6B645E'>mix them with the Day 1 closed form</text><rect x='40' y='42' width='440' height='50' rx='8' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='260' y='73' fill='#9A7208' font-size='13'>x_t = &#8730;&#7717;_t·x0 + &#8730;(1&#8722;&#7717;_t)·&#949;</text></g></svg>",
+  note:"<b>Build the noisy example x_t.</b> Pick a random step t, then blend the picture and the noise with the closed form. Now you have an input (x_t, t) and a known answer (ε). That pair is one training example."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The network guesses the noise'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='42' width='120' height='48' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='90' y='36' fill='#6B645E'>x_t + step t</text><text x='90' y='71' fill='#9A7208'>the example</text><text x='168' y='70' fill='#6B645E'>→</text><rect x='195' y='42' width='120' height='48' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='255' y='71' fill='#1F6280'>network</text><text x='335' y='70' fill='#6B645E'>→</text><rect x='360' y='42' width='130' height='48' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='425' y='71' fill='#5E5191'>guess ε&#770;</text></g></svg>",
+  note:"<b>The network guesses ε.</b> Feed the noisy example and the timestep in. The network outputs its guess of the noise, called ε̂ (epsilon-hat). It predicts the noise, not the clean picture — that is ε-prediction."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The MSE loss between true and guessed noise'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='22' fill='#6B645E'>score the guess with mean squared error</text><rect x='40' y='42' width='440' height='50' rx='8' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='260' y='73' fill='#1a5c38' font-size='13'>loss = mean( (&#949; &#8722; &#949;&#770;)² ) = 0.08</text></g></svg>",
+  note:"<b>Score with MSE.</b> Compare the true noise ε to the guess ε̂: subtract, square, average over all pixels. Small loss = good guess; zero = perfect. That is the entire objective — plain mean squared error."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The loss falling as weights update'><g font-family='monospace' font-size='11' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>gradient step shrinks the loss</text><line x1='40' y1='95' x2='490' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M50 45 C 170 60, 320 86, 480 92' fill='none' stroke='#2D8B55' stroke-width='2.5'/><circle cx='50' cy='45' r='4' fill='#C93B3B'/><text x='50' y='36' fill='#C93B3B'>0.080</text><circle cx='480' cy='92' r='4' fill='#2D8B55'/><text x='470' y='84' fill='#1a5c38'>0.007</text><text x='260' y='112' fill='#6B645E'>training steps →</text></g></svg>",
+  note:"<b>Step and repeat.</b> The gradient of the loss tells each weight how to move so the next guess is closer to ε. Do this over millions of (picture, t, ε) triples and one network learns to denoise at every level. That trained network is the denoiser from Day 2."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. In ε-prediction, what does the network try to output?',
+  opts:['the clean picture','the noise ε that was added','the timestep t','a class label'],
+  ans:1, fb:'Right. The network predicts the noise ε that was added, not the clean image. You can always recover the clean image from the noise using the closed form.'},
+ {q:'2. What is the training loss?',
+  opts:['cross-entropy over classes','mean squared error between the true noise ε and the guessed noise ε̂','the raw pixel sum','the timestep number'],
+  ans:1, fb:'Right. The loss is plain MSE: subtract the guess from the truth, square, and average. Zero means a perfect noise guess.'},
+ {q:'3. Why does diffusion training need no human labels?',
+  opts:['it uses a labeled dataset','you draw the noise ε yourself, so the target is known for free','labels are added later','it only trains on one image'],
+  ans:1, fb:'Right. You build the noisy example by drawing ε yourself, so the perfect answer comes for free — endless self-supervised training data.'},
+ {q:'4. If the true noise is ε=[0.5,−1.0,0.2] and the guess is ε̂=[0.3,−0.6,0.4], the MSE loss is:',
+  opts:['0.24','0.08','0.80','0.00'],
+  ans:1, fb:'Right. diffs = [0.2,−0.4,−0.2]; squares = [0.04,0.16,0.04]; mean = 0.24/3 = 0.08.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

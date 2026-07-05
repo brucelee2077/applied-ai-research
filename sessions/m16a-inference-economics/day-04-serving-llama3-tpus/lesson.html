@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 6 · Day 4 — Serving LLaMA 3 on TPUs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w06-d04-serving">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 06 Day 4</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-quantization-intro/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 2 · Week 6 · Day 4 (Thu)</span>
+    <h1>Serving LLaMA 3<br>on TPUs</h1>
+    <p class="lead">You've done the roofline math on paper. Today you plug in <em>real</em> numbers — LLaMA 3-70B's actual shape, a real TPU v5e chip — and find out what it takes to answer thousands of users at once without running out of memory.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> compute a KV cache's real size in gigabytes, explain why decode is memory-bound while prefill is compute-bound, derive the critical batch size B_crit for a real chip, and describe why production servers split prefill and decode onto separate machines.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is LLM serving, and why does it need its own field?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the roofline math from earlier this week (compute-bound vs. memory-bound, FLOPs/s, HBM bandwidth). <b>No prior serving-systems experience needed.</b></div></div>
+
+      <h4>The problem: a trained model is not a product yet</h4>
+      <p>Training gives you a big pile of weights that can predict the next word. <span class="term" data-tip="The job of running a trained model in real use, so many people can use it at the same time, cheaply and fast.">Serving</span> is the separate engineering job of taking those weights and running them in production so <strong>many people at once</strong> can chat with the model, cheaply and fast. This is called <span class="term" data-tip="The full design for running a big language model in real use, handling chips, memory, and many waiting users.">LLM serving architecture</span>. It is where scaling-law theory meets real chips, real memory limits, and real angry users waiting for a reply.</p>
+
+      <h4>Term 1 — the KV cache</h4>
+      <p>A transformer generates text one word (<span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span>) at a time. Each new token needs to "look back" at every earlier token using attention. Recomputing that look-back from scratch at every step would be wastefully slow. So instead, the model saves each token's <span class="term" data-tip="One of two small number lists (with the value) that attention makes per token, used so later tokens can look back at this one.">key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">value</span> vectors — small number lists produced by attention — the first time it computes them, into a buffer called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>. Every later token just reads this cache instead of recomputing it.</p>
+      <div class="callout c-info"><span class="ic">🧮</span><div><code>KV cache size = 2 × bytes_per_element × H × K × L × T</code><br><span style="font-size:.85rem;color:var(--text2)">H = size of one attention head, K = number of KV heads, L = number of layers, T = tokens cached so far, and the 2 is because you store both keys AND values.</span></div></div>
+
+      <h4>Term 2 — prefill vs. decode</h4>
+      <p>Answering one request has two phases. <span class="term" data-tip="The first step of inference, where the model reads your whole prompt at once and computes hidden states for every layer.">Prefill</span> reads your whole typed-in prompt at once, in one parallel pass, and fills the KV cache — this reuses the same weights across many tokens, so it is <strong>compute-bound</strong> (limited by how many FLOPs/second the chip can do). <span class="term" data-tip="Making output one token at a time, feeding each new token back in to produce the next one.">Decode</span> (generation) then produces one new word at a time; each step touches only 1 new token of real work but still has to reload the parameters and the whole KV cache from memory — so decode is <strong>memory-bandwidth-bound</strong> (limited by how fast data moves from HBM, the chip's fast on-package memory).</p>
+
+      <h4>Term 3 — memory fragmentation</h4>
+      <p>Different users type prompts of different lengths and get replies of different lengths. A naive server reserves one fixed, worst-case-sized memory block per user — space that mostly goes unused. That wasted, scattered, unusable memory is <span class="term" data-tip="Wasted, scattered memory that is set aside but never used, leaving less room for other users.">fragmentation</span>, and since a TPU v5e chip has only 16GB of HBM, fragmentation directly caps how many users you can serve at once.</p>
+
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs: <a href="https://jax-ml.github.io/scaling-book/serving/" target="_blank" rel="noopener">Scaling Book — Serving LLMs</a> · <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">Scaling Book — All About LLM Inference</a></div></div>
+      <p>Today's puzzle: LLaMA 3-70B, real TPU v5e numbers, and the three ideas — <strong>PagedAttention</strong>, <strong>continuous batching</strong>, and <strong>disaggregated serving</strong> — that every modern serving stack (vLLM, JetStream, TensorRT-LLM) is built on.</p>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A hotel booking rooms for conference guests</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Think of a hotel that books rooms for conference attendees. Every guest stays a different number of nights.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🏨🔒</span><h5>Naive booking = fragmentation</h5><p>Every guest gets a room sized for the longest possible stay (30 nights), even if they stay only 3. You "hold" 27 empty nights nobody else can use. The hotel looks full even though most rooms are mostly empty.</p></div>
+        <div class="card"><span class="big">🏨🔁</span><h5>PagedAttention = book night-by-night</h5><p>Guests get small blocks from a shared pool, released the moment they check out. The hotel's true capacity gets used, not its worst-case capacity.</p></div>
+      </div>
+      <p><strong>In one line:</strong> continuous batching is the front desk continuously checking guests in and out instead of waiting for a whole tour group to finish; disaggregated serving is having a separate check-in team (prefill — fast, done once) and a separate ongoing-stay team (decode — slow, trickles out over days), because the two jobs need totally different staffing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: hotel rooms don't get more expensive to "read" the longer a guest stays. A KV cache does — every decode step has to reload the entire growing cache from memory, so a long-staying guest doesn't just occupy space, they also slow down every single interaction with them.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three real serving numbers</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal, using LLaMA 3-70B's real config (K=8 KV heads, H=128 head-dim, L=80 layers) on TPU v5e (HBM bandwidth 8.2e11 B/s, bf16 FLOPs/s 1.97e14). <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="kvcache" type="button">① KV cache at 32k context</button>
+          <button class="play-btn" data-demo="roofline" type="button">② step-time roofline, batch 32</button>
+          <button class="play-btn" data-demo="bcrit" type="button">③ B_crit and quantization</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of the serving roofline, and why they matter</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>Arithmetic intensity of a chip is <code>FLOPs/s ÷ HBM bandwidth</code>. On TPU v5e (bf16): <code>1.97e14 / 8.2e11 ≈ 240</code>. This number, <strong>B_crit</strong>, is the batch size where a matmul flips from memory-bound to compute-bound.</li>
+        <li>Prefill batch size (tokens in a prompt) is usually hundreds to thousands — far above 240 — so prefill is almost always <strong>compute-bound</strong>.</li>
+        <li>Decode batches only as many <em>concurrent users</em> as fit in memory, which is usually far below 240 — so decode is almost always <strong>memory-bound</strong>.</li>
+        <li>Quantizing weights to int8 halves the bytes you load per parameter, so <strong>B_crit halves too</strong> (240 → 120) — fewer concurrent users needed to keep the chip's FLOPs unit as busy as its memory unit.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>StepTime = (B×KVSize)/BW + max(2×B×Params/FLOPs, ParamSize/BW)</code><br><span style="font-size:.85rem;color:var(--text2)">First term: loading the KV cache for every sequence in the batch, every step (always bandwidth-bound). Second term: the bigger of "doing the matmul FLOPs" or "loading the parameters" — whichever the chip actually waits on.</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>KV cache, not parameters, is usually the real memory bottleneck</strong> — at long context and high concurrency, the cache can dwarf the model's own weights (we'll see 1.3TB of KV vs. 70GB of weights next).</li>
+        <li><strong>Fragmentation caps your business</strong> — HBM is a hard, fixed 16GB-per-chip resource. Wasted padding directly means fewer paying users served per dollar of hardware.</li>
+        <li><strong>The fix composes</strong> — PagedAttention (no padding waste) + continuous batching (no idle slots) + disaggregated serving (each phase gets hardware suited to its bottleneck) is the backbone of vLLM, JetStream, and TensorRT-LLM.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> roofline math (compute-bound vs. memory-bound) → decode is memory-bound because FLOPs per token are tiny but the KV cache must reload every step → fragmentation wastes the very memory decode depends on → PagedAttention + continuous batching + disaggregation fix it in production.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Serving math looks like accounting, so the numbers always add up on the whiteboard. The two things below are what a staff engineer watches for once that math meets a real, fixed-size chip.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): sizing concurrency from average KV cache size.</b> A common bug is to compute how many concurrent users fit by dividing free HBM by the KV cache of an <em>average-length</em> request. Nothing errors — the capacity plan looks generous and the service runs fine most of the time. But KV cache grows with context length, so a handful of long conversations quietly consume the memory budgeted for many short ones; the scheduler then either evicts/preempts running requests or refuses new ones, and <span class="term" data-tip="The 95th/99th percentile of latency — the slow tail a small fraction of users actually feel.">tail latency</span> spikes exactly when traffic is heaviest. In <b>code review</b>, a senior engineer asks whether the concurrency limit is sized against the <em>maximum</em> context length (or a real length distribution with headroom), not the mean, and whether there is an admission/eviction policy for when the KV budget is exceeded.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: PagedAttention trades a little kernel complexity for a lot of usable memory.</b> Storing each sequence's KV cache in fixed-size pages (instead of one contiguous block sized to the max length) almost eliminates the padding fragmentation that otherwise wastes HBM — so you fit far more concurrent users per chip. The bill is a more complex attention kernel that follows a page table (a small indirection cost per step) and a memory manager to track pages. In a <b>design review</b> the question is whether the throughput and concurrency gain justifies that complexity — for a high-traffic multi-tenant service it clearly does, which is why vLLM and JetStream build on it, but a single-user, fixed-length workload may not need it at all.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build the serving roofline calculator</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): analyze the deployment architecture necessary to serve concurrent users without catastrophic memory fragmentation — as a checkable, quantitative modeling artifact.</p>
+      <h4>What to build</h4>
+      <ul>
+        <li>Hardcode LLaMA 3-70B's config (L=80, D=8192, F=28672, N=64, K=8, H=128) and TPU v5e specs (HBM bandwidth 8.2e11 B/s, bf16 FLOPs/s 1.97e14).</li>
+        <li>Implement <code>kv_cache_size_per_token(K, H, L, bytes_per_element)</code> and reproduce the 160kB/token int8 result.</li>
+        <li>Implement the general step-time roofline: <code>step_time(batch_size, seq_len, param_bytes, kv_bytes_per_token, num_chips, hbm_bw, flops)</code>, matching the 17ms/batch-32/4x2 worked example (within 5%).</li>
+        <li>Sweep batch size 1–512 at TPU v5e 4x4 (16 chips), sequence lengths 2048 and 8192, and plot (matplotlib, saved to a PNG) latency vs. throughput — the Pareto-frontier "100x cost for 2x latency" shape.</li>
+        <li>Add a naive-contiguous vs. paged-allocation memory-fragmentation simulation: given N requests with random prompt/generation lengths (max context 8192, median decode 512), compute wasted-memory percentage under naive allocation vs. page-based allocation (256-token pages), and how many more concurrent requests paging serves in the same 16GB/chip budget.</li>
+        <li>Compute the prefill:decode server ratio (reproduce P ≈ 3G for 8192-prefill/512-decode) as a standalone, parameterized function.</li>
+      </ul>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>File exists at <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py</code>, runs end-to-end with <code>python3 day04_llama3_serving_roofline.py</code>, no errors, only numpy/matplotlib.</li>
+        <li>Printed output reproduces, within 5%: (a) 160kB/token KV cache, (b) 112GB total memory / 17ms step time at batch 32 on 4x2, (c) 0.91s prefill latency at 8192 tokens/40% MFU/16 chips, (d) P≈3G prefill:decode server ratio.</li>
+        <li>At least one saved PNG plot showing the latency/throughput tradeoff curve across batch sizes.</li>
+        <li>The fragmentation simulation prints a concrete wasted-HBM percentage under naive allocation and a concrete "how many more concurrent users fit" number under paged allocation.</li>
+        <li>A short (under 1 page) <code>day04_llama3_serving_roofline.md</code> writeup stating the four numbers above and one sentence on what PagedAttention buys you concretely (the wasted-memory percentage found).</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Build <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py</code> and its writeup directly from the bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 6 Day 4 artifact: analyze the deployment architecture necessary to serve concurrent users without catastrophic memory fragmentation.
+
+Create sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py (pure numpy/matplotlib) that:
+1. Hardcodes LLaMA 3-70B's config (L=80, D=8192, F=28672, N=64, K=8, H=128) and TPU v5e specs (HBM bandwidth 8.2e11 B/s, bf16 FLOPs/s 1.97e14).
+2. Implements kv_cache_size_per_token(K, H, L, bytes_per_element) and reproduces the 160kB/token int8 result.
+3. Implements step_time(batch_size, seq_len, param_bytes, kv_bytes_per_token, num_chips, hbm_bw, flops) matching the curriculum's roofline formula, and reproduces the 17ms/batch-32/4x2 worked example (within 5%).
+4. Sweeps batch size 1-512 at TPU v5e 4x4 (16 chips) for seq lengths 2048 and 8192, and saves a PNG plot of latency vs. throughput under sessions/m16a-inference-economics/day-04-serving-llama3-tpus/.
+5. Adds a naive-contiguous vs. paged-allocation memory-fragmentation simulation (N requests, random prompt/decode lengths, max context 8192, median decode 512, 256-token pages) and prints the wasted-memory percentage and how many more concurrent requests paging serves in a 16GB/chip budget.
+6. Computes the prefill:decode server ratio as a standalone parameterized function, reproducing P≈3G for the 8192-prefill/512-decode example.
+Also write sessions/m16a-inference-economics/day-04-serving-llama3-tpus/day04_llama3_serving_roofline.md (under 1 page) stating the four reproduced numbers and one sentence on what PagedAttention buys you concretely. Run it to confirm everything works and matches within 5%.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/log.md</code>: what wasted-memory percentage did naive allocation produce, and how many more concurrent users did paging buy you at the same 16GB/chip budget?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 4 complete!</h3>
+    <p>You can now compute a real KV cache size in gigabytes, explain why decode is memory-bound while prefill is compute-bound, and describe why production servers split prefill and decode with PagedAttention and continuous batching. You've turned the roofline theory into an actual deployment architecture.<br>Next: <code>start today</code> → Day 5 is quantization (LLM.int8).</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-quantization-intro/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  kvcache:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># LLaMA 3-70B: K=8 KV heads, H=128 head-dim, L=80 layers, int8</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> kv_per_token = <span class="num">2</span> * <span class="num">1</span> * H * K * L\n<span class="ok">163,840 bytes ≈ 160kB</span>   <span class="hl"># per token, per sequence</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> seq_kv = <span class="num">160e3</span> * <span class="num">32768</span>   <span class="dim"># one 32k-context sequence</span>\n<span class="ok">≈ 5.3GB</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> total_kv = <span class="num">5.3e9</span> * <span class="num">240</span>   <span class="dim"># 240 concurrent sequences</span>\n<span class="bad">≈ 1.3TB</span>   <span class="hl"># vs. only 70GB of int8 params!</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> chips_needed = (<span class="num">70e9</span> + <span class="num">1.3e12</span>) / <span class="num">16e9</span>\n<span class="bad">≈ 86 chips</span>   <span class="dim"># just for memory, before any extra FLOPs</span>',
+    take:'<b>①  32k context is dangerous.</b> At high concurrency, the KV cache dwarfs the model\'s own parameters — it is usually the real memory bottleneck, not the weights.'},
+  roofline:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># batch 32, seq 8192, int8, TPU v5e 4x2 (8 chips)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> kv_mem = <span class="num">160e3</span> * <span class="num">8192</span> * <span class="num">32</span>\n<span class="ok">≈ 41.9GB</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> total_mem = kv_mem + <span class="num">70e9</span>   <span class="dim"># + int8 params</span>\n<span class="ok">≈ 112GB</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> step_time = total_mem / (<span class="num">8</span> * <span class="num">8.2e11</span>)\n<span class="ok">≈ 17ms</span>   <span class="hl"># memory-bound, so this dominates</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> throughput = <span class="num">32</span> / <span class="num">0.017</span>\n<span class="ok">≈ 1,882 tok/s</span>  <span class="dim">(235 tok/s/chip)</span>',
+    take:'<b>②  The roofline predicts step time.</b> Doubling chips halves latency, but throughput-per-chip stays flat once you\'re memory-bound — more chips buys speed, not efficiency.'},
+  bcrit:{html:'<span class="prompt">&gt;&gt;&gt;</span> B_crit_bf16 = <span class="num">1.97e14</span> / <span class="num">8.2e11</span>   <span class="dim"># TPU v5e bf16</span>\n<span class="ok">≈ 240</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># int8 weights, bf16 compute: half the bytes to load per param</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> B_crit_int8w = B_crit_bf16 / <span class="num">2</span>\n<span class="bad">≈ 120</span>   <span class="hl"># fewer concurrent users needed to saturate FLOPs</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># int8 weights AND int8 compute: FLOPs/s roughly doubles too</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> B_crit_int8_int8 = <span class="num">3.94e14</span> / <span class="num">8.2e11</span>\n<span class="ok">≈ 240</span>   <span class="dim"># back up — cheapest full-utilization recipe</span>',
+    take:'<b>③  B_crit moves with precision.</b> It is not a universal constant — it halves with int8 weights/bf16 compute, and climbs back with int8/int8, which is why that\'s the most popular production recipe.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"One request has two phases: prefill reads the whole prompt at once, decode generates one token at a time\"><rect x=\"10\" y=\"20\" width=\"210\" height=\"70\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"115\" y=\"45\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#1F6280\">PREFILL</text><text x=\"115\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">whole prompt, 1 parallel pass</text><text x=\"115\" y=\"80\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">fills the KV cache</text><rect x=\"20\" y=\"95\" width=\"190\" height=\"10\" rx=\"3\" fill=\"#2A7B9B\"/><path d=\"M225 55 L295 55\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah1)\"/><defs><marker id=\"ah1\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"300\" y=\"20\" width=\"210\" height=\"70\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"405\" y=\"45\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#9A7208\">DECODE</text><text x=\"405\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">1 new token per step</text><text x=\"405\" y=\"80\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">reads cache, repeats</text><rect x=\"310\" y=\"95\" width=\"20\" height=\"10\" rx=\"3\" fill=\"#C99A12\"/><rect x=\"335\" y=\"95\" width=\"20\" height=\"10\" rx=\"3\" fill=\"#C99A12\" opacity=\".7\"/><rect x=\"360\" y=\"95\" width=\"20\" height=\"10\" rx=\"3\" fill=\"#C99A12\" opacity=\".45\"/><text x=\"405\" y=\"125\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">token, token, token...</text></svg>", "note": "<b>Setup: one request, two very different jobs.</b> <b>Prefill</b> reads your whole typed prompt in one parallel pass and builds the <b>KV cache</b> (saved key/value vectors for every prompt token). <b>Decode</b> then produces the reply one token at a time, reusing that cache instead of recomputing it."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"KV cache formula built piece by piece: 2 times bytes per element times H times K times L times T\"><text x=\"10\" y=\"25\" font-size=\"13\" font-weight=\"700\" fill=\"#2C2A28\">KV cache size (bytes)</text><g font-family=\"monospace\" font-size=\"15\"><text x=\"10\" y=\"60\" fill=\"#C93B3B\" font-weight=\"700\">2</text><text x=\"34\" y=\"60\" fill=\"#6B645E\">×</text><text x=\"56\" y=\"60\" fill=\"#2A7B9B\" font-weight=\"700\">bytes</text><text x=\"122\" y=\"60\" fill=\"#6B645E\">×</text><text x=\"144\" y=\"60\" fill=\"#9A7208\" font-weight=\"700\">H</text><text x=\"162\" y=\"60\" fill=\"#6B645E\">×</text><text x=\"184\" y=\"60\" fill=\"#5E5191\" font-weight=\"700\">K</text><text x=\"202\" y=\"60\" fill=\"#6B645E\">×</text><text x=\"224\" y=\"60\" fill=\"#237046\" font-weight=\"700\">L</text><text x=\"242\" y=\"60\" fill=\"#6B645E\">×</text><text x=\"264\" y=\"60\" fill=\"#C93B3B\" font-weight=\"700\">T</text></g><line x1=\"6\" y1=\"75\" x2=\"290\" y2=\"75\" stroke=\"#E5DFD6\"/><g font-size=\"10\" fill=\"#6B645E\"><text x=\"5\" y=\"95\">2 = store keys AND values</text><text x=\"5\" y=\"110\">bytes = precision (fp16=2, int8=1)</text><text x=\"5\" y=\"125\">H = head dim, K = KV heads, L = layers</text><text x=\"5\" y=\"140\">T = tokens cached so far (grows every step!)</text></g><rect x=\"300\" y=\"40\" width=\"210\" height=\"30\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"405\" y=\"60\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"700\">only T grows over time</text></svg>", "note": "<b>Mechanism, piece 1: the KV cache formula.</b> <code>2 &times; bytes &times; H &times; K &times; L &times; T</code> — every symbol is fixed by the model except <b>T</b>, the number of tokens cached, which grows by one every decode step. That growth is the whole story ahead."}, {"viz": "<svg viewBox=\"0 0 520 180\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Plugging in LLaMA 3-70B numbers gives 160 kilobytes per token, then times 32768 context gives 5.3 gigabytes per sequence\"><text x=\"10\" y=\"22\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">LLaMA 3-70B int8: K=8, H=128, L=80, bytes=1</text><rect x=\"10\" y=\"35\" width=\"230\" height=\"46\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"125\" y=\"55\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#2C2A28\">2&#215;1&#215;128&#215;8&#215;80</text><text x=\"125\" y=\"72\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#2D8B55\">= 160kB / token</text><path d=\"M245 58 L300 58\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah2)\"/><defs><marker id=\"ah2\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"#6B645E\"/></marker></defs><text x=\"270\" y=\"48\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">&#215; 32,768 tokens</text><rect x=\"305\" y=\"35\" width=\"205\" height=\"46\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"407\" y=\"58\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#1a5c38\">&#8776; 5.3 GB</text><text x=\"407\" y=\"73\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">per sequence, one 32k-context user</text><rect x=\"10\" y=\"95\" width=\"500\" height=\"60\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"260\" y=\"118\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">&#215; 240 concurrent sequences &#8776; 1.3 TB of KV cache</text><text x=\"260\" y=\"138\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">vs. only 70 GB of int8 model weights &#8212; the cache dwarfs the model</text></svg>", "note": "<b>Key number: 160kB per token becomes terabytes at scale.</b> One 32k-context user costs 5.3GB of KV cache; 240 concurrent users cost 1.3TB &mdash; almost 20&times; the model's own 70GB of weights. At high concurrency, the <b>cache</b>, not the parameters, is the real memory bottleneck."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Roofline diagram: arithmetic intensity axis with B_crit at 240, prefill far to the right compute-bound, decode far to the left memory-bound\"><line x1=\"40\" y1=\"150\" x2=\"500\" y2=\"150\" stroke=\"#2C2A28\" stroke-width=\"1.5\"/><text x=\"270\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">batch size (arithmetic intensity)</text><line x1=\"250\" y1=\"30\" x2=\"250\" y2=\"150\" stroke=\"#C99A12\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"250\" y=\"22\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#9A7208\">B_crit &#8776; 240</text><rect x=\"45\" y=\"120\" width=\"120\" height=\"20\" rx=\"4\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"105\" y=\"134\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\" font-weight=\"700\">DECODE (batch ~10s)</text><text x=\"105\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">memory-bound</text><rect x=\"340\" y=\"55\" width=\"140\" height=\"20\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"410\" y=\"69\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\" font-weight=\"700\">PREFILL (100s-1000s)</text><text x=\"410\" y=\"45\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">compute-bound</text><line x1=\"45\" y1=\"148\" x2=\"245\" y2=\"148\" stroke=\"#C99A12\" stroke-width=\"3\"/><line x1=\"255\" y1=\"148\" x2=\"480\" y2=\"90\" stroke=\"#2A7B9B\" stroke-width=\"3\"/><text x=\"20\" y=\"155\" font-size=\"9\" fill=\"#6B645E\">0</text></svg>", "note": "<b>Mechanism, piece 2: B_crit splits the world in two.</b> <code>B_crit = FLOPs/s &divide; HBM bandwidth</code>. On TPU v5e bf16, <code>1.97e14 &divide; 8.2e11 &#8776; 240</code>. Prompts are hundreds to thousands of tokens (far above 240) so prefill is compute-bound; concurrent decode users rarely reach 240, so decode is memory-bound."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Step time formula built from two terms: KV cache load term plus the max of matmul FLOPs term and parameter load term, evaluated at batch 32 gives 17 milliseconds\"><text x=\"10\" y=\"20\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">StepTime = (B&#215;KV)/BW + max(2&#215;B&#215;Params/FLOPs, Params/BW)</text><rect x=\"10\" y=\"35\" width=\"160\" height=\"55\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"90\" y=\"57\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">load KV cache</text><text x=\"90\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">every step, always</text><text x=\"90\" y=\"85\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">bandwidth-bound</text><text x=\"178\" y=\"65\" font-size=\"16\" fill=\"#6B645E\">+</text><rect x=\"195\" y=\"35\" width=\"180\" height=\"55\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"285\" y=\"53\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">whichever the chip</text><text x=\"285\" y=\"67\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">waits on: matmul FLOPs</text><text x=\"285\" y=\"81\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">or loading params</text><rect x=\"10\" y=\"105\" width=\"500\" height=\"75\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"260\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1a5c38\">batch=32, seq=8192, int8, TPU v5e 4&#215;2 (8 chips)</text><text x=\"260\" y=\"148\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1a5c38\">KV 41.9GB + params 70GB = 112GB total</text><text x=\"260\" y=\"168\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#237046\">&#8776; 17ms/step &#8594; 1,882 tok/s (235 tok/s/chip)</text></svg>", "note": "<b>Mechanism, piece 3: the full step-time roofline.</b> The KV-cache term is <b>always</b> bandwidth-bound; the second term picks whichever the chip actually waits on. At batch 32, decode is dominated by moving 112GB through 8 chips' HBM, giving 17ms per step &mdash; matching the compute-vs-memory split from the last diagram."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Naive fixed-size room allocation wastes memory: three bars, one long guest and two short guests all get the same 30-slot room, most of it unused\"><text x=\"10\" y=\"18\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">Naive allocation: every request reserves the worst-case size</text><g font-size=\"9\" fill=\"#6B645E\"><text x=\"10\" y=\"38\">req A</text><text x=\"10\" y=\"70\">req B</text><text x=\"10\" y=\"102\">req C</text></g><rect x=\"55\" y=\"28\" width=\"420\" height=\"18\" rx=\"3\" fill=\"#F5F0E8\" stroke=\"#E5DFD6\"/><rect x=\"55\" y=\"28\" width=\"350\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/><rect x=\"55\" y=\"60\" width=\"420\" height=\"18\" rx=\"3\" fill=\"#F5F0E8\" stroke=\"#E5DFD6\"/><rect x=\"55\" y=\"60\" width=\"55\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/><rect x=\"55\" y=\"92\" width=\"420\" height=\"18\" rx=\"3\" fill=\"#F5F0E8\" stroke=\"#E5DFD6\"/><rect x=\"55\" y=\"92\" width=\"40\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/><text x=\"485\" y=\"41\" font-size=\"9\" fill=\"#6B645E\">30 slots</text><text x=\"485\" y=\"73\" font-size=\"9\" fill=\"#6B645E\">30 slots</text><text x=\"485\" y=\"105\" font-size=\"9\" fill=\"#6B645E\">30 slots</text><rect x=\"55\" y=\"122\" width=\"420\" height=\"30\" rx=\"5\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"265\" y=\"142\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">most of that light-blue space is empty, unused by anyone</text><text x=\"265\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">this is fragmentation &#8212; the same waste applies to the KV cache in HBM</text></svg>", "note": "<b>Failure mode: fragmentation.</b> A naive server reserves one fixed, max-length KV-cache block per request. Most requests finish far short of the max, so that reserved space sits empty and unusable by anyone else &mdash; on a 16GB-per-chip TPU v5e, that waste directly caps how many users you can serve."}, {"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"PagedAttention allocates fixed-size pages on demand from a shared pool, released the moment a request finishes\"><text x=\"10\" y=\"18\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">PagedAttention: fixed-size pages from a shared pool</text><g font-size=\"9\" fill=\"#6B645E\"><text x=\"10\" y=\"40\">req A</text><text x=\"10\" y=\"64\">req B</text><text x=\"10\" y=\"88\">req C</text></g><g><rect x=\"55\" y=\"31\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/><rect x=\"82\" y=\"31\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/><rect x=\"109\" y=\"31\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#2A7B9B\"/></g><g><rect x=\"55\" y=\"55\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#5E5191\"/></g><g><rect x=\"55\" y=\"79\" width=\"24\" height=\"18\" rx=\"3\" fill=\"#9A7208\"/></g><rect x=\"145\" y=\"31\" width=\"330\" height=\"66\" rx=\"5\" fill=\"none\" stroke=\"#E5DFD6\" stroke-dasharray=\"3 3\"/><g fill=\"#EEEBE5\" stroke=\"#C7C0B6\"><rect x=\"152\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/><rect x=\"178\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/><rect x=\"204\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/><rect x=\"230\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/><rect x=\"256\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/><rect x=\"282\" y=\"38\" width=\"22\" height=\"16\" rx=\"3\"/></g><text x=\"310\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">free pages, ready to hand out</text><text x=\"310\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">the instant any request finishes</text><rect x=\"10\" y=\"115\" width=\"500\" height=\"32\" rx=\"5\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"260\" y=\"136\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1a5c38\">true HBM capacity used, not worst-case capacity</text></svg>", "note": "<b>The fix: allocate in small pages, on demand.</b> Instead of one giant reservation per request, PagedAttention hands out small, fixed-size pages from a shared pool and frees them the moment a request finishes. This eliminates the wasted, scattered memory from the previous diagram."}, {"viz": "<svg viewBox=\"0 0 520 180\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Disaggregated serving: separate prefill and decode server pools with a roughly 3 to 1 ratio, connected by a KV cache handoff over the network\"><rect x=\"10\" y=\"20\" width=\"210\" height=\"90\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"115\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">PREFILL SERVERS</text><rect x=\"25\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><rect x=\"58\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><rect x=\"91\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><rect x=\"124\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><rect x=\"157\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><rect x=\"25\" y=\"85\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#2A7B9B\"/><text x=\"115\" y=\"98\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#fff\">&#215;</text><text x=\"115\" y=\"104\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\"></text><path d=\"M225 65 L295 65\" stroke=\"#6B645E\" stroke-width=\"2\" marker-end=\"url(#ah3)\"/><defs><marker id=\"ah3\" markerWidth=\"9\" markerHeight=\"9\" refX=\"7\" refY=\"3.5\" orient=\"auto\"><path d=\"M0,0 L7,3.5 L0,7 Z\" fill=\"#6B645E\"/></marker></defs><text x=\"260\" y=\"55\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">KV cache</text><text x=\"260\" y=\"80\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">over network</text><rect x=\"300\" y=\"20\" width=\"210\" height=\"90\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"405\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#9A7208\">DECODE SERVERS</text><rect x=\"325\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#C99A12\"/><rect x=\"358\" y=\"52\" width=\"28\" height=\"28\" rx=\"4\" fill=\"#C99A12\"/><text x=\"405\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9A7208\">continuous batching:</text><text x=\"405\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9A7208\">new users slot in as others finish</text><rect x=\"10\" y=\"125\" width=\"500\" height=\"42\" rx=\"6\" fill=\"#FDF9F3\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"144\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2C2A28\">P &#8776; 3G &#8212; about 3&#215; more prefill servers than decode servers</text><text x=\"260\" y=\"160\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">for the 8192-prefill / 512-decode workload &#8212; this is vLLM, JetStream, TensorRT-LLM's shared backbone</text></svg>", "note": "<b>Why it matters at frontier-lab scale: disaggregation is the production answer.</b> Prefill (compute-bound, little parallelism needed) and decode (memory-bound, wants heavy sharding) get separate hardware pools sized in roughly a 3:1 ratio here, linked by shipping the KV cache over the network. Combined with paging and continuous batching, this is exactly what a staff interviewer expects you to derive when asked how to serve LLaMA 3 at scale."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why is the decode (generation) phase of LLM inference typically memory-bandwidth-bound rather than compute-bound?',
+  opts:['Decode uses a different, slower attention algorithm than prefill','Decode processes only one new token per step, so FLOPs per step are tiny while the KV cache and parameters still have to be loaded from HBM every step','TPUs have no matrix multiply hardware for batch size 1','Decode always runs on CPU instead of the accelerator'],
+  ans:1, fb:'Right. Decode\'s arithmetic intensity collapses because the sequence dimension T=1 for the new token while the "reused" data (params + KV cache) stays large; you pay full memory-loading cost for almost no new compute.'},
+ {q:'2. You size your serving fleet by dividing free HBM by the KV cache of an average-length request, and the capacity plan says you can hold plenty of concurrent users. In production the service runs fine most of the day, but during busy periods it starts refusing or preempting requests and tail latency spikes — with no error in the logs. What did the sizing miss?',
+  opts:['The average GPU clock speed drops under load, halving effective throughput','KV cache grows with context length, so a few long conversations consume the memory budgeted for many short ones; concurrency must be sized against the maximum (or a real length distribution with headroom) plus an admission/eviction policy, not the mean','int8 quantization silently doubled the KV cache size at runtime','The tokenizer counts tokens differently in production, inflating every request'],
+  ans:1, fb:'Right. Sizing from the mean hides the tail: KV cache is proportional to context length, so a handful of long sessions can eat the HBM you reserved for many short ones. Nothing errors — the scheduler simply preempts running requests or refuses new ones once the KV budget is exceeded, and that happens exactly when traffic is heaviest, so tail latency spikes. The fix is to size concurrency against the maximum context (or a measured length distribution with headroom) and to define an explicit admission/eviction policy. The tempting wrong answers (clock speed, tokenizer, quantization) all reach for an unrelated mechanism instead of the capacity math that actually failed.'},
+ {q:'3. On TPU v5e (240 bf16 arithmetic intensity), what happens to the critical batch size B_crit if you quantize parameters to int8 but still compute your matmul FLOPs in bf16?',
+  opts:['B_crit stays at 240 because FLOPs precision is unchanged','B_crit doubles to 480','B_crit halves to 120','B_crit becomes irrelevant because attention dominates'],
+  ans:2, fb:'Right. int8 weights halve the bytes you need to load per parameter, so you need only half the batch size to keep the FLOPs unit as busy as the (now faster) memory-loading unit: B_crit = 120.'},
+ {q:'4. Why does production LLM serving typically disaggregate prefill and decode onto separate TPU/GPU slices instead of running both on the same machine?',
+  opts:['Prefill and decode require different model weights entirely','Prefill is compute-bound and wants little/no model parallelism while decode is memory-bound and benefits from heavy model parallelism, and running a big prefill batch would stall/block decode users mid-generation on the same hardware','It is required by the TPU compiler and cannot be avoided','Disaggregation makes the KV cache smaller'],
+  ans:1, fb:'Right. The two phases have opposite hardware bottlenecks and optimal sharding strategies, and colocating them causes one user\'s prefill to freeze other users\' decode steps, hurting tail latency; disaggregation lets each phase scale and shard independently, at the cost of shipping the KV cache over the network.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

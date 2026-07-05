@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 16 · Day 3 — GQA &amp; MQA: Sharing Key/Value Heads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w16-d03-gqamqa">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 16 Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-speculative-decoding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 4 · Week 16 · Day 3 (Wed)</span>
+    <h1>GQA &amp; MQA<br>Sharing Key/Value Heads</h1>
+    <p class="lead">Monday and Tuesday shrank the KV cache <em>after</em> training — by picking which tokens to keep. Today's fix happens <em>before</em> training even starts: change the architecture itself so fewer Key/Value heads exist in the first place. Fewer heads to store means a smaller cache on every single request, forever, for free.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why only the K/V heads (not the Q heads) need to shrink, walk through the exact head-grouping math for MHA, GQA, and MQA, convert an MHA checkpoint into a GQA one by mean-pooling, and compute the resulting parameter and KV-cache reduction by hand.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What are Q/K/V "heads", and what does "sharing" them mean?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's KV cache size formula and Tuesday's SnapKV eviction (both attack the same memory-bandwidth bottleneck). <b>No prior knowledge of GQA/MQA needed.</b></div></div>
+
+      <h4>A quick reminder: what a "head" is</h4>
+      <p>In multi-head attention, the model does not compute attention once. It splits the work into several parallel <span class="term" data-tip="Separate small attention calculations working at the same time, each looking at the input from a different angle.">heads</span> — think of each head as its own small attention calculation, looking at the input from a different angle (one head might track grammar, another might track "who is talking to whom"). Each head has its own three learned projection matrices: one that produces <span class="term" data-tip="Small lists of numbers for a token that say 'what am I looking for?' when attention searches other tokens.">Queries</span> (Q — "what am I looking for?"), one that produces <span class="term" data-tip="Small lists of numbers saying what each token can be matched against during attention.">Keys</span> (K — "what do I contain?"), and one that produces <span class="term" data-tip="Small lists of numbers saying what each token gives if attention picks it.">Values</span> (V — "what do I actually offer if picked?"). A model with, say, 32 heads has 32 separate Q projections, 32 separate K projections, and 32 separate V projections.</p>
+
+      <h4>The problem: every head's K and V get cached, and cache is what's expensive</h4>
+      <p>Recall Monday's formula: the KV cache stores one K vector and one V vector <em>per head, per layer, per token</em>. If a model has 32 heads and 32 layers, every single token you feed in or generate adds 32 × 32 × 2 new vectors to the cache. The number of heads is a direct multiplier on cache size — and it was fixed the moment the model finished training. Nothing you do at inference time (like SnapKV) can change how many heads exist.</p>
+
+      <h4>The idea: what if most heads didn't need their own K and V?</h4>
+      <p><span class="term" data-tip="A design where all query heads share one single set of keys and values, saving lots of memory.">Multi-Query Attention</span> (<span class="term" data-tip="Short for Multi-Query Attention: all query heads share one set of keys and values.">MQA</span>) and <span class="term" data-tip="A design where groups of query heads share keys and values, between full separate heads and one shared set.">Grouped-Query Attention</span> (<span class="term" data-tip="Short for Grouped-Query Attention: query heads share keys and values in small groups to save memory.">GQA</span>) both ask the same question: does every query head really need its <em>own private</em> Key and Value projection? Their answer is no. Multiple query heads can <strong>share</strong> one K/V head between them — each query head still computes its own attention scores and its own output, but several query heads read from the <em>same</em> stored K and V vectors instead of each keeping a separate copy.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div><strong>MQA</strong> (Shazeer, 2019): all query heads share <strong>one single</strong> K/V head. <strong>GQA</strong> (Ainslie et al., 2023): query heads are split into a handful of <strong>groups</strong>; heads within a group share one K/V head, but different groups have different K/V heads.<br><span style="font-size:.85rem;color:var(--text2)">Only the number of <em>K/V</em> heads shrinks. The number of <em>Query</em> heads never changes — queries are never cached, so shrinking them wouldn't save any memory.</span></div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>Fewer distinct K/V heads means each shared head has to serve more query heads at once, which is a real capacity trade-off — pushed too far (all the way to MQA), quality can dip. GQA exists specifically as the middle ground between MHA's full quality and MQA's full compression. We'll see exactly how much quality you keep, and how the paper converts an <em>existing</em> trained MHA model into a GQA one without retraining from scratch.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official papers (optional): <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noopener">Shazeer, Fast Transformer Decoding: One Write-Head is All You Need (arXiv:1911.02150)</a> · <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">Ainslie et al., GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints (arXiv:2305.13245)</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">One shared reference shelf, many readers</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a small research team. Each researcher (a query head) is investigating something slightly different, and each writes their own personal questions on their own notepad. The question is: does every researcher need their own private copy of the reference library, or can they share one?</p>
+      <div class="relate">
+        <div class="card"><span class="big">📚📚📚📚</span><h5>MHA = everyone has their own library</h5><p>Each of the 32 researchers keeps a full private copy of the reference shelf (their own K/V). Nobody waits on anyone else, but you're storing 32 copies of nearly the same shelves.</p></div>
+        <div class="card"><span class="big">📚</span><h5>MQA/GQA = shared shelves, private questions</h5><p>Instead, a handful of shared reference shelves exist (the K/V heads). Several researchers each walk up to the <em>same</em> shelf, but each still asks their own personal question (their own Q) and gets their own personal answer back. One shelf, many independent readers.</p></div>
+      </div>
+      <p><strong>In one line:</strong> queries stay personal and never shrink; only the shared reference shelves (K/V heads) shrink — from one shelf per researcher (MHA), down to a handful of shared shelves (GQA), down to a single shared shelf (MQA).</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real shared library shelves don't change what's written on them depending on who's reading. But GQA's shared K/V head is <strong>produced by mean-pooling</strong> the original per-head content, not simply "the same shelf as before" — the content of the shared shelf is itself a blend, an average, of what used to be several different shelves. If those original shelves held very different things, blending them can lose some of that specificity.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three numeric demos of the trade-off</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="cachesize" type="button">① KV cache: 32 heads vs. 8 vs. 1</button>
+          <button class="play-btn" data-demo="paramcount" type="button">② parameter count shrinks too</button>
+          <button class="play-btn" data-demo="pooling" type="button">③ mean-pooling an MHA checkpoint into GQA</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The exact grouping rule, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li>Let <code>num_heads</code> be the number of query heads (unchanged always) and <code>num_groups</code> be the number of distinct K/V heads you choose to keep.</li>
+        <li>Query heads are partitioned into <code>num_groups</code> equal-sized groups of <code>num_heads / num_groups</code> heads each. Every query head in a group attends using that group's single shared K and single shared V.</li>
+        <li><strong>MHA</strong> is the special case <code>num_groups = num_heads</code> (every head is its own group of 1 — nothing is shared, this is the identity case).</li>
+        <li><strong>MQA</strong> is the special case <code>num_groups = 1</code> (one giant group — every query head shares the same single K/V head).</li>
+        <li><strong>GQA</strong> is anything in between, e.g. <code>num_groups = 8</code> out of <code>num_heads = 32</code>: 8 shared K/V heads, each serving 4 query heads.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>cache_size = 2 × num_layers × num_kv_heads × head_dim × seq_len × bytes_per_element</code><br><span style="font-size:.85rem;color:var(--text2)">Same formula from Monday — but now <code>num_kv_heads</code> (= <code>num_groups</code>) is a free architectural knob instead of always equaling <code>num_heads</code>. Shrinking it shrinks the whole cache proportionally, at every context length, for every request.</span></div></div>
+
+      <h4>Converting an existing MHA checkpoint into GQA (the practical trick)</h4>
+      <p>You do not have to train a GQA model from a random start. The GQA paper's key contribution is a way to <strong>convert</strong> an already-trained MHA checkpoint: for each new group, take the mean (average) of the original K projection weights for every head that falls into that group, and do the same for V. Query and output projection weights are copied through completely unchanged.</p>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>W_K_group[g] = mean(W_K_head[h] for h in group g)</code><br><span style="font-size:.85rem;color:var(--text2)">Averaging, not picking one and discarding the rest — this keeps the converted model's behavior close to the original before any further training, because the mean is the single point that minimizes squared distance to all the original heads it replaces.</span></div></div>
+      <p>After this mean-pooling step, the paper does a short additional training run — "uptraining" — using only about 5% of the original training compute, to let the model adjust to its new, smaller K/V structure. The mean-pooling is what makes that uptraining fast: it starts the model very close to correct, instead of from scratch.</p>
+
+      <h4>Why it's a superpower</h4>
+      <ul>
+        <li><strong>Fixed at training time, paid back on every request</strong> — unlike SnapKV (content-dependent, decided per-prompt), GQA's saving is architectural. Every request, regardless of content, gets the smaller cache automatically.</li>
+        <li><strong>A tunable dial, not all-or-nothing</strong> — <code>num_groups</code> lets you choose a point between MHA's full quality and MQA's full compression, matching the paper's finding that GQA-8 on a converted T5-XXL model nearly matches MHA quality while running close to MQA speed.</li>
+        <li><strong>Stacks with everything else this week</strong> — a GQA model still benefits from SnapKV (fewer token positions) and from quantization (fewer bytes per element) on top of its already-smaller <code>num_kv_heads</code>.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common misunderstanding:</b> GQA/MQA do <strong>not</strong> reduce the number of query heads, and they do not change the attention computation's parallelism across heads — every query head still produces its own separate output. The only thing that shrinks is how many <em>distinct</em> K and V projections exist and get cached.</div></div>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> KV cache size scales with num_kv_heads (Monday) → most of those heads' K/V content is redundant across heads that attend similarly → group query heads and share one K/V per group (GQA/MQA) → fewer distinct K/V heads to store, fixed at training time → smaller cache at every context length, with SnapKV (Tuesday) able to shrink it further on top.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>GQA shares one K/V head across several query heads, and both the way you implement that sharing and the amount of sharing you choose can go quietly wrong.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mismatched broadcast of shared K/V heads.</b> Because there are fewer K/V heads than query heads, the attention kernel must repeat each shared K/V head to line it up with the right query heads (a <code>repeat_interleave</code>, not a plain <code>reshape</code>). If someone uses <code>reshape</code>/<code>repeat</code> with the wrong grouping — or transposes the group axis — the shapes still match, the matmul still runs, and no error fires. The queries just get paired with the wrong K/V group, so attention is subtly scrambled and the model's quality quietly drops. A senior engineer catches this in <b>code review</b> by testing that a GQA layer with <code>num_groups = num_heads</code> gives bit-for-bit the same output as plain MHA (the identity case), which any wrong-axis expansion would break.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how much K/V sharing to bake in.</b> Fewer groups (toward MQA, <code>num_groups = 1</code>) shrinks the cache the most and speeds decode the most, but concentrates all query heads onto one K/V representation, which can cost quality and training stability. More groups (toward MHA) keeps quality but saves less memory. Where to sit on that dial — the paper's finding that GQA-8 nearly matches MHA quality at close to MQA speed is a starting point, not a law — is the <b>design-review</b> decision, because it is fixed at training time and every future request inherits it.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Perform GQA checkpoint surgery and measure the reduction</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): analyze how GQA physically changes the parameter structure of the model to reduce the KV footprint during the initial training phase — by actually performing the checkpoint surgery on a toy MHA block and measuring the exact before/after numbers.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A toy MHA attention block in JAX (or plain JAX with explicit weight dicts) with configurable <code>d_model</code>, <code>num_heads</code>, <code>head_dim</code>.</li>
+        <li>A pure function <code>mha_to_gqa(params, num_groups)</code> that mean-pools <code>W_K</code> and <code>W_V</code> from <code>[d_model, num_heads, head_dim]</code> down to <code>[d_model, num_groups, head_dim]</code>, leaving <code>W_Q</code> untouched.</li>
+        <li>Printed/asserted exact parameter-count reduction (before/after shapes and total element counts) for <code>num_groups=1</code> (MQA), <code>num_groups=8</code> (GQA-8), and <code>num_groups=num_heads</code> (identity/MHA).</li>
+        <li>Projected KV cache bytes for a stated <code>(num_layers, seq_len, dtype)</code> config, for each of the three settings above, matching hand-computed values within rounding.</li>
+        <li>A unit test asserting: correct output shapes; <code>num_groups=num_heads</code> returns weights numerically identical to the original (mean-pool of a group of 1 is a no-op); <code>num_groups=1</code> produces a single merged head equal to the mean of all original heads; and something that fails loudly if the wrong axis gets pooled or if <code>W_Q</code> is accidentally modified.</li>
+        <li>No GPU/TPU required — this is about parameter structure, not measuring real decoding latency.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m17b-long-context-decoding/day-03-gqa-mqa/experiment.py</code> with the bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 16 Day 3 artifact.
+
+Analyze how GQA physically changes the parameter structure of the model to reduce the KV footprint during the initial training phase.
+
+Create sessions/m17b-long-context-decoding/day-03-gqa-mqa/experiment.py that:
+1. Defines a toy MHA attention block in JAX/Flax (or plain JAX with explicit weight dicts) with configurable d_model, num_heads, head_dim.
+2. Implements a pure function mha_to_gqa(params, num_groups) that mean-pools the K and V projection weight tensors from shape [d_model, num_heads, head_dim] down to [d_model, num_groups, head_dim], leaving W_Q untouched.
+3. Prints/asserts the exact parameter-count reduction (before/after shapes and total element counts) for at least 3 group settings: num_groups=1 (MQA), num_groups=8 (GQA-8), num_groups=num_heads (identity/MHA).
+4. Computes and prints projected KV cache bytes for a given seq_len/num_layers/dtype, for each of the 3 settings above.
+5. Includes a unit test asserting mha_to_gqa output shapes, that num_groups=num_heads returns weights numerically identical to the original (mean-pool of a group of 1 is a no-op), and that num_groups=1 produces a single merged head equal to the mean of all original heads.
+No GPU/TPU required. Run it end-to-end to confirm it exits 0.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17b-long-context-decoding/day-03-gqa-mqa/log.md</code>: why does <code>mha_to_gqa</code> leave <code>W_Q</code> completely unchanged — what would go wrong (for the cache, and for correctness) if you pooled the query heads too?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 3 complete!</h3>
+    <p>You can now explain why only K/V heads (never Q heads) need to shrink, walk through the exact head-grouping math behind MHA/GQA/MQA, and perform the mean-pooling checkpoint surgery that converts one into another. Combined with Monday's cache-size formula and Tuesday's SnapKV, you now have two complementary, stackable attacks on the same KV cache bottleneck: architectural (GQA/MQA) and content-aware (SnapKV).<br>Next: <code>start today</code> → Speculative Decoding, breaking the sequential decode bottleneck itself.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-speculative-decoding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  cachesize:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># 32 layers, head_dim=128, seq_len=128_000, fp16 (2 bytes), varying num_kv_heads</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> cache_gb = <span class="kw">lambda</span> num_kv_heads: <span class="num">2</span> * <span class="num">32</span> * num_kv_heads * <span class="num">128</span> * <span class="num">128_000</span> * <span class="num">2</span> / <span class="num">1e9</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> cache_gb(<span class="num">32</span>)   <span class="dim"># MHA: every head keeps its own K/V</span>\n<span class="bad">67.1 GB</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> cache_gb(<span class="num">8</span>)    <span class="dim"># GQA-8: 8 shared K/V heads</span>\n<span class="ok">16.8 GB</span>   <span class="hl"># 4x smaller, same formula, just fewer kv heads</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> cache_gb(<span class="num">1</span>)    <span class="dim"># MQA: one shared K/V head for everyone</span>\n<span class="ok">2.1 GB</span>   <span class="hl"># 32x smaller than MHA</span>',
+    take:'<b>①  Cache size arithmetic.</b> Same formula as Monday — only <code>num_kv_heads</code> changed. Cutting it from 32 to 8 or 1 shrinks the whole cache proportionally, at every context length, automatically.'},
+  paramcount:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># d_model=4096, num_heads=32, head_dim=128 — one W_K matrix</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> params = <span class="kw">lambda</span> num_groups: <span class="num">4096</span> * num_groups * <span class="num">128</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> params(<span class="num">32</span>), params(<span class="num">8</span>), params(<span class="num">1</span>)   <span class="dim"># W_K element counts</span>\n<span class="ok">(16,777,216, 4,194,304, 524,288)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># same shrink applies to W_V; W_Q stays at 16,777,216 always — never shrinks</span>',
+    take:'<b>②  Fewer parameters, not just a smaller runtime cache.</b> The K and V projection matrices themselves get smaller in the checkpoint — this is a permanent architectural change, not a runtime trick.'},
+  pooling:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># W_K shape [d_model, num_heads=8, head_dim] -&gt; convert to num_groups=2</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> reshaped = W_K.reshape(d_model, <span class="num">2</span>, <span class="num">4</span>, head_dim)   <span class="dim"># 2 groups of 4 heads each</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> new_W_K = reshaped.mean(axis=<span class="num">2</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> new_W_K.shape\n<span class="ok">(d_model, 2, head_dim)</span>   <span class="hl"># each group\'s head = the average of its 4 original heads</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># sanity check: num_groups == num_heads means "groups of 1" -&gt; mean of 1 = itself</span>\n<span class="ok">identical to original W_K</span>   <span class="dim"># confirms MHA is the num_groups=num_heads special case</span>',
+    take:'<b>③  Mean-pooling is the actual "surgery".</b> This is not random pruning or picking one head to keep — every original head still contributes, averaged into its group\'s shared K/V, which is why the converted model starts close to the original before any further training.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"MHA: every query head has its own private K and V head\"><text x=\"10\" y=\"18\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">MHA — num_kv_heads = num_heads (nothing shared)</text><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\"><g transform=\"translate(20,34)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#1F6280\">Q head 1</text></g><g transform=\"translate(20,68)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head 1</text></g><g transform=\"translate(20,102)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#9A7208\">V head 1</text></g><g transform=\"translate(150,34)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#1F6280\">Q head 2</text></g><g transform=\"translate(150,68)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head 2</text></g><g transform=\"translate(150,102)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#9A7208\">V head 2</text></g><text x=\"290\" y=\"52\" font-size=\"18\" fill=\"#6B645E\">...</text><g transform=\"translate(330,34)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#1F6280\">Q head 32</text></g><g transform=\"translate(330,68)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head 32</text></g><g transform=\"translate(330,102)\"><rect width=\"90\" height=\"26\" rx=\"5\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"45\" y=\"17\" text-anchor=\"middle\" fill=\"#9A7208\">V head 32</text></g></g><text x=\"10\" y=\"148\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#C93B3B\">32 distinct K heads + 32 distinct V heads get cached, per layer, per token</text></svg>", "note": "<b>Start with plain Multi-Head Attention (MHA).</b> Every one of the 32 Query heads owns its own private Key and Value projection — 32 separate K heads and 32 separate V heads exist, and all of them get written to the KV cache."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"cache formula highlights num_kv_heads as the multiplier\"><rect x=\"10\" y=\"15\" width=\"500\" height=\"48\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"32\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"12\" fill=\"#2C2A28\">cache = 2 &#215; num_layers &#215; <tspan fill=\"#C93B3B\" font-weight=\"700\">num_kv_heads</tspan> &#215; head_dim &#215; seq_len &#215; bytes</text><text x=\"260\" y=\"52\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#6B645E\">(Monday's formula — every other term is fixed once the model is chosen)</text><g transform=\"translate(0,80)\"><line x1=\"260\" y1=\"0\" x2=\"260\" y2=\"14\" stroke=\"#C93B3B\"/><path d=\"M260 0 L260 15\" stroke=\"#C93B3B\" stroke-width=\"2\" marker-end=\"url(#ar)\"/><text x=\"260\" y=\"32\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#C93B3B\" font-weight=\"600\">this is the ONLY term GQA/MQA touch</text><text x=\"260\" y=\"50\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">it was fixed at training time — SnapKV (Tuesday) cannot change it</text></g><defs><marker id=\"ar\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\" orient=\"auto\"><path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#C93B3B\"/></marker></defs></svg>", "note": "<b>Cache size is a straight multiple of <code>num_kv_heads</code>.</b> Every other term in the formula (layers, head_dim, sequence length, byte width) is either architecture-fixed or content-dependent — <code>num_kv_heads</code> is the one knob GQA and MQA get to turn."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"GQA groups query heads and shares one K/V head per group\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">GQA-8 — 32 query heads split into 8 groups of 4</text><g font-family=\"JetBrains Mono,monospace\" font-size=\"9.5\"><g transform=\"translate(20,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q1</text></g><g transform=\"translate(72,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q2</text></g><g transform=\"translate(124,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q3</text></g><g transform=\"translate(176,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q4</text></g><rect x=\"16\" y=\"26\" width=\"212\" height=\"30\" rx=\"6\" fill=\"none\" stroke=\"#2A7B9B\" stroke-dasharray=\"3,2\"/><text x=\"260\" y=\"46\" font-size=\"16\" fill=\"#6B645E\">...</text><g transform=\"translate(300,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q29</text></g><g transform=\"translate(352,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q30</text></g><g transform=\"translate(404,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q31</text></g><g transform=\"translate(456,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q32</text></g><rect x=\"296\" y=\"26\" width=\"212\" height=\"30\" rx=\"6\" fill=\"none\" stroke=\"#2A7B9B\" stroke-dasharray=\"3,2\"/></g><line x1=\"122\" y1=\"58\" x2=\"122\" y2=\"98\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><line x1=\"402\" y1=\"58\" x2=\"402\" y2=\"98\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><g font-family=\"JetBrains Mono,monospace\" font-size=\"10.5\"><g transform=\"translate(72,100)\"><rect width=\"100\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"50\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K/V group 1</text></g><g transform=\"translate(352,100)\"><rect width=\"100\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"50\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K/V group 8</text></g></g><text x=\"260\" y=\"92\" text-anchor=\"middle\" font-size=\"14\" fill=\"#6B645E\">...</text><text x=\"260\" y=\"148\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"12\" fill=\"#2D8B55\" font-weight=\"600\">only 8 distinct K/V heads exist now, instead of 32</text><text x=\"260\" y=\"168\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">each group's 4 query heads still compute separate outputs from the same shared K/V</text></svg>", "note": "<b>GQA-8 groups the 32 query heads into 8 groups of 4.</b> Every query head still asks its own personal question and gets its own personal answer — but each group of 4 reads from one shared K/V head instead of 4 separate ones."}, {"viz": "<svg viewBox=\"0 0 520 130\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"MQA is the extreme case: all query heads share one K/V head\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">MQA — num_groups = 1 (the extreme end of the same dial)</text><g font-family=\"JetBrains Mono,monospace\" font-size=\"9.5\"><rect x=\"14\" y=\"26\" width=\"492\" height=\"30\" rx=\"6\" fill=\"none\" stroke=\"#2A7B9B\" stroke-dasharray=\"3,2\"/><g transform=\"translate(20,30)\"><rect width=\"42\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"21\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q1</text></g><g transform=\"translate(68,30)\"><rect width=\"42\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"21\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q2</text></g><text x=\"140\" y=\"46\" font-size=\"14\" fill=\"#6B645E\">...</text><g transform=\"translate(170,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q31</text></g><g transform=\"translate(222,30)\"><rect width=\"48\" height=\"22\" rx=\"4\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"24\" y=\"15\" text-anchor=\"middle\" fill=\"#1F6280\">Q32</text></g></g><line x1=\"260\" y1=\"57\" x2=\"260\" y2=\"78\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ar2)\"/><g transform=\"translate(200,80)\"><rect width=\"120\" height=\"28\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"60\" y=\"19\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#5E5191\">one K/V head</text></g><text x=\"260\" y=\"124\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"600\">all 32 query heads read from the same single K and single V</text><defs><marker id=\"ar2\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\" orient=\"auto\"><path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#6B645E\"/></marker></defs></svg>", "note": "<b>MQA pushes the same dial all the way to one group.</b> <code>num_groups=1</code> means every query head shares a single K/V head — maximum cache compression, and maximum load placed on that one shared head to serve every angle of attention."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"mean pooling averages original K heads into one shared group head\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">Checkpoint surgery: W_K_group[g] = mean(W_K_head[h] for h in group g)</text><g font-family=\"JetBrains Mono,monospace\" font-size=\"10\"><g transform=\"translate(30,34)\"><rect width=\"70\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"35\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head A</text></g><g transform=\"translate(30,68)\"><rect width=\"70\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"35\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head B</text></g><g transform=\"translate(30,102)\"><rect width=\"70\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"35\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head C</text></g><g transform=\"translate(30,136)\"><rect width=\"70\" height=\"26\" rx=\"5\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\"/><text x=\"35\" y=\"17\" text-anchor=\"middle\" fill=\"#5E5191\">K head D</text></g></g><text x=\"140\" y=\"96\" font-size=\"20\" fill=\"#6B645E\" font-weight=\"700\">&#8721;/4</text><path d=\"M160 47 L200 96\" stroke=\"#C93B3B\" stroke-width=\"1.2\"/><path d=\"M160 81 L200 96\" stroke=\"#C93B3B\" stroke-width=\"1.2\"/><path d=\"M160 115 L200 96\" stroke=\"#C93B3B\" stroke-width=\"1.2\"/><path d=\"M160 149 L200 96\" stroke=\"#C93B3B\" stroke-width=\"1.2\"/><line x1=\"235\" y1=\"96\" x2=\"280\" y2=\"96\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ar3)\"/><g transform=\"translate(285,83)\"><rect width=\"140\" height=\"28\" rx=\"5\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"70\" y=\"19\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#1a5c38\">new_W_K_group1</text></g><text x=\"260\" y=\"175\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">averaging (not picking one, not discarding) minimizes squared distance to all 4 originals</text><defs><marker id=\"ar3\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\" orient=\"auto\"><path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#6B645E\"/></marker></defs></svg>", "note": "<b>The shared K/V head is not \"pick one, throw away the rest.\"</b> It is the mean of all original heads in the group — the point that minimizes squared distance to every head it replaces, which is why the converted model stays close to the original before any further \"uptraining.\""}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"KV cache size bar chart across MHA, GQA-8, MQA\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">KV cache, 32 layers, head_dim=128, seq_len=128k, fp16</text><g font-family=\"DM Sans,sans-serif\" font-size=\"11\"><rect x=\"70\" y=\"30\" width=\"70\" height=\"110\" fill=\"#C93B3B\"/><text x=\"105\" y=\"25\" text-anchor=\"middle\" fill=\"#C93B3B\" font-weight=\"700\">67.1 GB</text><text x=\"105\" y=\"156\" text-anchor=\"middle\" fill=\"#2C2A28\">MHA (32 kv)</text><rect x=\"220\" y=\"112\" width=\"70\" height=\"28\" fill=\"#C99A12\"/><text x=\"255\" y=\"107\" text-anchor=\"middle\" fill=\"#9A7208\" font-weight=\"700\">16.8 GB</text><text x=\"255\" y=\"156\" text-anchor=\"middle\" fill=\"#2C2A28\">GQA-8</text><rect x=\"370\" y=\"136\" width=\"70\" height=\"4\" fill=\"#2D8B55\"/><text x=\"405\" y=\"131\" text-anchor=\"middle\" fill=\"#1a5c38\" font-weight=\"700\">2.1 GB</text><text x=\"405\" y=\"156\" text-anchor=\"middle\" fill=\"#2C2A28\">MQA (1 kv)</text></g><line x1=\"55\" y1=\"140\" x2=\"460\" y2=\"140\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"180\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">GQA-8 is 4x smaller than MHA; MQA is 32x smaller — same formula, only num_kv_heads changed</text></svg>", "note": "<b>The key number: going from 32 K/V heads to 8 shrinks the cache 4x, to 1 shrinks it 32x.</b> This saving is paid back on <em>every single request</em> forever — unlike SnapKV's content-dependent, per-prompt saving, GQA's saving is architectural and unconditional."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"quality versus compression trade-off curve from MHA to GQA to MQA\"><text x=\"10\" y=\"16\" font-family=\"JetBrains Mono,monospace\" font-size=\"11\" fill=\"#6B645E\">The trade-off a staff interviewer will probe</text><line x1=\"55\" y1=\"150\" x2=\"480\" y2=\"150\" stroke=\"#6B645E\"/><line x1=\"55\" y1=\"150\" x2=\"55\" y2=\"30\" stroke=\"#6B645E\"/><text x=\"265\" y=\"175\" text-anchor=\"middle\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\">fewer distinct K/V heads &#8594; more compression</text><text x=\"22\" y=\"90\" font-family=\"DM Sans,sans-serif\" font-size=\"11\" fill=\"#6B645E\" transform=\"rotate(-90 22 90)\">model quality</text><path d=\"M70 45 C 150 48, 230 60, 300 78 C 360 94, 410 118, 460 142\" fill=\"none\" stroke=\"#2A7B9B\" stroke-width=\"2.5\"/><circle cx=\"70\" cy=\"45\" r=\"5\" fill=\"#2A7B9B\"/><text x=\"70\" y=\"33\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#1F6280\">MHA</text><circle cx=\"270\" cy=\"72\" r=\"5\" fill=\"#2D8B55\"/><text x=\"270\" y=\"60\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#1a5c38\">GQA-8: near-MHA quality</text><circle cx=\"460\" cy=\"142\" r=\"5\" fill=\"#C93B3B\"/><text x=\"460\" y=\"130\" text-anchor=\"middle\" font-family=\"JetBrains Mono,monospace\" font-size=\"10\" fill=\"#C93B3B\">MQA: fastest, most quality risk</text></svg>", "note": "<b>GQA is the tunable middle ground, not an all-or-nothing switch.</b> <code>num_groups</code> lets you slide between MHA's full quality and MQA's full compression — the paper found GQA-8 on a converted T5-XXL nearly matches MHA quality while running close to MQA speed, which is exactly why frontier labs default to GQA over MQA."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. In Grouped-Query Attention (GQA), which component is reduced, and which is never reduced?',
+  opts:['Both the number of Query heads and the number of Key/Value heads shrink together','Only the number of Query heads shrinks; Key/Value heads stay at the original count','Only the number of Key/Value heads shrinks; the number of Query heads stays the same','The head_dim shrinks, but the number of heads stays the same'],
+  ans:2, fb:'Right. Query heads are never cached, so shrinking them wouldn\'t save cache memory. GQA/MQA only reduce the number of distinct Key/Value heads, which are what actually get stored in the KV cache.'},
+ {q:'2. A model has num_heads=32. Under GQA with num_groups=8, how many query heads share each single K/V head?',
+  opts:['1 query head per K/V head (same as MHA)','32 query heads per K/V head (same as MQA)','4 query heads per K/V head (32 / 8 = 4)','8 query heads per K/V head'],
+  ans:2, fb:'Right. Query heads are partitioned into num_groups equal-sized groups: 32 heads / 8 groups = 4 query heads sharing each of the 8 K/V heads.'},
+ {q:'3. You convert a model to GQA (num_heads=32, num_groups=8). The code runs with no shape errors and loss looks only slightly worse, so it ships — but downstream quality is mysteriously degraded. You suspect the shared K/V heads are being matched to the wrong query heads. What is the fastest check that would have caught this in review?',
+  opts:['Verify the total parameter count dropped after conversion','Run the GQA layer with num_groups set equal to num_heads and confirm it produces the exact same output as plain MHA; any wrong-axis expansion of the shared K/V heads breaks this identity case','Confirm the model still loads on a single GPU','Check that num_groups evenly divides num_heads'],
+  ans:1, fb:'Right. GQA must repeat each shared K/V head to line it up with its query heads (repeat_interleave along the correct axis). A wrong reshape/transpose keeps the shapes valid — so no error — but pairs queries with the wrong K/V group, scrambling attention and quietly hurting quality. Setting num_groups=num_heads should reduce to plain MHA exactly; if the outputs do not match bit-for-bit, the broadcast axis is wrong. The other options are true facts but none of them detects a mismatched grouping.'},
+ {q:'4. Setting num_groups=1 and setting num_groups=num_heads are both special cases of GQA. What does each one correspond to?',
+  opts:['num_groups=1 is MHA; num_groups=num_heads is MQA','num_groups=1 is MQA (one shared K/V head for all queries); num_groups=num_heads is MHA (every head keeps its own K/V, a no-op)','Both settings are mathematically identical','num_groups=1 disables attention entirely'],
+  ans:1, fb:'Right. num_groups=1 collapses every query head onto one shared K/V head — that is exactly Multi-Query Attention (MQA). num_groups=num_heads makes every group size 1, so mean-pooling a group of 1 just returns that head unchanged — that is plain Multi-Head Attention (MHA), the identity case.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

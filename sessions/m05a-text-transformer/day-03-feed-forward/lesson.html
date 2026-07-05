@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 5a · Day 3 — The Feed-Forward Layer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="wf6-d03-ffn">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Foundations · M5a Day 3</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-full-block/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Block</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 5a · Represent · Day 3</span>
+    <h1>Each Word Thinks<br>in a Private Room</h1>
+    <p class="lead">Attention lets tokens share information — it is a meeting where everyone tells everyone else what they know. But after the meeting, someone has to sit down and actually think about what they heard. That is the feed-forward layer: a tiny two-step network that each token runs on its own. It widens the numbers to get more room to think, filters them, then narrows back down.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain the position-wise feed-forward layer (Linear → activation → Linear), write it out, and say why it widens then narrows.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">A tiny two-layer network, run per token</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know attention lets tokens share information (M3), what a <span class="term" data-tip="A layer that does output = input × weights + bias — a matrix multiply plus a shift. Also called a fully-connected or dense layer.">linear layer</span> is (M4), and what an activation like <span class="term" data-tip="A simple filter: ReLU keeps positive numbers as they are and turns every negative number into 0.">ReLU</span> does (M4).</div></div>
+
+      <h4>What it is</h4>
+      <p>The <span class="term" data-tip="A small two-layer network inside each transformer block. It runs on every token separately: a linear layer, an activation, then another linear layer.">feed-forward network</span> (FFN) is a small network that lives inside every transformer block. It has just three steps:</p>
+      <ol>
+        <li><b>Linear (expand):</b> multiply the token's numbers by a weight matrix that makes the list longer.</li>
+        <li><b>Activation:</b> apply a simple filter like ReLU (keep positives, zero out negatives).</li>
+        <li><b>Linear (compress):</b> multiply by a second weight matrix that shrinks the list back to its original length.</li>
+      </ol>
+
+      <h4>The key word: position-wise</h4>
+      <p>"<span class="term" data-tip="Applied to each position (each token) on its own, with the same weights. Tokens do not talk to each other in this step.">Position-wise</span>" means the FFN runs on each token by itself. It uses the same weights for every token, but each token is processed alone — no token looks at any other token here. All the mixing between tokens already happened in attention. This step is just private thinking.</p>
+
+      <h4>Why widen then narrow</h4>
+      <p>The middle is bigger than the input — usually 4 times bigger. If a token's list is 512 numbers long, the FFN expands it to 2048, filters, then compresses back to 512. The wider middle gives the model more room to combine features before packing the answer back into the original size. Keep going 👇</p>
+      <button class="gotit" type="button">Got the shape — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A private room with a big whiteboard</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🚪</span><h5>Each word gets its own room</h5><p>After the meeting (attention), each word walks into a private room to think. No one else is there. It works alone, using the same room rules as every other word.</p></div>
+        <div class="card"><span class="big">📋</span><h5>A big whiteboard, then a small note card</h5><p>Inside the room is a big whiteboard (the wide middle). The word spreads its ideas out, crosses out the ones that do not help (the filter), then copies the final answer onto a small note card to carry out (compress back down).</p></div>
+      </div>
+      <p><strong>In one line:</strong> the feed-forward layer is each token's private thinking step — spread out on scratch paper, filter, then write the answer back in the original size.</p>
+      <div class="callout c-info"><span class="ic">🎮</span><div>Attention decides <b>which</b> words to combine. The feed-forward layer decides <b>what to do</b> with the combined information. Two different jobs, side by side in every block.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real rooms are separate places, but in the FFN every token uses the <b>exact same weights</b> — the same room and the same whiteboard rules. It only feels private because tokens never look at each other during this step.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch a token widen, filter, and narrow</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. Follow one token's numbers through the three steps: expand, ReLU filter, compress. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="expand" type="button">① expand (× W1)</button>
+          <button class="play-btn" data-demo="relu" type="button">② ReLU filter</button>
+          <button class="play-btn" data-demo="compress" type="button">③ compress (× W2)</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: the same two weight matrices <code>W1</code> and <code>W2</code> are reused for every token in the sequence — that is what "position-wise" means.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Two matrices and a filter</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Take one token's list of numbers. Multiply it by a first weight matrix to get a longer list (expand). Run every number through ReLU: keep it if it is positive, replace it with 0 if it is negative (filter). Multiply the result by a second weight matrix to get back to the original length (compress). Two matrix multiplies and one filter — that is the whole layer.</p>
+
+      <h4>Step 2 — the formula, symbol by symbol</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        h = ReLU(x · W1 + b1)<br>
+        y = h · W2 + b2<br>
+        <span class="dim">x  = the token, shape (d_model,)          e.g. 512 numbers</span><br>
+        <span class="dim">W1 = expand weights, shape (d_model, d_ff)  e.g. 512 × 2048</span><br>
+        <span class="dim">h  = the wide hidden list, shape (d_ff,)    e.g. 2048 numbers</span><br>
+        <span class="dim">W2 = compress weights, shape (d_ff, d_model) e.g. 2048 × 512</span><br>
+        <span class="dim">y  = the output, shape (d_model,)           e.g. 512 numbers</span>
+      </div></div>
+      <p>The input and output are the same length (<code>d_model</code>), so the FFN slots neatly into the block. The middle length <code>d_ff</code> is the wide part, usually <code>4 × d_model</code>.</p>
+
+      <h4>Step 3 — a worked example with small numbers</h4>
+      <p>Say <code>d_model = 2</code> and <code>d_ff = 4</code>, and a token is <code>x = [1, −1]</code>.</p>
+      <ul>
+        <li>Expand: <code>x · W1 + b1</code> gives 4 numbers, say <code>[2, −3, 0.5, −1]</code>.</li>
+        <li>ReLU filter: keep positives, zero the rest → <code>[2, 0, 0.5, 0]</code>.</li>
+        <li>Compress: <code>[2, 0, 0.5, 0] · W2 + b2</code> gives 2 numbers again, say <code>[1.3, −0.4]</code>.</li>
+      </ul>
+      <p>The token went in as 2 numbers, spread out to 4, got filtered, and came back as 2 numbers — a new, "thought-about" version of itself.</p>
+
+      <h4>Why it matters — the muscle of the transformer</h4>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the FFN holds most of a transformer's weights — often two thirds of them. Attention decides who talks to whom; the FFN is where the model actually stores and applies most of what it has learned. In real models the activation is often GELU or SwiGLU instead of ReLU, but the widen-filter-narrow shape is the same.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The FFN is the model's memory, and its power comes entirely from one small nonlinear step in the middle — and from how wide you make that middle.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the activation goes missing and the FFN collapses to one linear layer.</b> The whole point of <code>ReLU(x · W1) · W2</code> is the ReLU in the middle. If you drop it (or leave a placeholder that just passes numbers through), you get <code>(x · W1) · W2</code>, which is mathematically the same as multiplying by one single matrix. Nothing crashes — the shapes are identical and the code runs — but two layers are now doing the work of one, so the model quietly loses most of its capacity and plateaus at a worse loss you cannot explain from the numbers. A senior engineer in <b>code review</b> confirms a real nonlinearity sits <em>between</em> the two linear layers, because two stacked linears with nothing between them are secretly just one.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: d_ff width buys capacity but dominates the compute and memory bill.</b> The middle size <code>d_ff</code> (usually <code>4 × d_model</code>) is where most of the model's parameters and matmul FLOPs live. Making it wider gives the model more room to store and combine features, but it grows the parameter count and the per-token compute faster than almost any other knob. In a <b>design review</b> the FFN width is the main lever for trading model quality against training cost and inference latency — which is also why sparse mixture-of-experts replaces one wide FFN with many, activating only a few per token.</div></div>
+      <button class="gotit" type="button">Got how the FFN works</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From narrow to wide and back — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the feed-forward layer, built one step at a time: the token, the expand, the filter, the compress, and its place in the block. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Leave evidence you can measure (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Prove the feed-forward layer to yourself with a tiny experiment. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m05a-text-transformer/day-03-feed-forward/experiment.py</code>. Write <code>feed_forward(x, W1, b1, W2, b2)</code> that does <code>hidden = maximum(0, x @ W1 + b1)</code> then <code>hidden @ W2 + b2</code>. Use <code>d_model = 4</code> and <code>d_ff = 16</code>. Feed in a tiny sequence of shape <code>(3, 4)</code> and print the shape at every step to confirm it goes 4 → 16 → 4. Run with <code>python3 m05a_ffn.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 3 artifact.
+
+Create sessions/m05a-text-transformer/day-03-feed-forward/experiment.py that, with a comment on each step, shows the position-wise feed-forward layer widens then narrows:
+1. Defines feed_forward(x, W1, b1, W2, b2) = (maximum(0, x @ W1 + b1)) @ W2 + b2.
+2. Uses d_model=4, d_ff=16, and a sequence x of shape (3, 4); prints the shape after expand (should be (3,16)), after ReLU, and after compress (back to (3,4)).
+3. Confirms every token is processed with the SAME W1, W2 (position-wise) by checking that permuting the tokens permutes the output the same way.
+4. Prints how many parameters the FFN has (W1, b1, W2, b2 counts).
+Then run it and paste the shapes and the parameter count at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-03-feed-forward/log.md</code>: what were the three shapes (4 → ? → 4), and how many parameters did the FFN have?</div></div>
+      <button class="gotit" type="button">Done — on to Day 4</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🏆</span>
+    <h3>Day 3 complete — the thinking layer is built!</h3>
+    <p>You learned the position-wise feed-forward layer: <code>ReLU(x·W1+b1)·W2+b2</code>. It widens each token to get room to think, filters, then narrows back to the same size — and it runs on every token alone. This is where most of a transformer's weights live.<br>Next: assemble everything into <b>The Full Decoder Block</b>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-full-block/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Block</span></a>
+</nav>
+
+<footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  expand:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([<span class="num">1.0</span>, <span class="num">-1.0</span>])   <span class="dim"># one token: 2 numbers</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> pre = x @ W1 + b1        <span class="dim"># W1 is (2, 4): widen to 4</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> pre\n'+
+    '<span class="hl">array([ 2.0, -3.0, 0.5, -1.0])</span>   <span class="dim"># now 4 numbers</span>',
+    take:'<b>①  Expand.</b> The first linear layer multiplies the token by W1, making the list longer (here 2 → 4). This is the big whiteboard — more room to combine features.'},
+  relu:{html:'<span class="prompt">&gt;&gt;&gt;</span> hidden = np.maximum(<span class="num">0</span>, pre)   <span class="dim"># ReLU: keep +, zero the −</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> hidden\n'+
+    '<span class="hl">array([2.0, 0.0, 0.5, 0.0])</span>   <span class="dim"># negatives crossed out</span>',
+    take:'<b>②  Filter.</b> ReLU keeps positive numbers and turns negatives into 0. This lets the layer switch features on or off — the "crossing out" on the whiteboard.'},
+  compress:{html:'<span class="prompt">&gt;&gt;&gt;</span> y = hidden @ W2 + b2      <span class="dim"># W2 is (4, 2): narrow back to 2</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> y\n'+
+    '<span class="hl">array([1.3, -0.4])</span>   <span class="dim"># same size as the input, a new version</span>',
+    take:'<b>③  Compress.</b> The second linear layer shrinks the wide list back to the original size. In goes 2 numbers, out comes 2 — but "thought about". This is the note card carried out of the room.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='One token with d_model numbers'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='190' y='34' width='140' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='260' y='54' fill='#1a5c38'>token: d_model = 4</text></g></svg>",
+  note:"<b>Start: one token, alone.</b> The FFN gets one token's list of numbers at a time (here 4 long). No other token is in the room — this step is private thinking."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Expand the token to a wider hidden size'><g font-family='monospace' font-size='10.5' text-anchor='middle'><rect x='30' y='34' width='110' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='85' y='54' fill='#1a5c38'>4</text><rect x='170' y='34' width='130' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='235' y='54' fill='#1F6280'>× W1 + b1</text><text x='320' y='54' fill='#6B645E'>→</text><rect x='345' y='34' width='150' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='420' y='54' fill='#5E5191'>d_ff = 16 (wide)</text></g></svg>",
+  note:"<b>Step 1: expand.</b> The first linear layer <code>x·W1+b1</code> makes the list longer — usually 4× wider. This is the big whiteboard: more room to spread ideas out."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='ReLU filter keeps positives'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='120' y='34' width='150' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='195' y='54' fill='#9A7208'>ReLU</text><text x='290' y='54' fill='#6B645E'>keep + , zero −</text></g></svg>",
+  note:"<b>Step 2: filter.</b> ReLU keeps positive numbers and turns negatives to 0. The layer uses this to switch features on or off — crossing out the ideas that do not help."},
+ {viz:"<svg viewBox='0 0 520 90' role='img' aria-label='Compress back to d_model'><g font-family='monospace' font-size='10.5' text-anchor='middle'><rect x='30' y='34' width='150' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='105' y='54' fill='#5E5191'>16 (wide)</text><rect x='210' y='34' width='130' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='275' y='54' fill='#1F6280'>× W2 + b2</text><text x='360' y='54' fill='#6B645E'>→</text><rect x='385' y='34' width='110' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='440' y='54' fill='#1a5c38'>back to 4</text></g></svg>",
+  note:"<b>Step 3: compress.</b> The second linear layer <code>h·W2+b2</code> shrinks the wide list back to the original size. Out comes a same-shaped token, now thought-about."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='FFN sits after attention in the block'><g font-family='monospace' font-size='9.5' text-anchor='middle'><rect x='60' y='40' width='150' height='24' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='135' y='56' fill='#1F6280'>attention (who talks)</text><text x='230' y='56' fill='#6B645E'>→</text><rect x='270' y='40' width='190' height='24' rx='4' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='1.5'/><text x='365' y='56' fill='#5E5191'>feed-forward (what to do)</text></g></svg>",
+  note:"<b>Where it lives.</b> In every transformer block, attention decides <b>which</b> tokens combine, then the FFN decides <b>what to do</b> with the result. Most of the model's weights sit here. You will wire both into one block on Day 4."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. The feed-forward layer inside a transformer block is:',
+  opts:['a single linear layer','Linear → activation → Linear (a tiny two-layer network)','the same as attention','a normalization step'],
+  ans:1, fb:'Right. Expand with a linear layer, filter with an activation like ReLU, then compress with a second linear layer.'},
+ {q:'2. "Position-wise" means the FFN:',
+  opts:['looks at all tokens together','runs on each token separately with the same weights','only runs at the last position','changes the order of tokens'],
+  ans:1, fb:'Right. Each token is processed alone (no mixing between tokens), using the same W1 and W2 for every position.'},
+ {q:'3. Why does the FFN widen then narrow?',
+  opts:['to save memory','the wider middle gives more room to combine features before packing back to the original size','to delete tokens','to add positions'],
+  ans:1, fb:'Right. The wide hidden size (usually 4× d_model) is scratch space; the output is compressed back to d_model so it fits the block.'},
+ {q:'4. Your FFN code runs fine and shapes all match, but the model trains to a clearly worse loss than expected and adding more FFN layers barely helps. Where do you look first?',
+  opts:['the batch size, since a small batch always caps the loss','whether a real nonlinearity (ReLU/GELU) actually sits between the two linear layers — without it, W1 then W2 collapses into a single linear map and the FFN loses most of its power','the random seed','the file encoding of the dataset'],
+  ans:1, fb:'Right. The FFN needs a nonlinearity between its two linear layers. If it is missing or is a no-op, (x·W1)·W2 is mathematically just one matrix multiply, so two layers do the work of one and capacity quietly disappears — with no error and matching shapes. That is exactly the silent bug a code review catches by checking the activation is really there between the linears.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

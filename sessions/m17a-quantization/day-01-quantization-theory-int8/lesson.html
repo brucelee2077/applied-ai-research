@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 15 · Day 1 — Quantization Theory (int8)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w15-d01-int8theory">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 15 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../../week-m16b/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M16b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 4 · Week 15 · Day 1 (Mon)</span>
+    <h1>Quantization Theory<br>(int8)</h1>
+    <p class="lead">A big model stores every weight as a 16-bit float. Swap those for 8-bit integers and you cut memory roughly in half — the model that needed two GPUs now fits on one. But do it the naive way and a large model silently loses its accuracy. Today: how int8 quantization works, why it breaks, and the clever fix that made it safe.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain <code>absmax</code> int8 quantization and its scale factor, describe why a single <span class="term" data-tip="One column of a model's numbers whose values grow far larger than the rest, causing trouble when shrinking numbers.">outlier feature</span> destroys accuracy in large transformers, and describe how <strong>LLM.int8()</strong> mixed-precision decomposition fixes it.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is quantization, and what is int8?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you know a neural network is a big pile of numbers (the weights) that get multiplied together, and that these live on a GPU with limited memory. <b>No prior knowledge of number formats needed — we start from zero.</b></div></div>
+
+      <h4>First, the vocabulary</h4>
+      <p>A number inside a neural network is normally stored as a <span class="term" data-tip="A way computers store numbers that can have fractions, like 0.0037 or 128.5, not just whole numbers.">float</span> (short for "floating point"). The most common kind is <span class="term" data-tip="A way to store a number using 16 bits, called 16-bit floating point. It can hold fractions and a wide range of values.">FP16</span>: 16 <span class="term" data-tip="The smallest pieces of computer data. Each bit is a single 0 or 1, and many bits together make a number.">bits</span> (a bit is a single 0 or 1) per number. FP16 can represent a huge range of values, including fractions like <code>0.0037</code> or <code>128.5</code>.</p>
+      <p><span class="term" data-tip="Replacing each large number, like a 16-bit float, with a smaller one from a limited set, so the model uses less memory.">Quantization</span> means one thing: replace those 16-bit floats with smaller numbers, most often <span class="term" data-tip="A way to store a number using only 8 bits as a whole number, from -127 to +127. It saves memory.">INT8</span> — 8-bit signed integers, meaning whole numbers from <code>-127</code> to <code>+127</code>. Fewer bits means two wins: the model takes <strong>less memory</strong> to store, and the multiply hardware is <strong>cheaper and faster</strong>. So the model runs faster and fits on smaller GPUs.</p>
+
+      <h4>The catch: 256 seats vs. tens of thousands</h4>
+      <p>An INT8 can hold only 256 distinct values. FP16 can hold tens of thousands. To squeeze floats onto that tiny grid, you pick a <span class="term" data-tip="A number you divide by to fit big float values onto a small grid of whole numbers, then multiply back later.">scale factor</span> called <code>s</code>. You find the largest absolute value in a group of numbers (the <span class="term" data-tip="The largest size of a number in a group, ignoring whether it is positive or negative.">absmax</span>), set <code>s = absmax / 127</code>, store each number as <code>round(x / s)</code>, and recover it later as <code>int_value × s</code>. This is <span class="term" data-tip="A way to shrink numbers where you set the scale using the biggest value in a group.">absmax quantization</span>.</p>
+      <p>Because the scale is set by the <em>biggest</em> value, one huge number stretches the grid and squashes all the small numbers toward zero — they lose their detail. That lost detail is called <span class="term" data-tip="The small detail lost when you round a number to fit a smaller set of choices.">quantization error</span>.</p>
+
+      <h4>The discovery: outlier features</h4>
+      <p>In large transformers, a few specific <span class="term" data-tip="The columns of numbers that flow between a model's layers, each holding one part of the information.">feature dimensions</span> (columns of the hidden-state matrix — the vector of numbers flowing between layers) grow enormously larger than the rest, sometimes about <strong>20× larger</strong>. These are <span class="term" data-tip="A few fixed columns of numbers in a big model that grow far larger than the rest, about 20 times bigger.">outlier features</span>. They are not random: past a size threshold (around <strong>6.7 billion parameters</strong>) they appear in the same handful of dimensions (up to ~7 of them) across almost every token and layer, and the model relies on them heavily. When you absmax-quantize a whole vector containing one of these giants, every ordinary feature gets crushed into a couple of buckets and accuracy collapses. This is <span class="term" data-tip="When accuracy suddenly collapses, here because one giant value crushes all the small ones during shrinking.">catastrophic degradation</span>.</p>
+
+      <h4>The fix: LLM.int8()</h4>
+      <p><strong>LLM.int8()</strong> uses <span class="term" data-tip="A trick that splits a matrix multiply: a few unusual numbers stay high-precision, while most ordinary ones use small 8-bit integers.">mixed-precision decomposition</span>. It splits each matrix multiply into two parts: the few outlier dimensions stay in FP16 and are multiplied in FP16, while the ~99.9% of ordinary dimensions are quantized to INT8. The two partial results are added back together. Because the outliers never enter the INT8 path, they never stretch the INT8 grid — so ordinary features keep their precision. The result: 8-bit inference with essentially zero accuracy loss, even at 175B parameters.</p>
+
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noopener">LLM.int8() paper (Dettmers et al.)</a> · <a href="https://github.com/bitsandbytes-foundation/bitsandbytes" target="_blank" rel="noopener">bitsandbytes on GitHub</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">The bus with 256 numbered seats</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Think of quantization as fitting a room full of people onto a bus with only <strong>256 numbered seats</strong>, where a person's seat number must be proportional to their height. You measure the <em>tallest</em> person and give them seat 127. Everyone else gets <code>seat = round(their_height / tallest_height × 127)</code>.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🧍🧍🧍</span><h5>Normal adults → clean seating</h5><p>If everyone is a normal-height adult, heights spread nicely across the seats. A 5-foot person and a 6-foot person land in clearly different seats. You can still tell everyone apart.</p></div>
+        <div class="card"><span class="big">🦒</span><h5>One 30-foot giant → chaos</h5><p>Now one passenger is a 30-foot circus giant. To fit him in seat 127, the scale stretches so much that every normal adult rounds to the same few low seat numbers. You can no longer tell them apart.</p></div>
+      </div>
+      <p>That lost distinction is the <strong>accuracy collapse</strong>. The giant is the outlier feature; the normal adults are the ordinary features that got crushed.</p>
+      <p><strong>LLM.int8()'s trick:</strong> put the giant on his own private FP16 minibus, and seat only the normal-height people on the INT8 bus — where they now spread out beautifully across all 256 seats.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real outlier features are not one lone giant but a small <em>fixed set</em> of dimensions (about 7) that are systematically large across nearly all tokens. They are a structural property of the network, not a rare visitor — which is exactly why you can reliably detect and route them.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Watch a vector get quantized — clean, broken, fixed</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. We take a small vector of numbers and quantize it to INT8 three ways: first a clean vector, then the same vector after we inject one outlier, then the LLM.int8() rescue. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="clean" type="button">① absmax on a clean vector</button>
+          <button class="play-btn" data-demo="outlier" type="button">② inject ONE outlier</button>
+          <button class="play-btn" data-demo="mixed" type="button">③ LLM.int8() rescue</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of int8 quantization, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li><strong>absmax int8:</strong> find <code>absmax = max(|x|)</code> of a group, set <code>s = absmax / 127</code>, store <code>q = round(x / s)</code> as an integer in <code>[-127, 127]</code>, recover with <code>x̂ = q × s</code>.</li>
+        <li><strong>The scale is set by the biggest value.</strong> So one giant value makes <code>s</code> large, and every small value rounds to the same few integers. That is where accuracy dies.</li>
+        <li><strong>Weights vs. activations are different.</strong> Weights are static and well-behaved — per-tensor absmax int8 on weights is fine. The outlier problem lives in the <em>activations</em> (the runtime hidden states), which is why outliers are detected <em>per input at inference time</em>, not once at load.</li>
+        <li><strong>Mixed-precision decomposition (LLM.int8):</strong> detect outlier columns (<code>|x| &gt; threshold</code>), run those in FP16, run the rest in INT8, and add the two partial matmuls together.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>result = (X_int8 @ W_int8) · s&nbsp;&nbsp;+&nbsp;&nbsp;(X_outlier_fp16 @ W_outlier_fp16)</code><br><span style="font-size:.85rem;color:var(--text2)">"Multiply the ~99.9% ordinary columns in cheap INT8, multiply the ~7 outlier columns in FP16, then sum. Outliers never touch the INT8 grid, so ordinary features stay sharp."</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>Half the memory</strong> — 8 bits instead of 16 means a model that needed two GPUs can fit on one. Same idea that lets you serve bigger models on cheaper hardware.</li>
+        <li><strong>Essentially no accuracy loss</strong> — plain int8 collapses above ~6.7B params; LLM.int8() keeps full accuracy even at 175B, because it never lets an outlier stretch the grid.</li>
+        <li><strong>The trade is bookkeeping</strong> — you pay a little extra work finding outlier columns at runtime and keeping a thin FP16 side-path, in exchange for roughly halving memory.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> INT8 has only 256 buckets → the scale is set by the absmax → a systematic outlier feature stretches the scale → ordinary features get crushed → accuracy collapses → route outliers to FP16 so the INT8 grid resolves the rest cleanly.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>int8 quantization never throws an error — the model still loads, still runs, still returns numbers. That is exactly why the two things below are so easy to miss.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): calibrating the outlier threshold on the wrong data.</b> Outlier features live in the <em>activations</em>, and which columns blow up depends on the input text. If you pick your outlier threshold (or your fixed set of "known outlier" columns) using one calibration set — say, clean English prose — then serve traffic in another domain like code or a second language, new columns cross the threshold and quietly re-enter the INT8 path. There is no crash: the absmax scale inflates for those blocks, ordinary features get crushed, and quality drops only on the shifted inputs. In <b>code review</b> a senior engineer asks "what data was the threshold calibrated on, and does it match production traffic?" and checks that outliers are detected <em>per input at runtime</em>, not frozen once at load.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: mixed precision saves memory but forks the hot path.</b> Routing the ~0.1% outlier columns to FP16 is what buys you full accuracy at half the memory — but it means every matmul now runs two kernels (an INT8 one and a small FP16 one) plus a step that finds and gathers the outlier columns at runtime. That extra branching and the scatter/gather can eat into the speed-up on short sequences, and it makes the kernel harder to fuse. In a <b>design review</b> the question is whether the memory win is worth a slower, more complex inference path — for a model that already fits in memory, plain FP16 or a simpler weight-only scheme may serve faster.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time: a hidden-state matrix, the outlier that breaks it, and the mixed-precision fix. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. The first step is a live interactive you can drag; the rest are diagrams. By the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Demonstrate the outlier problem — and the fix</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task: build a small, reproducible experiment that <strong>empirically shows</strong> outlier features breaking naive int8, and the LLM.int8() mixed-precision fix repairing it. Every claim in the writeup must be backed by printed output from the script.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>absmax_quantize(x)</code> returns the INT8 codes, the scale, and the dequantized tensor. A unit test asserts round-trip <strong>max-abs-error &lt; 0.02</strong> on a clean random vector.</li>
+        <li>An outlier-injection demo adds one value of ~70 to an otherwise-normal vector and asserts the small-feature max-abs-error grows by <strong>at least 10×</strong> versus the clean case (printed side by side).</li>
+        <li><code>llm_int8_matmul(x, W, threshold=6.0)</code> detects outlier columns (<code>|x| &gt; threshold</code>), runs the FP16 side-path plus the INT8 path, and asserts its relative error vs a full FP16 matmul is <strong>&lt; 0.01</strong> while plain int8 matmul relative error is <strong>&gt; 0.05</strong> on the same inputs.</li>
+        <li>A printed memory comparison shows INT8 storage is <strong>~50%</strong> of FP16 for the weight matrix.</li>
+        <li><em>Stretch (optional):</em> load a real HF model via <code>bitsandbytes load_in_8bit=True</code> and print which columns it flags as outliers, confirming they cluster in a few fixed dimensions.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m17a-quantization/day-01-quantization-theory-int8/experiment.py</code> plus a <code>results.md</code> writeup in the same folder, covering the five bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 1 artifact.
+
+Create sessions/m17a-quantization/day-01-quantization-theory-int8/experiment.py (plus a results.md writeup in the same folder) that empirically demonstrates outlier features and the LLM.int8() mixed-precision fix:
+1. absmax_quantize(x): returns (int8_codes, scale, dequantized). A unit test asserts round-trip max-abs-error < 0.02 on a clean random vector.
+2. Outlier-injection demo: add one value of ~70 to an otherwise-normal vector; assert the small-feature max-abs-error grows by at least 10x versus the clean case, and print both side by side.
+3. llm_int8_matmul(x, W, threshold=6.0): detect outlier columns (|x| > threshold), run the FP16 side-path plus the INT8 path, sum the partials. Assert its relative error vs a full FP16 matmul is < 0.01, while plain int8 matmul relative error is > 0.05 on the same inputs.
+4. Print a memory comparison showing INT8 storage is ~50% of FP16 for the weight matrix.
+5. Optional stretch: load a real HF model via bitsandbytes load_in_8bit=True and print which columns bitsandbytes flags as outliers, confirming they cluster in a few fixed dimensions.
+Every claim in results.md must be backed by printed output from the script (exit code 0). Add a brief comment on each step.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-01-quantization-theory-int8/log.md</code>: why is the outlier problem an <em>activation</em> problem, not a weight problem — and what breaks if you set the threshold to 20.0 instead of 6.0?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete!</h3>
+    <p>You now understand int8 quantization: the <code>absmax</code> scale, why a single outlier feature causes catastrophic degradation above ~6.7B params, and how LLM.int8() mixed-precision decomposition keeps 8-bit inference safe.<br>Next: <code>start today</code> → Day 2 is <code>Incoherent Processing (QuiP)</code>, a different route to low-bit weights.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../../week-m16b/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M16b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  clean:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">quantize_int8</span>(<span class="hl">[0.5, -1.2, 0.8, 2.4, -0.3]</span>)\n'+
+    '<span class="dim"># absmax = 2.4 -&gt; scale = 2.4/127 =</span> <span class="num">0.0189</span>\n'+
+    '<span class="kw">int8</span>: <span class="num">[ 26, -63,  42, 127, -16]</span>\n'+
+    '<span class="kw">dequant</span>: <span class="num">[0.491, -1.191, 0.794, 2.400, -0.302]</span>\n'+
+    '<span class="ok">max abs error = 0.009  (clean: tiny error)</span>',
+    take:'<b>①  A clean vector round-trips fine.</b> The values spread across the INT8 grid, so every number keeps its detail. The error is tiny — quantization here is basically free.'},
+  outlier:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">quantize_int8</span>(<span class="hl">[0.5, -1.2, 0.8, 2.4, -0.3,</span> <span class="bad">70.0</span><span class="hl">]</span>)\n'+
+    '<span class="dim"># absmax = 70.0 -&gt; scale = 70/127 =</span> <span class="num">0.5512</span>\n'+
+    '<span class="kw">int8</span>: <span class="num">[  1,  -2,   1,   4,  -1, 127]</span>\n'+
+    '<span class="kw">dequant</span>: <span class="num">[0.551, -1.102, 0.551, 2.205, -0.551, 70.00]</span>\n'+
+    '<span class="bad">0.5 and 0.8 both round to seat 1 -&gt; now indistinguishable</span>\n'+
+    '<span class="bad">max abs error on small features = 0.25  (~27x worse)</span>',
+    take:'<b>②  One outlier wrecks everything.</b> The 70.0 sets the absmax, the scale balloons, and 0.5 and 0.8 both round to the same integer. This is catastrophic degradation.'},
+  mixed:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">llm_int8_matmul</span>(<span class="hl">x</span>, <span class="hl">W</span>, <span class="kw">outlier_threshold=</span><span class="num">6.0</span>)\n'+
+    '<span class="dim"># detect outlier cols: |x| &gt; 6.0 -&gt; column</span> <span class="num">[5]</span>\n'+
+    '<span class="ok">FP16 path</span>: cols <span class="num">[5]</span>      -&gt; partial_hi\n'+
+    '<span class="ok">INT8 path</span>: cols <span class="num">[0,1,2,3,4]</span> -&gt; partial_lo <span class="dim">(scale=2.4/127, clean)</span>\n'+
+    '<span class="kw">result</span> = partial_hi + partial_lo\n'+
+    '<span class="ok">rel error vs FP16 = 0.0004   vs 0.21 for plain int8</span>\n'+
+    '<span class="dim"># outliers touched ~0.1% of dims but caused ~99% of the error</span>',
+    take:'<b>③  LLM.int8() rescues it.</b> Route column 5 to FP16, quantize the rest to INT8, add the partials. Outliers never stretch the INT8 grid, so error drops from 0.21 back to ~0.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up. `viz` is inline HTML/SVG (use the .dgram/.node
+   diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
+   is the short explanation beside it. Engine below is fixed across all lessons. */
+var BUILD=[
+ {viz:'<div class="build-embed"><iframe src="../../viz/quantization.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/quantization.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+  note:'<b>Play with it first.</b> This is a live quantization sandbox. Drag the controls to change the values and the outlier size, and watch the INT8 grid and the error meter respond. Get a feel for how one big value ruins everything — then scroll on and we\'ll build up why, one diagram at a time.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node">t1</span> <span class="node">0.4</span> <span class="node">1.1</span> <span class="node">0.7</span> <span class="node">0.3</span> <span class="node">0.9</span> <span class="node">0.5</span> <span class="node">1.2</span> <span class="node">0.6</span></span>'+
+    '<span><span class="node">t2</span> <span class="node">0.8</span> <span class="node">0.5</span> <span class="node">1.3</span> <span class="node">0.6</span> <span class="node">0.4</span> <span class="node">1.0</span> <span class="node">0.7</span> <span class="node">0.9</span></span>'+
+    '<span><span class="node">t3</span> <span class="node">0.6</span> <span class="node">0.9</span> <span class="node">0.4</span> <span class="node">1.1</span> <span class="node">0.7</span> <span class="node">0.8</span> <span class="node">0.5</span> <span class="node">1.0</span></span>'+
+    '<span><span class="node">t4</span> <span class="node">1.0</span> <span class="node">0.7</span> <span class="node">0.6</span> <span class="node">0.9</span> <span class="node">0.5</span> <span class="node">1.2</span> <span class="node">0.4</span> <span class="node">0.8</span></span>'+
+    '</div>',
+  note:'<b>Step 1 — the hidden-state matrix.</b> This grid <code>X</code> is <code>[tokens × features]</code>: 4 rows (tokens t1–t4) by 8 columns (feature dimensions). Every cell is a normal, small value (0.1–2.0). This is the vector of numbers flowing between transformer layers — the thing we want to multiply and quantize.'},
+ {viz:'<div class="dgram col">'+
+    '<span class="dim" style="font-size:.72rem">↑ magnitude</span>'+
+    '<span><span class="arrow">▂</span> <span class="arrow">▂</span> <span class="arrow">▂</span> <span class="arrow">▂</span> <span class="arrow">▂</span> <span class="node hot" style="font-size:.7rem;padding:.15rem .4rem">█ 20×</span> <span class="arrow">▂</span> <span class="arrow">▂</span></span>'+
+    '<span><span class="node">0.4</span> <span class="node">1.1</span> <span class="node">0.7</span> <span class="node">0.3</span> <span class="node">0.9</span> <span class="node hot">62.0</span> <span class="node">1.2</span> <span class="node">0.6</span></span>'+
+    '<span><span class="node">0.8</span> <span class="node">0.5</span> <span class="node">1.3</span> <span class="node">0.6</span> <span class="node">0.4</span> <span class="node hot">58.0</span> <span class="node">0.7</span> <span class="node">0.9</span></span>'+
+    '<span class="dim">… column 5 is huge in every token …</span></div>',
+  note:'<b>Step 2 — reveal the outlier column.</b> In big models a few <em>fixed</em> dimensions run about 20× larger than the others — here, column 5 turns deep red at ~58–62 while everything else stays pale. These are <span class="term" data-tip="A few fixed columns of numbers in a big model that grow far larger than the rest, about 20 times bigger.">outlier features</span>: systematic, not noise, and the same handful of columns light up across almost every token and layer.'},
+ {viz:'<div class="dgram">'+
+    '<span class="node">[0.4 … <span style="color:var(--err)">62.0</span> … 0.6]</span> <span class="arrow">▶</span> <span class="node dim">absmax=62 · s=0.488</span> <span class="arrow">▶</span> '+
+    '<span class="node dim">1</span><span class="node dim">2</span><span class="node dim">1</span><span class="node dim">1</span><span class="node dim">2</span><span class="node hot">127</span><span class="node dim">2</span><span class="node dim">1</span></div>',
+  note:'<b>Step 3 — naive absmax quantization crushes the small values.</b> Because the red outlier sets the absmax, the scale <code>s = 62/127</code> becomes huge. Every ordinary feature (0.4, 0.6, 0.9…) rounds to the same one or two gray integers — 0, 1, or 2. Information destroyed: you can no longer tell those features apart.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node ok" style="min-width:60px">clean</span> <span style="display:inline-block;width:60px;height:14px;background:var(--ok);border-radius:4px"></span> <span class="dim">error ≈ 0.01</span></span>'+
+    '<span><span class="node hot" style="min-width:60px">outlier</span> <span style="display:inline-block;width:210px;height:14px;background:var(--err);border-radius:4px"></span> <span class="bad">accuracy collapse</span></span></div>',
+  note:'<b>Step 4 — the error meter spikes.</b> The tiny green bar is the clean-vector error. The long red bar is what happens once an outlier is present: catastrophic degradation. This is exactly why plain 8-bit quantization breaks for models past ~6.7B parameters.'},
+ {viz:'<div class="dgram">'+
+    '<span class="node" style="border-style:dashed">X (4×8)</span> <span class="arrow">✂</span> '+
+    '<span class="node ok" style="border-color:#C99A12;background:var(--warn-l);color:#9A7208">FP16 lane · col [5]</span> '+
+    '<span class="node" style="min-width:120px">INT8 lane · cols [0-4,6,7]</span></div>',
+  note:'<b>Step 5 — split the columns.</b> A vertical cut pulls the red outlier column (col 5) out of <code>X</code> into its own narrow FP16 lane (orange), while the 7 pale columns form the wide INT8 lane (blue). This is <span class="term" data-tip="A trick that splits a matrix multiply: a few unusual numbers stay high-precision, while most ordinary ones use small 8-bit integers.">mixed-precision decomposition</span>: route outlier columns one way, ordinary columns another.'},
+ {viz:'<div class="dgram">'+
+    '<span class="node dim">0.4</span><span class="node dim">1.1</span><span class="node dim">0.7</span><span class="node dim">0.3</span><span class="node dim">0.9</span><span class="node dim">1.2</span><span class="node dim">0.6</span> <span class="arrow">▶</span> '+
+    '<span class="node">absmax=1.3 · s=0.0102</span> <span class="arrow">▶</span> '+
+    '<span class="node ok">39</span><span class="node ok">108</span><span class="node ok">69</span><span class="node ok">29</span><span class="node ok">88</span><span class="node ok">118</span><span class="node ok">59</span></div>',
+  note:'<b>Step 6 — quantize only the clean block.</b> With the giant removed, the INT8 lane\'s absmax is now just 1.3. The scale is small, so the 7 ordinary features spread evenly across the full <code>-127…127</code> range (39, 108, 69, 29…). The grid finally resolves small features cleanly.'},
+ {viz:'<div class="dgram">'+
+    '<span class="node ok" style="border-color:#C99A12;background:var(--warn-l);color:#9A7208">outlier × W&nbsp;<span class="dim">(FP16)</span></span> <span class="arrow">▶</span> <span class="node">partial_hi</span>'+
+    '<span class="arrow">＋</span>'+
+    '<span class="node">clean × W&nbsp;<span class="dim">(INT8)</span></span> <span class="arrow">▶</span> <span class="node">partial_lo</span>'+
+    '<span class="arrow">=</span> <span class="node ok">full result</span></div>',
+  note:'<b>Step 7 — two matmuls, then add.</b> The clean block times its weights runs in INT8 to give <code>partial_lo</code>; the outlier strip times its weights runs in FP16 to give <code>partial_hi</code>. Each partial is a matrix multiply on its own precision. Summing them reconstructs the full output — exactly what a pure FP16 matmul would have produced.'},
+ {viz:'<div class="dgram col">'+
+    '<span><span class="node hot" style="min-width:90px">plain INT8</span> <span style="display:inline-block;width:200px;height:14px;background:var(--err);border-radius:4px"></span> <span class="bad">0.21</span></span>'+
+    '<span><span class="node ok" style="min-width:90px">LLM.int8()</span> <span style="display:inline-block;width:4px;height:14px;background:var(--ok);border-radius:4px"></span> <span class="ok">0.0004</span></span>'+
+    '<span style="margin-top:.4rem"><span class="node dim" style="min-width:90px">FP16 memory</span> <span style="display:inline-block;width:200px;height:14px;background:var(--muted);border-radius:4px"></span> <span class="dim">100%</span></span>'+
+    '<span><span class="node ok" style="min-width:90px">INT8 memory</span> <span style="display:inline-block;width:100px;height:14px;background:var(--ok);border-radius:4px"></span> <span class="ok">~50%</span></span></div>',
+  note:'<b>Step 8 — the final scoreboard.</b> Plain INT8 error 0.21 (red) versus LLM.int8() error 0.0004 (green), and memory drops from 100% to about 50%. Half the memory, essentially no accuracy loss — the outliers were only ~0.1% of the dimensions but caused ~99% of the error.'}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[{"q": "You quantize a 13B-parameter model's activations to INT8 with plain per-tensor absmax quantization. Perplexity spikes badly, but the exact same pipeline worked fine on a 350M model. You check the weights — they look completely normal in both cases. What is the most likely cause, and where should you look first?", "opts": ["The larger model has more layers, so rounding error simply accumulates linearly with depth — check total layer count", "Check the runtime activations, not the weights: past roughly 6.7B parameters a small fixed set of feature dimensions grow ~20x larger than the rest, and per-tensor absmax lets that single outlier column set the scale for the whole vector, crushing everything else", "The 13B model was trained with a different learning rate schedule, which changed the weight distribution enough to break INT8 rounding", "INT8 can only represent 256 values, so it is mathematically incapable of quantizing any tensor above roughly 1B parameters"], "ans": 1, "fb": "Weights are static and well-behaved, so per-tensor absmax on weights is fine at any scale — the outlier problem is specifically an activations (runtime hidden-state) problem, and it emerges as a phase transition around ~6.7B params where a handful of fixed dimensions become systematically huge. The tempting wrong answer blames depth/layer count, but the lesson's causal chain is explicit: 256 buckets -> scale set by absmax -> one systematic outlier stretches the scale -> ordinary features crushed. Layer count alone doesn't explain why the exact same code path is fine at 350M and broken at 13B; only the outlier-feature phase transition does."}, {"q": "You implement LLM.int8() mixed-precision decomposition but set the outlier detection threshold to 20.0 instead of the paper's 6.0. Inference runs without errors and is even a bit faster, but accuracy quietly degrades on some inputs compared to the threshold=6.0 version. What is happening?", "opts": ["A higher threshold makes the FP16 side-path numerically unstable, which is the real source of the accuracy loss", "Raising the threshold means some genuinely outlier columns (with magnitude between 6 and 20) no longer get routed to the FP16 path, so they re-enter the INT8 matmul, inflate the absmax scale there, and crush the ordinary columns in that same block — exactly the catastrophic degradation the method exists to prevent", "The threshold only controls how much memory is allocated for the FP16 buffer, so raising it can only affect speed, not accuracy", "int8 rounding error does not depend on which columns are quantized, so the threshold change should have no accuracy effect at all"], "ans": 1, "fb": "The whole mechanism only works if every column that behaves like an outlier is pulled out of the INT8 path. Threshold=20 is stricter than 6, so columns with |x| between 6 and 20 that used to be routed to FP16 now stay in the INT8 lane, reintroducing the same absmax-inflation problem the lesson describes in section 4 and the playground demo. The 'faster but slightly less accurate' symptom is the giveaway: fewer columns go through the FP16 side-path (speed win) at the cost of some outliers leaking back into INT8 (accuracy loss). The FP16 path itself is unaffected by the threshold value — it's just fed fewer columns."}, {"q": "A teammate is building a mixed-precision quantization pipeline. They compute one global absmax over the entire weight matrix, quantize activations per-tensor using that same style of scale, and their model trains without crashing — but downstream accuracy is silently worse than expected on a large model. Where do you look first?", "opts": ["Check whether they applied the same treatment (a single global absmax scale) to activations that contain outlier features, since activations — unlike weights — need outlier columns detected and routed to FP16 rather than folded into one global INT8 scale", "Check the learning rate — training without crashing but with worse accuracy almost always means the optimizer step size is miscalibrated", "Check that they used FP32 instead of FP16 as the storage format for the master weights", "Check the batch size, since larger batches are known to change absmax quantization error independent of outlier features"], "ans": 0, "fb": "The lesson draws a sharp line: weights are static and well-behaved, so per-tensor absmax on weights is fine, but activations at inference time can contain systematic outlier features that need per-input detection and FP16 routing. Treating activations exactly like weights — one global absmax, no outlier split — is precisely the naive approach that collapses once outlier features appear. The other options (learning rate, FP32 master weights, batch size) are generic ML debugging reflexes that don't engage with the outlier-feature mechanism this lesson is testing; nothing in the setup suggests an optimizer or batch-size problem, and 'trains without crashing' plus 'silently worse accuracy' is the textbook signature of quantization error, not a training instability."}, {"q": "You are deciding whether to route a given feature column through the FP16 side-path or the INT8 path in an LLM.int8()-style implementation. Which single property of that column should drive the decision, and why?", "opts": ["The column's position in the matrix (e.g., whether it's in the first or last few columns), since outliers are known to cluster at the matrix edges", "The column's magnitude relative to a threshold (|x| > threshold): large-magnitude columns disproportionately set the absmax scale for the whole quantization group, so isolating them is what keeps the INT8 grid's scale small enough to resolve the remaining ordinary features", "The column's variance across the batch dimension, since high-variance columns are hardest for gradient descent to optimize", "Whether the column corresponds to an attention head versus a feed-forward dimension, since attention outputs are inherently higher precision"], "ans": 1, "fb": "The decisive property is magnitude relative to a threshold, because absmax quantization sets its scale from the single largest-magnitude value in the group — so any column whose magnitude is large enough to dominate that scale must be pulled out, regardless of where it sits in the matrix or what architectural role it plays. The tempting wrong answer is matrix position, since the lesson's diagrams do show outliers landing in a 'fixed set' of columns — but that fixedness is an empirical observation about which columns tend to be outliers, not the criterion used to detect them; the actual detection rule in the lesson is explicitly |x| > threshold, a magnitude test, not a positional one."}];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

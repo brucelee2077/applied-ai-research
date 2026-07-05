@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 12 · Day 2 — Repository Cleansing: CI, README, and Reproducibility</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w12-d02-repocleanse">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 12 Day 2</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-04-report-finalization/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Report Finalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-consolidation-publishing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Consolidation &amp; Publishing</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 3 · Week 12 · Day 2 (Weekend)</span>
+    <h1>Repository Cleansing<br>CI, README, Reproducibility</h1>
+    <p class="lead">Four weeks of the Addition Transformer Crucible left you with scattered notebooks, scripts, and run logs. Today isn't new ML — it's <em>reproducibility engineering</em>: turning that mess into a clean, single-command repo using <code>.github/workflows</code> and a real README, before Phase 4 begins.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> modularize a monolithic notebook into single-responsibility Python files, write a GitHub Actions smoke-test workflow that catches breakage on every push, and write a README whose "Reproduce" section actually works from a clean checkout.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is "repository cleansing," and why does it need tools?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you've written JAX/Flax/Optax code across Weeks 9–12 (data generation, a dense transformer, an MoE upgrade, scaling-law fits) and you use `git` and GitHub. <b>No prior CI or packaging experience needed.</b></div></div>
+
+      <h4>The problem: four weeks of scattered scripts</h4>
+      <p>You did not sit down once and design a clean research pipeline. You ran urgent experiments, week after week, and the code grew the way most research code grows: a notebook here, a tweaked copy of that notebook there, a plotting cell pasted in wherever a run finished. That is completely normal — it is also now a liability.</p>
+      <p>Two things are missing, and both have names:</p>
+      <ul>
+        <li><strong><span class="term" data-tip="GitHub's tool that runs tasks like tests for you automatically. You add a YAML file to control it.">GitHub Actions</span></strong> — GitHub's built-in continuous integration (<span class="term" data-tip="Continuous Integration: a system that automatically builds and tests your code every time you change it.">CI</span>) system. You drop a YAML file in <code>.github/workflows/</code> and tell GitHub's servers: "every time code changes, spin up a fresh machine, check out the repo, and run these commands." Without it, nobody — including future you — finds out a training script silently broke until the day you actually need it.</li>
+        <li><strong><span class="term" data-tip="A file GitHub shows on your project's homepage. It explains what the project does and how to run it.">README documentation</span></strong> — the file GitHub renders automatically on your repo's homepage. Without a real one, a reader (including future you) has no way to know what the empirical claim is or how to reproduce it.</li>
+      </ul>
+
+      <h4>The answer: modularize, document, automate</h4>
+      <p>Today has three linked moves. First, <span class="term" data-tip="To split one big messy file into smaller, separate files, each doing one clear job.">modularize</span>: split whatever grew organically (data generation, model, training loop, plotting, all mixed in one notebook) into importable, single-job Python files — <code>data.py</code>, <code>model.py</code>, <code>train.py</code>, and so on. Second, write a README that states the exact one-command reproduction recipe. Third, add a GitHub Actions <span class="term" data-tip="A tiny, fast run that only checks the code still imports and trains. It is not the real experiment.">smoke test</span>: a tiny, fast run (say 20 training steps) that proves the code still imports and still trains, on every push, without needing a GPU or TPU.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>A <span class="term" data-tip="A tiny, fast run that only checks the code still imports and trains. It is not the real experiment.">smoke test</span> is not the real experiment. It is a scaled-down version of your real training run — same code path, tiny config — whose only job is to catch "I refactored this and it silently broke" within two minutes, instead of three weeks later.</div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>The catch is not technical difficulty — it's discipline. It is tempting to write a beautiful README and never actually test it. We will build the habit of testing the reproduce steps from a genuinely clean checkout, because that is the only way to know they are true.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.github.com/en/actions" target="_blank" rel="noopener">GitHub Actions documentation</a> · <a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes" target="_blank" rel="noopener">About READMEs</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">The end-of-project lab cleanup</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Think of the last four weeks as a busy chemistry lab bench during a series of urgent experiments. Reagent bottles are unlabeled. Scratch notes about "which run used which formula" sit on loose paper. The one working setup exists only because you happen to remember which three knobs to turn, in which order — nobody else, not even future-you in six months, could walk in and reproduce the discovery.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🧪🏷️</span><h5>Label every bottle</h5><p>Modularizing the scripts into named files with one job each — <code>data.py</code>, <code>model.py</code>, <code>train.py</code> — is labeling the reagent bottles so anyone can find the right one.</p></div>
+        <div class="card"><span class="big">📋🔬</span><h5>Write the protocol sheet</h5><p>The README is the official lab protocol: a new grad student could follow it start to finish without ever asking you a question.</p></div>
+      </div>
+      <p><strong>In one line:</strong> "Repository Cleansing" is the end-of-project lab cleanup — label the bottles (modules), write the protocol sheet (README), and install a tripwire alarm (CI) that rings the moment something breaks.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks down: a chemistry lab cleanup doesn't literally re-run the whole experiment to prove it's reproducible. A good research-repo cleanup does exactly that — the "tripwire alarm" (CI) doesn't just sit there and detect breakage passively. It actively re-executes a scaled-down version of your real training run on every single change. That's a stronger, more automatic guarantee than any physical checklist can give you.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three before/after cleanups</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal showing three real before/after transformations from a cleansed repo. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="modularize" type="button">① notebook → modules</button>
+          <button class="play-btn" data-demo="cismoke" type="button">② the smoke-test workflow</button>
+          <button class="play-btn" data-demo="readme" type="button">③ README before/after</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of a cleansed repo, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li><strong>One file, one job.</strong> <code>data.py</code> generates data. <code>model.py</code> defines the dense transformer. <code>moe_model.py</code> defines the MoE upgrade, sharing scaffolding with <code>model.py</code> rather than copy-pasting it. <code>train.py</code> runs the Optax loop. <code>sweep.py</code> orchestrates many runs. <code>scaling_law.py</code> fits the Chinchilla-style curve.</li>
+        <li><strong>Config objects, not magic numbers.</strong> <code>train(config: TrainConfig)</code> reads hyperparameters from a config file (<code>configs/smoke.yaml</code>, <code>configs/scaling_sweep.yaml</code>), so nothing is hardcoded inside the function.</li>
+        <li><strong>CI reuses the real code path.</strong> The smoke test does not test a fake mini-pipeline — it calls the exact same <code>train()</code> function as the full sweep, just with a tiny config (<code>d_model=32</code>, <code>max_steps=20</code>). That is what makes a green check mean something.</li>
+        <li><strong>The README's "Reproduce" section is a contract.</strong> It names the exact commands, the expected output file path, and the expected runtime — not just a description of what the project does.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>python -m src.train --config configs/smoke.yaml --max_steps 20</code><br><span style="font-size:.85rem;color:var(--text2)">This is the entire trick: run the real training function, just tiny and fast, so CI can prove "it still works" in under two minutes on CPU.</span></div></div>
+
+      <h4>Why it's worth doing before Phase 4</h4>
+      <ul>
+        <li><strong>Future-you can't ask past-you questions.</strong> Six months from now, only the README and the code answer questions — not your memory of which cell to run first.</li>
+        <li><strong>CI catches silent breakage immediately.</strong> A refactor that breaks an import or a shape mismatch turns red on the very next push, not three weeks later when you need the real scaling-law runs.</li>
+        <li><strong>Modular code is testable code.</strong> You cannot unit-test a 40-cell notebook. You can absolutely unit-test <code>generate_addition_batch()</code> in two lines of pytest.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> four weeks of urgent experiments (Weeks 9–12) → code grows organically in notebooks → without cleanup, nobody (including future-you) can reproduce the result → modularize + README + CI → a repo Phase 4 (custom kernels, ThunderKittens) can build on with confidence.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Cleanse the Phase 3 repo into one reproducible pipeline</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task is not new experiment code — it's turning everything you built in Weeks 9–12 into a repository someone else (or future-you) could clone and reproduce with one command.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>sessions/m14b-capstone-moe/day-05-repository-cleansing/src/{data.py, model.py, moe_model.py, train.py, sweep.py, scaling_law.py}</code> exist, each importable standalone — e.g. <code>python -c "from src.model import AdditionTransformer"</code> succeeds with no notebook context needed.</li>
+        <li><code>sessions/m14b-capstone-moe/day-05-repository-cleansing/tests/</code> contains at least 3 passing pytest tests (data shape test, model forward-pass shape test, training-loss-decreases smoke test); <code>pytest tests/ -q</code> exits 0.</li>
+        <li><code>.github/workflows/smoke_test.yml</code> exists and, when pushed, shows a green check in the GitHub Actions tab on the remote.</li>
+        <li><code>sessions/m14b-capstone-moe/day-05-repository-cleansing/README.md</code> covers: what the project is, the empirical claim (dense vs. MoE Chinchilla-style scaling exponents from your own runs), install steps, and one copy-pasteable "Reproduce" command sequence with expected output path and runtime.</li>
+        <li>Acceptance test: from a fresh clone (or <code>git clean -xdf</code> scratch checkout), running <strong>only</strong> the README's commands regenerates the scaling-law plot with no manual notebook editing, no undocumented environment variables, and no crashes.</li>
+        <li><code>sessions/m14b-capstone-moe/day-05-repository-cleansing/EXPERIMENT_LOG.md</code> (or <code>PROGRESS.md</code>) has a final dated entry marking the cleanup complete, linking the README and CI badge.</li>
+      </ul>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The most common failure mode:</b> a beautiful "Reproduce" section that was never actually tested from a clean checkout — it references a renamed config file, assumes an environment variable you forgot you set locally, or quietly depends on a cached dataset sitting on your disk that a fresh clone won't have. Always do the final test in a genuinely clean environment: a fresh <code>git clone</code> into a scratch directory, or at minimum <code>git clean -xdf</code> plus a fresh virtualenv — running nothing but the README's own instructions.</div></div>
+      <h4>Option A · do it yourself</h4>
+      <p>This is direct repository hygiene work on your own accumulated code — walk the 20-step checklist from Section 5 against your actual Weeks 9–12 notebooks and scripts, in <code>sessions/m14b-capstone-moe/day-05-repository-cleansing/</code> (or your existing Phase 3 experiment directory).</p>
+      <h4>Option B · a starting checklist to copy into your notes</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">no skill trigger — this is your own repo cleanup</span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Repository Cleansing checklist for sessions/m14b-capstone-moe/day-05-repository-cleansing/:
+
+1. Inventory every notebook, script, and results file from Weeks 9-12 (data gen, dense model, MoE upgrade, scaling-law fits).
+2. Decide module boundaries: data.py, model.py, moe_model.py, train.py, sweep.py, scaling_law.py, run.py.
+3. Create sessions/m14b-capstone-moe/day-05-repository-cleansing/{src,tests,configs,results,reports}/.
+4. Extract the synthetic addition-sequence generator into src/data.py with a typed signature and docstring stating shapes.
+5. Extract the dense Flax transformer into src/model.py as a standalone nn.Module, removing hidden notebook-global state.
+6. Extract the MoE upgrade into src/moe_model.py, sharing the base transformer via composition, not copy-paste.
+7. Extract the Optax training loop into src/train.py as train(config) -> TrainState, Metrics.
+8. Extract sweep orchestration into src/sweep.py: calls train() across a grid of model sizes/token budgets, saves each run to results/.
+9. Extract Chinchilla-style curve-fitting into src/scaling_law.py: returns fitted alpha, beta (and N_c, D_c) plus a plot.
+10. Write configs/smoke.yaml (tiny, fast) and configs/scaling_sweep.yaml (the real sweep) so no magic numbers stay hardcoded.
+11. Write run.py or python -m src.<module> CLI entry points for the full pipeline, no notebook clicking required.
+12. Write pytest tests: data shape test, model/moe forward-pass shape test, loss-decreases-over-N-steps smoke test.
+13. Delete or archive dead code, abandoned branches, stale results, and now-duplicated notebook cells.
+14. Write .github/workflows/smoke_test.yml: checkout, setup-python, pip install, python -m src.train --config configs/smoke.yaml --max_steps 20, pytest tests/ -q.
+15. Push, confirm the Actions tab shows green; deliberately break an import once to confirm it goes red, then revert.
+16. Write the comprehensive README.md: description, empirical claim, install, exact reproduce command sequence with expected output path and runtime.
+17. Add a results/reports section to the README with your own fitted scaling-law numbers and plot (not placeholders).
+18. Final clean-checkout test: fresh clone into a scratch dir, run only the README's reproduce command, confirm zero manual intervention.
+19. Update PROGRESS.md/EXPERIMENT_LOG.md marking the cleanup complete, linking the README and CI badge.
+20. Add a CI status badge to the top of the README pointing at the smoke_test.yml workflow.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After finishing, write one line in <code>sessions/m14b-capstone-moe/day-05-repository-cleansing/log.md</code>: what would have broken if you had written the README's "Reproduce" section without testing it from a clean checkout?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Week 12 Day 2 complete!</h3>
+    <p>You turned four weeks of scattered notebooks into a modularized, tested, CI-checked, single-command-reproducible repository. That's the reproducibility bar every research project should clear — before Phase 4's custom kernels ever touch it.<br>Next: <code>start today</code> → Week 13 Day 1 is <code>The Pallas Abstraction</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-04-report-finalization/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Report Finalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-consolidation-publishing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Consolidation &amp; Publishing</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  modularize:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># BEFORE: addition_transformer.ipynb, ~40 cells, everything mixed together</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># cell 3: data gen inline · cell 12: nn.Module defined · cell 20: for step in range(num_steps): ... + matplotlib calls</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># bottom cell: scaling-law fit using whatever variables happen to still be in memory</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># AFTER: src/data.py, src/model.py, src/train.py, src/scaling_law.py</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">from</span> src.model <span class="kw">import</span> AdditionTransformer   <span class="dim"># works with zero notebook context</span>\n<span class="ok">import succeeded</span>',
+    take:'<b>①  Notebook → modules.</b> A 40-cell notebook mixing data, model, training, and plotting can\'t be unit-tested. Four single-job files, each importable on its own, can.'},
+  cismoke:{html:'<span class="prompt">$</span> cat .github/workflows/smoke_test.yml\n'+
+    '<span class="kw">name:</span> smoke-test\n<span class="kw">on:</span> [push, pull_request]\n'+
+    '<span class="kw">jobs:</span>\n  train-tiny:\n    <span class="kw">runs-on:</span> ubuntu-latest\n    <span class="kw">steps:</span>\n'+
+    '      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n      - run: pip install -r requirements.txt\n'+
+    '      - run: python -m src.train --config configs/smoke.yaml --max_steps <span class="num">20</span>\n      - run: pytest tests/ -q\n'+
+    '<span class="dim"># d_model=32, num_layers=2, max_steps=20 → finishes in &lt;2 min on CPU, no GPU/TPU needed</span>\n<span class="ok">✓ green check on every push</span>',
+    take:'<b>②  The smoke-test workflow.</b> Same train() code path as the real sweep, just tiny and fast — it catches a broken import or shape mismatch in under two minutes, on every push.'},
+  readme:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># BEFORE</span>\n# Addition Transformer\nSome JAX code for scaling laws.\n\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># AFTER</span>\n## Reproduce the headline result\n<span class="fn">git clone</span> &lt;repo&gt; &amp;&amp; <span class="fn">cd</span> &lt;repo&gt;\n'+
+    '<span class="fn">pip install</span> -r requirements.txt\n<span class="fn">python -m</span> src.sweep --config configs/scaling_sweep.yaml\n'+
+    '<span class="fn">python -m</span> src.scaling_law --sweep_dir results/scaling_sweep/ --out sessions/m14b-capstone-moe/day-05-repository-cleansing/reports/scaling_law_fit.png\n'+
+    '<span class="dim"># fits L(N,D) = E + A/N^α + B/D^β, expected runtime: ~25 min on 1 GPU/TPU-v* core</span>\n<span class="ok">sessions/m14b-capstone-moe/day-05-repository-cleansing/reports/scaling_law_fit.png</span>',
+    take:'<b>③  README before/after.</b> "Some JAX code" tells the reader nothing checkable. The exact command sequence, output path, and runtime is the acceptance bar for a comprehensive README.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"One notebook mixing data, model, training, and plotting code\"><rect x=\"150\" y=\"10\" width=\"220\" height=\"170\" rx=\"10\" fill=\"#FFFFFF\" stroke=\"#C93B3B\" stroke-width=\"2\"/><rect x=\"162\" y=\"22\" width=\"196\" height=\"30\" rx=\"4\" fill=\"#FDE8E8\"/><text x=\"260\" y=\"41\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">cell 3: data gen inline</text><rect x=\"162\" y=\"58\" width=\"196\" height=\"30\" rx=\"4\" fill=\"#FDE8E8\"/><text x=\"260\" y=\"77\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">cell 12: nn.Module def</text><rect x=\"162\" y=\"94\" width=\"196\" height=\"30\" rx=\"4\" fill=\"#FDE8E8\"/><text x=\"260\" y=\"113\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">cell 20: train loop + plt</text><rect x=\"162\" y=\"130\" width=\"196\" height=\"30\" rx=\"4\" fill=\"#FDE8E8\"/><text x=\"260\" y=\"149\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">bottom cell: scaling fit</text><text x=\"260\" y=\"185\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">addition_transformer.ipynb — 40 cells, one big file</text></svg>", "note": "<b>The starting mess.</b> Four weeks of urgent experiments left one notebook where data loading, the model, the training loop, and plotting are all tangled in the same 40 cells — nothing here can be imported or tested on its own."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"The notebook splits into six single-job files\"><rect x=\"150\" y=\"10\" width=\"220\" height=\"55\" rx=\"10\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"260\" y=\"42\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">40-cell notebook</text><line x1=\"260\" y1=\"65\" x2=\"260\" y2=\"85\" stroke=\"#6B645E\" stroke-width=\"1.5\"/><path d=\"M260 85 L90 85 M260 85 L430 85\" stroke=\"#6B645E\" stroke-width=\"1.5\" fill=\"none\"/><g font-family=\"monospace\" font-size=\"10.5\" fill=\"#1F6280\"><rect x=\"20\" y=\"95\" width=\"120\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"80\" y=\"112\" text-anchor=\"middle\">data.py</text><rect x=\"150\" y=\"95\" width=\"120\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"210\" y=\"112\" text-anchor=\"middle\">model.py</text><rect x=\"280\" y=\"95\" width=\"120\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"340\" y=\"112\" text-anchor=\"middle\">moe_model.py</text><rect x=\"410\" y=\"95\" width=\"90\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"455\" y=\"112\" text-anchor=\"middle\">train.py</text><rect x=\"85\" y=\"131\" width=\"120\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"145\" y=\"148\" text-anchor=\"middle\">sweep.py</text><rect x=\"215\" y=\"131\" width=\"150\" height=\"26\" rx=\"5\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"290\" y=\"148\" text-anchor=\"middle\">scaling_law.py</text></g><text x=\"260\" y=\"195\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">one file, one job — each importable standalone</text></svg>", "note": "<b>Step 1: modularize.</b> The notebook splits into <code>data.py</code>, <code>model.py</code>, <code>moe_model.py</code>, <code>train.py</code>, <code>sweep.py</code>, and <code>scaling_law.py</code>. Each file has exactly one job, so <code>from src.model import AdditionTransformer</code> works with zero notebook context."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Magic numbers replaced by a config object read by train\"><rect x=\"20\" y=\"20\" width=\"200\" height=\"40\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"120\" y=\"44\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">d_model=512 hardcoded</text><rect x=\"20\" y=\"90\" width=\"200\" height=\"40\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\"/><text x=\"120\" y=\"114\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">max_steps=100000 hardcoded</text><path d=\"M230 40 L 300 75\" stroke=\"#6B645E\" stroke-width=\"1.5\" fill=\"none\" marker-end=\"url(#ah1)\"/><path d=\"M230 110 L 300 75\" stroke=\"#6B645E\" stroke-width=\"1.5\" fill=\"none\" marker-end=\"url(#ah1)\"/><defs><marker id=\"ah1\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"305\" y=\"50\" width=\"195\" height=\"50\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"402\" y=\"70\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#2D8B55\">configs/smoke.yaml</text><text x=\"402\" y=\"88\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#2D8B55\">train(config: TrainConfig)</text></svg>", "note": "<b>Step 2: config objects, not magic numbers.</b> Hyperparameters move out of the function body and into <code>configs/smoke.yaml</code> or <code>configs/scaling_sweep.yaml</code>, so <code>train(config)</code> can be called with a tiny config or the real one without editing code."}, {"viz": "<svg viewBox=\"0 0 520 180\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Push triggers CI which runs the real train function with a tiny config\"><rect x=\"15\" y=\"70\" width=\"110\" height=\"40\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"70\" y=\"94\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#1F6280\">git push</text><path d=\"M125 90 L180 90\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah2)\"/><rect x=\"180\" y=\"55\" width=\"160\" height=\"70\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\"/><text x=\"260\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#9A7208\">GitHub Actions</text><text x=\"260\" y=\"96\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#9A7208\">fresh ubuntu VM</text><text x=\"260\" y=\"112\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#9A7208\">checkout + pip install</text><path d=\"M340 90 L395 90\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah2)\"/><rect x=\"395\" y=\"55\" width=\"115\" height=\"70\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"452\" y=\"78\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1a5c38\">train(smoke</text><text x=\"452\" y=\"92\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1a5c38\">config)</text><text x=\"452\" y=\"110\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9.5\" fill=\"#1a5c38\">20 steps, d=32</text><defs><marker id=\"ah2\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><text x=\"260\" y=\"160\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">same train() as the real sweep — just d_model=32, max_steps=20</text></svg>", "note": "<b>Step 3: CI reuses the real code path.</b> A <code>.github/workflows/smoke_test.yml</code> file tells GitHub: on every push, spin up a fresh machine, check out the repo, and call the exact same <code>train()</code> function — just with a tiny config. That's what makes a green check mean something rather than testing a fake mini-pipeline."}, {"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Two timeline bars comparing smoke test runtime versus full sweep runtime\"><text x=\"10\" y=\"25\" font-family=\"monospace\" font-size=\"11\" fill=\"#2C2A28\">smoke test</text><rect x=\"110\" y=\"14\" width=\"22\" height=\"18\" rx=\"3\" fill=\"#2D8B55\"/><text x=\"142\" y=\"27\" font-family=\"monospace\" font-size=\"11\" fill=\"#2D8B55\">~90 sec, CPU only</text><text x=\"10\" y=\"65\" font-family=\"monospace\" font-size=\"11\" fill=\"#2C2A28\">full sweep</text><rect x=\"110\" y=\"54\" width=\"390\" height=\"18\" rx=\"3\" fill=\"#C99A12\"/><text x=\"305\" y=\"67\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#FFFFFF\">~25+ min, GPU/TPU, many configs</text><line x1=\"110\" y1=\"90\" x2=\"110\" y2=\"110\" stroke=\"#E5DFD6\"/><line x1=\"500\" y1=\"90\" x2=\"500\" y2=\"110\" stroke=\"#E5DFD6\"/><text x=\"305\" y=\"130\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">~17x faster to catch a broken import, at near-zero cost</text></svg>", "note": "<b>The key number.</b> The smoke test finishes in about 90 seconds on CPU because it trains a tiny model for 20 steps, while the real scaling-law sweep can take 25+ minutes per config on an accelerator. CI needs the cheap version to give fast feedback on <em>every</em> push."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"A beautiful README reproduce section that was never tested from a clean checkout, breaking on fresh clone\"><rect x=\"20\" y=\"15\" width=\"220\" height=\"110\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"130\" y=\"35\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#2C2A28\">README.md</text><text x=\"130\" y=\"55\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#6B645E\">## Reproduce</text><text x=\"130\" y=\"72\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9.5\" fill=\"#6B645E\">python train.py --cfg old.yaml</text><text x=\"130\" y=\"88\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9.5\" fill=\"#6B645E\">(uses cached ~/data/*.npz)</text><text x=\"130\" y=\"105\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"9.5\" fill=\"#6B645E\">export MY_LOCAL_VAR=1</text><path d=\"M245 70 L305 70\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah3)\"/><defs><marker id=\"ah3\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"310\" y=\"15\" width=\"195\" height=\"110\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.5\"/><text x=\"407\" y=\"38\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">fresh git clone</text><text x=\"407\" y=\"60\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#C93B3B\">old.yaml renamed</text><text x=\"407\" y=\"78\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#C93B3B\">no ~/data/*.npz</text><text x=\"407\" y=\"96\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#C93B3B\">MY_LOCAL_VAR undocumented</text><text x=\"407\" y=\"115\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#C93B3B\">✗ crashes</text><text x=\"260\" y=\"150\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">it worked on your machine because your machine wasn't clean</text></svg>", "note": "<b>Failure mode: the untested README.</b> A reproduce section that references a renamed config, a cached dataset only on your disk, or an environment variable you forgot you set will pass for you and fail for everyone else — including future-you on a new machine."}, {"viz": "<svg viewBox=\"0 0 520 175\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Clean checkout test proves the reproduce contract, unlocking Phase 4 confidently\"><rect x=\"15\" y=\"55\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"85\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1F6280\">git clone</text><text x=\"85\" y=\"96\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1F6280\">/tmp/scratch</text><path d=\"M155 85 L205 85\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah4)\"/><rect x=\"210\" y=\"55\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\"/><text x=\"280\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1F6280\">only run</text><text x=\"280\" y=\"96\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10.5\" fill=\"#1F6280\">README commands</text><path d=\"M350 85 L400 85\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah4)\"/><defs><marker id=\"ah4\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"405\" y=\"55\" width=\"105\" height=\"60\" rx=\"8\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"457\" y=\"80\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#1a5c38\">scaling_law</text><text x=\"457\" y=\"96\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"10\" fill=\"#1a5c38\">_fit.png ✓</text><text x=\"260\" y=\"150\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#6B645E\">this is the reproducibility bar Phase 4's custom kernels get to build on</text></svg>", "note": "<b>Why frontier labs care.</b> A repo that survives a fresh <code>git clone</code> plus README-only commands is what lets a staff engineer hand off work, onboard a new teammate, or trust a scaling-law claim enough to build Phase 4's custom kernels on top of it — no tribal knowledge required."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. What is the primary purpose of adding a GitHub Actions smoke-test workflow to the addition-transformer repo?',
+  opts:['To automatically deploy the trained model to production','To automatically re-run a tiny version of the training pipeline on every push/PR so broken code is caught immediately, without needing a GPU/TPU','To generate the README file automatically from docstrings','To speed up JAX\'s JIT compilation across runs'],
+  ans:1, fb:'Right. GitHub Actions is a CI system for running checks on code changes; here it verifies the training loop still runs and produces a finite loss on every push — deployment, README generation, and JIT speed are unrelated to its role here.'},
+ {q:'2. In the modularization goal "Clean the codebase, modularize all JAX scripts," what is the main problem being solved?',
+  opts:['JAX code runs slower when split across multiple files','A single monolithic notebook mixes data generation, model, training loop, and plotting, making pieces impossible to test, reuse, or reproduce independently','Flax requires each nn.Module to live in its own file by law','GitHub cannot render notebooks with more than one model definition'],
+  ans:1, fb:'Right. The reproducibility problem is that intermingled responsibilities in one notebook can\'t be unit-tested or reused in isolation; JAX has no per-file performance or Flax file-layout requirement, and GitHub renders multi-cell notebooks fine.'},
+ {q:'3. What makes a README "comprehensive" under this curriculum\'s practical execution goal, beyond just describing what the project is?',
+  opts:['It must include a table of contents and nothing else','It must list every contributor\'s GitHub handle','It must give the exact command(s) to reproduce the headline empirical result from a clean checkout, including expected outputs/runtime','It must be written in reStructuredText instead of Markdown'],
+  ans:2, fb:'Right. "Ensure the entire experiment can be reproduced with a single command" is the acceptance bar the curriculum names explicitly — a description alone, contributor list, or markup format choice doesn\'t satisfy that reproducibility contract.'},
+ {q:'4. Why does the smoke-test workflow use a tiny config (e.g., 20 steps, small d_model) instead of running the full scaling-law sweep on every push?',
+  opts:['GitHub Actions cannot execute JAX code at all','Full sweeps are needed to catch import errors, but tiny ones cannot','A full multi-run sweep can take tens of minutes to hours; CI needs a fast, cheap check that still exercises the real code path to catch breakage quickly on every change','Tiny configs test a completely different code path than the full sweep'],
+  ans:2, fb:'Right. The smoke test intentionally reuses the same train() code path at a tiny scale purely for speed — CI should give fast feedback on every push, while the expensive full sweep is run manually/separately for the actual scaling-law result; GitHub Actions runs JAX fine, and both configs exercise identical code.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

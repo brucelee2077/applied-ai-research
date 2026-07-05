@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 14 · Day 5 — Comparative Benchmarking: FlashAttention, ThunderKittens & the IO-Awareness Argument</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w14-d05-compbench">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 14 Day 5</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; Implementation</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 4 · Week 14 · Day 5 (Fri)</span>
+    <h1>Comparative Benchmarking<br>FlashAttention, ThunderKittens &amp; Why Kernels Win</h1>
+    <p class="lead">You've hand-written Pallas kernels and learned the ThunderKittens CUDA DSL. Today's new idea isn't a new algorithm — it's a new <em>skill</em>: reading the FlashAttention 1→2→3 lineage and the ThunderKittens paper as a chronological argument about hardware constraints, then proving that argument yourself with numbers on real hardware.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why naive attention is memory-bound not compute-bound, trace what each FlashAttention generation fixed and why, explain ThunderKittens' "silicon constraints as the API" philosophy, and benchmark a from-scratch attention kernel against a naive implementation and a vendor library.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is IO-awareness, and why does it matter?</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you've written a Pallas kernel and read about the ThunderKittens CUDA DSL in the last two days. You know what a GPU kernel is. <b>No prior knowledge of FlashAttention needed.</b></div></div>
+
+      <h4>The problem: attention looks compute-heavy, but it isn't the bottleneck</h4>
+      <p>Standard <span class="term" data-tip="The part of a transformer where each token looks at other tokens, using Query, Key, and Value vectors, to decide what matters.">attention</span> computes a score matrix S = QK^T (query dot key, for every pair of positions), applies softmax, then multiplies by V. That looks like a lot of matrix multiplication — so you'd guess the GPU's math units are the bottleneck. They are not.</p>
+      <p>The real bottleneck is <span class="term" data-tip="High-Bandwidth Memory: the big memory chips next to the compute. Large but slower than tiny on-chip memory, and built for fast data movement.">HBM</span> (High Bandwidth Memory — the GPU's big but relatively slow "main memory," as opposed to the small, very fast on-chip scratchpad called <span class="term" data-tip="Very small but very fast memory right next to the compute units. On NVIDIA GPUs it is called shared memory.">SRAM</span>). Naive attention writes the full N×N score matrix to HBM, reads it back to compute softmax, writes the softmax result back, and reads it again for the final multiply. For long sequences, that traffic — not the FLOP count — is what makes attention slow.</p>
+
+      <h4>The answer: fuse the steps, never touch HBM in between</h4>
+      <p><span class="term" data-tip="A fast method and GPU program that computes attention without ever storing the full big matrix in slow memory.">FlashAttention</span> (2022) noticed this and fused QK^T → softmax → ×V into a single kernel using <span class="term" data-tip="Splitting big data into small blocks that fit in fast on-chip memory, so you do all the math there before writing back.">tiling</span>: load small blocks of Q, K, V into SRAM, do all three steps right there on-chip, and only write the final output to HBM once. This is called <b>IO-awareness</b> — optimizing for memory <em>traffic</em>, not FLOP count.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>FlashAttention → FlashAttention-2 → FlashAttention-3: each generation squeezes more speed out of the <em>same math</em> (exact softmax attention) by matching the kernel more closely to how the GPU actually schedules work.<br><span style="font-size:.85rem;color:var(--text2)">Then <b>ThunderKittens</b> asks a bigger question: instead of hand-tuning one kernel per GPU generation, can a small set of reusable abstractions make writing <em>any</em> fast kernel easy?</span></div></div>
+
+      <h4>So what's today's catch?</h4>
+      <p>Today is not about deriving new math. It's about reading a family of papers as a chronological argument about hardware constraints — then <em>proving that argument yourself</em> by benchmarking a from-scratch kernel against a naive one and a vendor library, and watching the memory-traffic gap appear in real numbers.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs and papers: <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention paper</a> · <a href="https://github.com/dao-ailab/flash-attention" target="_blank" rel="noopener">FlashAttention GitHub</a> · <a href="https://arxiv.org/abs/2307.08691" target="_blank" rel="noopener">FlashAttention-2 paper</a> · <a href="https://arxiv.org/abs/2407.08608" target="_blank" rel="noopener">FlashAttention-3 paper</a> · <a href="https://tridao.me/blog/2024/flash3/" target="_blank" rel="noopener">FlashAttention-3 blog post</a> · <a href="https://arxiv.org/abs/2410.20399" target="_blank" rel="noopener">ThunderKittens paper</a> · <a href="https://github.com/HazyResearch/ThunderKittens" target="_blank" rel="noopener">ThunderKittens GitHub</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">The kitchen with a walk-in freezer and a cutting board</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Picture a professional kitchen with two zones: a giant walk-in freezer in the back (HBM — huge capacity, but every trip there and back costs real time), and a small set of prep bowls right on your cutting board (SRAM — tiny capacity, but instantly reachable).</p>
+      <div class="relate">
+        <div class="card"><span class="big">🥶🚶</span><h5>Naive attention = running to the freezer for every step</h5><p>Get the tomatoes, chop, walk back. Get the onions, chop, walk back. Correct, but you spend most of your time walking, not cooking — the freezer trips (HBM round-trips) dominate.</p></div>
+        <div class="card"><span class="big">🍱🔪</span><h5>FlashAttention = one trip, one tray, cook it all at the board</h5><p>Grab a full tray of ingredients (a tile) in one trip. Do every step for that tray using only the prep bowls (SRAM). Only walk back for the next tray. Online softmax is keeping a running "flavor total" in your head instead of laying out every tray at once.</p></div>
+      </div>
+      <p><strong>In one line:</strong> the FlashAttention lineage is the story of a cook who stops making unnecessary trips to the freezer; ThunderKittens is the kitchen-designer who reshapes the counter and bowls so that the fast way and the natural way become the same thing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real kitchen has one cook per station, but a GPU runs thousands of "cooks" (threads) truly in parallel across many stations (streaming multiprocessors). The hardest part of kernel engineering is choreographing all of them to hit the freezer and the cutting board at overlapping but non-colliding times — a synchronization problem this single-cook story doesn't capture at all.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through three back-of-envelope arguments</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. These are the exact back-of-envelope numbers the FlashAttention and ThunderKittens papers are built on. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="memtraffic" type="button">① memory traffic: naive vs fused</button>
+          <button class="play-btn" data-demo="fa2util" type="button">② FA-2 vs FA-1: loop order matters</button>
+          <button class="play-btn" data-demo="tkgap" type="button">③ ThunderKittens: where the 10-40x comes from</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">What each generation fixed, and why it matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The lineage, one fix at a time</h4>
+      <ul>
+        <li><strong>FlashAttention (2022):</strong> fuses QK^T → softmax → ×V into one kernel using <b>tiling</b> (load Q/K/V blocks into SRAM) and <b>online softmax</b> (rescale running sums as new blocks arrive, so the full row of scores is never needed at once). Result: the exact same math, but O(N·d) HBM writes instead of O(N²).</li>
+        <li><strong>FlashAttention-2 (2023):</strong> re-orders the loop nest to parallelize over sequence length (not just batch/heads) and cuts non-matmul FLOPs, roughly doubling GPU utilization by better matching how <b>warps</b> (groups of 32 threads the GPU schedules in lockstep) actually get scheduled.</li>
+        <li><strong>FlashAttention-3 (2024):</strong> targets Hopper (H100) specifically. Exploits <b>asynchrony</b> between Tensor Cores and the <b>TMA</b> (Tensor Memory Accelerator — copies HBM↔SRAM tiles without occupying a compute thread) via <b>warp specialization</b> (some warps only load, others only compute), plus FP8 quantization.</li>
+        <li><strong>ThunderKittens (2024):</strong> asks whether tiling, online softmax, warp specialization, and async copies can be captured as <b>reusable primitives</b> instead of re-derived per kernel, per GPU generation.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div>ThunderKittens' three abstraction levels mirror the GPU's actual memory/compute hierarchy: <b>warp level</b> — a 16×16 tile as the atomic data type (exactly what the Tensor Core's <code>mma</code> instruction wants); <b>thread-block level</b> — a template for overlapping async loads with compute across warps; <b>grid level</b> — hiding launch/teardown overhead across the whole grid.<br><span style="font-size:.85rem;color:var(--text2)">The design philosophy is "silicon constraints as the API" — the abstraction mirrors what the hardware does, instead of presenting a general model that then has to be optimized away.</span></div></div>
+
+      <h4>Why it's the core kernel-interview skill</h4>
+      <ul>
+        <li><strong>IO-awareness generalizes</strong> — the same "count the HBM round-trips" argument explains why naive attention is slow, why FlashAttention-2 is faster than FlashAttention-1 at the same math, and why ThunderKittens ties CuBLAS on GEMM but wins big on newer ops.</li>
+        <li><strong>The gap size is a signal</strong> — TK roughly ties mature, heavily hand-tuned baselines (GEMM, attention-inference) but wins 10-40% on attention-backward, 8x on state-space models, 14x on linear attention. Bigger gap = less prior hand-tuning investment in that baseline.</li>
+        <li><strong>Theory meets the merge request</strong> — real inference engines like llama.cpp have to decide whether to adopt a faster kernel at all, weighing portability, maintenance burden, and measured speedup against integration risk (see the produce section).</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> attention is memory-bound (Section 1) → tiling + online softmax fixes it exactly once (FlashAttention) → loop order and hardware-specific asynchrony squeeze out more (FA-2, FA-3) → ThunderKittens generalizes the fix into reusable, hardware-aligned primitives → you benchmark to see the argument proven in wall-clock numbers.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A benchmark is only evidence if it times the steady state — the way it quietly lies is by measuring the very first call.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): timing the cold / first call.</b> The first time you invoke a kernel, the measured time includes things that never happen again: lazy CUDA context creation, JIT compilation, cuDNN/autotuner shape selection, and cold caches. Your timer runs fine and prints a number — it is just measuring startup, not the kernel. This makes a genuinely faster kernel look slower (or gives wildly high variance), and you ship the wrong conclusion with no error to hint at it. A senior engineer checks in <b>code review</b> that the harness does <em>warmup</em> iterations first, uses <code>torch.cuda.synchronize()</code> (or an equivalent device barrier) around the timed region so async launches are actually finished, and reports the median of many steady-state runs — not one cold call.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fusing the whole op into one kernel buys HBM traffic but costs flexibility.</b> FlashAttention wins by fusing QK^T → softmax → ×V so the N×N scores never touch HBM — that is the entire IO-awareness gain. The cost: the intermediate score matrix no longer exists to inspect, log, or reuse, the fused kernel is specialized to specific shapes/dtypes and much harder to write and maintain, and adopting it in a real engine adds portability and integration risk. In a <b>design review</b> you weigh the measured speedup against maintenance burden and how often the op's shape actually matches what the fused kernel was tuned for.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Benchmark naive vs. fused vs. vendor attention</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): build a small reproducible benchmark suite comparing a from-scratch attention kernel against a naive unfused implementation and a vendor/library baseline — directly measuring the memory-traffic story behind the FlashAttention argument, scoped down to run without a CUDA/ThunderKittens toolchain (JAX Pallas stands in as the hardware-aligned kernel).</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>bench_attention.py</code> runs end-to-end with <code>python3 sessions/m15b-native-kernels/day-05-comparative-benchmarking/experiment.py</code> and exits 0.</li>
+        <li>It implements (1) naive unfused attention (materializes the full N×N score matrix), (2) a tiled/Pallas fused attention kernel with online softmax, (3) the built-in library attention as the vendor baseline.</li>
+        <li>Runs each across at least 3 sequence lengths (e.g. 512, 2048, 8192) and prints, for each of the 3 implementations × 3 lengths, a wall-clock time and an estimated bytes-moved figure (9 rows minimum).</li>
+        <li>The naive implementation's estimated bytes-moved must scale visibly closer to O(N²) than the fused/library implementations' O(N) scaling — the checkable numeric signature of IO-awareness.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m15b-native-kernels/day-05-comparative-benchmarking/experiment.py</code>, <code>results.md</code>, and <code>notes_issue_7276.md</code> with the criteria above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Day 5 artifact.
+
+Path: sessions/m15b-native-kernels/day-05-comparative-benchmarking/day5_comparative_benchmarking/
+
+Create bench_attention.py that implements:
+1. Naive unfused attention (materializes the full N×N scores matrix S = QK^T in HBM, then softmax, then the ×V matmul as separate steps).
+2. A tiled/Pallas fused attention kernel with online softmax (loads Q/K/V blocks into on-chip memory, never materializes the full N×N matrix).
+3. The built-in library attention call (e.g. jax.nn.dot_product_attention) as the vendor baseline.
+Run each across at least 3 sequence lengths (512, 2048, 8192) and print wall-clock time plus estimated HBM bytes moved (computed analytically) for each of the 9 combinations. The naive implementation's bytes-moved must scale closer to O(N^2) than the fused/library ones' O(N) scaling.
+
+Create results.md with the results table and a 3-5 sentence write-up connecting the pattern to the FlashAttention IO-awareness argument and the ThunderKittens "match mature baselines, blow out immature ones" pattern.
+
+Create notes_issue_7276.md: a 10-15 line summary of the llama.cpp GitHub issue #7276 discussion's key engineering trade-offs (portability, maintenance cost vs. measured speedup) for adopting a faster attention kernel.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15b-native-kernels/day-05-comparative-benchmarking/log.md</code>: at N=128, would you expect the fused kernel to look faster than naive? Why or why not? (Hint: at small N, the whole problem fits in SRAM/cache regardless of implementation — the O(N²) vs O(N) gap only opens up once N is large. Always sweep sequence length and look at the trend, not a single data point.)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 5 complete!</h3>
+    <p>You can now read a kernel-paper lineage as a chronological argument about hardware constraints, and prove it yourself with benchmark numbers. You've bridged "I can write a kernel" to "I can explain, with roofline numbers, why my kernel is fast or slow" — the core skill for a kernel-engineering interview.<br>Next: <code>start today</code> → Week 15 begins quantization.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; Implementation</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  memtraffic:{html:'<span class="prompt">&gt;&gt;&gt;</span> N, d, heads = <span class="num">4096</span>, <span class="num">128</span>, <span class="num">32</span>   <span class="dim"># FP16, 2 bytes/elem</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> S_bytes = N * N * <span class="num">2</span>   <span class="dim"># one N x N score matrix</span>\n<span class="ok">33.6 MB</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> naive_traffic = S_bytes * <span class="num">4</span> * heads   <span class="dim"># write S, read S (max), read S (sum), write+read P</span>\n<span class="bad">&gt; 4 GB per attention layer</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> fused_traffic = N * d * <span class="num">2</span>   <span class="dim"># FlashAttention: only the final output touches HBM</span>\n<span class="hl">≈ 1 MB</span>\n'+
+    '<span class="dim"># same math result, order-of-magnitude less memory traffic — the entire IO-awareness thesis</span>',
+    take:'<b>①  Memory traffic, naive vs. fused.</b> At N=4096, naive attention moves over 4 GB through HBM for one layer; FlashAttention moves about 1 MB, because it never writes the N×N matrix to HBM at all.'},
+  fa2util:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># FlashAttention-1 on A100 (forward pass)</span>\nutilization ≈ <span class="bad">25-40%</span> of peak FLOPs\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># FlashAttention-2 on A100 — SAME math, exact softmax attention</span>\nutilization ≈ <span class="ok">70%</span> of peak FLOPs   <span class="hl"># ~2x wall-clock speedup</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># what changed?</span>\nchanged: loop order (parallelize over seq-len + heads, not just batch)\nchanged: fewer non-matmul rescaling ops\nchanged: better warp partitioning\n<span class="dim">unchanged: the numerical algorithm — still exact, still tiled, still online softmax</span>',
+    take:'<b>②  FA-2 vs FA-1.</b> Two kernels computing the identical function differed 2x in speed purely from loop order and warp scheduling — zero change to the math.'},
+  tkgap:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># ThunderKittens vs strongest hand-written baseline</span>\nGEMM:                <span class="hl">≈ ties CuBLAS</span>   <span class="dim"># years of hand-tuning already</span>\nattention-inference: <span class="hl">≈ ties FlashAttention-3</span>   <span class="dim"># years of hand-tuning already</span>\nattention-backward:  <span class="ok">+10-40%</span>   <span class="dim"># fewer optimization cycles invested</span>\nstate-space models:  <span class="ok">8x faster</span>   <span class="dim"># nobody hand-tuned SSM kernels this hard</span>\nlinear attention:    <span class="ok">14x faster</span>   <span class="dim"># same story</span>\n'+
+    '<span class="dim"># the newer/less-mature the operation, the bigger the gap TK opens — a principled abstraction wins outright</span>',
+    take:'<b>③  Where the 10-40x gaps come from.</b> TK only ties the specialists on mature, years-hand-tuned ops (GEMM, attention-inference). On less-mature ops it wins by a landslide, because a good general abstraction applied fresh beats code nobody had time to hand-tune yet.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 180\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"GPU memory hierarchy: small fast SRAM next to large slow HBM\"><rect x=\"10\" y=\"20\" width=\"150\" height=\"140\" rx=\"10\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"85\" y=\"45\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#1F6280\">SRAM</text><text x=\"85\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">on-chip</text><text x=\"85\" y=\"100\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1F6280\">~20 MB</text><text x=\"85\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2D8B55\" font-weight=\"700\">~19 TB/s</text><text x=\"85\" y=\"145\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">tiny, instant</text><rect x=\"320\" y=\"20\" width=\"190\" height=\"140\" rx=\"10\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"415\" y=\"45\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"700\" fill=\"#C93B3B\">HBM</text><text x=\"415\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#C93B3B\">main memory</text><text x=\"415\" y=\"100\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\">40-80 GB</text><text x=\"415\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C93B3B\" font-weight=\"700\">~3 TB/s</text><text x=\"415\" y=\"145\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">huge, slow round-trip</text><line x1=\"165\" y1=\"90\" x2=\"315\" y2=\"90\" stroke=\"#6B645E\" stroke-width=\"2\" marker-end=\"url(#ah1)\"/><line x1=\"315\" y1=\"105\" x2=\"165\" y2=\"105\" stroke=\"#6B645E\" stroke-width=\"2\" marker-end=\"url(#ah1)\"/><text x=\"240\" y=\"80\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">write</text><text x=\"240\" y=\"120\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">read</text><defs><marker id=\"ah1\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#6B645E\"/></marker></defs></svg>", "note": "<b>The two zones every kernel has to respect.</b> SRAM is small but roughly 6x faster per byte than HBM; every extra trip across that gap costs real wall-clock time, no matter how fast the math units are."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Naive attention writes and reads the full NxN score matrix through HBM four times\"><rect x=\"10\" y=\"70\" width=\"90\" height=\"50\" rx=\"8\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.5\"/><text x=\"55\" y=\"99\" text-anchor=\"middle\" font-size=\"12\" fill=\"#5E5191\" font-weight=\"600\">Q, K, V</text><rect x=\"180\" y=\"20\" width=\"160\" height=\"150\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"260\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">S = QK^T</text><text x=\"260\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#C93B3B\">N x N in HBM</text><g fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"1\" opacity=\"0.5\"><line x1=\"195\" y1=\"85\" x2=\"325\" y2=\"85\"/><line x1=\"195\" y1=\"105\" x2=\"325\" y2=\"105\"/><line x1=\"195\" y1=\"125\" x2=\"325\" y2=\"125\"/><line x1=\"195\" y1=\"145\" x2=\"325\" y2=\"145\"/><line x1=\"225\" y1=\"75\" x2=\"225\" y2=\"160\"/><line x1=\"255\" y1=\"75\" x2=\"255\" y2=\"160\"/><line x1=\"285\" y1=\"75\" x2=\"285\" y2=\"160\"/></g><rect x=\"390\" y=\"70\" width=\"110\" height=\"50\" rx=\"8\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"445\" y=\"99\" text-anchor=\"middle\" font-size=\"11\" fill=\"#9A7208\" font-weight=\"600\">output</text><line x1=\"100\" y1=\"95\" x2=\"178\" y2=\"95\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah2)\"/><path d=\"M340,60 Q365,60 365,95 Q365,130 340,130\" fill=\"none\" stroke=\"#C93B3B\" stroke-width=\"2\" marker-end=\"url(#ah2r)\"/><text x=\"400\" y=\"50\" font-size=\"9\" fill=\"#C93B3B\">write S, read S (max),</text><text x=\"400\" y=\"185\" font-size=\"9\" fill=\"#C93B3B\">read S (sum), write+read P (softmax)</text><line x1=\"340\" y1=\"95\" x2=\"388\" y2=\"95\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah2)\"/><defs><marker id=\"ah2\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#6B645E\"/></marker><marker id=\"ah2r\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#C93B3B\"/></marker></defs></svg>", "note": "<b>Naive attention materializes the full N&#215;N score matrix in HBM.</b> Softmax needs the row max and row sum before it can normalize anything, so the matrix gets written once and read back three more times &#8212; four HBM round-trips of an N&#215;N tensor, per attention layer."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Bar chart: naive HBM traffic is over 4 gigabytes, fused traffic is about 1 megabyte, at N=4096\"><line x1=\"60\" y1=\"140\" x2=\"480\" y2=\"140\" stroke=\"#E5DFD6\" stroke-width=\"1\"/><rect x=\"120\" y=\"20\" width=\"70\" height=\"120\" fill=\"#C93B3B\"/><text x=\"155\" y=\"14\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#C93B3B\">&gt;4 GB</text><text x=\"155\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\">naive</text><rect x=\"330\" y=\"137\" width=\"70\" height=\"3\" fill=\"#2D8B55\"/><text x=\"365\" y=\"128\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#2D8B55\">&#8776;1 MB</text><text x=\"365\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2C2A28\">FlashAttention</text><text x=\"270\" y=\"165\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">HBM bytes moved, one attention layer, N=4096, d=128, 32 heads, fp16</text></svg>", "note": "<b>Same math, order-of-magnitude less traffic.</b> At N=4096 naive attention moves over 4&nbsp;GB through HBM for one layer; a fused kernel that never writes the intermediate N&#215;N matrix moves about 1&nbsp;MB &#8212; roughly 4000x less traffic for an identical result."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Tiling: load one block of K and V into SRAM at a time and update a running output\"><rect x=\"10\" y=\"20\" width=\"60\" height=\"170\" rx=\"6\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"1.5\"/><text x=\"40\" y=\"14\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">Q row-block</text><rect x=\"110\" y=\"20\" width=\"90\" height=\"45\" rx=\"6\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.5\"/><text x=\"155\" y=\"46\" text-anchor=\"middle\" font-size=\"10\" fill=\"#5E5191\">K/V block 1</text><rect x=\"110\" y=\"73\" width=\"90\" height=\"45\" rx=\"6\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.5\" opacity=\"0.55\"/><text x=\"155\" y=\"99\" text-anchor=\"middle\" font-size=\"10\" fill=\"#5E5191\">K/V block 2</text><rect x=\"110\" y=\"126\" width=\"90\" height=\"45\" rx=\"6\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.5\" opacity=\"0.3\"/><text x=\"155\" y=\"152\" text-anchor=\"middle\" font-size=\"10\" fill=\"#5E5191\">K/V block 3 &#8230;</text><rect x=\"250\" y=\"55\" width=\"110\" height=\"90\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"305\" y=\"90\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F6280\">SRAM tile</text><text x=\"305\" y=\"106\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\">QK^T &#8594; softmax &#8594; &#215;V</text><text x=\"305\" y=\"122\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\">all on-chip</text><rect x=\"410\" y=\"75\" width=\"100\" height=\"50\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.5\"/><text x=\"460\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1a5c38\">running</text><text x=\"460\" y=\"110\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1a5c38\">output</text><line x1=\"200\" y1=\"42\" x2=\"248\" y2=\"70\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah3)\"/><line x1=\"360\" y1=\"100\" x2=\"408\" y2=\"100\" stroke=\"#6B645E\" stroke-width=\"1.5\" marker-end=\"url(#ah3)\"/><path d=\"M460,75 Q460,30 205,42\" fill=\"none\" stroke=\"#9399B2\" stroke-width=\"1.2\" stroke-dasharray=\"3,3\" marker-end=\"url(#ah3d)\"/><text x=\"330\" y=\"20\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9399B2\">next block loaded once tile is done</text><defs><marker id=\"ah3\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#6B645E\"/></marker><marker id=\"ah3d\" markerWidth=\"8\" markerHeight=\"8\" refX=\"4\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"#9399B2\"/></marker></defs></svg>", "note": "<b>FlashAttention's fix: tiling.</b> Load one block of K and V into SRAM, do <code>QK^T &#8594; softmax &#8594; &#215;V</code> entirely on-chip, then move to the next block. The N&#215;N matrix is never written to HBM &#8212; only small tiles pass through SRAM."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Online softmax rescales a running max and sum as each new block arrives, without ever seeing the full row\"><circle cx=\"90\" cy=\"90\" r=\"45\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"90\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1F6280\">running max</text><text x=\"90\" y=\"100\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">m</text><circle cx=\"90\" cy=\"170\" r=\"0\" opacity=\"0\"/><circle cx=\"230\" cy=\"90\" r=\"45\" fill=\"#FCF3DC\" stroke=\"#C99A12\" stroke-width=\"2\"/><text x=\"230\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9A7208\">running sum</text><text x=\"230\" y=\"100\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#9A7208\">l</text><path d=\"M320,50 L400,50 L400,130 L320,130\" fill=\"none\" stroke=\"#6B645E\" stroke-width=\"1.5\" stroke-dasharray=\"4,3\"/><text x=\"360\" y=\"45\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">new block arrives</text><line x1=\"140\" y1=\"90\" x2=\"320\" y2=\"75\" stroke=\"#2D8B55\" stroke-width=\"2\" marker-end=\"url(#ah4)\"/><line x1=\"320\" y1=\"105\" x2=\"140\" y2=\"90\" stroke=\"#2D8B55\" stroke-width=\"2\" marker-end=\"url(#ah4)\" opacity=\"0.6\"/><text x=\"230\" y=\"55\" text-anchor=\"middle\" font-size=\"9\" fill=\"#2D8B55\">rescale m, l if new max is bigger</text><rect x=\"330\" y=\"75\" width=\"60\" height=\"35\" rx=\"5\" fill=\"#E8F5EE\" stroke=\"#2D8B55\"/><text x=\"360\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">accum. out</text><text x=\"90\" y=\"155\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">never needs the full row at once</text></svg>", "note": "<b>Online softmax: exact answer without ever seeing a full row.</b> Standard softmax needs every score in a row before it can normalize. Online softmax keeps a running max <code>m</code> and running sum <code>l</code>, and rescales the accumulated output whenever a new block reveals a bigger max &#8212; mathematically identical, but computable one tile at a time."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"FlashAttention-3 warp specialization: producer warps load the next tile while consumer warps compute on the current tile, overlapping in time\"><rect x=\"20\" y=\"30\" width=\"460\" height=\"36\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"40\" y=\"53\" font-size=\"10\" fill=\"#1F6280\" font-weight=\"600\">producer warps (TMA load)</text><rect x=\"330\" y=\"32\" width=\"140\" height=\"32\" fill=\"#2A7B9B\" opacity=\"0.35\"/><text x=\"400\" y=\"53\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1F6280\">loading tile i+1</text><rect x=\"20\" y=\"90\" width=\"460\" height=\"36\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.5\"/><text x=\"40\" y=\"113\" font-size=\"10\" fill=\"#1a5c38\" font-weight=\"600\">consumer warps (Tensor Core compute)</text><rect x=\"30\" y=\"92\" width=\"140\" height=\"32\" fill=\"#2D8B55\" opacity=\"0.35\"/><text x=\"100\" y=\"113\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1a5c38\">computing tile i</text><line x1=\"330\" y1=\"66\" x2=\"330\" y2=\"90\" stroke=\"#6B645E\" stroke-width=\"1\" stroke-dasharray=\"3,3\"/><line x1=\"470\" y1=\"66\" x2=\"470\" y2=\"90\" stroke=\"#6B645E\" stroke-width=\"1\" stroke-dasharray=\"3,3\"/><text x=\"400\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">both bars active during the SAME time window &#8592; no idle wait</text><line x1=\"20\" y1=\"175\" x2=\"480\" y2=\"175\" stroke=\"#E5DFD6\"/><text x=\"20\" y=\"190\" font-size=\"9\" fill=\"#6B645E\">t &#8594;</text></svg>", "note": "<b>FlashAttention-3's fix: warp specialization on Hopper.</b> Some warps only issue asynchronous TMA loads for the next tile, others only run Tensor Core matmul and softmax on the current tile &#8212; compute and memory traffic overlap in time instead of the GPU waiting idle for each load."}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"ThunderKittens factors tiling, online softmax, warp specialization and async copies into three reusable abstraction levels: warp, thread-block, grid\"><rect x=\"20\" y=\"20\" width=\"480\" height=\"48\" rx=\"8\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.5\"/><text x=\"40\" y=\"40\" font-size=\"11\" font-weight=\"700\" fill=\"#5E5191\">warp level</text><text x=\"40\" y=\"56\" font-size=\"9\" fill=\"#5E5191\">16&#215;16 tile = atomic data type, matches Tensor Core mma directly</text><rect x=\"20\" y=\"80\" width=\"480\" height=\"48\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.5\"/><text x=\"40\" y=\"100\" font-size=\"11\" font-weight=\"700\" fill=\"#1F6280\">thread-block level</text><text x=\"40\" y=\"116\" font-size=\"9\" fill=\"#1F6280\">template overlapping async loads with compute across warps</text><rect x=\"20\" y=\"140\" width=\"480\" height=\"48\" rx=\"8\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.5\"/><text x=\"40\" y=\"160\" font-size=\"11\" font-weight=\"700\" fill=\"#1a5c38\">grid level</text><text x=\"40\" y=\"176\" font-size=\"9\" fill=\"#1a5c38\">hides launch/teardown overhead across the whole kernel grid</text><text x=\"260\" y=\"205\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">write ONE new kernel using only these three levels &#8212; no hand CUDA per op</text></svg>", "note": "<b>ThunderKittens generalizes the fix into three reusable primitives.</b> Instead of re-deriving tiling, online softmax, and warp specialization for every new kernel, TK factors the GPU's own memory/compute hierarchy into warp-level, thread-block-level, and grid-level building blocks &#8212; \"silicon constraints as the API.\""}, {"viz": "<svg viewBox=\"0 0 520 220\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Bar chart of ThunderKittens speedup versus hand-written baselines, growing as the baseline is less mature: ties on GEMM and attention inference, plus 10 to 40 percent on attention backward, 8x on state space models, 14x on linear attention\"><line x1=\"60\" y1=\"180\" x2=\"500\" y2=\"180\" stroke=\"#E5DFD6\"/><g font-size=\"9\" fill=\"#2C2A28\" text-anchor=\"middle\"><rect x=\"70\" y=\"170\" width=\"55\" height=\"10\" fill=\"#9399B2\"/><text x=\"97\" y=\"163\">1.0x</text><text x=\"97\" y=\"195\">GEMM</text><rect x=\"150\" y=\"170\" width=\"55\" height=\"10\" fill=\"#9399B2\"/><text x=\"177\" y=\"163\">&#8776;1.0x</text><text x=\"177\" y=\"195\">attn-infer</text><rect x=\"230\" y=\"148\" width=\"55\" height=\"32\" fill=\"#2A7B9B\"/><text x=\"257\" y=\"141\">1.1-1.4x</text><text x=\"257\" y=\"195\">attn-backward</text><rect x=\"310\" y=\"75\" width=\"55\" height=\"105\" fill=\"#2D8B55\"/><text x=\"337\" y=\"68\">8x</text><text x=\"337\" y=\"195\">SSMs</text><rect x=\"400\" y=\"20\" width=\"55\" height=\"160\" fill=\"#1a5c38\"/><text x=\"427\" y=\"13\">14x</text><text x=\"427\" y=\"195\">linear attn</text></g><text x=\"280\" y=\"212\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">speedup over strongest hand-written baseline (log-ish scale, illustrative)</text></svg>", "note": "<b>The gap size is the interview signal.</b> TK roughly ties years-hand-tuned baselines like CuBLAS GEMM and FlashAttention-3 inference, but wins 10-40% on attention-backward and 8-14x on state-space models and linear attention &#8212; the less hand-optimization debt a baseline has, the bigger a good general abstraction wins, and that's exactly the number a staff interviewer will ask you to explain."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why is naive attention slow, if not because of FLOP count?',
+  opts:['It is actually compute-bound — the matmuls are just too big','It is memory-bound: writing/reading the full N×N score matrix to/from HBM dominates wall-clock time','It uses the wrong data type','It cannot run on GPUs at all'],
+  ans:1, fb:'Right. The QK^T matmul looks compute-heavy, but the real cost is HBM traffic: naive attention writes the N×N score matrix to HBM and reads it back multiple times (for max, sum, softmax output), and that memory traffic — not FLOPs — is the bottleneck for long sequences.'},
+ {q:'2. What two techniques does FlashAttention combine to avoid ever materializing the full N×N matrix in HBM?',
+  opts:['Quantization and pruning','Tiling (load Q/K/V blocks into SRAM) and online softmax (rescale a running max/sum as new blocks arrive)','Batching and gradient checkpointing','Weight sharing and low-rank approximation'],
+  ans:1, fb:'Right. Tiling keeps blocks of Q, K, V in fast on-chip SRAM so all three steps (QK^T, softmax, ×V) happen without round-tripping to HBM; online softmax lets softmax be computed exactly without ever seeing a full row at once, by rescaling a running max and sum as each new block arrives.'},
+ {q:'3. Your benchmark reports the fused FlashAttention-style kernel as <em>slower</em> than naive attention, and the times swing wildly from run to run — yet everyone agrees the fused kernel should win, and the outputs match. Where do you look first, and why?',
+  opts:['Conclude FlashAttention is a myth and keep the naive kernel','Check the timing harness for a cold-start bug: no warmup runs, or missing torch.cuda.synchronize() around the timed region, so you are measuring JIT compile / autotune / context init / async launch latency instead of the kernel','Increase the sequence length until the fused kernel finally wins','Rewrite the fused kernel, since a correct-but-slow result means the algorithm is wrong'],
+  ans:1, fb:'Right. Correct output plus high variance and a "faster kernel looks slower" result is the fingerprint of measuring the cold path. The first call folds in JIT compilation, autotuner shape selection, and lazy CUDA context creation, and without a device sync you time the launch, not the work. Add warmup iterations, synchronize around the timed region, and report the median of steady-state runs before doubting the algorithm.'},
+ {q:'4. In today\'s benchmark, what is the checkable numeric signature that proves the IO-awareness argument?',
+  opts:['The fused/library kernels are always faster in wall-clock time, at every sequence length tested','The naive implementation\'s estimated HBM bytes-moved scales visibly closer to O(N²), while the fused/library implementations\' scales closer to O(N), as sequence length grows','The naive kernel uses more GPU memory bandwidth on paper but is actually faster in practice','All three implementations produce different numerical outputs, proving the fused kernel is a new algorithm'],
+  ans:1, fb:'Right. The point isn\'t just "fused is faster" — it\'s that the memory-traffic estimates scale differently: naive attention\'s bytes-moved grows close to O(N²) because it repeatedly round-trips the full N×N matrix through HBM, while the tiled/fused and vendor-library kernels scale close to O(N) because they never materialize that matrix. That scaling gap, not a single timing number, is the direct numeric evidence for IO-awareness.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

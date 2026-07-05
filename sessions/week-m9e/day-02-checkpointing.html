@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Module 9e · Day 2 — Async &amp; Sharded Checkpointing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="m9e-d02-checkpoint">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Spiral · M9e Day 2</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="day-01-multi-host-bringup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Host Bring-Up</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-bit-exact-resume.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Bit-Exact Resume</span></a>
+</nav>
+
+  <header class="hero">
+    <span class="eyebrow">Module 9e · Scale · Day 2</span>
+    <h1>Saving the Whole<br>Game, Not the Score</h1>
+    <p class="lead">A frontier run lasts a month. Machines crash — that is certain, not possible. So every so often you must save the run's full state to disk, and when a crash happens you reload and continue. But a save that only keeps the model weights is a trap: the run will restart wrong. Today you learn the four things a checkpoint must store, why leaving out any one silently breaks the resume, and how to save fast without freezing training.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> list the four parts a checkpoint must save (weights, optimizer state, RNG state, dataloader position), explain why each one matters, and say what async and sharded checkpointing do to make saving fast.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">A save file that stores everything</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> from Day 1 you know a run is many chips acting as one machine, and from earlier modules you know a model learns by updating its numbers each step. Today: how do you save that whole living machine so a crash does not throw the month away?</div></div>
+
+      <h4>The month-long run always crashes</h4>
+      <p>A frontier run takes weeks. Over weeks, some machine will fail — a chip dies, a host reboots, the power blips. This is normal, not rare. So you save the run's state to disk every so often. That save is a <span class="term" data-tip="A saved snapshot of a training run's full state, written to disk so the run can be reloaded and continued after a crash.">checkpoint</span>. After a crash you reload the last checkpoint and keep going.</p>
+
+      <h4>The trap: saving only the weights</h4>
+      <p>It is tempting to save only the <span class="term" data-tip="The numbers inside the model that get learned during training. Loading them back restores what the model has learned so far.">model weights</span> — the learned numbers. But that is like saving only your score in a video game and losing everything else. Reload it and the run keeps going, but it goes <em>wrong</em>. A good checkpoint must save four things.</p>
+
+      <h4>The four things a checkpoint must save</h4>
+      <ul>
+        <li><strong>Model weights</strong> — the learned numbers. Without these you have learned nothing.</li>
+        <li><strong>Optimizer state</strong> — the extra numbers the <span class="term" data-tip="The part of training that decides how to change the weights each step. It keeps running averages (momentum) to smooth the updates — those averages are the optimizer state.">optimizer</span> keeps, like the running averages (momentum) that smooth each update. Drop these and the next updates are jerky.</li>
+        <li><strong>RNG state</strong> — the <span class="term" data-tip="Random Number Generator state: the internal position of the random number machine. It decides things like dropout masks. Restore it and the same random choices continue.">RNG state</span>, the position of the random-number machine. Drop it and randomness restarts from a different place.</li>
+        <li><strong>Dataloader position</strong> — how far through the data you were. The <span class="term" data-tip="The part that feeds training examples to the model in order. Its position is which example comes next. Restore it and the run continues on unseen data, not re-seen data.">dataloader</span> position says which example comes next. Drop it and you re-feed data the model already saw.</li>
+      </ul>
+
+      <h4>Save fast, without freezing training</h4>
+      <p>Saving a giant model takes time. Two tricks keep it cheap: <span class="term" data-tip="Saving in the background while training keeps running, instead of pausing the run to write to disk. The step goes on; the save happens beside it.">async checkpointing</span> writes in the background so training does not stop, and <span class="term" data-tip="Each chip saves only its own slice of the model in parallel, instead of one chip gathering and writing the whole thing. Many small writes at once, not one huge slow write.">sharded checkpointing</span> lets every chip save its own slice at once. Keep going 👇</p>
+      <button class="gotit" type="button">Got the save-everything idea — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A save file that stores every detail</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🎮</span><h5>A real save file</h5><p>In a good video game, the save file keeps everything: your level, your items, where you stand, which doors are open, even the weather. Reload it and the world is exactly as you left it. You continue as if nothing happened.</p></div>
+        <div class="card"><span class="big">📝</span><h5>Saving only the score</h5><p>Now imagine a save that keeps only your score. Reload, and you have the right number of points — but you are back at the start, no items, wrong place. The game "continues", but it is not the game you were playing. It is a different run wearing your score.</p></div>
+      </div>
+      <p><strong>In one line:</strong> the model weights are your score. The optimizer state, RNG state, and dataloader position are your items, your location, and how far you had walked. A checkpoint must save all four, or the reload starts a different run.</p>
+      <p>Saving in the background while you keep playing is <span class="term" data-tip="Saving in the background while training keeps running.">async checkpointing</span>. Letting each part of the world save its own piece at once is <span class="term" data-tip="Each chip saves only its own slice of the model in parallel.">sharded checkpointing</span> — many small saves happening together instead of one giant slow one.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a game save is small and one machine writes it. A frontier checkpoint can be terabytes spread across thousands of chips, so it must be written by all of them at once and in the background — a plain "pause and save" would waste huge amounts of run time.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">See a full save, a broken save, and a fast save</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Below is a simulated Python terminal. First look at a full checkpoint with all four parts, then see what a resume from a weights-only save does, then see how sharded + async saving stays fast. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="full" type="button">① a full checkpoint</button>
+          <button class="play-btn" data-demo="broken" type="button">② weights-only resume</button>
+          <button class="play-btn" data-demo="fast" type="button">③ sharded + async save</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: a checkpoint is not "the model". It is the whole live run — the model plus everything needed to continue it.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM & WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · MECHANISM &amp; WHY</span><span class="sec-h">Why sharded saving is so much faster</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>Writing to disk has a speed, in bytes per second. If one chip gathers the whole model and writes it alone, the time is the total size divided by one chip's write speed. If every chip writes only its own slice at the same time, the time is just <em>one slice</em> divided by that same write speed. Many hands, much faster.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        one writer:      time = total_size / write_speed<br>
+        sharded (N chips): time = (total_size / N) / write_speed<br>
+        <span class="dim"># total_size = full checkpoint size in bytes</span><br>
+        <span class="dim"># N = number of chips saving in parallel</span><br>
+        <span class="dim"># write_speed = bytes per second per chip</span>
+      </div></div>
+      <p>Symbols: <code>total_size</code> = the full checkpoint size. <code>N</code> = how many chips write at once. <code>write_speed</code> = one chip's disk speed. Sharded saving divides the work by <code>N</code>.</p>
+
+      <h4>Step 3 — a worked example</h4>
+      <p>Say the checkpoint is <code>800</code> gigabytes, one chip writes at <code>1</code> gigabyte per second, and there are <code>400</code> chips.</p>
+      <div class="callout c-info"><span class="ic">🔢</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.8">
+        one writer:   800 GB / 1 GB/s        = <span class="hl">800 s</span>  <span class="dim"># over 13 minutes</span><br>
+        sharded 400:  (800 GB / 400) / 1 GB/s = <span class="hl">2 s</span>    <span class="dim"># each writes 2 GB</span><br><br>
+        sharded is <span class="hl">400×</span> faster
+      </div></div>
+      <p>One writer would freeze the run for 13 minutes. Sharded, each chip writes only its 2 gigabyte slice at once, so the whole save takes about 2 seconds. Add async — writing in the background — and training barely pauses at all.</p>
+
+      <h4>Why leaving out any part breaks the resume</h4>
+      <ul>
+        <li><strong>No optimizer state:</strong> the momentum averages reset to zero, so the first steps after resume lurch and the loss can spike.</li>
+        <li><strong>No RNG state:</strong> random choices (like dropout) restart from a different place, so the continued run drifts away from the one that never stopped.</li>
+        <li><strong>No dataloader position:</strong> the run re-feeds data it already saw, or skips data, quietly changing what the model learns.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> a checkpoint saves the whole living run, and saving fast means sharded (each chip its slice) plus async (in the background). Tomorrow you learn why even a perfect four-part save must line up exactly on resume — bit-for-bit — or it silently corrupts a scaling experiment.</div></div>
+      <button class="gotit" type="button">Got why sharded saving wins</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From four parts to a fast, safe save — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one step at a time: the live run, its four parts, a weights-only trap, the full checkpoint, sharded writing, and async writing. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove it with a tiny checkpoint (strongly recommended)</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Understanding ≠ being able to do it. Prove the "save all four parts" rule to yourself with a tiny script. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>experiments/scale/m9e_checkpoint.py</code>. Make a small fake run state as a dict with four keys: <code>weights</code>, <code>optimizer</code>, <code>rng</code>, <code>data_pos</code>. Save it to a JSON file. Then write two loaders: a full one that reads all four keys, and a broken one that reads only <code>weights</code>. Print both loaded states side by side and print which keys the broken loader is missing. Run with <code>python3 m9e_checkpoint.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 9e Day 2 artifact.
+
+Create experiments/scale/m9e_checkpoint.py that, with a comment on each step, shows why a checkpoint must save all four parts:
+1. Builds a small fake run state as a dict with keys: weights, optimizer, rng, data_pos.
+2. save_full(state, path) writes all four keys to a JSON file; save_weights_only(state, path) writes only weights.
+3. Loads both files back and prints them side by side, then prints which keys the weights-only save is missing (optimizer, rng, data_pos).
+4. Prints a one-line takeaway: dropping any part means the resume is a different run, not the same one.
+Then run it and paste the two loaded dicts and the missing-keys list at the bottom as a comment.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-m9e/day-02-log.md</code>: which three keys were missing from the weights-only save, and what would each one break on resume?</div></div>
+      <button class="gotit" type="button">Done — on to Day 3</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎮</span>
+    <h3>Day 2 complete — you saved the whole game!</h3>
+    <p>You now know a checkpoint must save four things — model weights, optimizer state, RNG state, and dataloader position — and that dropping any one turns a resume into a different run. You also know how to save fast: sharded (every chip its slice) plus async (in the background), so training barely pauses.<br>Next: <b>Day 3</b> — why the resume must line up exactly, bit for bit.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="day-01-multi-host-bringup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Host Bring-Up</span></a>
+  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="day-03-bit-exact-resume.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Bit-Exact Resume</span></a>
+</nav>
+
+<footer>Frontier Lab · Capability Spiral — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  full:{html:'<span class="prompt">&gt;&gt;&gt;</span> ckpt = save_full(run, step=<span class="num">50000</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> ckpt.keys()\n'+
+    '<span class="str">[\'weights\', \'optimizer\', \'rng\', \'data_pos\']</span>\n'+
+    '<span class="ok"># all four parts saved</span>\n'+
+    '<span class="hl">resume → identical run ✓</span>',
+    take:'<b>①  A full checkpoint has four parts.</b> Weights (what it learned), optimizer state (the momentum averages), RNG state (the random position), and dataloader position (how far through the data). Save all four and the run continues exactly.'},
+  broken:{html:'<span class="prompt">&gt;&gt;&gt;</span> ckpt = save_weights_only(run)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> resume(ckpt)\n'+
+    '<span class="bad"># optimizer reset → loss spikes</span>\n'+
+    '<span class="bad"># rng reset → different randomness</span>\n'+
+    '<span class="bad"># data_pos reset → re-sees old data</span>\n'+
+    '<span class="hl">resume → a DIFFERENT run ✗</span>',
+    take:'<b>②  Weights-only is a trap.</b> The score is right but everything else resets. Momentum is gone, randomness jumps, and the model re-reads data it already saw. The run keeps going — but it is no longer the same run.'},
+  fast:{html:'<span class="prompt">&gt;&gt;&gt;</span> size = <span class="num">800</span>   <span class="dim"># GB, N = 400 chips</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> save_one_writer(size)   <span class="dim"># gather + write alone</span>\n'+
+    '<span class="bad">800 s  (13 min frozen)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> save_sharded_async(size, N=<span class="num">400</span>)\n'+
+    '<span class="ok">~2 s  (each chip writes 2 GB, in background)</span>\n'+
+    '<span class="hl">400× faster, training barely pauses</span>',
+    take:'<b>③  Sharded + async saving is fast.</b> Each chip writes only its own 2 GB slice at once (sharded), and it writes in the background (async). A 13-minute freeze becomes a 2-second blip beside a run that keeps going.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='A running training loop'><g font-family='monospace' font-size='12' text-anchor='middle'><text x='260' y='18' fill='#6B645E'>a live run, step after step</text><rect x='120' y='38' width='80' height='38' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='160' y='62' fill='#1F6280'>step</text><text x='215' y='60' fill='#6B645E'>→</text><rect x='235' y='38' width='80' height='38' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='275' y='62' fill='#1F6280'>step</text><text x='330' y='60' fill='#6B645E'>→</text><rect x='350' y='38' width='80' height='38' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='390' y='62' fill='#1F6280'>step</text><text x='445' y='60' fill='#6B645E'>→ …</text></g></svg>",
+  note:"<b>A run is alive.</b> Step after step, for weeks. At any moment the run carries a full state — not just what it learned, but exactly where it is in the process. A crash can hit at any step, so you must be able to save all of it."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The four parts of run state'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>the four parts of the state</text><rect x='30' y='34' width='110' height='60' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='85' y='60' fill='#1F6280'>weights</text><text x='85' y='80' fill='#6B645E'>what it learned</text><rect x='150' y='34' width='110' height='60' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='205' y='60' fill='#5E5191'>optimizer</text><text x='205' y='80' fill='#6B645E'>momentum</text><rect x='270' y='34' width='110' height='60' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='325' y='60' fill='#9A7208'>RNG</text><text x='325' y='80' fill='#6B645E'>random pos</text><rect x='390' y='34' width='110' height='60' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='445' y='60' fill='#1a5c38'>data_pos</text><text x='445' y='80' fill='#6B645E'>how far</text></g></svg>",
+  note:"<b>Four parts, not one.</b> Weights (learned numbers), optimizer state (momentum averages), RNG state (the random position), and dataloader position (how far through the data). Each one is needed to continue the exact same run."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='A weights-only save drops three parts'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>weights-only save = a trap</text><rect x='60' y='34' width='110' height='56' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='66' fill='#1F6280'>weights ✓</text><rect x='200' y='34' width='90' height='56' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2' stroke-dasharray='5 4'/><text x='245' y='66' fill='#C93B3B'>optimizer ✗</text><rect x='300' y='34' width='70' height='56' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2' stroke-dasharray='5 4'/><text x='335' y='66' fill='#C93B3B'>RNG ✗</text><rect x='380' y='34' width='90' height='56' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2' stroke-dasharray='5 4'/><text x='425' y='66' fill='#C93B3B'>data_pos ✗</text></g></svg>",
+  note:"<b>Drop three, break the resume.</b> Save only the weights and the other three reset. Momentum lurches, randomness jumps, and old data gets re-fed. The reload is a different run wearing your weights."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='A full checkpoint written to disk'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='80' y='40' width='150' height='44' rx='8' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='155' y='58' fill='#1a5c38'>all 4 parts</text><text x='155' y='76' fill='#6B645E'>weights+opt+rng+pos</text><text x='255' y='66' fill='#6B645E'>→ disk →</text><rect x='330' y='40' width='150' height='44' rx='8' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='405' y='66' fill='#1F6280'>checkpoint file</text></g></svg>",
+  note:"<b>The full checkpoint.</b> Write all four parts to disk together. Now, after any crash, you can reload this one file and the run continues as if nothing happened. But writing it must be fast — the next two steps show how."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Sharded save: each chip writes its own slice'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='260' y='16' fill='#6B645E'>sharded: every chip writes its slice</text><rect x='60' y='40' width='70' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='95' y='64' fill='#1F6280'>chip→2GB</text><rect x='160' y='40' width='70' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='195' y='64' fill='#1F6280'>chip→2GB</text><rect x='260' y='40' width='70' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='295' y='64' fill='#1F6280'>chip→2GB</text><rect x='360' y='40' width='70' height='40' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='395' y='64' fill='#1F6280'>chip→2GB</text><text x='465' y='64' fill='#6B645E'>…</text><text x='260' y='104' fill='#2D8B55'>800s → ~2s (400× faster)</text></g></svg>",
+  note:"<b>Sharded writing.</b> Instead of one chip gathering and writing 800 GB alone (13 minutes), every chip writes only its own 2 GB slice at the same time. The whole save drops to about 2 seconds."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Async save happens in the background'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='40' y='34' width='300' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='190' y='54' fill='#1F6280'>training keeps stepping →</text><rect x='40' y='72' width='300' height='30' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2' stroke-dasharray='5 3'/><text x='190' y='92' fill='#1a5c38'>save runs in background ↓</text><text x='430' y='58' fill='#6B645E'>no freeze</text><text x='430' y='92' fill='#2D8B55'>✓</text></g></svg>",
+  note:"<b>Async writing.</b> The save happens in the background while training keeps stepping. Combine sharded + async and a month-long run can save often, cheaply, and survive any crash — with almost no time lost. That is production checkpointing."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. Which four things must a checkpoint save?',
+  opts:['just the model weights','the learning rate only','weights, optimizer state, RNG state, and dataloader position','only the loss curve'],
+  ans:2, fb:'Right. All four: weights, optimizer state, RNG state, and dataloader position. Dropping any one breaks the resume.'},
+ {q:'2. What breaks if you save the weights but not the optimizer state?',
+  opts:['nothing','the momentum averages reset to zero, so the first steps after resume lurch','the model forgets everything','the data is deleted'],
+  ans:1, fb:'Right. The optimizer\'s running averages (momentum) reset, so the updates jerk and the loss can spike right after resume.'},
+ {q:'3. What does async checkpointing do?',
+  opts:['saves twice for safety','writes the checkpoint in the background so training does not stop','deletes old checkpoints','makes the model smaller'],
+  ans:1, fb:'Right. Async saving writes in the background while training keeps stepping, so the run barely pauses.'},
+ {q:'4. Why is sharded checkpointing faster than one writer?',
+  opts:['it saves less data','each chip writes only its own slice in parallel, so the time divides by the number of chips','it skips the weights','it uses a faster disk'],
+  ans:1, fb:'Right. With N chips each writing their slice at once, an 800 GB save that took 800 s can drop to about 2 s.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select &amp; copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

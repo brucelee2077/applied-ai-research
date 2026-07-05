@@ -42,7 +42,7 @@ def master_index_urls(text: str):
 def all_lesson_text():
     """Concatenate the text of every generated lesson HTML file."""
     blobs = {}
-    for html in sorted(SESSIONS.glob("week-*/day-*.html")):
+    for html in sorted(list(SESSIONS.glob("week-*/day-*.html")) + list(SESSIONS.glob("m*/day-*/lesson.html"))):
         blobs[html.relative_to(ROOT).as_posix()] = html.read_text(encoding="utf-8")
     return blobs
 
@@ -64,7 +64,7 @@ def main():
         print("No resources parsed; aborting.")
         return 2
     if not blobs:
-        print("No lesson files found under sessions/week-*/day-*.html; aborting.")
+        print("No lesson files found under sessions/week-*/day-*.html or sessions/m*/day-*/lesson.html; aborting.")
         return 2
 
     # Build one normalized haystack per file plus a global one.

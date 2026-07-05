@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention Heatmap — who listens to whom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3; --bg-warm:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --q:#2563eb; --k:#7c3aed; --v:#f97316;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 14px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+b{color:var(--text)}
+
+.nav{position:sticky;top:0;z-index:100;height:54px;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{max-width:860px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.95rem;font-weight:700}
+.nav-back{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.hero{margin-bottom:1.6rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.hero h1{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1.14}
+.intro{margin-top:.8rem;font-size:1.05rem;color:var(--text2);line-height:1.5}
+.intro b{color:var(--text)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:.4rem}
+.card .how{font-size:.9rem;color:var(--muted);margin-bottom:1rem}
+.card .how b{color:var(--accent-d)}
+
+.fig-wrap{width:100%}
+svg{display:block;width:100%;height:auto}
+.viz-caption{font-size:.95rem;color:var(--accent-d);min-height:1.5em;margin-top:.9rem;font-style:italic;text-align:center}
+.fallback{padding:2rem;text-align:center;color:var(--bad);font-size:.9rem;border:1px dashed var(--bad);border-radius:var(--r-md);background:#fff}
+
+/* d3 text styles */
+.d3-axis-label{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.d3-axis-title{font-family:var(--body);font-size:11px;font-weight:600;fill:var(--text2)}
+.d3-num{font-family:var(--mono);font-weight:600}
+.row-label{font-family:var(--mono);font-size:12px;fill:var(--text)}
+.row-label.active{fill:var(--accent-d);font-weight:700}
+.col-label{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+
+/* shared floating tooltip */
+.d3-tooltip{position:fixed;pointer-events:none;z-index:200;background:#1f2735;color:#fff;font-family:var(--mono);font-size:.74rem;line-height:1.45;padding:.4rem .6rem;border-radius:6px;opacity:0;transition:opacity .12s;max-width:250px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.d3-tooltip b{color:#fff}
+
+.notice{background:var(--accent-l);border:1px solid #BEE0EB;border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1.1rem 1.3rem}
+.notice h3{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--accent-d);margin-bottom:.6rem}
+.notice ul{margin:0 0 0 1.1rem}
+.notice li{margin-bottom:.5rem;font-size:.92rem;color:var(--text)}
+.notice li:last-child{margin-bottom:0}
+.notice b{color:var(--accent-d)}
+.trap{background:#FFF6E9;border:1px solid #F0DCB0;border-left:4px solid var(--warn);border-radius:0 var(--r-md) var(--r-md) 0;padding:.9rem 1.2rem;margin-top:1.2rem}
+.trap b{color:#9A7208}
+.trap-h{font-weight:700;color:#9A7208;margin-bottom:.35rem}
+
+details.quiz{margin-top:1.5rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);padding:.4rem 1rem}
+details.quiz summary{cursor:pointer;font-weight:700;font-family:var(--display);padding:.7rem 0;color:var(--accent-d)}
+.q{margin:.8rem 0}
+.q-q{font-weight:600;margin-bottom:.2rem}
+.q-a{font-size:.9rem;color:var(--text2)}
+.q-a b{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="nav"><div class="nav-in">
+  <span class="nav-title">Attention Heatmap</span>
+  <a class="nav-back" href="../index.html">← All lessons</a>
+</div></div>
+
+<main>
+  <div class="hero">
+    <span class="eyebrow">Attention · Represent</span>
+    <h1>Who listens to whom?</h1>
+    <p class="intro">
+      When a transformer reads a sentence, <b>every word looks at every other word</b> and decides how much
+      each one matters. The result is a grid of numbers called an <b>attention matrix</b>. This page lets you
+      feel it: hover any square, or use the arrow keys on the word list, to see who each word is really listening to.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>The attention matrix for one sentence</h2>
+    <p class="how">
+      <b>How to read it:</b> each <b>row</b> is one word doing the looking (the <i>query</i>). Each <b>column</b>
+      is a word being looked at (the <i>key</i>). A darker blue square = more attention. <b>Hover</b> a square, or
+      <b>click / arrow-key</b> a word on the left, to light up that word's row.
+    </p>
+    <div class="fig-wrap" id="d3-heatmap"></div>
+    <p class="viz-caption" id="d3-heatmap-caption"></p>
+  </div>
+
+  <div class="card">
+    <div class="notice">
+      <h3>What to notice</h3>
+      <ul>
+        <li>Look at the row for <b>‘it’</b> — most of its attention points at <b>‘cat’</b>. That is how the model
+          figures out what the word “it” refers to. This is the whole magic of attention in one square.</li>
+        <li>Every <b>row</b> lights up a <b>Σ = 1.00</b> badge. The attention a word spends is a fixed
+          <b>100% budget</b> spread across all words — it can shift where it looks, but the total is always one.</li>
+        <li>The strongest square in each row gets a <b>ring</b>. That is the word this word listens to most.</li>
+      </ul>
+    </div>
+    <div class="trap">
+      <div class="trap-h">One trap to avoid</div>
+      <span>The matrix is <b>not symmetric</b>. “it → cat” being strong does <b>not</b> mean “cat → it” is strong.
+      Row <i>i</i>, column <i>j</i> asks “how much does word <i>i</i> look at word <i>j</i>?” — swapping them is a
+      different question. Read rows, not diagonals.</span>
+    </div>
+  </div>
+
+  <details class="quiz">
+    <summary>Quick check (3 questions)</summary>
+    <div class="q"><div class="q-q">1. In this grid, what does a single row represent?</div>
+      <div class="q-a"><b>One word's attention over all words</b> — how much that query word looks at every other word. The row always sums to 1.</div></div>
+    <div class="q"><div class="q-q">2. The row for “it” is darkest at the “cat” column. Why does that matter?</div>
+      <div class="q-a">It shows the model has learned that <b>“it” refers to “cat”</b>. Attention is how a transformer resolves references and links related words.</div></div>
+    <div class="q"><div class="q-q">3. If “it → cat” is 0.7, is “cat → it” also 0.7?</div>
+      <div class="q-a"><b>Not necessarily.</b> The matrix is not symmetric — each row is computed from its own query, so the two directions are independent.</div></div>
+  </details>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var container = document.getElementById("d3-heatmap");
+  var caption = document.getElementById("d3-heatmap-caption");
+
+  // graceful degradation if d3 failed to load
+  if (typeof window.d3 === "undefined") {
+    console.warn("[attention-heatmap] d3 not found — showing fallback.");
+    container.innerHTML = '<div class="fallback">Could not load the chart library (d3.v7.min.js). '
+      + 'The explanation above still applies: each row is one word’s attention over all words, and every row sums to 1.</div>';
+    if (caption) caption.textContent = "";
+    return;
+  }
+  var d3 = window.d3;
+  var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function dur(ms){ return REDUCED ? 0 : ms; }
+
+  var ACCENT = "#2A7B9B", QCOL = "#2563eb", LINE = "#E5DFD6";
+
+  // ---- data: the sentence and its (illustrative) attention matrix ----
+  var words = ["The","cat","sat","on","the","mat","because","it","was","tired"];
+  var A = [
+    [0.9,0.1,0,0,0,0,0,0,0,0],
+    [0.1,0.7,0.1,0,0,0.1,0,0,0,0],
+    [0,0.45,0.4,0.05,0,0.1,0,0,0,0],
+    [0,0,0.1,0.8,0.1,0,0,0,0,0],
+    [0,0,0,0.1,0.8,0.1,0,0,0,0],
+    [0,0,0.1,0.1,0.1,0.7,0,0,0,0],
+    [0,0.15,0,0,0,0,0.65,0.1,0.1,0],
+    [0,0.7,0,0,0,0.05,0,0.05,0,0.2],
+    [0,0.1,0,0,0,0,0,0.1,0.6,0.2],
+    [0,0.45,0,0,0,0,0,0.1,0.1,0.35]
+  ];
+  var caps = [
+    "‘The’ mostly looks at itself and the next word.",
+    "‘cat’ looks at itself and its action.",
+    "‘sat’ looks back at the cat — who sat?",
+    "‘on’ mostly holds itself, with a little look ahead to the object.",
+    "‘the’ mostly holds itself.",
+    "‘mat’ ties to ‘sat’ and itself.",
+    "‘because’ links the two clauses.",
+    "‘it’ looks mostly at ‘cat’. That is how the model knows what ‘it’ means.",
+    "‘was’ looks at the subject and the feeling.",
+    "‘tired’ looks back at the cat — who is tired?"
+  ];
+  var defaultCaption = "Hover any square, or click / arrow-key a word on the left, to see who that word listens to.";
+  var n = words.length;
+
+  // ---- one shared body-level tooltip ----
+  var tt = document.createElement("div");
+  tt.className = "d3-tooltip"; tt.setAttribute("aria-hidden","true");
+  document.body.appendChild(tt);
+  function showTip(html,e){ tt.innerHTML = html; tt.style.opacity = "1"; moveTip(e); }
+  function moveTip(e){
+    var x = e.clientX + 14, y = e.clientY + 14;
+    var maxX = window.innerWidth - tt.offsetWidth - 8;
+    if (x > maxX) x = e.clientX - tt.offsetWidth - 14;
+    tt.style.left = x + "px"; tt.style.top = y + "px";
+  }
+  function hideTip(){ tt.style.opacity = "0"; }
+
+  // ---- layout ----
+  var margin = {top:70, right:110, bottom:16, left:88};
+  var gridSize = 360;
+  var width = gridSize + margin.left + margin.right;
+  var height = gridSize + margin.top + margin.bottom;
+  var x = d3.scaleBand().domain(d3.range(n)).range([0,gridSize]).padding(0.06);
+  var y = d3.scaleBand().domain(d3.range(n)).range([0,gridSize]).padding(0.06);
+  var color = d3.scaleSequential(d3.interpolateBlues).domain([0,1]);
+  var g;
+
+  function render(){
+    d3.select(container).selectAll("*").remove();
+    var svg = d3.select(container).append("svg")
+      .attr("viewBox","0 0 "+width+" "+height)
+      .attr("preserveAspectRatio","xMidYMid meet")
+      .attr("role","img")
+      .attr("aria-label","Attention heatmap. Rows are query words doing the looking; columns are key words being looked at; darker blue means more attention.");
+    svg.append("title").text("A 10 by 10 attention matrix for the sentence: "+words.join(" ")+". Each row is one word's attention over all words.");
+
+    g = svg.append("g").attr("transform","translate("+margin.left+","+margin.top+")");
+
+    // column labels (key words) across the top, rotated
+    g.selectAll(".col-label").data(words).join("text")
+      .attr("class","d3-axis-label col-label")
+      .attr("data-col",function(d,i){return i;})
+      .attr("x",function(d,i){return x(i)+x.bandwidth()/2;})
+      .attr("y",-10).attr("text-anchor","start")
+      .attr("transform",function(d,i){var cx=x(i)+x.bandwidth()/2;return "rotate(-45,"+cx+",-10)";})
+      .text(function(d){return d;});
+
+    g.append("text").attr("class","d3-axis-title")
+      .attr("x",gridSize/2).attr("y",-margin.top+16).attr("text-anchor","middle")
+      .text("key word (being looked at) →");
+    g.append("text").attr("class","d3-axis-title").attr("text-anchor","middle")
+      .attr("transform","translate("+(-margin.left+16)+","+gridSize/2+") rotate(-90)")
+      .text("query word (doing the looking) ↓");
+
+    // row labels (query words) — clickable + keyboard-navigable
+    g.selectAll(".row-label").data(words).join("text")
+      .attr("class","d3-axis-label row-label")
+      .attr("data-row",function(d,i){return i;})
+      .attr("x",-10).attr("y",function(d,i){return y(i)+y.bandwidth()/2;})
+      .attr("text-anchor","end").attr("dominant-baseline","central")
+      .attr("tabindex",0).attr("role","button")
+      .attr("aria-label",function(d,i){return "Query word "+d+", row "+(i+1)+" of "+n;})
+      .style("cursor","pointer")
+      .text(function(d){return d;})
+      .on("mouseenter",function(e,d){highlightRow(words.indexOf(d));})
+      .on("focus",function(e,d){highlightRow(words.indexOf(d));})
+      .on("click",function(e,d){highlightRow(words.indexOf(d));})
+      .on("keydown",function(e,d){
+        var i=words.indexOf(d), ni=i;
+        if(e.key==="ArrowDown"||e.key==="ArrowRight") ni=Math.min(n-1,i+1);
+        else if(e.key==="ArrowUp"||e.key==="ArrowLeft") ni=Math.max(0,i-1);
+        else return;
+        e.preventDefault(); highlightRow(ni);
+        g.selectAll(".row-label").filter(function(dd,ii){return ii===ni;}).node().focus();
+      });
+
+    // the cells
+    var cells=[];
+    for(var r=0;r<n;r++) for(var c=0;c<n;c++) cells.push({row:r,col:c,weight:A[r][c]});
+    var cellSel = g.selectAll(".d3-cell").data(cells).join("rect")
+      .attr("class","d3-cell")
+      .attr("data-row",function(d){return d.row;})
+      .attr("x",function(d){return x(d.col);})
+      .attr("y",function(d){return y(d.row);})
+      .attr("width",x.bandwidth()).attr("height",y.bandwidth()).attr("rx",3)
+      .attr("fill",function(d){return d.weight>0?color(d.weight):"#fbfcfe";})
+      .attr("stroke",LINE).attr("stroke-width",1)
+      .on("mouseenter",function(e,d){
+        var pct=Math.round(d.weight*100);
+        showTip("<b>‘"+words[d.row]+"’</b> attends <b>"+pct+"%</b> to <b>‘"+words[d.col]+"’</b>",e);
+        highlightRow(d.row); highlightCol(d.col);
+      })
+      .on("mousemove",function(e){moveTip(e);})
+      .on("mouseleave",function(){hideTip();highlightCol(-1);});
+
+    if(!REDUCED){
+      cellSel.attr("opacity",0).transition().duration(dur(450))
+        .delay(function(d){return d.row*24+d.col*4;}).attr("opacity",1);
+    }
+
+    drawLegend(svg,g);
+    g.append("g").attr("class","hl-overlay");
+  }
+
+  function drawLegend(svg,g){
+    var legendH=140, legendW=12, legendX=gridSize+56, legendTop=6;
+    var defs=svg.append("defs");
+    var grad=defs.append("linearGradient").attr("id","d3-heatmap-grad")
+      .attr("x1","0%").attr("y1","100%").attr("x2","0%").attr("y2","0%");
+    d3.range(0,1.01,0.1).forEach(function(t){
+      grad.append("stop").attr("offset",t*100+"%").attr("stop-color",color(t));
+    });
+    var legend=g.append("g").attr("transform","translate("+legendX+","+legendTop+")");
+    legend.append("rect").attr("width",legendW).attr("height",legendH).attr("rx",3)
+      .attr("fill","url(#d3-heatmap-grad)").attr("stroke",LINE);
+    legend.append("text").attr("class","d3-axis-label").attr("x",legendW+6).attr("y",4)
+      .attr("dominant-baseline","hanging").text("100%");
+    legend.append("text").attr("class","d3-axis-label").attr("x",legendW+6).attr("y",legendH)
+      .attr("dominant-baseline","baseline").text("0%");
+    legend.append("text").attr("class","d3-axis-label").attr("x",legendW/2).attr("y",legendH+16)
+      .attr("text-anchor","middle").text("weight");
+  }
+
+  function highlightRow(idx){
+    if(!g) return;
+    g.selectAll(".d3-cell")
+      .attr("stroke",function(d){return d.row===idx?ACCENT:LINE;})
+      .attr("stroke-width",function(d){return d.row===idx?2:1;});
+    g.selectAll(".row-label").classed("active",function(d,i){return i===idx;});
+    if(caption) caption.textContent = caps[idx];
+
+    var top=0,sum=0;
+    for(var c=0;c<n;c++){ sum+=A[idx][c]; if(A[idx][c]>A[idx][top]) top=c; }
+
+    var ov=g.select(".hl-overlay");
+    ov.selectAll("*").remove();
+    // ring on the strongest cell
+    ov.append("rect")
+      .attr("x",x(top)-2).attr("y",y(idx)-2)
+      .attr("width",x.bandwidth()+4).attr("height",y.bandwidth()+4)
+      .attr("rx",4).attr("fill","none").attr("stroke",ACCENT).attr("stroke-width",3)
+      .attr("opacity",0).transition().duration(dur(180)).attr("opacity",1);
+    // Σ badge
+    var badge=ov.append("g").attr("transform","translate("+(gridSize+6)+","+(y(idx)+y.bandwidth()/2)+")");
+    badge.append("rect").attr("x",0).attr("y",-11).attr("width",46).attr("height",22).attr("rx",6)
+      .attr("fill","#E4F2F7").attr("stroke",ACCENT).attr("stroke-width",1);
+    badge.append("text").attr("x",23).attr("y",1).attr("text-anchor","middle")
+      .attr("dominant-baseline","central").attr("class","d3-num")
+      .attr("fill",ACCENT).style("font-size","10.5px").text("Σ="+sum.toFixed(2));
+  }
+
+  function highlightCol(idx){
+    if(!g) return;
+    g.selectAll(".col-label")
+      .attr("fill",function(d,i){return i===idx?QCOL:null;})
+      .attr("font-weight",function(d,i){return i===idx?800:null;});
+  }
+
+  render();
+  highlightRow(7);                                   // pre-show the flagship ‘it’ → ‘cat’ ring + Σ badge on load
+  if(caption) caption.textContent = defaultCaption;   // but keep the inviting hint
+})();
+</script>
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;            /* opened standalone — no parent to size */
+  var last = 0;
+  function measure(){
+    return Math.ceil(Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    ));
+  }
+  function report(){
+    var h = measure();
+    if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); }
+  }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 360); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

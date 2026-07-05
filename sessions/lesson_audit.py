@@ -65,7 +65,7 @@ def classify(week, slug, qid, path):
     secs = t.count('class="sec"')
     gotit = t.count('class="gotit"')
     demos = t.count('data-demo=')
-    quiz = len(re.findall(r'\{q:', t))
+    quiz = len(re.findall(r'\{\s*"?q"?\s*:', t))
     if secs != 7: reasons.append(f"sections={secs} (want 7)")
     if gotit != 7: reasons.append(f"gotit={gotit} (want 7)")
     if demos != 3: reasons.append(f"data-demo={demos} (want 3)")

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 5 · Day 6 — Scaling Simulator &amp; Visualization</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w05-d06-simviz">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 5 Day 6</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-05-data-wall/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Data Wall</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m10b/day-01-loss-spikes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M10b · Training Stability &amp; Optimization Dynamics</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 2 · Week 5 · Day 6 (Weekend Capstone)</span>
+    <h1>Scaling Simulator<br>&amp; Visualization</h1>
+    <p class="lead">You have a fixed pile of money for a big training run. How much goes into a <em>bigger model</em>, and how much into <em>more data</em>? Today you turn dollars into <code>FLOPs</code>, split them the compute-optimal way, and watch the famous Chinchilla curves appear one layer at a time.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> convert a dollar budget into training <code>FLOPs</code> (with <code>MFU</code>), split a fixed <code>C = 6ND</code> budget into the best model size <code>N</code> and token count <code>D</code>, and read the <code>IsoFLOP</code> parabolas and power-law frontier that every frontier lab uses to plan a run.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">The vocabulary, then the money question</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can read simple Python and you know that training a model means adjusting numbers to lower an error score. <b>No prior scaling-law knowledge needed — every term below is defined the first time it appears.</b></div></div>
+
+      <h4>Three words that carry the whole day</h4>
+      <p>A <span class="term" data-tip="One floating-point operation: a single multiply or add on decimal numbers.">FLOP</span> (floating-point operation) is one arithmetic step on real numbers — one multiply or one add. Training a model costs a giant number of these.</p>
+      <p>The number of tunable numbers inside the model is called <strong>N</strong> — the <span class="term" data-tip="The numbers a neural network learns, like weights and biases. Training changes them so answers get better.">parameters</span>. The amount of text you train on is called <strong>D</strong> — the number of <span class="term" data-tip="Small pieces of text or data that a model reads one by one, each turned into a list of numbers.">tokens</span> (a token is a chunk of text, roughly a word-piece). The total arithmetic cost of the run is <strong>C</strong>, the total training <span class="term" data-tip="The count of floating-point operations, where each one is a single multiply or add on decimal numbers.">FLOPs</span>.</p>
+      <p>There is one simple accounting rule that ties them together:</p>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>C = 6 · N · D</code><br><span style="font-size:.85rem;color:var(--text2)">Total training cost ≈ 6 FLOPs per parameter, per token. The 6 comes from ~2 FLOPs for the forward pass and ~4 for the backward pass, per parameter, per token.</span></div></div>
+
+      <h4>What is a scaling law?</h4>
+      <p>A <span class="term" data-tip="A formula found from many experiments that predicts a model's loss from its size, data, or compute.">scaling law</span> is a formula found from experiments that predicts model <span class="term" data-tip="One number that measures how wrong a model's predictions are. Lower means the model is doing better.">loss</span> (a number measuring prediction error — lower is better) from <code>N</code> and <code>D</code>. Kaplan and others (2020) showed loss falls as a smooth <span class="term" data-tip="A relationship where y equals a constant times x raised to a fixed power. It looks like a straight line on a log-log plot.">power law</span>: a straight line on a log-log plot. A power law means loss drops by a fixed factor every time you double the model — no sudden cliff, no plateau, just a steady slide.</p>
+
+      <h4>The money question: Chinchilla</h4>
+      <p>The <span class="term" data-tip="A 2022 DeepMind study that carefully found the best balance of model size and data amount for a fixed training budget.">Chinchilla</span> paper (2022) asked: if <code>C</code> is fixed, what <code>N</code> and <code>D</code> give the lowest loss? Because <code>C = 6ND</code>, once you pick <code>N</code> the data <code>D = C / (6N)</code> is decided for you. So there is really <strong>one knob</strong> (the N/D split) and one best setting. Chinchilla's answer: grow <code>N</code> and <code>D</code> together — each about as <code>C^0.5</code> — which works out to roughly <strong>20 training tokens per parameter</strong>. Older giant models like Gopher (280B params, only 300B tokens) were far too big for their data — <strong>undertrained</strong>.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official references: <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Chinchilla (Hoffmann et al. 2022)</a> · <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">Kaplan et al. 2020</a> · <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Feinberg — scaling talk (2025)</a> · <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">JAX scaling book — roofline</a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html" target="_blank" rel="noopener">SciPy curve_fit</a> · <a href="https://matplotlib.org/stable/" target="_blank" rel="noopener">Matplotlib</a> · <a href="https://seaborn.pydata.org/" target="_blank" rel="noopener">Seaborn</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">A road trip with a fixed fuel budget</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Imagine planning a road trip with a fixed amount of money for fuel. You must split it between a <strong>bigger, thirstier engine</strong> (more horsepower = model size <code>N</code>) and <strong>more miles of actual driving</strong> (fuel burned on the road = training data <code>D</code>). You want to get as far as possible — the farthest distance is the lowest loss.</p>
+      <div class="relate">
+        <div class="card"><span class="big">🏎️💨</span><h5>All engine, no road</h5><p>Spend everything on a monster engine and you barely leave the driveway — a huge model that never saw enough data. This is being <strong>undertrained</strong> (Gopher's mistake).</p></div>
+        <div class="card"><span class="big">🚗🛣️</span><h5>All road, tiny engine</h5><p>Pour all the fuel into distance in an underpowered car and you crawl — mountains of data poured into a model too small to absorb it.</p></div>
+      </div>
+      <p><strong>In one line:</strong> there is one sweet split that gets you farthest. Chinchilla found that for every unit of engine you should buy about <strong>20 units of driving</strong>, and this ratio holds as the budget grows.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: fuel and engine are separate purchases, but <code>N</code> and <code>D</code> are chained by <code>C = 6ND</code> — pick the engine and the miles are decided, so it is really one dial, not two. Also, a real trip has a hard maximum distance; loss has a soft <strong>floor</strong> (the <code>E</code> term, the entropy of the data) that you approach but never cross.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Turn $1M into an optimal training plan</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. We start with a $1M budget of H100 GPU time and walk it all the way to a model recipe. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="dollars" type="button">① dollars → FLOPs</button>
+          <button class="play-btn" data-demo="split" type="button">② split the budget (20 tok/param)</button>
+          <button class="play-btn" data-demo="isoflop" type="button">③ sweep the split: the U-shape</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The rules of the simulator, and why they matter</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The rules</h4>
+      <ul>
+        <li><strong>Dollars → FLOPs.</strong> <code>gpu_hours = usd / price_per_gpu_hr</code>, then <code>C = gpu_hours × 3600 × H100_bf16 × MFU</code>. <code>MFU</code> (Model FLOPs Utilization, usually 0.3–0.5) is the fraction of peak speed you actually get — GPUs never hit peak.</li>
+        <li><strong>The one constraint.</strong> <code>C = 6ND</code>. Pick <code>N</code> and <code>D = C / (6N)</code> is forced. It is a see-saw, not two free choices.</li>
+        <li><strong>The optimal split.</strong> Set <code>D = 20·N</code> (20 tokens per parameter), plug into <code>C = 6ND</code>, and solve: <code>N* = sqrt(C / 120)</code>.</li>
+        <li><strong>The full scaling law.</strong> <code>L(N, D) = E + A/N^α + B/D^β</code>. <code>E</code> is the <strong>irreducible loss</strong> — the entropy of the data, which no compute removes.</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>optimal_N_D(C=7.12e23) → N* ≈ 77B params, D* ≈ 1.54T tokens</code><br><span style="font-size:.85rem;color:var(--text2)">$1M of H100 time lands almost exactly on Chinchilla's real 70B / 1.4T recipe.</span></div></div>
+
+      <h4>Why it matters</h4>
+      <ul>
+        <li><strong>It is the plan every lab makes.</strong> Before spending millions, you decide <code>N</code> and <code>D</code> — get it wrong and you burn the whole budget on an undertrained giant.</li>
+        <li><strong>The U-shape is real.</strong> At fixed <code>C</code>, too-small models underfit and too-large models starve on data; the valley bottom is the sweet spot.</li>
+        <li><strong>The frontier is a power law.</strong> Connect the valley bottoms across budgets and, on log-log axes, they form a straight line of slope ≈ 0.5 for both <code>N*</code> and <code>D*</code>.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> hardware throughput (Week 5) → dollars become <code>C</code> FLOPs (with MFU) → <code>C = 6ND</code> makes it one knob → the IsoFLOP U picks the best <code>N</code> → many U's trace a power-law frontier → the 20-tokens-per-param planning rule.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The simulator turns money into a model recipe through a chain of clean multiplications, so it always prints a plausible <code>(N, D)</code> — which is exactly why the one wrong assumption inside it can go unnoticed.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): budgeting at peak FLOPs instead of MFU.</b> If you drop the <code>MFU</code> factor (or leave it at <code>1.0</code>) in <code>C = gpu_hours × 3600 × H100_bf16 × MFU</code>, the dollars-to-<code>C</code> step overstates your real compute by 2–3x. Every later step still runs — <code>N* = sqrt(C/120)</code>, <code>D = C/(6N)</code>, the plots — and hands you a bigger, confident-looking recipe. Nothing errors; you only discover the gap when the real run costs 2–3x the money or blows past the wall-clock. In <b>code review</b>, a senior engineer checks that the compute number was derived with a realistic <code>MFU</code> (0.3–0.5), not peak, before any <code>N/D</code> plan is trusted.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: the 20-tokens-per-param rule optimizes training cost, not lifetime cost.</b> Chinchilla's split gives the lowest <em>training</em> loss for a fixed <code>C</code>, so it is the right answer to "how do I spend this training budget?" But a smaller model trained on <em>more</em> tokens than compute-optimal (deliberately "overtrained") costs more to train yet is cheaper to serve for every request afterward — which can win overall when a model is queried billions of times. In a <b>design review</b>, the decision is whether you are optimizing the one-time training bill or the total training-plus-inference bill over the model's life.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a scaling simulator + Chinchilla plot</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's capstone (Saturday + Sunday combined): build a small <strong>scaling simulator</strong> that turns dollars into an optimal <code>(N, D)</code> plan, then a notebook that <strong>visualizes</strong> the IsoFLOP parabolas and the power-law frontier — the Chinchilla figure in your own code.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>budget_to_flops(usd, price_per_gpu_hr, h100_bf16=989.5e12, mfu)</code>: for <code>usd=1e6, price=2.0, mfu=0.4</code> returns <code>7.12e23</code> (±1%).</li>
+        <li><code>optimal_N_D(C, tokens_per_param=20)</code>: returns <code>(N*, D*)</code> with <code>6·N*·D* == C</code> (±0.1%) and <code>D*/N* == tokens_per_param</code>; for <code>C=7.12e23</code> gives <code>N* ≈ 7.7e10</code>, <code>D* ≈ 1.5e12</code> (±5%).</li>
+        <li><code>isoflop_scan(C)</code>: returns arrays whose loss curve has a single interior minimum (the U), and its argmin matches <code>optimal_N_D</code> within a factor of 1.5.</li>
+        <li>Notebook: ≥3 IsoFLOP parabolas on one axis, each minimum marked, a frontier line through them; a second log-log panel fits the frontier with <code>scipy.optimize.curve_fit</code> and prints slope in <strong>0.4–0.6</strong>.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>frontier-labs/week5/scaling_simulator.py</code> + tests + the notebook, following the four bullets above.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 5 Day 6 capstone artifact.
+
+Create these files:
+- frontier-labs/week5/scaling_simulator.py
+- frontier-labs/week5/test_scaling_simulator.py
+- frontier-labs/week5/01_scaling_simulator.ipynb   (Sunday visualization; Matplotlib to match the Chinchilla figure style)
+- frontier-labs/week5/README.md   (writeup + run command)
+
+scaling_simulator.py must define:
+1. budget_to_flops(usd, price_per_gpu_hr, h100_bf16=989.5e12, mfu) returning effective training FLOPs = (usd/price_per_gpu_hr)*3600*h100_bf16*mfu. For usd=1e6, price=2.0, mfu=0.4 it must return 7.12e23 within 1%.
+2. optimal_N_D(C, tokens_per_param=20) returning (N*, D*) with 6*N*D*==C within 0.1% and D*/N*==tokens_per_param, via N*=sqrt(C/(6*tokens_per_param)). For C=7.12e23: N* about 7.7e10, D* about 1.5e12.
+3. isoflop_scan(C) that sweeps N, sets D=C/(6N), predicts loss with L=E+A/N**alpha+B/D**beta, and returns arrays whose loss has a single interior minimum whose argmin matches optimal_N_D within a factor of 1.5.
+
+test_scaling_simulator.py: pytest cases for all four acceptance criteria above; pytest must exit 0.
+
+01_scaling_simulator.ipynb: plot >=3 IsoFLOP parabolas on one axis, mark each minimum, draw the power-law frontier line through the minima; a second log-log panel fits log(N*) vs log(C) with scipy.optimize.curve_fit and prints the slope (must land in 0.4-0.6). Include COACH start/end cells with module_id "week5", no savefig calls. Then run:
+  python3 scripts/validate_notebook.py frontier-labs/week5/01_scaling_simulator.ipynb week5
+  pytest frontier-labs/week5/test_scaling_simulator.py
+Confirm both exit 0.
+
+Gotcha to respect: fit the N-vs-C and D-vs-C frontiers as power laws (straight on log-log), NOT the loss-vs-C curve, which bends toward the irreducible floor E. And always multiply by MFU when converting hardware time to trainable FLOPs, or you overstate the optimal model size by 2-3x.</pre>
+      </div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m10a-scaling-laws/day-06-scaling-simulator-visualization/log.md</code>: if you forgot to multiply by <code>MFU</code>, would your simulator suggest a model that is too big or too small? (Hint: more claimed FLOPs → larger <code>N*</code>.)</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Week 5 capstone complete!</h3>
+    <p>You can now turn a dollar budget into training <code>FLOPs</code>, split a fixed <code>C = 6ND</code> budget the compute-optimal way, and read the IsoFLOP parabolas and power-law frontier that decide every real training run.<br>Next: <code>start today</code> → Week 6 opens the inference arc with <code>Inference Mechanics</code>.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-05-data-wall/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Data Wall</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m10b/day-01-loss-spikes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M10b · Training Stability &amp; Optimization Dynamics</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  dollars:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">budget_to_flops</span>(<span class="kw">usd</span>=<span class="num">1_000_000</span>, <span class="kw">price_per_gpu_hr</span>=<span class="num">2.0</span>, <span class="kw">h100_bf16</span>=<span class="num">989.5e12</span>, <span class="kw">mfu</span>=<span class="num">0.4</span>)\n'+
+    '<span class="dim"># gpu_hours = 1e6 / 2.0 = 500,000</span>\n'+
+    '<span class="dim"># seconds   = 500,000 * 3600 = 1.8e9</span>\n'+
+    '<span class="dim"># FLOPs     = seconds * 989.5e12 * 0.40</span>\n'+
+    '<span class="ok">effective_training_FLOPs = 7.12e23</span>\n'+
+    '<span class="hl"># $1M of H100 time ≈ 7.1e23 FLOPs — about Chinchilla itself (5.9e23).</span>',
+    take:'<b>①  Dollars become one number, C.</b> Rent time, multiply by H100 speed and <code>MFU</code> (the ~40% you really get). Everything downstream depends only on this total FLOP budget.'},
+  split:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">optimal_N_D</span>(<span class="kw">C</span>=<span class="num">7.12e23</span>, <span class="kw">tokens_per_param</span>=<span class="num">20</span>)\n'+
+    '<span class="dim"># C = 6*N*D  and  D = 20*N  ->  N = sqrt(C / (6*20))</span>\n'+
+    '<span class="ok">N* = 7.71e10 params  (77.1B)</span>\n'+
+    '<span class="ok">D* = 1.54e12 tokens  (1.54T)</span>\n'+
+    '<span class="dim"># check: 6 * 7.71e10 * 1.54e12 = 7.12e23  ✓</span>\n'+
+    '<span class="hl"># $1M → a ~77B model on ~1.5T tokens. Almost exactly Chinchilla (70B/1.4T).</span>',
+    take:'<b>②  One knob, one best setting.</b> Fix 20 tokens per parameter, plug into <code>C = 6ND</code>, and solve. The math hands you both <code>N*</code> and <code>D*</code> at once.'},
+  isoflop:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="fn">isoflop_scan</span>(<span class="kw">C</span>=<span class="num">7.12e23</span>)   <span class="dim"># fix C, vary N, set D=C/(6N)</span>\n'+
+    '<span class="dim">    N (params)   D (tokens)     loss</span>\n'+
+    '   <span class="num">5.0e9</span>       <span class="num">2.37e13</span>      <span class="num">2.041</span>   <span class="bad">← too small: model-starved</span>\n'+
+    '   <span class="num">2.0e10</span>      <span class="num">5.93e12</span>      <span class="num">1.977</span>\n'+
+    '   <span class="num">7.7e10</span>      <span class="num">1.54e12</span>      <span class="ok">1.968  ← minimum (optimal)</span>\n'+
+    '   <span class="num">3.0e11</span>      <span class="num">3.96e11</span>      <span class="num">1.995</span>\n'+
+    '   <span class="num">1.0e12</span>      <span class="num">1.19e11</span>      <span class="bad">2.083  ← too big: undertrained</span>\n'+
+    '<span class="hl"># Same FLOPs, very different loss. The bottom of the U is where you want to be.</span>',
+    take:'<b>③  The U-shape (IsoFLOP).</b> Hold C fixed and sweep N. Too small underfits, too big starves on data — the valley bottom is the compute-optimal model for that budget.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up. `viz` is inline HTML/SVG (use the .dgram/.node
+   diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
+   is the short explanation beside it. Engine below is fixed across all lessons. */
+var BUILD=[
+ {viz:'<div class="build-embed"><iframe src="../../viz/scaling-laws.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/scaling-laws.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+  note:'<b>Play with the real thing first.</b> This is a live scaling-laws sandbox. Drag the budget and the N/D split and watch the loss curve move. Get a feel for the U-shape, then scroll down and we will build the whole picture up one layer at a time.'},
+ {viz:'<div class="dgram"><span class="node">$ Budget</span><span class="arrow">▶</span><span class="node dim">÷ price → GPU-hrs × H100 FLOP/s × MFU</span><span class="arrow">▶</span><span class="node ok">C : total FLOPs</span></div>',
+  note:'<b>Step 1 — the compute pipeline.</b> Money becomes GPU-hours, GPU-hours become raw FLOP/s, and <code>MFU</code> trims that to what you really get. Out comes a single number <code>C</code> — the only resource that matters from here on.'},
+ {viz:'<svg viewBox="0 0 340 160" width="340" height="160" role="img" aria-label="C=6ND hyperbola on N-D axes">'+
+    '<line x1="40" y1="130" x2="320" y2="130" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="130" x2="40" y2="14" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<text x="322" y="145" font-size="10" fill="#5A544E" text-anchor="end">N</text>'+
+    '<text x="30" y="20" font-size="10" fill="#5A544E">D</text>'+
+    '<path d="M 55 26 Q 110 118 315 124" fill="none" stroke="#2A7B9B" stroke-width="2.5"/>'+
+    '<circle cx="150" cy="70" r="6" fill="#C99A12" stroke="#9A7208" stroke-width="1.5"/>'+
+    '<text x="160" y="66" font-size="10" fill="#9A7208">move me: pick N, D is forced</text>'+
+    '<text x="200" y="110" font-size="10" fill="#2A7B9B">C = 6·N·D (fixed)</text></svg>',
+  note:'<b>Step 2 — one constraint, not two dials.</b> Every point on this curve spends exactly <code>C</code>. Slide the dot: choosing <code>N</code> forces <code>D = C/(6N)</code>. It is a see-saw — you have a single free choice, the split.'},
+ {viz:'<svg viewBox="0 0 340 170" width="340" height="170" role="img" aria-label="single IsoFLOP U curve">'+
+    '<line x1="40" y1="140" x2="320" y2="140" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="140" x2="40" y2="16" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<text x="322" y="155" font-size="10" fill="#5A544E" text-anchor="end">log N</text>'+
+    '<text x="14" y="24" font-size="10" fill="#5A544E">loss</text>'+
+    '<path d="M 60 30 Q 180 175 300 30" fill="none" stroke="#2A7B9B" stroke-width="2.5"/>'+
+    '<circle cx="180" cy="123" r="6" fill="#2D8B55" stroke="#1a5c38" stroke-width="1.5"/>'+
+    '<text x="70" y="46" font-size="9.5" fill="#C93B3B">too small</text>'+
+    '<text x="248" y="46" font-size="9.5" fill="#C93B3B">too big</text>'+
+    '<text x="150" y="150" font-size="10" fill="#2D8B55">optimal N</text></svg>',
+  note:'<b>Step 3 — one IsoFLOP curve (the U).</b> For a single budget, plot loss against model size. High on the left (model too small to fit the data), high on the right (data too small for the model). The green dot at the valley bottom is the compute-optimal <code>N</code>.'},
+ {viz:'<svg viewBox="0 0 340 180" width="340" height="180" role="img" aria-label="family of IsoFLOP parabolas">'+
+    '<line x1="40" y1="150" x2="320" y2="150" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="150" x2="40" y2="14" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<text x="322" y="165" font-size="10" fill="#5A544E" text-anchor="end">log N</text>'+
+    '<text x="14" y="22" font-size="10" fill="#5A544E">loss</text>'+
+    '<path d="M 55 34 Q 130 120 210 34" fill="none" stroke="#9399B2" stroke-width="2"/>'+
+    '<path d="M 80 58 Q 165 150 255 58" fill="none" stroke="#7C6DAA" stroke-width="2"/>'+
+    '<path d="M 110 84 Q 200 178 300 84" fill="none" stroke="#2A7B9B" stroke-width="2.5"/>'+
+    '<text x="250" y="120" font-size="9.5" fill="#5A544E">bigger C</text>'+
+    '<text x="250" y="133" font-size="9.5" fill="#5A544E">→ lower, wider</text></svg>',
+  note:'<b>Step 4 — stack many budgets.</b> Fade in more U-curves for larger <code>C</code>. Each sits lower and shifts right — a family of nested smiles. Bigger budgets buy lower achievable loss and larger optimal models.'},
+ {viz:'<svg viewBox="0 0 340 180" width="340" height="180" role="img" aria-label="frontier line through the U minima">'+
+    '<line x1="40" y1="150" x2="320" y2="150" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="150" x2="40" y2="14" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<path d="M 55 34 Q 130 120 210 34" fill="none" stroke="#c9c4bb" stroke-width="1.5"/>'+
+    '<path d="M 80 58 Q 165 150 255 58" fill="none" stroke="#c9c4bb" stroke-width="1.5"/>'+
+    '<path d="M 110 84 Q 200 178 300 84" fill="none" stroke="#c9c4bb" stroke-width="1.5"/>'+
+    '<circle cx="132" cy="98" r="5" fill="#2D8B55"/><circle cx="167" cy="122" r="5" fill="#2D8B55"/><circle cx="205" cy="150" r="5" fill="#2D8B55"/>'+
+    '<line x1="120" y1="88" x2="220" y2="162" stroke="#C93B3B" stroke-width="2.5"/>'+
+    '<text x="222" y="150" font-size="9.5" fill="#C93B3B">frontier</text></svg>',
+  note:'<b>Step 5 — connect the valley bottoms.</b> Thread a line through every U\'s minimum (green dots). A clean trend appears: this is the compute-optimal <span class="term" data-tip="The best possible loss you can reach at each compute budget, shown as a line through the best points.">frontier</span> — the best loss reachable at each budget.'},
+ {viz:'<svg viewBox="0 0 340 170" width="340" height="170" role="img" aria-label="frontier as a straight line on log-log axes">'+
+    '<line x1="40" y1="140" x2="320" y2="140" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="140" x2="40" y2="16" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<text x="322" y="155" font-size="10" fill="#5A544E" text-anchor="end">log C</text>'+
+    '<text x="14" y="24" font-size="10" fill="#5A544E">log N*</text>'+
+    '<line x1="55" y1="120" x2="305" y2="45" stroke="#2A7B9B" stroke-width="2.5"/>'+
+    '<circle cx="95" cy="108" r="5" fill="#2D8B55"/><circle cx="180" cy="83" r="5" fill="#2D8B55"/><circle cx="265" cy="57" r="5" fill="#2D8B55"/>'+
+    '<text x="150" y="60" font-size="10" fill="#2A7B9B">slope ≈ 0.5</text></svg>',
+  note:'<b>Step 6 — replot in log-log (the power law).</b> Move the minima to a new panel: <code>log(N*)</code> vs <code>log(C)</code>. The threaded line becomes <strong>straight</strong>, slope ≈ 0.5. A straight line on log-log axes is the signature of a power law: <code>N* ∝ C^0.5</code> (and identically <code>D* ∝ C^0.5</code>).'},
+ {viz:'<div class="dgram col"><span class="node ok">slope 0.5 for N* AND D*</span><span class="arrow">▼</span><span class="node hot" style="font-size:1rem">D / N ≈ 20 tokens per parameter</span><span class="dim">constant as C grows</span></div>',
+  note:'<b>Step 7 — read off the recipe.</b> If both <code>N*</code> and <code>D*</code> scale as <code>C^0.5</code>, their ratio <code>D/N</code> stays fixed — about <strong>20 tokens per parameter</strong>. That single ratio is the whole planning rule.'},
+ {viz:'<svg viewBox="0 0 340 170" width="340" height="170" role="img" aria-label="Gopher off the frontier, Chinchilla on it">'+
+    '<line x1="40" y1="140" x2="320" y2="140" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<line x1="40" y1="140" x2="40" y2="16" stroke="#5A544E" stroke-width="1.5"/>'+
+    '<text x="322" y="155" font-size="10" fill="#5A544E" text-anchor="end">log C</text>'+
+    '<text x="14" y="24" font-size="10" fill="#5A544E">log N*</text>'+
+    '<line x1="55" y1="118" x2="305" y2="48" stroke="#2A7B9B" stroke-width="2.5"/>'+
+    '<circle cx="185" cy="45" r="6" fill="#C93B3B" stroke="#8f2a2a" stroke-width="1.5"/>'+
+    '<text x="150" y="38" font-size="9.5" fill="#C93B3B">Gopher 280B/300B — undertrained</text>'+
+    '<circle cx="185" cy="83" r="6" fill="#2D8B55" stroke="#1a5c38" stroke-width="1.5"/>'+
+    '<text x="196" y="100" font-size="9.5" fill="#2D8B55">Chinchilla 70B/1.4T — on the line</text></svg>',
+  note:'<b>Step 8 — overlay real models.</b> Gopher sits <strong>above</strong> the frontier (too big for its data). Chinchilla, on the <strong>same compute</strong>, chose 70B params and 1.4T tokens and landed <strong>on</strong> the line — and won. The paper\'s headline in one picture.'}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+/* QUIZ */
+var QS=[
+ {q:'1. In a fixed-compute (IsoFLOP) experiment, why does the loss-vs-model-size curve form a U shape?',
+  opts:['Numerical precision errors dominate at both extremes','Too-small models underfit the data while too-large models are starved of data (since D=C/6N shrinks as N grows)','The learning rate must be retuned for every model size','Loss is only U-shaped due to random seed variance'],
+  ans:1, fb:'At fixed C, growing N forces D=C/(6N) down; small N underfits, large N is undertrained, so the middle wins.'},
+ {q:'2. Chinchilla\'s compute-optimal rule says that as the compute budget C grows, the optimal model size N and dataset size D should each scale approximately as...',
+  opts:['N ∝ C and D ∝ constant','N ∝ C^0.5 and D ∝ C^0.5 (roughly equal scaling, ~20 tokens/param)','N ∝ C^0.7 and D ∝ C^0.3','N ∝ log(C) and D ∝ C'],
+  ans:1, fb:'Chinchilla found N and D should grow in near-equal proportion, giving a stable ratio of about 20 training tokens per parameter.'},
+ {q:'3. Your simulator turns a $1M budget into a plan and prints <code>N* ≈ 130B, D* ≈ 2.6T</code>. The code runs cleanly and <code>6·N*·D* == C</code> checks out, but the real run overshoots the money by about 2.5x. Where do you look FIRST?',
+  opts:['The parameter count N*, which must have been rounded up somewhere','The dollars→FLOPs step: if MFU was left at peak (1.0) instead of a realistic 0.3–0.5, C is overstated ~2–3x, so every downstream N*/D* is confidently too big even though C=6ND still balances','The matplotlib axis limits on the IsoFLOP plot','The tokens-per-param ratio, which should have been 6 instead of 20'],
+  ans:1, fb:'Right. C=6ND balancing only proves N* and D* are consistent with the C you computed — it says nothing about whether that C was realistic. GPUs never hit peak, so the dollars→FLOPs step must multiply by MFU (typically 0.3–0.5). Leaving MFU at 1.0 inflates C by 2–3x, and since N*=sqrt(C/120) grows with C, the whole recipe comes out too large with no error anywhere. Check the MFU assumption first.'},
+ {q:'4. When you plot the IsoFLOP minima as <code>log(optimal N)</code> versus <code>log(compute C)</code> and see a straight line, what does that straight line tell you?',
+  opts:['The relationship is exponential','The relationship is a power law, and the line\'s slope is the scaling exponent','The data is overfit and should be discarded','Loss has reached its irreducible floor'],
+  ans:1, fb:'A straight line on log-log axes is the signature of a power law; the slope equals the exponent (≈0.5 for N vs C).'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>

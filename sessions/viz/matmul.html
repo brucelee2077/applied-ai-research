@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Multiply — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --a-fill:#E4F2F7; --a-line:#2A7B9B;   /* matrix A: accent blue */
+  --b-fill:#F4E9D6; --b-line:#C99A12;   /* matrix B: warm gold  */
+  --c-fill:#E6F1E8; --c-line:#2D8B55;   /* matrix C: green      */
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+
+/* top bar */
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+
+/* controls */
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.ctrl-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+@media(max-width:560px){.ctrl-row{grid-template-columns:1fr}}
+.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
+.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
+.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+
+/* shape rule banner */
+.shape{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem;
+  font-family:var(--mono);font-size:.95rem;font-weight:600}
+.shape .dim{padding:.15rem .5rem;border-radius:var(--r-sm)}
+.shape .dim.m{background:var(--a-fill);color:var(--accent-d)}
+.shape .dim.n{background:var(--b-fill);color:#8a6a08}
+.shape .dim.k{background:#efe6db;color:var(--warn);border:1px solid var(--warn)}
+.shape .op{color:var(--muted)}
+.shape .note{font-family:var(--body);font-size:.82rem;font-weight:400;color:var(--muted)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+@media(max-width:560px){.readouts{grid-template-columns:1fr}}
+
+/* dot-product readout */
+.dot{margin-top:.9rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.85rem 1rem}
+.dot-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.dot-v{font-family:var(--mono);font-size:.98rem;font-weight:500;color:var(--text);line-height:1.7;word-break:break-word}
+.dot-v .ta{color:var(--accent-d);font-weight:600}
+.dot-v .tb{color:#8a6a08;font-weight:600}
+.dot-v .res{color:var(--c-line);font-weight:700}
+.dot-v .hint{color:var(--muted);font-weight:400}
+
+/* figure */
+.figwrap{width:100%}
+svg#mm{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.mtx-title{fill:var(--text2);font-family:var(--body);font-size:13px;font-weight:700}
+.mtx-sub{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.cell-txt{font-family:var(--mono);font-weight:500;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.op-sym{fill:var(--muted);font-family:var(--display);font-weight:700;text-anchor:middle;dominant-baseline:central}
+.c-cell{cursor:pointer}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+
+/* takeaway */
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+.k-a{color:var(--accent-d);font-weight:600}.k-b{color:#8a6a08;font-weight:600}.k-c{color:var(--c-line);font-weight:600}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Matrix Multiply</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Linear algebra &middot; the core of ML math</span>
+    <h1>Matrix Multiply, Cell by Cell</h1>
+    <p><b>What am I looking at?</b> Three grids of numbers. On the left is matrix <b>A</b>, next to it matrix <b>B</b>,
+    and on the right their product <b>C = A &times; B</b>. Move the sliders to change the shapes, then hover or tap any
+    cell of <b>C</b>. The row of A and the column of B that make that one number light up, and the sum that builds it
+    appears below. This single operation is what almost every neural network spends its time doing.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+
+      <div class="ctrl-row">
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">m <span class="ctrl-hint">rows of A</span></span>
+            <span class="ctrl-val" id="val-m">3</span>
+          </div>
+          <input type="range" id="dim-m" min="1" max="5" step="1" value="3" aria-label="m, the number of rows of A and of C">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">k <span class="ctrl-hint">inner / shared</span></span>
+            <span class="ctrl-val" id="val-k">3</span>
+          </div>
+          <input type="range" id="dim-k" min="1" max="5" step="1" value="3" aria-label="k, the shared inner dimension, columns of A and rows of B">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">n <span class="ctrl-hint">cols of B</span></span>
+            <span class="ctrl-val" id="val-n">4</span>
+          </div>
+          <input type="range" id="dim-n" min="1" max="5" step="1" value="4" aria-label="n, the number of columns of B and of C">
+        </div>
+      </div>
+
+      <div class="shape" aria-live="polite">
+        <span class="op">A</span>
+        <span class="dim m" id="sh-m1">3</span><span class="op">&times;</span><span class="dim k" id="sh-k1">3</span>
+        <span class="op">&nbsp;&middot;&nbsp;B</span>
+        <span class="dim k" id="sh-k2">3</span><span class="op">&times;</span><span class="dim n" id="sh-n1">4</span>
+        <span class="op">&nbsp;&rarr;&nbsp;C</span>
+        <span class="dim m" id="sh-m2">3</span><span class="op">&times;</span><span class="dim n" id="sh-n2">4</span>
+        <span class="note" id="sh-note">inner dims match (k = k), so the product exists</span>
+      </div>
+
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Try a shape:</span>
+        <button class="preset-btn" data-m="1" data-k="4" data-n="1">Row &middot; column &rarr; scalar</button>
+        <button class="preset-btn" data-m="4" data-k="1" data-n="4">Outer product</button>
+        <button class="preset-btn" data-m="2" data-k="3" data-n="2">Small square-ish</button>
+        <button class="preset-btn" data-m="5" data-k="5" data-n="5">Full 5&times;5&times;5</button>
+      </div>
+
+      <div class="readouts">
+        <div class="ro">
+          <div class="ro-k">A shape</div>
+          <div class="ro-v" id="ro-a" style="color:var(--accent-d)">3 &times; 3</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">B shape</div>
+          <div class="ro-v" id="ro-b" style="color:#8a6a08">3 &times; 4</div>
+        </div>
+        <div class="ro">
+          <div class="ro-k">C shape</div>
+          <div class="ro-v" id="ro-c" style="color:var(--c-line)">3 &times; 4</div>
+        </div>
+      </div>
+
+      <div class="dot">
+        <div class="dot-k">Selected C cell = dot product of a row and a column</div>
+        <div class="dot-v" id="dot-readout"><span class="hint">Hover or tap any green cell of C to see how it is built.</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>A &times; B = C</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="mm" viewBox="0 0 720 360" role="img"
+           aria-label="Matrix multiplication diagram. Matrix A of shape m by k, times matrix B of shape k by n, equals matrix C of shape m by n. Hovering a cell of C highlights the matching row of A and column of B whose dot product produces that cell.">
+      </svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li><b>Inner dims must match.</b> A is <span class="k-a">m &times; k</span> and B is <span class="k-b">k &times; n</span>.
+        The two <b>k</b>'s in the middle have to be equal, or the product does not exist. Change <b>k</b> and watch A's width and B's height move together.</li>
+      <li><b>Each C cell is one dot product.</b> Cell <span class="k-c">C[i][j]</span> takes <span class="k-a">row i of A</span>
+        and <span class="k-b">column j of B</span>, multiplies them position by position, and adds the results:
+        <span style="font-family:var(--mono)">a&#8321;b&#8321; + a&#8322;b&#8322; + &hellip;</span>. That sum has exactly <b>k</b> terms.</li>
+      <li><b>C is (rows of A) &times; (cols of B).</b> The output shape is <span class="k-c">m &times; n</span> &mdash;
+        it keeps A's row count and B's column count. The shared <b>k</b> disappears; it is summed away inside every cell.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var svgEl = document.getElementById("mm");
+
+  // Graceful degradation if D3 failed to load.
+  if (typeof window.d3 === "undefined") {
+    console.warn("[matmul] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) {
+      svgEl.outerHTML =
+        '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>' +
+        'Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>';
+    }
+    return;
+  }
+
+  var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = reduceMotion ? 0 : 200;
+
+  // ---- geometry ----------------------------------------------------------
+  var W = 720, H = 360;
+  var svg = d3.select(svgEl);
+
+  // Small integer matrices. We regenerate entries only when a shape grows,
+  // so numbers stay stable while you slide dimensions down and back up.
+  var A = [], B = [];       // A[i][p], B[p][j]
+  function randInt(){ return Math.floor(Math.random() * 9) + 1; } // 1..9
+
+  // Ensure A has at least m rows and k cols; B has at least k rows and n cols.
+  function ensureData(m, k, n){
+    for (var i = 0; i < m; i++){
+      if (!A[i]) A[i] = [];
+      for (var p = 0; p < k; p++){
+        if (A[i][p] === undefined) A[i][p] = randInt();
+      }
+    }
+    for (var r = 0; r < k; r++){
+      if (!B[r]) B[r] = [];
+      for (var c = 0; c < n; c++){
+        if (B[r][c] === undefined) B[r][c] = randInt();
+      }
+    }
+  }
+
+  // ---- readout / control elements ---------------------------------------
+  var elM = document.getElementById("dim-m");
+  var elK = document.getElementById("dim-k");
+  var elN = document.getElementById("dim-n");
+
+  var valM = document.getElementById("val-m");
+  var valK = document.getElementById("val-k");
+  var valN = document.getElementById("val-n");
+
+  var shM1 = document.getElementById("sh-m1"), shM2 = document.getElementById("sh-m2");
+  var shK1 = document.getElementById("sh-k1"), shK2 = document.getElementById("sh-k2");
+  var shN1 = document.getElementById("sh-n1"), shN2 = document.getElementById("sh-n2");
+
+  var roA = document.getElementById("ro-a");
+  var roB = document.getElementById("ro-b");
+  var roC = document.getElementById("ro-c");
+
+  var dotReadout = document.getElementById("dot-readout");
+
+  // ---- persistent svg groups (created once) ------------------------------
+  var gA = svg.append("g");
+  var gB = svg.append("g");
+  var gC = svg.append("g");
+  var gOps = svg.append("g");
+
+  // ---- state: which C cell is selected -----------------------------------
+  var sel = { i: -1, j: -1 };   // -1 means none
+
+  // Compute one C cell as the dot product of A row i and B column j.
+  function cValue(i, j, k){
+    var s = 0;
+    for (var p = 0; p < k; p++) s += A[i][p] * B[p][j];
+    return s;
+  }
+
+  // ---- main render -------------------------------------------------------
+  function draw(){
+    var m = +elM.value, k = +elK.value, n = +elN.value;
+
+    valM.textContent = m; valK.textContent = k; valN.textContent = n;
+    shM1.textContent = m; shM2.textContent = m;
+    shK1.textContent = k; shK2.textContent = k;
+    shN1.textContent = n; shN2.textContent = n;
+    roA.textContent = m + " × " + k;
+    roB.textContent = k + " × " + n;
+    roC.textContent = m + " × " + n;
+
+    ensureData(m, k, n);
+
+    // If the selected cell no longer exists after a resize, drop it.
+    if (sel.i >= m || sel.j >= n) { sel.i = -1; sel.j = -1; renderDot(m, k, n); }
+
+    // ---- layout: choose one cell size so all three grids share it -------
+    // Widest matrix in columns = k (A) + n (B or C); tallest = max(m, k).
+    var pad = 18;                       // outer padding
+    var gap = 58;                       // space for the x and = symbols
+    var maxCols = Math.max(k, n);       // per-matrix column budget
+    var totalColsWidth = (k + n + n);   // A cols + B cols + C cols
+    var availW = W - pad * 2 - gap * 2; // width left for the three grids
+    var maxRows = Math.max(m, k);
+    var availH = H - pad * 2 - 26;      // minus title band
+
+    var cellW = availW / totalColsWidth;
+    var cellH = availH / maxRows;
+    var cell = Math.min(cellW, cellH, 42);   // square-ish, capped for readability
+
+    var aW = k * cell, bW = n * cell, cW = n * cell;
+    var aH = m * cell, bH = k * cell, cH = m * cell;
+
+    // Horizontal placement: A | x | B | = | C, centered as a block.
+    var blockW = aW + gap + bW + gap + cW;
+    var startX = (W - blockW) / 2;
+    var aX = startX;
+    var bX = aX + aW + gap;
+    var cX = bX + bW + gap;
+
+    // Vertical placement: each grid centered on a shared mid-line.
+    var midY = pad + 22 + Math.max(aH, bH, cH) / 2;
+    var aY = midY - aH / 2;
+    var bY = midY - bH / 2;
+    var cY = midY - cH / 2;
+
+    // ---- draw a labeled grid --------------------------------------------
+    // kind: "A" | "B" | "C". data laid out row-major as {r,c,v}.
+    function drawMatrix(g, kind, rows, cols, ox, oy, valueFn){
+      var fill, line, title, sub;
+      if (kind === "A"){ fill="var(--a-fill)"; line="var(--a-line)"; title="A"; sub=rows+"×"+cols; }
+      else if (kind === "B"){ fill="var(--b-fill)"; line="var(--b-line)"; title="B"; sub=rows+"×"+cols; }
+      else { fill="var(--c-fill)"; line="var(--c-line)"; title="C = A×B"; sub=rows+"×"+cols; }
+
+      // build cell data
+      var data = [];
+      for (var r = 0; r < rows; r++)
+        for (var c = 0; c < cols; c++)
+          data.push({ r:r, c:c, v: valueFn(r, c) });
+
+      // title + subtitle above the grid
+      var t = g.selectAll("text.mtx-title").data([0]);
+      t.enter().append("text").attr("class","mtx-title").merge(t)
+        .attr("x", ox + cols*cell/2).attr("y", oy - 16)
+        .attr("text-anchor","middle").text(title);
+      var st = g.selectAll("text.mtx-sub").data([0]);
+      st.enter().append("text").attr("class","mtx-sub").merge(st)
+        .attr("x", ox + cols*cell/2).attr("y", oy - 4)
+        .attr("text-anchor","middle").text(sub);
+
+      var fontPx = Math.max(9, Math.min(15, cell * 0.42));
+
+      // rects
+      var rects = g.selectAll("rect.cell").data(data, function(d){ return d.r+"_"+d.c; });
+      rects.exit().remove();
+      var rectsEnter = rects.enter().append("rect")
+        .attr("class", "cell" + (kind === "C" ? " c-cell" : ""))
+        .attr("rx", 4).attr("ry", 4);
+      var rectsAll = rectsEnter.merge(rects)
+        .attr("data-kind", kind)
+        .attr("x", function(d){ return ox + d.c*cell + 1.5; })
+        .attr("y", function(d){ return oy + d.r*cell + 1.5; })
+        .attr("width", cell - 3).attr("height", cell - 3)
+        .attr("fill", fill).attr("stroke", line).attr("stroke-width", 1);
+
+      // wire C hover/click here (handlers use closed-over m,k,n via redraw)
+      if (kind === "C"){
+        rectsAll
+          .on("mouseenter", function(ev, d){ select(d.r, d.c); })
+          .on("click",      function(ev, d){ select(d.r, d.c); })
+          .attr("data-i", function(d){ return d.r; })
+          .attr("data-j", function(d){ return d.c; });
+      }
+
+      // numbers
+      var txt = g.selectAll("text.cell-txt").data(data, function(d){ return d.r+"_"+d.c; });
+      txt.exit().remove();
+      txt.enter().append("text").attr("class","cell-txt").merge(txt)
+        .attr("x", function(d){ return ox + d.c*cell + cell/2; })
+        .attr("y", function(d){ return oy + d.r*cell + cell/2; })
+        .attr("font-size", fontPx + "px")
+        .attr("fill", "var(--text)")
+        .text(function(d){ return d.v; });
+    }
+
+    drawMatrix(gA, "A", m, k, aX, aY, function(r,c){ return A[r][c]; });
+    drawMatrix(gB, "B", k, n, bX, bY, function(r,c){ return B[r][c]; });
+    drawMatrix(gC, "C", m, n, cX, cY, function(r,c){ return cValue(r, c, k); });
+
+    // ---- operator symbols: A [x] B [=] C --------------------------------
+    var ops = [
+      { x: aX + aW + gap/2, s: "×" },
+      { x: bX + bW + gap/2, s: "=" }
+    ];
+    var opSel = gOps.selectAll("text.op-sym").data(ops);
+    opSel.exit().remove();
+    opSel.enter().append("text").attr("class","op-sym").merge(opSel)
+      .attr("x", function(d){ return d.x; })
+      .attr("y", midY)
+      .attr("font-size", "22px")
+      .text(function(d){ return d.s; });
+
+    // store layout so highlight() can reuse it without recomputing
+    layout = { m:m, k:k, n:n, cell:cell, aX:aX, aY:aY, bX:bX, bY:bY, cX:cX, cY:cY };
+
+    applyHighlight();
+    renderDot(m, k, n);
+  }
+
+  var layout = null;
+
+  function select(i, j){
+    sel.i = i; sel.j = j;
+    applyHighlight();
+    var m = +elM.value, k = +elK.value, n = +elN.value;
+    renderDot(m, k, n);
+  }
+
+  // Highlight: selected C cell, its A row, its B column.
+  function applyHighlight(){
+    // reset every cell to its base look
+    svg.selectAll("rect.cell")
+      .attr("stroke-width", 1).attr("opacity", 1);
+
+    if (sel.i < 0 || sel.j < 0) return;
+
+    // A: whole row i
+    gA.selectAll("rect.cell")
+      .attr("opacity", function(d){ return d.r === sel.i ? 1 : 0.32; })
+      .attr("stroke-width", function(d){ return d.r === sel.i ? 2.5 : 1; });
+    // B: whole column j
+    gB.selectAll("rect.cell")
+      .attr("opacity", function(d){ return d.c === sel.j ? 1 : 0.32; })
+      .attr("stroke-width", function(d){ return d.c === sel.j ? 2.5 : 1; });
+    // C: the one cell
+    gC.selectAll("rect.cell")
+      .attr("opacity", function(d){ return (d.r === sel.i && d.c === sel.j) ? 1 : 0.32; })
+      .attr("stroke-width", function(d){ return (d.r === sel.i && d.c === sel.j) ? 3 : 1; });
+  }
+
+  // Write the dot-product expression for the selected cell.
+  function renderDot(m, k, n){
+    if (sel.i < 0 || sel.j < 0){
+      dotReadout.innerHTML =
+        '<span class="hint">Hover or tap any green cell of C to see how it is built.</span>';
+      return;
+    }
+    var i = sel.i, j = sel.j;
+    var terms = [];   // "a×b" strings
+    var sum = 0;
+    for (var p = 0; p < k; p++){
+      var av = A[i][p], bv = B[p][j];
+      sum += av * bv;
+      terms.push('<span class="ta">' + av + '</span>·<span class="tb">' + bv + '</span>');
+    }
+    var head = 'C[' + i + '][' + j + '] &nbsp;=&nbsp; ';
+    var body = terms.join(' &nbsp;+&nbsp; ');
+    var tail = ' &nbsp;=&nbsp; <span class="res">' + sum + '</span>';
+    var note = ' <span class="hint">(' + k + ' term' + (k === 1 ? '' : 's') +
+               ', one per shared k &mdash; row ' + i + ' of A &middot; column ' + j + ' of B)</span>';
+    dotReadout.innerHTML = head + body + tail + note;
+  }
+
+  // ---- wire up controls --------------------------------------------------
+  ["input", "change"].forEach(function(evt){
+    elM.addEventListener(evt, draw);
+    elK.addEventListener(evt, draw);
+    elN.addEventListener(evt, draw);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      elM.value = btn.getAttribute("data-m");
+      elK.value = btn.getAttribute("data-k");
+      elN.value = btn.getAttribute("data-n");
+      sel.i = -1; sel.j = -1;
+      draw();
+    });
+  });
+
+  // Start with a sensible selected cell so the demo is not empty.
+  draw();
+  select(0, 0);
+})();
+</script>
+</body>
+</html>

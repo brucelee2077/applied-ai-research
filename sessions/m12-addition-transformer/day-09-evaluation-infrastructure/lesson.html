@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 10 · Day 1 — Evaluation Infrastructure: Autoregressive Exact-Match Accuracy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --surface:#FFFFFF; --surface2:#FDF9F3;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+
+.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
+.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
+.nav-meta{display:flex;align-items:center;gap:1rem}
+.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
+.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
+.nav-reset:hover{color:var(--err);border-color:var(--err)}
+
+main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
+.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
+.sec.done{border-color:var(--ok)}
+.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
+.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
+.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
+.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
+.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
+.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
+.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
+.sec-body{padding:1.5rem}
+.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
+.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
+.sec-body strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+
+.hero{margin-bottom:2rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
+.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
+.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
+.goal b{color:var(--accent-d)}
+
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
+.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
+.sec.done .gotit{background:var(--ok)}
+
+.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
+.callout .ic{font-size:1.1rem;flex-shrink:0}
+.c-info{background:var(--accent-l);border-color:var(--accent)}
+.c-warn{background:var(--warn-l);border-color:#C99A12}
+.c-ok{background:var(--ok-l);border-color:var(--ok)}
+
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
+.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
+.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
+.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
+.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
+
+.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
+.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
+.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
+.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
+.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
+.play-take b{color:var(--text)}
+
+/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
+.build-viz svg{max-width:100%;height:auto;display:block}
+.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
+.build-note b{color:var(--text)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
+.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
+.dgram.col{flex-direction:column;gap:.28rem}
+.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
+  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
+.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
+.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
+.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
+.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
+.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
+.node.dash{border-style:dashed}
+.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
+.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.build-embed iframe{width:100%;height:520px;border:0;display:block}
+.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent)}
+.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
+.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
+.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+
+.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
+.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
+.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
+.fin.show{opacity:1;max-height:420px}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
+.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+
+footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
+.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
+.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
+.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.lnav.disabled{opacity:.4;pointer-events:none}
+.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnav.next{text-align:right}
+.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
+.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
+@media(max-width:600px){.lnav-t{white-space:normal}}
+
+@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
+.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
+.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
+.lnav-hub .lnav-hub-ic{font-size:1.05rem}
+.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
+
+/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
+.term{cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
+  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
+  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
+  pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
+  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
+@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+</style>
+</head>
+
+<body data-quest-id="w10-d01-evalinfra">
+
+<nav class="nav">
+  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
+  <div class="nav-in">
+    <span class="nav-title">Frontier Lab · Week 10 Day 1</span>
+    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
+  </div>
+</nav>
+
+<main>
+
+<nav class="lesson-nav top" aria-label="lesson navigation (top)">
+  <a class="lnav prev" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
+</nav>
+
+
+  <header class="hero">
+    <span class="eyebrow">Phase 3 · Week 10 · Day 1 (Mon)</span>
+    <h1>Evaluation Infrastructure<br>Autoregressive Exact-Match Accuracy</h1>
+    <p class="lead">Your training loop already reports a loss number. That number is <em>lying</em> to you about how good your model really is. Today you build the eval harness that checks the addition transformer the way it will actually be used — one generated digit at a time — so every scaling-law plot for the rest of Phase 3 measures the right thing.</p>
+    <div class="goal">
+      <b>🎯 By the end, you'll be able to:</b> explain why teacher-forced loss hides error compounding, write a pure-JAX autoregressive decode loop that only ever conditions on the model's own predictions, and build a <code>pytest</code> harness that reports strict digit-exact accuracy per digit-length bucket plus a speed benchmark.
+    </div>
+  </header>
+
+  <!-- ===== 1. WHAT IS IT ===== -->
+  <section class="sec" id="s1" data-sec="what">
+    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">Two ways to grade a model, and why they disagree</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you have a trained addition transformer from Week 9 (it takes <code>"123+456="</code> and should output <code>"579"</code>) and normal Python/pytest fluency. <b>No prior eval-infrastructure experience needed.</b></div></div>
+
+      <h4>The problem: your training loss has been lying to you</h4>
+      <p>Every day this training run has printed a loss number that keeps going down. That number comes from <span class="term" data-tip="A loss found by always feeding the model the true previous digits, even ones it would have gotten wrong itself.">teacher-forced loss</span>: at every position, you feed the model the <strong>ground-truth</strong> previous digits — even the ones the model itself would have predicted wrong — and ask "how surprised are you by the next true digit?" For input <code>"123+456="</code> and target <code>"579"</code>, teacher forcing feeds the model the true <code>"5"</code>, then the true <code>"7"</code>, then the true <code>"9"</code> as history, no matter what the model's own guesses were. This is fast — one parallel forward pass — and it's exactly what your training loop's cross-entropy loss measures.</p>
+
+      <h4>The answer: score it the way it will actually be used</h4>
+      <p><span class="term" data-tip="Making output one piece at a time, where each new guess is added to the input and used to make the next guess.">Autoregressive (AR) generation</span> is what happens at real inference time: the model predicts digit 1, that <strong>predicted</strong> digit (not the true one) gets appended to the input, then it predicts digit 2 conditioned on its own possibly-wrong digit 1, and so on. <span class="term" data-tip="A strict score where the whole generated answer must match the true answer perfectly. One wrong character fails it.">Exact-match accuracy</span> means the whole generated string must equal the true sum, character for character — one wrong digit anywhere fails the entire example.</p>
+      <div class="callout c-info"><span class="ic">📦</span><div>Teacher-forced loss asks: "given the correct answer so far, do you agree with the next digit?"<br>AR exact-match asks: "starting from nothing but the problem, can you produce the whole correct answer yourself?"<br><span style="font-size:.85rem;color:var(--text2)">Nobody hands a deployed model the correct answer while it's trying to produce that same answer. AR accuracy is the only metric that reflects real usage.</span></div></div>
+
+      <h4>Why the gap exists: error compounding</h4>
+      <p>Addition has carries. A wrong tens-digit early in generation shifts every digit after it, so one bad token can cascade into a totally wrong number — even though teacher-forced loss on that same example can look fine, because each position is still scored against the <strong>correct</strong> prefix, hiding the cascade. Published work on transformer arithmetic (Nogueira et al. 2021; Lee et al. 2023, "Teaching Arithmetic to Small Transformers") repeatedly shows models reaching near-zero teacher-forced loss while AR exact-match accuracy stays far below 100%, especially as digit length grows. Catching that gap is the whole point of today's build.</p>
+      <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.pytest.org/" target="_blank" rel="noopener">pytest documentation</a> · <a href="https://pytest-benchmark.readthedocs.io/" target="_blank" rel="noopener">pytest-benchmark documentation</a></div></div>
+      <button class="gotit" type="button">Got it — let's go</button>
+    </div>
+  </section>
+
+  <!-- ===== 2. INTUITION ===== -->
+  <section class="sec" id="s2" data-sec="intuition">
+    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Grading long division with vs. without the answer key</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Imagine grading a student on long division problems, digit by digit.</p>
+      <div class="relate">
+        <div class="card"><span class="big">📖</span><h5>Teacher-forced = answer key on the page</h5><p>You write every correct intermediate digit on the page already, and just ask "do you agree this next digit is right?" at each step. The student always looks like they understand, because you keep handing them the answer one line at a time.</p></div>
+        <div class="card"><span class="big">✍️</span><h5>Autoregressive = no answer key</h5><p>You take the answer key away. The student writes digit 1 from their own work, then must use their <strong>own</strong> digit 1 to compute digit 2, and so on. Slip on digit 1, and every later digit inherits that mistake.</p></div>
+      </div>
+      <p><strong>In one line:</strong> teacher-forced grading checks each step against the truth in isolation; autoregressive grading checks whether the whole chain, built entirely on the model's own prior steps, lands on the right final answer.</p>
+      <p>A driving-test version of the same idea: teacher-forcing is like resetting the car to the perfect position before each phase of a parallel-parking test and asking "would you have signaled here?" — always graded from a pristine state. Autoregressive grading is watching the whole park happen in one continuous attempt, mistakes and all.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a human student who messes up digit 1 can often <em>notice</em> and self-correct using number sense. A transformer doing autoregressive decoding has no built-in "wait, that carry was wrong" instinct — it confidently keeps building on its own mistake unless training specifically taught it to recover. That's why the AR-vs-teacher-forced gap is a real, measurable phenomenon, not a theoretical nitpick.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. PLAYGROUND ===== -->
+  <section class="sec" id="s3" data-sec="play">
+    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Click through the same example, graded three different ways</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>A simulated terminal. Ground truth: <code>123 + 456 = 579</code>. The model's greedy decode mishandles a carry and actually emits <code>5, 6, 9</code>. <strong>Click all three</strong> to finish.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="teacherforced" type="button">① teacher-forced view</button>
+          <button class="play-btn" data-demo="autoregressive" type="button">② autoregressive view</button>
+          <button class="play-btn" data-demo="benchmark" type="button">③ pytest-benchmark: is eval fast enough?</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+  </section>
+
+  <!-- ===== 4. MECHANISM + WHY ===== -->
+  <section class="sec" id="s4" data-sec="why">
+    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">The pytest building blocks, and why this eval matters</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <h4>The building blocks</h4>
+      <ul>
+        <li><strong>pytest</strong> is Python's standard test framework. Functions named <code>test_*</code> are auto-discovered and run; each uses plain <code>assert</code> statements, and pytest rewrites them to give rich failure diffs.</li>
+        <li><strong><code>@pytest.fixture</code></strong> — reusable setup code, shared across many tests. Today: load a trained checkpoint's <code>params</code> and <code>apply_fn</code> once, not once per test.</li>
+        <li><strong><code>@pytest.mark.parametrize</code></strong> — runs the same test body once per input case, without duplicating code. Today: run the same accuracy test once per digit-length bucket (1, 2, 4, 8, 12, 16, 20 digits).</li>
+        <li><strong>pytest-benchmark</strong> — a plugin adding a <code>benchmark</code> fixture that runs a callable many times, discards warmup, and reports calibrated min/mean/stddev timing. Today it's not about correctness — it answers "can I afford to run full AR eval after every N training steps?"</li>
+      </ul>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>@pytest.mark.parametrize("num_digits", [1, 2, 4, 8, 12, 16, 20])</code><br><span style="font-size:.85rem;color:var(--text2)">One test function, run seven times — once per digit-length bucket — so you get seven separate accuracy numbers, not one blended average that hides length-generalization failure.</span></div></div>
+
+      <h4>Why this matters for the capstone</h4>
+      <ul>
+        <li><strong>The metric is the contract</strong> — every scaling-law curve for the rest of Phase 3 plots accuracy on the y-axis. If that accuracy number is measured the wrong way (teacher-forced instead of AR), every curve you fit is measuring the wrong thing.</li>
+        <li><strong>The gap is diagnostic, not noise</strong> — a large teacher-forced-vs-AR gap at high digit counts tells you the model hasn't learned to generalize its carry logic, which is exactly the failure mode Chinchilla-style scaling work needs to see.</li>
+        <li><strong>Speed is a real constraint</strong> — AR decoding is sequential (one token at a time), unlike the fully parallel teacher-forced forward pass, so you must know its wall-clock cost before deciding how often to run it during training.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> teacher-forced loss hides error compounding → AR exact-match reveals it → pytest + parametrize turns that into one reliable, repeatable number per digit length → pytest-benchmark confirms you can afford to collect it often enough to fit a scaling law.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole point of this eval is to measure what deployment will actually do — and the way it goes wrong is by measuring something that looks like that but isn't.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a "decode loop" that peeks at the true answer.</b> It is easy to write an evaluation that <em>looks</em> autoregressive but, at each step, slices the next token out of the true target array instead of the model's own previous prediction. It runs, it reports high accuracy, and there is no error — but it is just teacher forcing wearing a costume. The error cascade that appears in real generation is completely hidden, so you ship a model that scores 99% in eval and fails on long sums in production. A senior engineer catches this in <b>code review</b> with one test: corrupt the target array to garbage and re-run the decode; a genuinely autoregressive loop produces the exact same generated digits, because it never reads the targets. If the output changes, the loop is peeking.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: honest AR eval is slow eval.</b> Teacher-forced loss is one parallel forward pass and is cheap to compute every step. True autoregressive exact-match must decode one token at a time — sequential, and far slower — but it is the only number that matches deployment. You cannot afford to run full AR eval after every training step, so the <b>design-review</b> decision is the cadence: how often (every N steps, or only on a subset of checkpoints and digit-length buckets) to pay for the honest metric versus lean on the cheap proxy in between. <code>pytest-benchmark</code> exists to make that cost a measured number, not a guess.</div></div>
+      <button class="gotit" type="button">Got the rules</button>
+    </div>
+  </section>
+
+  <!-- ===== 5. WORKED EXAMPLE ===== -->
+  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
+  <section class="sec" id="s5" data-sec="build">
+    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+  </section>
+
+  <!-- ===== 6. QUIZ ===== -->
+  <section class="sec" id="s6" data-sec="quiz">
+    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+  </section>
+
+  <!-- ===== 7. PRODUCE ===== -->
+  <section class="sec" id="s7" data-sec="produce">
+    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build the strict AR-accuracy eval harness</span><span class="sec-tick">✓</span></div>
+    <div class="sec-body">
+      <p>Today's task (from the curriculum): finalize a pytest-based eval script that grades the addition transformer by strict digit-by-digit autoregressive generation accuracy, not teacher-forced loss — the contract every later scaling-law plot in Phase 3 depends on.</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A fixture that loads/builds a trained checkpoint and exposes <code>params</code> + <code>apply_fn</code>.</li>
+        <li>A fixture or helper that generates stratified digit-length evaluation batches (buckets: 1, 2, 4, 8, 12, 16, 20 digits).</li>
+        <li>A pure-JAX <code>autoregressive_decode</code> function whose every new digit prediction conditions on the model's <strong>own</strong> previously generated digits — never on the ground-truth targets. This is the one non-negotiable correctness property.</li>
+        <li>At least one <code>@pytest.mark.parametrize</code>-driven test asserting/reporting strict exact-match accuracy per digit-length bucket.</li>
+        <li>At least one retained teacher-forced-loss test, kept explicitly as a contrast baseline — not as the pass/fail gate.</li>
+      </ul>
+      <h4>Option A · write it yourself</h4>
+      <p>Build <code>sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py</code> with the five bullets above, plus a <code>pytest-benchmark</code> test for <code>autoregressive_decode</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 10 Day 1 artifact.
+
+Create sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py that:
+1. Has a fixture that loads/builds a trained addition-transformer checkpoint and exposes params + apply_fn.
+2. Has a make_eval_batch(num_digits, n) fixture/helper returning tokenized prompts ("123+456=") and true target digit sequences ("579"), stratified across digit-length buckets [1, 2, 4, 8, 12, 16, 20].
+3. Implements a pure-JAX autoregressive_decode(state, prompts, max_new_tokens) that, at each step, takes argmax of the logits at the last position, appends that PREDICTED token (never the ground-truth token) to the running sequence, and feeds the extended sequence back in. JIT-compile it with a static max sequence length.
+4. Adds test_addition_exact_match, parametrized over the digit-length buckets with @pytest.mark.parametrize, asserting/reporting strict exact-match accuracy per bucket (every digit must match, including sequence length).
+5. Keeps a separate test_teacher_forced_loss test as a sanity-check baseline, explicitly not the pass/fail gate — used only to report the gap between teacher-forced loss and AR accuracy.
+6. Adds a test_generation_speed test using the pytest-benchmark `benchmark` fixture to time autoregressive_decode on a fixed batch.
+7. Adds an explicit unit test that corrupts the ground-truth targets array before decoding and asserts the generated output is unaffected — proving the decode loop never reads targets after the prompt.
+Run pytest sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py -v and pytest ... --benchmark-only --benchmark-json=sessions/m12-addition-transformer/day-09-evaluation-infrastructure/reports/eval_bench.json to confirm it works, then write the metric contract ("strict digit-by-digit AR exact-match accuracy, stratified by digit length") into sessions/m12-addition-transformer/day-09-evaluation-infrastructure/reports/week10_eval_notes.md.</pre>
+      </div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to watch for:</b> a decode loop that <em>looks</em> autoregressive but secretly still slices into the ground-truth answer array for each new step. If your "AR accuracy" comes out nearly identical to what teacher-forced loss implied, that's the tell — verify by corrupting the targets array before decoding and confirming the output doesn't change.</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-09-evaluation-infrastructure/log.md</code>: on your longest digit bucket, how much lower is AR exact-match accuracy than teacher-forced loss would suggest — and what does that gap tell you about carry generalization?</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+  </section>
+
+  <div class="fin" id="fin" role="status" aria-hidden="true">
+    <span class="em">🎉</span>
+    <h3>Day 1 complete!</h3>
+    <p>You can now explain exactly why teacher-forced loss and autoregressive accuracy diverge, and you've built the pytest harness that measures the metric your model will actually be judged on. Every scaling-law plot for the rest of Phase 3 stands on this eval.<br>Next: <code>start today</code> → Day 2 is profiling the step time.</p>
+  </div>
+
+</main>
+
+<nav class="lesson-nav" aria-label="lesson navigation">
+  <a class="lnav prev" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
+</nav>
+
+<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
+var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
+  count.textContent = done+'/'+total;
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+document.getElementById('reset').addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* PLAYGROUND */
+var DEMOS = {
+  teacherforced:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># truth: "123+456="  -&gt;  "579"   fed as history: "5","7","9" (all TRUE)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> logits_at_pos2 = apply_fn(params, prompt + <span class="str">"5"</span>)   <span class="dim"># true prefix "5"</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> prob(<span class="str">"7"</span>)   <span class="dim"># true next digit, scored against true history</span>\n<span class="ok">0.61</span>   <span class="hl"># mediocre but nonzero — "loss looks okay"</span>\n'+
+    '<span class="dim"># every position scored against the TRUE prefix -- the tens-digit mistake never propagates</span>',
+    take:'<b>①  Teacher-forced view.</b> Each position is graded against the true prefix in isolation. The model\'s own error at position 2 never gets to poison position 3\'s score — that\'s exactly what hides error compounding.'},
+  autoregressive:{html:'<span class="prompt">&gt;&gt;&gt;</span> seq = prompt; seq += argmax(apply_fn(params, seq))   <span class="dim"># emits "5" — feeds its OWN output back</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> seq += argmax(apply_fn(params, seq))   <span class="dim"># conditions on its OWN "5" -&gt; emits "6" (should be "7")</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> seq += argmax(apply_fn(params, seq))   <span class="dim"># conditions on its OWN "56" -&gt; emits "9"</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> generated, true\n<span class="bad">"569"</span> <span class="dim">vs</span> <span class="ok">"579"</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> exact_match\n<span class="bad">False</span>   <span class="hl"># complete failure, despite "pretty good" teacher-forced loss</span>',
+    take:'<b>②  Autoregressive view.</b> One wrong tens-digit cascades: the model conditions on its own mistake and the whole string comes out wrong. Exact-match is all-or-nothing per example.'},
+  benchmark:{html:'<span class="prompt">$</span> pytest test_eval_speed.py --benchmark-only\n'+
+    '<span class="dim">Name                        Min       Mean      StdDev    Rounds</span>\n'+
+    '<span class="ok">test_generation_speed     41.2ms    43.8ms     1.9ms         12</span>\n'+
+    '<span class="dim"># decode is sequential (one token at a time) -- must know the cost before deciding eval cadence</span>',
+    take:'<b>③  pytest-benchmark.</b> This is not a correctness check — it answers an engineering question: can you afford full AR eval every N training steps, or do you need to subsample checkpoints?'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
+var BUILD=[{"viz": "<svg viewBox=\"0 0 520 160\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Teacher forcing feeds the true prefix into the model at every position\"><rect x=\"14\" y=\"18\" width=\"492\" height=\"36\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"41\" text-anchor=\"middle\" font-size=\"12.5\" font-family=\"monospace\" fill=\"#2C2A28\">prompt: \"123+456=\"</text><g><rect x=\"40\" y=\"78\" width=\"56\" height=\"36\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"68\" y=\"101\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#1F6280\">5</text><rect x=\"110\" y=\"78\" width=\"56\" height=\"36\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"138\" y=\"101\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#1F6280\">7</text><rect x=\"180\" y=\"78\" width=\"56\" height=\"36\" rx=\"6\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"208\" y=\"101\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"700\" fill=\"#1F6280\">9</text><text x=\"113\" y=\"128\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#6B645E\">true digits, handed to the model as history at every step</text></g><path d=\"M40 60 L96 60\" stroke=\"#2D8B55\" stroke-width=\"2\" fill=\"none\" marker-end=\"url(#arr1)\"/><defs><marker id=\"arr1\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2D8B55\"/></marker></defs><text x=\"350\" y=\"98\" text-anchor=\"middle\" font-size=\"12\" fill=\"#2D8B55\" font-weight=\"600\">loss looks fine — each digit is graded against truth, in isolation</text></svg>", "note": "<b>Teacher-forced loss feeds the model the true prefix.</b> At every position, the model sees the <b>correct</b> digits so far and is asked only whether it agrees with the next one — it never has to build on its own guesses."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Autoregressive decoding feeds the model its own predicted digit instead of the true one\"><rect x=\"40\" y=\"20\" width=\"56\" height=\"34\" rx=\"6\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"2\"/><text x=\"68\" y=\"42\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#1a5c38\">5</text><text x=\"68\" y=\"66\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#6B645E\">correct</text><path d=\"M96 37 L162 37\" stroke=\"#6B645E\" stroke-width=\"2\" marker-end=\"url(#arr2)\"/><defs><marker id=\"arr2\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"166\" y=\"20\" width=\"56\" height=\"34\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"194\" y=\"42\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#C93B3B\">6</text><text x=\"194\" y=\"66\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#C93B3B\">wrong (should be 7)</text><path d=\"M222 37 L288 37\" stroke=\"#C93B3B\" stroke-width=\"2\" marker-end=\"url(#arr3)\"/><defs><marker id=\"arr3\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#C93B3B\"/></marker></defs><rect x=\"292\" y=\"20\" width=\"56\" height=\"34\" rx=\"6\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"2\"/><text x=\"320\" y=\"42\" text-anchor=\"middle\" font-size=\"14\" font-weight=\"700\" fill=\"#C93B3B\">9</text><text x=\"320\" y=\"66\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#C93B3B\">inherits the error</text><path d=\"M68 54 Q68 90 194 90 Q222 90 222 54\" stroke=\"#C93B3B\" stroke-width=\"1.6\" fill=\"none\" stroke-dasharray=\"4 3\" marker-end=\"url(#arr4)\"/><defs><marker id=\"arr4\" markerWidth=\"7\" markerHeight=\"7\" refX=\"5\" refY=\"3.5\" orient=\"auto\"><path d=\"M0,0 L7,3.5 L0,7 Z\" fill=\"#C93B3B\"/></marker></defs><text x=\"140\" y=\"104\" text-anchor=\"middle\" font-size=\"10\" fill=\"#C93B3B\">fed back as OWN input</text><rect x=\"40\" y=\"126\" width=\"308\" height=\"28\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"194\" y=\"145\" text-anchor=\"middle\" font-size=\"12\" font-family=\"monospace\" fill=\"#2C2A28\">generated \"569\"  vs  true \"579\"  → exact_match = False</text></svg>", "note": "<b>Autoregressive (AR) decoding feeds back its own prediction, not the truth.</b> Once the model predicts the wrong tens-digit (\"6\" instead of \"7\"), that wrong digit becomes the input for the next step — the error cascades and the whole answer fails, even though each individual step \"made sense\" given what it saw."}, {"viz": "<svg viewBox=\"0 0 520 190\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Same underlying model, two different metrics, disagreeing verdicts\"><rect x=\"200\" y=\"14\" width=\"120\" height=\"34\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"2\"/><text x=\"260\" y=\"36\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F6280\">trained model</text><path d=\"M230 48 L110 90\" stroke=\"#6B645E\" stroke-width=\"1.6\"/><path d=\"M290 48 L410 90\" stroke=\"#6B645E\" stroke-width=\"1.6\"/><rect x=\"20\" y=\"90\" width=\"180\" height=\"58\" rx=\"8\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.6\"/><text x=\"110\" y=\"111\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"700\" fill=\"#1F6280\">teacher-forced loss</text><text x=\"110\" y=\"131\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"700\" fill=\"#2D8B55\">looks great</text><rect x=\"320\" y=\"90\" width=\"180\" height=\"58\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.6\"/><text x=\"410\" y=\"111\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"700\" fill=\"#C93B3B\">AR exact-match</text><text x=\"410\" y=\"131\" text-anchor=\"middle\" font-size=\"18\" font-weight=\"700\" fill=\"#C93B3B\">far below 100%</text><text x=\"260\" y=\"175\" text-anchor=\"middle\" font-size=\"11.5\" fill=\"#6B645E\">two metrics, one model, opposite verdicts — which one matches deployment?</text></svg>", "note": "<b>The two metrics genuinely disagree.</b> Published results (Nogueira et al. 2021; Lee et al. 2023) repeatedly show near-zero teacher-forced loss paired with AR exact-match accuracy far below 100%, especially as digit length grows — the gap is real, not measurement noise."}, {"viz": "<svg viewBox=\"0 0 520 200\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Accuracy drops as digit length grows, a bar chart across seven buckets\"><line x1=\"40\" y1=\"20\" x2=\"40\" y2=\"160\" stroke=\"#E5DFD6\"/><line x1=\"40\" y1=\"160\" x2=\"500\" y2=\"160\" stroke=\"#E5DFD6\"/><text x=\"10\" y=\"24\" font-size=\"9.5\" fill=\"#6B645E\">100%</text><text x=\"10\" y=\"98\" font-size=\"9.5\" fill=\"#6B645E\">50%</text><text x=\"10\" y=\"163\" font-size=\"9.5\" fill=\"#6B645E\">0%</text><g font-family=\"monospace\">\n<rect x=\"55\" y=\"27\" width=\"44\" height=\"133\" fill=\"#2D8B55\"/><text x=\"77\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">1</text>\n<rect x=\"113\" y=\"31\" width=\"44\" height=\"129\" fill=\"#2D8B55\"/><text x=\"135\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">2</text>\n<rect x=\"171\" y=\"38\" width=\"44\" height=\"122\" fill=\"#2D8B55\"/><text x=\"193\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">4</text>\n<rect x=\"229\" y=\"60\" width=\"44\" height=\"100\" fill=\"#C99A12\"/><text x=\"251\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">8</text>\n<rect x=\"287\" y=\"75\" width=\"44\" height=\"85\" fill=\"#C99A12\"/><text x=\"309\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">12</text>\n<rect x=\"345\" y=\"98\" width=\"44\" height=\"62\" fill=\"#C93B3B\"/><text x=\"367\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">16</text>\n<rect x=\"403\" y=\"117\" width=\"44\" height=\"43\" fill=\"#C93B3B\"/><text x=\"425\" y=\"175\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B645E\">20</text>\n</g><text x=\"260\" y=\"192\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#6B645E\">digit-length bucket → AR exact-match accuracy per bucket</text></svg>", "note": "<b>One blended average would hide this.</b> Stratifying by digit length (<code>@pytest.mark.parametrize(\"num_digits\", [1,2,4,8,12,16,20])</code>) turns one fuzzy number into seven honest ones — the drop-off at 16 and 20 digits is exactly the length-generalization failure a scaling-law analysis needs to see."}, {"viz": "<svg viewBox=\"0 0 520 210\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"The autoregressive decode loop assembled step by step, each iteration feeding the model its own last prediction\"><rect x=\"20\" y=\"18\" width=\"150\" height=\"34\" rx=\"7\" fill=\"#FFFFFF\" stroke=\"#2A7B9B\" stroke-width=\"1.6\"/><text x=\"95\" y=\"40\" text-anchor=\"middle\" font-size=\"11.5\" font-family=\"monospace\" fill=\"#1F6280\">seq = prompt</text><path d=\"M170 35 L230 35\" stroke=\"#6B645E\" stroke-width=\"2\" marker-end=\"url(#arrA)\"/><defs><marker id=\"arrA\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"234\" y=\"18\" width=\"190\" height=\"34\" rx=\"7\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.6\"/><text x=\"329\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#1F6280\">logits = apply_fn(params, seq)</text><rect x=\"234\" y=\"70\" width=\"190\" height=\"34\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.6\"/><text x=\"329\" y=\"92\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#5E5191\">next = argmax(logits[:, -1])</text><rect x=\"234\" y=\"122\" width=\"190\" height=\"34\" rx=\"7\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.6\"/><text x=\"329\" y=\"144\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#1a5c38\">seq = concat(seq, next)</text><path d=\"M329 52 L329 70\" stroke=\"#6B645E\" stroke-width=\"1.6\" marker-end=\"url(#arrB)\"/><path d=\"M329 104 L329 122\" stroke=\"#6B645E\" stroke-width=\"1.6\" marker-end=\"url(#arrB)\"/><defs><marker id=\"arrB\" markerWidth=\"7\" markerHeight=\"7\" refX=\"5\" refY=\"3.5\" orient=\"auto\"><path d=\"M0,0 L7,3.5 L0,7 Z\" fill=\"#6B645E\"/></marker></defs><path d=\"M424 139 Q470 139 470 90 Q470 40 424 35\" stroke=\"#2D8B55\" stroke-width=\"2\" fill=\"none\" marker-end=\"url(#arrC)\"/><defs><marker id=\"arrC\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#2D8B55\"/></marker></defs><text x=\"470\" y=\"90\" text-anchor=\"middle\" font-size=\"10\" fill=\"#2D8B55\" transform=\"rotate(90 470 90)\">loop max_new_tokens times</text><text x=\"140\" y=\"185\" text-anchor=\"middle\" font-size=\"11\" fill=\"#6B645E\">seq never re-reads the true target — only its own growing output</text></svg>", "note": "<b>This is the loop, piece by piece.</b> Start from the prompt, run the forward pass, take <code>argmax</code> of the last position's logits, append that prediction to <code>seq</code>, then repeat — the growing sequence is entirely self-generated, which is the one property this eval must prove."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"A targets-corruption test proves the decode loop never reads ground truth\"><rect x=\"30\" y=\"18\" width=\"200\" height=\"40\" rx=\"8\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.6\"/><text x=\"130\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#C93B3B\">corrupt(targets)</text><text x=\"130\" y=\"51\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#6B645E\">true \"579\" → garbage \"000\"</text><path d=\"M230 38 L280 38\" stroke=\"#6B645E\" stroke-width=\"2\" stroke-dasharray=\"3 3\" marker-end=\"url(#arrD)\"/><defs><marker id=\"arrD\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 Z\" fill=\"#6B645E\"/></marker></defs><text x=\"255\" y=\"28\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B645E\">passed in, ignored</text><rect x=\"284\" y=\"18\" width=\"200\" height=\"40\" rx=\"8\" fill=\"#FFFFFF\" stroke=\"#E5DFD6\"/><text x=\"384\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#2C2A28\">autoregressive_decode(...)</text><text x=\"384\" y=\"51\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#6B645E\">only ever reads seq (its own output)</text><line x1=\"130\" y1=\"58\" x2=\"130\" y2=\"100\" stroke=\"#E5DFD6\" stroke-dasharray=\"3 3\"/><line x1=\"384\" y1=\"58\" x2=\"384\" y2=\"100\" stroke=\"#E5DFD6\" stroke-dasharray=\"3 3\"/><rect x=\"200\" y=\"104\" width=\"120\" height=\"32\" rx=\"7\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.6\"/><text x=\"260\" y=\"124\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1a5c38\">output unchanged</text></svg>", "note": "<b>The tell-tale unit test: corrupt the targets and see if anything changes.</b> A decode loop that <em>looks</em> autoregressive but secretly slices into the true answer array will produce different output once targets are corrupted — a genuinely AR loop must produce the exact same generated digits either way."}, {"viz": "<svg viewBox=\"0 0 520 150\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"pytest-benchmark timing bar showing sequential decode cost per batch\"><rect x=\"20\" y=\"14\" width=\"480\" height=\"28\" rx=\"6\" fill=\"#F5F0E8\" stroke=\"#E5DFD6\"/><text x=\"260\" y=\"33\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#2C2A28\">pytest test_generation_speed --benchmark-only</text><line x1=\"50\" y1=\"66\" x2=\"470\" y2=\"66\" stroke=\"#E5DFD6\"/><rect x=\"50\" y=\"56\" width=\"250\" height=\"20\" rx=\"4\" fill=\"#2A7B9B\"/><text x=\"175\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#FFFFFF\" font-weight=\"600\">min 41.2ms</text><rect x=\"50\" y=\"84\" width=\"265\" height=\"20\" rx=\"4\" fill=\"#1F6280\"/><text x=\"182\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#FFFFFF\" font-weight=\"600\">mean 43.8ms ± 1.9ms</text><text x=\"340\" y=\"70\" font-size=\"10\" fill=\"#6B645E\">12 rounds, warmup discarded</text><text x=\"260\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#C99A12\" font-weight=\"600\">decode is sequential — one digit at a time, unlike the parallel teacher-forced pass</text></svg>", "note": "<b>Speed is a real constraint, not an afterthought.</b> Because AR decoding runs token by token instead of one parallel forward pass, <code>pytest-benchmark</code>'s calibrated min/mean/stddev timing tells you whether you can afford full AR eval after every N training steps, or must subsample checkpoints."}, {"viz": "<svg viewBox=\"0 0 520 170\" style=\"max-width:100%;height:auto\" role=\"img\" aria-label=\"Causal chain from hidden error compounding to a trustworthy scaling law curve\"><rect x=\"10\" y=\"18\" width=\"115\" height=\"46\" rx=\"7\" fill=\"#FDE8E8\" stroke=\"#C93B3B\" stroke-width=\"1.4\"/><text x=\"67\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"700\" fill=\"#C93B3B\">teacher-forced</text><text x=\"67\" y=\"52\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#C93B3B\">loss hides cascade</text><path d=\"M125 41 L150 41\" stroke=\"#6B645E\" stroke-width=\"1.6\" marker-end=\"url(#arrE)\"/><defs><marker id=\"arrE\" markerWidth=\"7\" markerHeight=\"7\" refX=\"5\" refY=\"3.5\" orient=\"auto\"><path d=\"M0,0 L7,3.5 L0,7 Z\" fill=\"#6B645E\"/></marker></defs><rect x=\"154\" y=\"18\" width=\"115\" height=\"46\" rx=\"7\" fill=\"#E4F2F7\" stroke=\"#2A7B9B\" stroke-width=\"1.4\"/><text x=\"211\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"700\" fill=\"#1F6280\">AR exact-match</text><text x=\"211\" y=\"52\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#1F6280\">reveals it</text><path d=\"M269 41 L294 41\" stroke=\"#6B645E\" stroke-width=\"1.6\" marker-end=\"url(#arrE)\"/><rect x=\"298\" y=\"18\" width=\"115\" height=\"46\" rx=\"7\" fill=\"#EDE9F8\" stroke=\"#7C6DAA\" stroke-width=\"1.4\"/><text x=\"355\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"700\" fill=\"#5E5191\">pytest parametrize</text><text x=\"355\" y=\"52\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#5E5191\">per digit length</text><path d=\"M413 41 L438 41\" stroke=\"#6B645E\" stroke-width=\"1.6\" marker-end=\"url(#arrE)\"/><rect x=\"442\" y=\"18\" width=\"68\" height=\"46\" rx=\"7\" fill=\"#E8F5EE\" stroke=\"#2D8B55\" stroke-width=\"1.4\"/><text x=\"476\" y=\"38\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"700\" fill=\"#1a5c38\">benchmark</text><text x=\"476\" y=\"52\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#1a5c38\">confirms cadence</text><line x1=\"20\" y1=\"90\" x2=\"20\" y2=\"150\" stroke=\"#E5DFD6\"/><line x1=\"20\" y1=\"150\" x2=\"500\" y2=\"150\" stroke=\"#E5DFD6\"/><path d=\"M20 148 Q140 148 200 130 Q300 105 500 96\" stroke=\"#2D8B55\" stroke-width=\"2.4\" fill=\"none\"/><text x=\"260\" y=\"90\" text-anchor=\"middle\" font-size=\"11\" fill=\"#2D8B55\" font-weight=\"600\">every scaling-law curve for the rest of Phase 3 plots THIS number</text></svg>", "note": "<b>The metric is the contract.</b> This whole chain — teacher-forced loss hiding the cascade, AR exact-match revealing it, <code>pytest.mark.parametrize</code> turning it into one number per digit length, and <code>pytest-benchmark</code> confirming you can afford it — exists because every scaling-law curve for the rest of Phase 3 plots accuracy on the y-axis. Get this metric wrong and every curve you fit measures the wrong thing."}];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+if(!bsteps.length){ bUnlock(); }
+else if(!RM && 'IntersectionObserver' in window){
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+} else {
+  bsteps.forEach(seeStep);
+}
+
+
+/* QUIZ */
+var QS=[
+ {q:'1. Why can a model have very low teacher-forced loss but poor autoregressive (AR) generation accuracy on addition?',
+  opts:['Teacher-forced loss uses a different loss function than cross-entropy','Teacher forcing always feeds the true previous tokens, so one wrong digit\'s error never compounds into later positions the way it does when the model conditions on its own generated digits','AR generation always uses a smaller model than teacher-forced evaluation','pytest cannot measure teacher-forced loss at all'],
+  ans:1, fb:'Right. Teacher forcing scores each position independently against ground-truth history, hiding the error-cascade that happens when the model must condition on its own possibly-wrong previous predictions during real generation.'},
+ {q:'2. In pytest, what is the purpose of <code>@pytest.mark.parametrize</code> in the addition-accuracy test script?',
+  opts:['It benchmarks the wall-clock speed of a function automatically','It runs the same test function repeatedly with different input values (e.g. different digit lengths) without duplicating code','It marks a test as expected to fail','It replaces the need for fixtures'],
+  ans:1, fb:'Right. parametrize lets one test body run once per parameter set — here, once per digit-length bucket — producing a separate reported result for each.'},
+ {q:'3. Your AR eval reports 99% exact-match, but the same checkpoint fails visibly on long sums when you type them in by hand. The eval code has no errors. What single test do you run first to find the bug?',
+  opts:['Retrain the model, since a wrong eval always means the weights are bad','Corrupt the true target array to garbage and re-run the decode: if the generated digits change, the loop is secretly reading the targets (teacher forcing in disguise) instead of feeding back its own predictions','Lower the exact-match threshold so more answers count as correct','Run the eval on more examples until the number drops on its own'],
+  ans:1, fb:'Right. A 99% eval that collapses on hand-typed long sums is the fingerprint of a decode loop that peeks at the true answer. The definitive test: replace the targets with garbage and decode again. A genuinely autoregressive loop reads only its own growing output, so it must produce the exact same digits either way; if the output changes, the loop was slicing the next token from the true array and hiding the error cascade. Retraining or loosening the threshold both accept the wrong number instead of fixing how it is measured.'},
+ {q:'4. What is the <code>benchmark</code> fixture from pytest-benchmark actually used for in today\'s task?',
+  opts:['To measure how accurate the model\'s arithmetic is','To time and calibrate how fast the evaluation/generation code itself runs, so you know if full autoregressive eval is cheap enough to run frequently during training','To automatically fix bugs in the decode loop','To replace assert statements in correctness tests'],
+  ans:1, fb:'Right. pytest-benchmark measures wall-clock performance (min/mean/stddev over repeated calibrated runs) of a callable — here it answers an engineering question (eval cost), not a correctness question.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* COPY */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;                // prefer above the word
+    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el;
+    tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body);
+    tip.classList.add('show');
+    position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+</body>
+</html>
