@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Size Arithmetic</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-batch-normalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
+  <a class="lnav prev" href="../day-02-output-dim-arithmetic/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Dimension Arithmetic</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-batch-normalization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
 </nav>
 
   <header class="hero">
@@ -304,6 +304,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Dense at the end:</strong> once features are small and rich, a fully-connected layer is the cheapest way to make the final call.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this exact conv-pool-conv-pool-flatten-dense shape is LeNet, the first practical CNN from 1998, and it still describes the skeleton of far bigger modern image models.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The flatten step is where the trickiest quiet bug hides, and how deep to stack conv-pool blocks is a real design choice.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): flattening the feature map in the wrong axis order.</b> Flatten just reads the <code>(C, H, W)</code> grid out into one long row. If you reshape or permute it in a different order than the layer expects — for example reading it channel-last when the dense layer was wired for channel-first — the row has the exact same length (<code>16×7×7 = 784</code> either way), so no shape error is raised and training still runs. But the 784 numbers now sit in scrambled positions, so the dense layer learns from a jumbled feature order and lands at lower accuracy for no obvious reason. A senior engineer, in <b>code review</b>, checks that any manual <code>reshape</code>/<code>permute</code> before the dense layer matches the tensor's real memory layout, and prefers the framework's own flatten over a hand-written one.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more conv-pool blocks give a wider view but cost resolution.</b> Each pooling step halves height and width, which lets later filters see a bigger area of the original image (a larger receptive field) and keeps compute low. What you give up is fine spatial detail and the ability to place small objects precisely — by <code>7×7</code> the network sees only a coarse summary. How deep to stack these blocks is a <b>design-review</b> decision that balances a wide receptive field and cheap compute against keeping enough resolution for the task.</div></div>
       <button class="gotit" type="button">Got the shape flow</button>
     </div>
   </section>
@@ -335,21 +340,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Build the small CNN in PyTorch and watch the shape flow. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_small_cnn.py</code>. Build an <code>nn.Sequential</code> with: Conv2d(1→8, k=3, p=1), ReLU, MaxPool2d(2), Conv2d(8→16, k=3, p=1), ReLU, MaxPool2d(2), Flatten, Linear(16·7·7 → 10). Push a dummy tensor of shape (1,1,28,28) through it, printing the shape after every layer. Confirm the last shape is (1,10). Run with <code>python3 m06_small_cnn.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py</code>. Build an <code>nn.Sequential</code> with: Conv2d(1→8, k=3, p=1), ReLU, MaxPool2d(2), Conv2d(8→16, k=3, p=1), ReLU, MaxPool2d(2), Flatten, Linear(16·7·7 → 10). Push a dummy tensor of shape (1,1,28,28) through it, printing the shape after every layer. Confirm the last shape is (1,10). Run with <code>python3 sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 3 artifact.
 
-Create experiments/foundations/m06_small_cnn.py that, with a comment on each step, builds a small CNN image classifier and traces its shapes:
+Create sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py that, with a comment on each step, builds a small CNN image classifier and traces its shapes:
 1. Builds a model: Conv2d(1,8,kernel_size=3,padding=1) -> ReLU -> MaxPool2d(2) -> Conv2d(8,16,kernel_size=3,padding=1) -> ReLU -> MaxPool2d(2) -> Flatten -> Linear(16*7*7, 10).
 2. Creates a dummy input of shape (1,1,28,28) and passes it through, printing the tensor shape after every layer so the width/height shrink and the channels grow are visible.
 3. Asserts the final output shape is (1, 10) — one score per digit class.
 4. Prints the total parameter count.
 Then run it and paste the sequence of shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-03-log.md</code>: what was the shape right before flatten, and did 16×7×7 equal the flattened length you expected?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/log.md</code>: what was the shape right before flatten, and did 16×7×7 equal the flattened length you expected?</div></div>
       <button class="gotit" type="button">Done — on to Day 4</button>
     </div>
   </section>
@@ -363,9 +368,9 @@ Then run it and paste the sequence of shapes at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Size Arithmetic</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-batch-normalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
+  <a class="lnav prev" href="../day-02-output-dim-arithmetic/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Output-Dimension Arithmetic</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-batch-normalization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batch Normalization</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -485,9 +490,9 @@ var QS=[
  {q:'3. Why do the convolution layers come before the dense layer?',
   opts:['dense layers are slow','convolutions keep the neighbor structure; flattening first would throw it away','it looks nicer','dense layers cannot run on images'],
   ans:1, fb:'Right. Convolutions use the fact that nearby pixels belong together; flatten only after those features are found.'},
- {q:'4. What does the final dense layer output for a 10-class problem?',
-  opts:['a single image','10 scores, one per class','the flattened pixels','a bigger feature map'],
-  ans:1, fb:'Right. It maps the flattened features to 10 class scores; the biggest score is the guess.'}
+ {q:'4. You rewrote the flatten step by hand with a manual reshape before the dense layer. The model trains with no shape error, but accuracy is stuck far below a known-good baseline that uses the same architecture. Where do you look first?',
+  opts:['The number of output classes must be wrong','The manual reshape may read the (C,H,W) grid in a different axis order than the dense layer expects — the row length (16×7×7 = 784) is identical either way, so no error fires, but the 784 features are scrambled and the dense layer learns from jumbled positions; use the framework flatten or match the memory layout','The images are too large and must be resized','The dense layer needs more classes than the conv layers produce'],
+  ans:1, fb:'Right. Flatten only unrolls the grid into a row. If your reshape/permute uses a different axis order than the layer was wired for, the length still comes out 784, so there is no shape error — but the feature order is scrambled and the dense layer trains against jumbled inputs, capping accuracy with no obvious symptom. Prefer the framework flatten or verify the memory layout. It is not the class count (shapes matched) or image size.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-full-block.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Full Decoder Block</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-encoder-vs-decoder.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Encoder vs Decoder</span></a>
+  <a class="lnav prev" href="../day-04-full-block/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Full Block</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-encoder-vs-decoder/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Encoder vs Decoder</span></a>
 </nav>
 
   <header class="hero">
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>Why it matters — training and generating agree</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the mask lets the model train on a full sentence in parallel while still learning "predict the next word from the past only". Without it, position 2 could just copy the true word at position 3 and never learn anything. The causal mask is exactly what makes GPT-style models possible — and it is the only difference between a decoder and an encoder (Day 6).</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The mask is one triangle of numbers, and an off-by-one in that triangle is the most famous silent bug in language modeling — it makes training look brilliant while the model learns nothing useful.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the mask leaks the future (peeking ahead).</b> The mask must block every position <code>j &gt; i</code>. If it is off by one — you use <code>j &gt; i+1</code>, or forget to shift the labels, or build the triangle with the diagonal on the wrong side — then each token can peek at the very next word it is supposed to predict. Nothing crashes. Worse, the training loss drops beautifully low, because the model is quietly copying the answer instead of learning to predict it. You only find out when you generate text and it is nonsense. A senior engineer in <b>code review</b> checks the mask alignment directly — assert that position <code>i</code> can see positions <code>0…i</code> and <em>not</em> <code>i+1</code> — because a loss that looks too good is exactly the smell of a leaked future.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: parallel training speed vs left-to-right-only understanding.</b> The mask lets you train every position of a sentence at once in one forward pass, which is a huge speed win over predicting one word at a time. What you give up is any use of the words to the <em>right</em>: a masked (decoder) token can never draw on future context, so for pure understanding tasks like classification it is weaker than a bidirectional encoder that reads the whole sentence. In a <b>design review</b> this is the reason you pick a decoder when the job is to <em>write</em> text and an encoder when the job is to <em>understand</em> a fixed input.</div></div>
       <button class="gotit" type="button">Got the −inf trick</button>
     </div>
   </section>
@@ -324,21 +329,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the mask to yourself with a tiny experiment. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_causal_mask.py</code>. Write <code>causal_mask(seq_len)</code> that returns a grid with 0 on and below the diagonal and −infinity above it. Make a random <code>(4, 4)</code> score grid, add the mask, run softmax on each row, and print the weights. Confirm every weight above the diagonal is exactly 0 and each row still sums to 1. Run with <code>python3 m05a_causal_mask.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-05-causal-masking/experiment.py</code>. Write <code>causal_mask(seq_len)</code> that returns a grid with 0 on and below the diagonal and −infinity above it. Make a random <code>(4, 4)</code> score grid, add the mask, run softmax on each row, and print the weights. Confirm every weight above the diagonal is exactly 0 and each row still sums to 1. Run with <code>python3 m05a_causal_mask.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 5 artifact.
 
-Create experiments/foundations/m05a_causal_mask.py that, with a comment on each step, shows causal masking blocks the future:
+Create sessions/m05a-text-transformer/day-05-causal-masking/experiment.py that, with a comment on each step, shows causal masking blocks the future:
 1. Defines causal_mask(seq_len) returning a (seq_len, seq_len) array with 0 on/below the diagonal and -inf above it.
 2. Builds a random (4,4) score grid, adds the mask, and applies a row-wise softmax.
 3. Asserts every attention weight strictly above the diagonal is 0 and each row sums to 1.
 4. Prints one worked row (like scores [1,2,3] + mask [0,0,-inf]) and its softmax to show the biggest future score still gets weight 0.
 Then run it and paste the masked weight grid at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-05-log.md</code>: after masking, what weight did the future positions get, and did each row still sum to 1?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-05-causal-masking/log.md</code>: after masking, what weight did the future positions get, and did each row still sum to 1?</div></div>
       <button class="gotit" type="button">Done — on to Day 6</button>
     </div>
   </section>
@@ -352,9 +357,9 @@ Then run it and paste the masked weight grid at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-full-block.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Full Decoder Block</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-encoder-vs-decoder.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Encoder vs Decoder</span></a>
+  <a class="lnav prev" href="../day-04-full-block/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Full Block</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-encoder-vs-decoder/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Encoder vs Decoder</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -469,9 +474,9 @@ var QS=[
  {q:'3. In the mask grid, the allowed positions form a:',
   opts:['full square','lower triangle (on and below the diagonal)','single diagonal only','upper triangle'],
   ans:1, fb:'Right. Lower triangle = 0 (allowed: past and self), upper triangle = −infinity (blocked: future).'},
- {q:'4. Why does the mask matter for training?',
-  opts:['it makes the model faster','it forces "predict the next word from the past only", so the model cannot copy the answer','it removes the softmax','it adds more tokens'],
-  ans:1, fb:'Right. Without it, position i could just read the true word at i+1 and learn nothing. The mask keeps training honest and left-to-right.'}
+ {q:'4. Your model trains and the loss drops to a suspiciously low value fast — but when you generate text it is nonsense. No error anywhere. Where do you look first?',
+  opts:['the font used to display the output','the mask alignment: an off-by-one that lets position i see position i+1 leaks the future, so the model copies the next word instead of predicting it — training looks great, generation is broken','the number of GPUs','the batch order'],
+  ans:1, fb:'Right. This is the classic future-leak bug. If the causal mask is off by one (blocking j > i+1 instead of j > i, or labels not shifted), each token can peek at the word it is meant to predict. The loss looks fantastic because the model is cheating, but generation exposes it. Assert that position i sees 0…i and not i+1 — a loss that is too good, too fast is the tell.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

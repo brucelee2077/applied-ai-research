@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-quantization-theory-int8.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Quantization Theory (int8)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-extreme-compression-quip-sharp.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Extreme Compression (QuIP#)</span></a>
+  <a class="lnav prev" href="../day-01-quantization-theory-int8/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Quantization Theory (int8)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-extreme-compression-quip-sharp/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
 </nav>
 
 
@@ -290,6 +290,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>It sets up the next ideas.</strong> Once the weights are incoherent, smarter codebooks work: E8 lattice codebooks (QuIP#) and trellis codes (QTIP) only pack well on smooth, even data.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> outliers force a coarse grid → rotate with an orthogonal matrix (lossless) → outliers smear away, matrix becomes incoherent → tight 2-bit grid fits → un-rotate at inference (nearly free) → usable 2-bit models. The full recipe also uses the <b>Hessian</b> (which error directions hurt the output most) to round smartly — but the headline is: rotate first, then round.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole method is a rotate-round-unrotate sandwich. It only stays lossless if the un-rotate exactly matches the rotate — and if it doesn't, nothing crashes.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a rotate/un-rotate mismatch.</b> The stored weights live in rotated space, so at inference you must un-rotate with the <em>exact</em> transpose <code>Uᵀ</code>/<code>Vᵀ</code> (for a randomized Hadamard transform, the exact same sign pattern and permutation seed used to rotate). If the seed drifts, or someone re-generates the sign vector, or the transform is applied on the wrong axis, the shapes still line up and the matmul still runs — it just returns weights rotated into the wrong basis. The model produces fluent, plausible-looking text that is quietly wrong, and perplexity is only mildly off, so it can pass a smoke test. In <b>code review</b> a senior engineer checks that the rotation seed/sign pattern is stored <em>with</em> the checkpoint and reused byte-for-byte at load, and adds a round-trip assertion (rotate then un-rotate an identity block ≈ identity).</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: incoherence buys 2-bit accuracy but adds a calibration and runtime step.</b> Rotating to kill outliers is what lets a 4-level grid work at all — but it means every layer now carries an extra transform on both weights and activations, plus a Hessian estimate from calibration data to round smartly. Even the fast Hadamard transform is not free, and it must fuse cleanly into the neighboring matmuls or it eats the memory-bandwidth win it was meant to protect. In a <b>design review</b> the question is whether the extra transform and calibration complexity are justified: at 4 bits, simpler outlier-tolerant schemes may match it; the rotation earns its keep mainly in the extreme 2–3 bit regime.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -329,13 +334,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Report the incoherence score μ before/after (must be <strong>strictly lower</strong> after), and show the 2-bit relative error on the rotated matrix is at least <strong>3× lower</strong> than on the raw matrix. Save a histogram figure to disk.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/w15-incoherent-processing/incoherence_quant.py</code> plus <code>test_incoherence.py</code> and <code>results.md</code> in the same folder, matching the five bullets above.</p>
+      <p>Create <code>sessions/m17a-quantization/day-02-incoherent-processing-quip/experiment.py</code> plus <code>test_incoherence.py</code> and <code>results.md</code> in the same folder, matching the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 2 artifact.
 
-Create experiments/w15-incoherent-processing/incoherence_quant.py (plus results.md and test_incoherence.py in the same folder) that:
+Create sessions/m17a-quantization/day-02-incoherent-processing-quip/experiment.py (plus results.md and test_incoherence.py in the same folder) that:
 1. Synthesizes a weight matrix (Gaussian, n=256) with a few injected large-magnitude outlier entries.
 2. Implements a fast recursive Hadamard transform (size a power of two) and verifies orthonormality (H @ H.T within 1e-6 of the identity).
 3. Implements uniform symmetric 2-bit quantization (4 levels) with a per-matrix scale.
@@ -352,7 +357,7 @@ Acceptance criteria (all checkable):
 - results.md states, one sentence each, the mu before/after and the error ratio, tying back to the QuIP insight.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> both the weights AND the Hessian must be made incoherent, and the rotation must be UNDONE at inference. If you rotate and quantize but forget to multiply by the transpose to return to weight space (or rotate the wrong side, or rescale so norms no longer match), the model produces garbage even though the rotation itself lost nothing. Also: the fast Hadamard transform needs a power-of-two dimension — for real LLM layers you must pad or use a block-diagonal / Kronecker Hadamard, or the transform is undefined. Incoherence smooths outliers, but it does not make quantization error-free; it just makes the coarse grid fit well.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-02-log.md</code>: why is the rotation "free" at inference even though it is an extra matrix multiply? (Hint: it fuses into the neighboring matmuls.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-02-incoherent-processing-quip/log.md</code>: why is the rotation "free" at inference even though it is an extra matrix multiply? (Hint: it fuses into the neighboring matmuls.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -366,9 +371,9 @@ Acceptance criteria (all checkable):
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-quantization-theory-int8.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Quantization Theory (int8)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-extreme-compression-quip-sharp.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Extreme Compression (QuIP#)</span></a>
+  <a class="lnav prev" href="../day-01-quantization-theory-int8/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Quantization Theory (int8)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-extreme-compression-quip-sharp/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -552,9 +557,9 @@ var QS=[
  {q:'3. Why did QuIP# and QTIP switch from random orthogonal matrices to the randomized Hadamard transform?',
   opts:['The Hadamard transform gives higher quantization error but is simpler to code','The Hadamard transform runs in O(n·log n) with only +1/−1 entries, so it smooths outliers just as well but is far faster and needs almost no extra memory','The Hadamard transform can store the weights without any quantization at all','Random matrices are not invertible, but Hadamard matrices are'],
   ans:1, fb:'A dense random Q costs O(n²) time and memory; the structured Hadamard transform is a fast recursive +1/−1 operation with the same incoherence benefit.'},
- {q:'4. After incoherence processing and quantization, how are the rotations handled at inference?',
-  opts:['They are discarded, which is why the model loses accuracy','They must be recomputed from scratch on every token, doubling latency','The inverse rotations (transposes) are applied to undo the transform, and they fold into neighboring matrix multiplications so the runtime cost is tiny','The weights are permanently left in rotated space and never converted back'],
-  ans:2, fb:'You un-rotate with the transpose to return to weight space, and because it is a matmul it fuses with adjacent layer matmuls, adding almost no cost.'}
+ {q:'4. You ship an incoherence-processed 2-bit model. It loads, runs, and produces fluent text, but its answers are subtly wrong and perplexity is a bit worse than your offline number — with no error anywhere. Where do you look first, and why?',
+  opts:['Assume the 2-bit grid is simply too coarse and re-quantize at 4 bits','Check that the exact rotation used to quantize (the Hadamard sign pattern / seed and axis) is stored with the checkpoint and reused byte-for-byte at load — a mismatched un-rotate returns weights in the wrong basis, which still runs but is quietly wrong','Blame GPU nondeterminism and re-run several times to average it out','Increase the calibration set size, since more data always fixes accuracy gaps'],
+  ans:1, fb:'The method stores weights in rotated space, so inference must un-rotate with the exact transpose. If the seed/sign pattern drifts or the transform is applied on the wrong axis, shapes still line up and the matmul still runs — it just reconstructs weights in the wrong basis. That is the classic silent failure here: fluent output, mildly-off perplexity, no crash. A round-trip assertion (rotate then un-rotate an identity block ≈ identity) catches it. Re-quantizing at 4 bits or averaging over GPU noise does not address a basis mismatch.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

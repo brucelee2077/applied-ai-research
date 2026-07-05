@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-incoherent-processing-quip.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-additive-quantization-qtip.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
+  <a class="lnav prev" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-additive-quantization-qtip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
 </nav>
 
 
@@ -290,6 +290,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Trellis/additive beat the wall</strong> — decoupling stored bits from dimension (QTIP) or summing codebooks (AQLM) reaches ultra-rich representations at ~2 bits with tiny stored tables.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> memory-bound inference → want ~2 bits → naive RTN collapses (outliers + wrong error metric) → incoherence flattens outliers → lattice VQ shrinks cells → fine-tune closes the gap → trellis/additive push past the codebook wall.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>QuIP# spends its accuracy budget where the Hessian says errors hurt most — but that Hessian comes from a small calibration set, and a bad one fails without any warning.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a calibration set that doesn't match deployment.</b> The objective <code>tr(ΔW·H·ΔWᵀ)</code> uses <code>H = E[xxᵀ]</code> estimated from a handful of calibration sequences. If that calibration text is narrow or off-distribution — say a few hundred lines of clean English, then you deploy on code, math, or another language — <code>H</code> points at the wrong input directions, so the rounding protects error directions the model rarely uses and lets error grow along the ones it actually needs. Nothing crashes: WikiText perplexity (often the same kind of text used to calibrate) looks great, while quality quietly sags on the shifted traffic. In <b>code review</b> a senior engineer asks what corpus the Hessian was built from, whether it covers real production distribution, and whether accuracy was checked on held-out domains, not just the calibration-like set.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: lattice VQ + fine-tuning buys 2-bit quality but costs build-time and kernel complexity.</b> Rounding groups of weights onto an E₈ lattice and then briefly fine-tuning is what closes the gap to FP16 at 2 bits — but it turns a one-shot conversion into a pipeline: estimate the Hessian, run the lattice search, then fine-tune against block outputs, and ship a custom decode kernel that reconstructs weights from codebook indices on the fly. In a <b>design review</b> the question is whether the extreme compression is worth that heavier build and a more fragile inference kernel: if 3–4 bits already fits your memory budget, a simpler scheme ships faster and is easier to keep correct.</div></div>
       <button class="gotit" type="button">Got the chain</button>
     </div>
   </section>
@@ -329,13 +334,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>All randomness seeded; two runs give identical printed numbers.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week15-wed-extreme-compression/quip_lattice_demo.py</code> (plus <code>README.md</code> and <code>test_quant.py</code>) with the criteria above.</p>
+      <p>Create <code>sessions/m17a-quantization/day-03-extreme-compression-quip-sharp/experiment.py</code> (plus <code>README.md</code> and <code>test_quant.py</code>) with the criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 3 artifact.
 
-Create experiments/week15-wed-extreme-compression/quip_lattice_demo.py (plus README.md and test_quant.py in the same folder). NumPy or JAX, CPU-only, synthetic weights — no LLM download. It should:
+Create sessions/m17a-quantization/day-03-extreme-compression-quip-sharp/experiment.py (plus README.md and test_quant.py in the same folder). NumPy or JAX, CPU-only, synthetic weights — no LLM download. It should:
 1. Generate a synthetic weight matrix with a heavy-tailed outlier distribution (seeded).
 2. Implement scalar 2-bit RTN quantization and measure the proxy loss tr(ΔW·H·ΔWᵀ) with a synthetic Hessian H = E[xxᵀ].
 3. Implement the Randomized Hadamard Transform (fast ±1 transform, padded to a power of 2, with 1/sqrt(n) normalization), quantize the transformed weights, invert, and re-measure the proxy loss.
@@ -352,7 +357,7 @@ Acceptance criteria:
 Then run it to confirm it works.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> the common mistake is minimizing the <em>wrong</em> error — <code>‖ΔW‖</code> ignores that weights interact through <code>H = E[xxᵀ]</code>. Two quantizations with equal <code>‖ΔW‖</code> can give wildly different output error. Also: the Hadamard transform needs the dimension padded to a power of 2 — forgetting the padding or the <code>1/√n</code> normalization silently breaks orthogonality and makes results look worse than scalar RTN.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-03-log.md</code>: why does minimizing <code>tr(ΔW·H·ΔWᵀ)</code> beat minimizing <code>‖ΔW‖</code>? (Hint: high-variance input directions.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-03-extreme-compression-quip-sharp/log.md</code>: why does minimizing <code>tr(ΔW·H·ΔWᵀ)</code> beat minimizing <code>‖ΔW‖</code>? (Hint: high-variance input directions.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -366,9 +371,9 @@ Then run it to confirm it works.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-incoherent-processing-quip.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-additive-quantization-qtip.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
+  <a class="lnav prev" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-additive-quantization-qtip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -458,7 +463,7 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
    diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
    is the short explanation beside it. Engine below is fixed across all lessons. */
 var BUILD=[
- {viz:'<div class="build-embed"><iframe src="../viz/quantization.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/quantization.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+ {viz:'<div class="build-embed"><iframe src="../../viz/quantization.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/quantization.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
   note:'<b>Play with it first.</b> This live widget lets you drag the bit budget and watch the quantization grid coarsen. Try dropping to 2 bits and adding an outlier — feel how the grid stretches and the small weights collapse. The steps below explain what you just saw.'},
  {viz:'<div class="dgram col">'+
     '<span><span class="node" style="width:220px">16-bit weight matrix</span> <span class="node dim">fits VRAM? overflow ✗</span></span>'+
@@ -536,9 +541,9 @@ var QS=[
  {q:'3. Why does QTIP use trellis coded quantization instead of just using a bigger E₈-style vector-quantization codebook?',
   opts:['Trellis coding needs no calibration data','A VQ codebook grows exponentially with dimension (2^(bits·d)), capping VQ near d≈8; a trellis\'s stateful decoder separates stored bits from effective dimension, enabling ultra-high-dimensional quantization with a tiny table','E₈ only works in 4 bits','Trellises avoid the need for the Hadamard transform'],
   ans:1, fb:'The codebook-size wall is the whole motivation for TCQ; the stateful decoder decouples bitrate/dimension from table size.'},
- {q:'4. In these methods, what quantity should the quantization error ΔW = Ŵ − W actually be minimized against?',
-  opts:['The raw Frobenius norm ‖ΔW‖ alone','The number of nonzero weights','The proxy loss tr(ΔW · H · ΔWᵀ), where H = E[xxᵀ] is the activation Hessian, so errors along high-variance input directions are penalized more','The model\'s parameter count'],
-  ans:2, fb:'Error direction matters: aligning ΔW with the input covariance H is what greedy/adaptive rounding (e.g., LDLQ) targets, not raw magnitude.'}
+ {q:'4. Your 2-bit QuIP# model scores excellent WikiText-2 perplexity, matching the paper — but users report it is noticeably worse on code and non-English prompts, with no errors in the logs. Where do you look first, and why?',
+  opts:['Conclude 2-bit is inherently unusable and roll back to FP16 for everyone','Check what corpus the Hessian H = E[xxᵀ] was calibrated on: if it was English-like text similar to WikiText, the objective tr(ΔW·H·ΔWᵀ) protected the wrong input directions, so error grows on out-of-distribution inputs the calibration set never covered','Increase the E₈ codebook size, since a bigger codebook always fixes domain gaps','Assume the tokenizer is broken, since only non-English is affected'],
+  ans:1, fb:'QuIP# minimizes tr(ΔW·H·ΔWᵀ), and H is estimated from a small calibration set. If that set is English-like (and WikiText is too), the rounding is tuned to the directions that text uses — and quietly under-protects the directions code or other languages need. The symptom is textbook: the calibration-like benchmark looks perfect while shifted traffic sags, with no crash. Fixing it means calibrating on data that reflects real production distribution and checking held-out domains. Codebook size and tokenizer are not the mechanism here.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

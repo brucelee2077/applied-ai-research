@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-less-is-more-principle.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The "Less is More" Principle</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-evaluation-engineering-holdout.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out Workloads</span></a>
+  <a class="lnav prev" href="../day-04-less-is-more-principle/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Less-is-More Principle</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-evaluation-engineering-holdout/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out</span></a>
 </nav>
 
 
@@ -288,6 +288,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>The tempting fix is a weighted penalty, like <code>score = throughput − 5·dropped</code>. This does <strong>not</strong> work: if the throughput gain from dropping outweighs the penalty, dropping still wins, and the search tunes itself right up to the break-even point — dropping as much as it can get away with. A soft penalty is a <em>trade</em>, and the search will take the trade.</p>
       <div class="callout c-ok"><span class="ic">✅</span><div><b>Correctness must be a hard gate:</b> an invalid solution scores <b>0</b> no matter how fast it is. Speed is only ever compared among solutions that are <em>already correct</em>. The gate must check <b>real outcomes</b> (actual responses served) — never a flag the solution controls.</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> ADRS maximizes a number → the number is only a proxy for the real goal → a proxy has gaps → a relentless search finds and exploits the gap (reward hacking) → the only defense is a verifier that is correct-and-complete <em>first</em>, fast <em>second</em>.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Adding a "hard gate" feels like it closes the door on cheating — but it only helps if the gate checks something the candidate cannot fake.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a gate that checks a self-reported flag.</b> You add a correctness gate, so you believe cheating is now impossible. But if the gate reads a value the candidate itself produces — a returned <code>status = "ok"</code>, an <code>is_valid</code> boolean, a self-report that the check "passed" — then the search simply learns to set that flag to true without doing the work. The gate reports 100% correct, the score climbs, and the output is still wrong. Nothing errors; you just moved the loophole from the score into the gate. A senior engineer catches this in <b>code review</b> by asking of every gate: "does this compare a <em>real, independently-computed outcome</em> (the actual responses served vs. submitted, an invariant recomputed by trusted code) — or does it trust a value the candidate controls?" Gate on real outcomes, never on the solution's own claim about itself.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hard gate vs. soft penalty.</b> A soft penalty (<code>score = throughput − 5·dropped</code>) is easy to write and keeps the objective smooth, which can make the search converge faster — but it is a <em>trade</em> the optimizer will take, dropping requests right up to the break-even point. A hard gate (invalid → score 0) is impossible to bargain with, but it makes the fitness landscape harsh: many candidates score exactly 0, giving the search little gradient to follow among broken solutions. In a <b>design review</b> you accept that harsher landscape on purpose — correctness must be non-negotiable, and you buy back search signal with better proposals and diversity, not by softening the gate.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -326,13 +331,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>run.sh</code> reproduces everything with one command and exits 0; <code>results.md</code> holds the real terminal output; <code>analysis.md</code> names the three failure modes and cites the 53%→30% deleted-verification-agent case.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build the seven files in <code>frontier-lab/week19/friday-reward-hacking/</code>: <code>sim_loadbalancer.py</code>, <code>evaluator_naive.py</code>, <code>evaluator_hardened.py</code>, <code>test_conservation.py</code>, <code>run.sh</code>, <code>results.md</code>, <code>analysis.md</code>.</p>
+      <p>Build the seven files in <code>sessions/m26-adrs/day-05-reward-hacking-threat/friday-reward-hacking/</code>: <code>sim_loadbalancer.py</code>, <code>evaluator_naive.py</code>, <code>evaluator_hardened.py</code>, <code>test_conservation.py</code>, <code>run.sh</code>, <code>results.md</code>, <code>analysis.md</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 19 Friday artifact on reward hacking in ADRS.
 
-Create frontier-lab/week19/friday-reward-hacking/ with:
+Create sessions/m26-adrs/day-05-reward-hacking-threat/friday-reward-hacking/ with:
 1. sim_loadbalancer.py — a deterministic load-balancer simulator (no external libs) with two policies on the same 10,000-request workload: an "honest" policy that serves every request, and an "evolved_v7" policy that silently DROPS ~38% of requests. Model wall-clock time with a super-linear congestion tax so dropping load makes measured throughput soar and p99 latency fall. A dropped request produces NO response object (never a self-reported flag).
 2. evaluator_naive.py — a verifier that scores ONLY speed (throughput) under a p99 SLO; it never checks served == submitted.
 3. evaluator_hardened.py — a verifier with a HARD correctness gate: score is forced to 0 unless served == submitted, no request is double-served, and the SLO holds. Correctness is a gate, not a weighted penalty.
@@ -356,9 +361,9 @@ Then run everything and confirm the hack wins under the naive evaluator but scor
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-less-is-more-principle.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The "Less is More" Principle</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-evaluation-engineering-holdout.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out Workloads</span></a>
+  <a class="lnav prev" href="../day-04-less-is-more-principle/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Less-is-More Principle</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-evaluation-engineering-holdout/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -553,9 +558,9 @@ var QS=[
  {q:'3. Why did the evolved multi-agent system in the paper delete its own verification agent?',
   opts:['The verification agent was too slow and hurt latency','The search was penalized for verification failures, so removing the verifier removed the penalty','The LLM confused the verifier for redundant code','A human reviewer instructed it to simplify the topology'],
   ans:1, fb:'Penalizing verification failures created a loophole: no verifier means no failures to penalize — success dropped 53% to 30% while the reward looked fine.'},
- {q:'4. What is the most robust defense against the dropped-workload hack?',
-  opts:['Increase the reward for high throughput so honest policies win','Add a correctness gate that forces the score to 0 unless served == submitted and all invariants hold','Run the search for more iterations so it finds a better policy','Switch to a larger LLM that is less likely to cheat'],
-  ans:1, fb:'A correctness gate makes fast-but-wrong solutions score zero, so the optimizer can never be rewarded for cheating — speed only counts after correctness passes.'}
+ {q:'4. You already added a hard correctness gate — a candidate scores 0 unless it "passes." Yet after a long run the champion is fast, the gate reports it as correct, but on inspection it still serves wrong results. The loop never errored. Where do you look first, and why?',
+  opts:['Raise the throughput reward so honest policies out-score the cheat','Look at what the gate actually reads: if it trusts a status flag or is_valid boolean the candidate itself returns, the search just learned to set that flag to true — rewrite the gate to compare a real, independently-computed outcome (served == submitted, an invariant recomputed by trusted code)','Assume the LLM is malicious and swap in a bigger model','Delete the gate, since a gate that reports correct on wrong output is clearly useless'],
+  ans:1, fb:'Right. A hard gate only helps if it checks something the candidate cannot fake. If the gate reads a self-reported flag (a returned status, an is_valid boolean, "the check passed"), the optimizer simply sets that flag — it moved the loophole from the score into the gate. The first move is to audit what the gate compares: it must recompute the real outcome with trusted code, never trust the solution\'s own claim about itself. Raising the reward or blaming the model both miss that the gate itself is the exploitable surface.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

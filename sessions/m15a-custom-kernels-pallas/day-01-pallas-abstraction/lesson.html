@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-12/day-02-repository-cleansing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Repository Cleansing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-basic-kernel-construction.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Basic Kernel Construction</span></a>
+  <a class="lnav prev" href="../../m14b-capstone-moe/day-06-consolidation-publishing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M14b · Capstone Close-Out: MoE Upgrade + Report</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-basic-kernel-construction/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Basic Kernel Construction</span></a>
 </nav>
 
 
@@ -286,6 +286,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>It's still just JAX</strong> — no new language, no separate compiler toolchain to install. The same <code>jax.jit</code>, <code>jax.vmap</code>, and autodiff machinery you already know can wrap around a Pallas kernel.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> XLA tiles generically (Weeks 1–2) → some patterns need a specific, hand-picked tiling → Pallas lets you write that tiling directly as a kernel body plus a grid plus BlockSpecs → this week builds toward reading and reasoning about real production kernels like FlashAttention.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The <code>BlockSpec</code> index map is where a Pallas kernel is easiest to get subtly wrong, and the choice to hand-tile at all is the thing a design review pushes back on.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): index map returns an element offset, not a block index.</b> The index map must return the <em>block</em> index, which Pallas multiplies by the block shape to get the real offset. If you write <code>lambda i: (i*4, 0)</code> instead of <code>lambda i: (i, 0)</code> for a block of height 4, the shapes still match and the kernel still runs with no error — but Pallas re-multiplies, so step 1 now reads rows <code>16:20</code> instead of <code>4:8</code>. It reads the wrong region (or off the end, silently clamped), and the output is quietly wrong. In <b>code review</b>, a senior engineer checks that every index map returns block coordinates, not row/element offsets, and traces one non-zero grid step by hand to confirm the offset.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: control over memory vs. loss of the compiler's freedom.</b> Writing the tiling by hand buys you exact control over what lives in fast on-chip memory — the whole reason a custom kernel can beat XLA. But you pay for it: XLA can no longer re-fuse, re-tile, or re-order around your kernel, so it becomes an opaque box the compiler must treat as fixed. A kernel that wins on today's chip can lose on the next one because it hard-codes tile sizes the newer hardware would tile differently. In a <b>design review</b>, the question is whether this op is hot enough to justify freezing its tiling by hand instead of letting XLA adapt.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -326,13 +331,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Assert final numerical equivalence between the plain-JAX result and both Pallas variants.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week13_jax/pallas_elementwise.py</code>, following this curriculum's flat-file convention (see <code>experiments/week01_jax/*.py</code>). Runs with exit code 0 either on CPU using <code>pl.pallas_call(..., interpret=True)</code> (Pallas ships a CPU interpreter for exactly this case) or on a real accelerator.</p>
+      <p>Create <code>sessions/m15a-custom-kernels-pallas/day-01-pallas-abstraction/experiment.py</code>, following this curriculum's flat-file convention (see <code>sessions/m15a-custom-kernels-pallas/day-01-pallas-abstraction/*.py</code>). Runs with exit code 0 either on CPU using <code>pl.pallas_call(..., interpret=True)</code> (Pallas ships a CPU interpreter for exactly this case) or on a real accelerator.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 13 Day 1 artifact.
 
-Create experiments/week13_jax/pallas_elementwise.py that:
+Create sessions/m15a-custom-kernels-pallas/day-01-pallas-abstraction/experiment.py that:
 1. Implements the plain-JAX baseline: y_ref = x * 2.0 on a (8, 128) float32 array, timed/printed for comparison.
 2. Implements the no-grid Pallas kernel from the walkthrough (steps 1-9): a double_kernel(x_ref, o_ref) using pl.pallas_call with no explicit grid, and asserts jnp.allclose(y_pallas, y_ref).
 3. Implements the gridded version (walkthrough steps 10-14): grid=(2,), explicit BlockSpec((4, 128), lambda i: (i, 0)) for input and output, and inside the kernel prints (or returns as a side-channel debug array) pl.program_id(0) for each of the 2 grid steps to prove the kernel body ran twice with different tile data.
@@ -340,7 +345,7 @@ Create experiments/week13_jax/pallas_elementwise.py that:
 5. Asserts final numerical equivalence between the plain-JAX result and both Pallas variants.
 Use pl.pallas_call(..., interpret=True) if no GPU/TPU is available locally. Then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-13/day-01-log.md</code>: in the gridded kernel, why does <code>BlockSpec</code>'s index map return a <em>block index</em> like <code>(i, 0)</code> instead of a raw row offset like <code>(4*i, 0)</code>?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15a-custom-kernels-pallas/day-01-pallas-abstraction/log.md</code>: in the gridded kernel, why does <code>BlockSpec</code>'s index map return a <em>block index</em> like <code>(i, 0)</code> instead of a raw row offset like <code>(4*i, 0)</code>?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -354,9 +359,9 @@ Use pl.pallas_call(..., interpret=True) if no GPU/TPU is available locally. Then
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-12/day-02-repository-cleansing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Repository Cleansing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-basic-kernel-construction.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Basic Kernel Construction</span></a>
+  <a class="lnav prev" href="../../m14b-capstone-moe/day-06-consolidation-publishing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M14b · Capstone Close-Out: MoE Upgrade + Report</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-basic-kernel-construction/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Basic Kernel Construction</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -454,9 +459,9 @@ var QS=[
  {q:'2. With NO grid specified in pl.pallas_call, how many times does the kernel body run, and over what?',
   opts:['Once per row of the input array','Once, over the whole array treated as a single tile','Zero times — no grid means no execution','Twice, by default'],
   ans:1, fb:'Right. No grid means the kernel body runs exactly once, and the Refs point at the entire array — there is no tiling happening at all.'},
- {q:'3. A BlockSpec is created as <code>pl.BlockSpec((4, 128), lambda i: (i, 0))</code> with <code>grid=(2,)</code>. What does grid step i=1 actually see?',
-  opts:['The full (8,128) array','A (4,128) tile starting at row 4 (block index (1,0) times block shape (4,128))','A (1,128) tile at row 1','The same tile as step 0'],
-  ans:1, fb:'Right. The index_map returns a BLOCK index, not a row offset. Pallas multiplies (1,0) by the block shape (4,128) to get the actual offset — rows 4:8.'},
+ {q:'3. Your kernel runs without any error, but the output rows are subtly wrong — some input rows are skipped and others appear twice. You wrote <code>pl.BlockSpec((4,128), lambda i: (i*4, 0))</code> with <code>grid=(2,)</code>. Where do you look first, and why?',
+  opts:['The kernel body math — it must be reading the wrong columns','The index map: it returns an element offset (i*4) but Pallas expects a BLOCK index and multiplies again by the block shape, so step 1 lands at row 16 instead of row 4','The out_shape — it is probably one tile too small','Nowhere in Pallas — this is an XLA fusion bug, not something you wrote'],
+  ans:1, fb:'Right. The index map must return the block index, not an element offset. Pallas multiplies whatever you return by the block shape (4,128). Writing i*4 means step 1 returns block index (4,0), which becomes row offset 16 — off the end of an 8-row array (silently clamped), so rows are skipped and the output is quietly wrong with no crash. The fix is lambda i: (i, 0). Checking the index map is the first move because the shapes still line up, so the bug never raises an error.'},
  {q:'4. Why does a hand-written kernel like FlashAttention exist, when XLA already tiles ops automatically?',
   opts:['XLA cannot compile attention at all','FlashAttention is purely a marketing name with no real tiling difference','XLA tiles generically op-by-op and does not discover the specific tiling that avoids ever materializing the full attention matrix in slow memory; a human wrote that tiling by hand as a kernel','Kernels are only needed for GPUs, never TPUs'],
   ans:2, fb:'Right. XLA\'s general-purpose tiling does not find the specific, algorithm-aware tiling FlashAttention uses to keep the big intermediate matrix in fast on-chip memory instead of round-tripping it through slow off-chip memory.'}

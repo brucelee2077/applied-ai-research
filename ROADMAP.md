@@ -83,52 +83,52 @@ The authoritative build target. `~L` = expected short-lesson count. `Src` = prim
 | 5a | Full Text Transformer *(+ modern components)* | Represent | `01-transformers/days` 18–28 | author | 8 | $0 | ✅ 8/8 + gate |
 | 5b | Vision Transformer (ViT) | Represent | frontier ViT | author | 4 | $0 | ✅ 4/4 + gate |
 | 6 | CNNs & Vision Encoders ⭐ | Represent | `00-nn/cnn` + `05-multimodal` | author | 8 | $0 | ✅ 8/8 + gate |
-| 7 | Thinking in JAX *(+ autodiff internals)* | Train | `week-01` (+ MLP capstone 🆕) | reuse+author | 6 | $0 | ⬜ |
+| 7 | Thinking in JAX *(+ autodiff internals)* | Train | `week-01` (+ MLP capstone 🆕) | reuse+author | 6 | $0 | ✅ core built · +auth follow-up |
 | **Phase 1 · Hardware, Distribution & Scaling** | | | | | | | |
-| 8 | Transformer Math + Search 🎨 *(+ FlashAttention concept)* | Represent | `week-03` + 4 design studies | reuse+wrap | 8 | $0 | ⬜ |
-| 9a | Hardware: One Device *(+ activation recomputation)* | Scale | `week-02` | reuse | 5 | $0 | ⬜ |
+| 8 | Transformer Math + Search 🎨 *(+ FlashAttention concept)* | Represent | `week-03` + 4 design studies | reuse+wrap | 8 | $0 | ✅ core built · +auth follow-up |
+| 9a | Hardware: One Device *(+ activation recomputation)* | Scale | `week-02` | reuse | 5 | $0 | ✅ built + wired |
 | 9b | Mixed-Precision & fp8 Training ⭐ | Scale | 🆕 authored (bf16/fp8 numerics) | author | 4 | $0 | ✅ 4/4 + gate |
-| 9c | Sharding & Parallelism *(+ modern parallelism depth)* | Scale | `week-04` | reuse+author | 8 | $0 | ⬜ |
-| 9d | First Real Multi-Device Run 🔴 | Scale | `week-04` bridge | reuse | 2 | ~$50 | ⬜ |
+| 9c | Sharding & Parallelism *(+ modern parallelism depth)* | Scale | `week-04` | reuse+author | 8 | $0 | ✅ built + wired |
+| 9d | First Real Multi-Device Run 🔴 | Scale | `week-04` bridge | reuse | 2 | ~$50 | ✅ 2/2 + gate |
 | 9e | Distributed Orchestration & Fault Tolerance ⭐ | Scale | 🆕 authored (bit-exact resume, preemption) | author | 5 | $0 | ✅ 5/5 + gate |
-| 10a | Scaling Laws + Simulator *(+ data curation & mixtures)* | Scale | `week-05` + 🆕 curation | reuse+author | 8 | $0 | ⬜ |
+| 10a | Scaling Laws + Simulator *(+ data curation & mixtures)* | Scale | `week-05` + 🆕 curation | reuse+author | 8 | $0 | ✅ core built · +auth follow-up |
 | 10b | Training Stability & Optimization Dynamics ⭐ | Scale | 🆕 authored (spikes, z-loss, muP, LR schedules) | author | 5 | $0 | ✅ 5/5 + gate |
 | 11 | Experimental Method & Statistics ⭐ | Scale | 🆕 authored (absorbs prob/stats) | author | 5 | $0 | ✅ 5/5 + gate |
 | **Phase 2 · The Capstone (paid)** | | | | | | | |
-| 12 | Addition Transformer — Build 🔴 | Train | `week-09` + `week-10`(d1–3) + `week-08` | reuse | 10 | paid TPU | ⬜ |
-| 13 | Your Own IsoFlops Law 🔴 | Scale | `week-10`(d4–6) + `week-11`(d1–3) | reuse | 6 | ~$150–250 | ⬜ |
+| 12 | Addition Transformer — Build 🔴 | Train | `week-09` + `week-10`(d1–3) + `week-08` | reuse | 10 | paid TPU | ✅ built + wired |
+| 13 | Your Own IsoFlops Law 🔴 | Scale | `week-10`(d4–6) + `week-11`(d1–3) | reuse | 6 | ~$150–250 | ✅ built + wired |
 | **Phase 3 · Mixture-of-Experts & Kernels** | | | | | | | |
-| 14a | Mixture of Experts *(+ router refinements)* | Scale | `week-07` | reuse | 7 | $0 | ⬜ |
-| 14b | Capstone Close-Out: MoE Upgrade + Report | Optimize | `week-11`(d4–6) + `week-12` (+ `week-17`) | reuse | 3 | small TPU | ⬜ |
-| 15a | Custom Kernels I: Pallas & FlashAttention *(+ Triton)* | Optimize | `week-13` + on-ramp 🆕 | reuse+author | 6 | small TPU | ⬜ |
-| 15b | Native Kernels: C++/CUDA + ThunderKittens 🔴 | Optimize | `week-14` | reuse | 5 | ~$40 | ⬜ |
+| 14a | Mixture of Experts *(+ router refinements)* | Scale | `week-07` | reuse | 7 | $0 | ✅ built + wired |
+| 14b | Capstone Close-Out: MoE Upgrade + Report | Optimize | `week-11`(d4–6) + `week-12` (+ `week-17`) | reuse | 3 | small TPU | ✅ built + wired |
+| 15a | Custom Kernels I: Pallas & FlashAttention *(+ Triton)* | Optimize | `week-13` + on-ramp 🆕 | reuse+author | 6 | small TPU | ✅ built + wired |
+| 15b | Native Kernels: C++/CUDA + ThunderKittens 🔴 | Optimize | `week-14` | reuse | 5 | ~$40 | ✅ built + wired |
 | **Phase 4 · Serving & Efficiency** | | | | | | | |
-| 16a | Inference Economics & Language-Assist 🎨 | Serve | `week-06` + smart-compose, translate + BPE 🆕 | reuse+wrap+author | 8 | $0 | ⬜ |
-| 16b | Serving Systems in Practice ⭐ | Serve | 🆕 authored (vLLM/SGLang, prefix cache, routing) | author | 4 | small | ⬜ |
-| 17a | Quantization *(+ FP8/AWQ/GPTQ, KV-quant)* | Optimize | `week-15` | reuse+author | 5 | small | ⬜ |
-| 17b | Long-Context Decoding | Optimize | `week-16` | reuse | 5 | small | ⬜ |
-| 17c | State-Space Models & Attention Alternatives ⭐ | Optimize | 🆕 authored (Mamba/S6, selective scan) | author | 4 | small | ⬜ |
+| 16a | Inference Economics & Language-Assist 🎨 | Serve | `week-06` + smart-compose, translate + BPE 🆕 | reuse+wrap+author | 8 | $0 | ✅ core built · +auth follow-up |
+| 16b | Serving Systems in Practice ⭐ | Serve | 🆕 authored (vLLM/SGLang, prefix cache, routing) | author | 4 | small | ✅ 4/4 + gate |
+| 17a | Quantization *(+ FP8/AWQ/GPTQ, KV-quant)* | Optimize | `week-15` | reuse+author | 5 | small | ✅ built + wired |
+| 17b | Long-Context Decoding | Optimize | `week-16` | reuse | 5 | small | ✅ built + wired |
+| 17c | State-Space Models & Attention Alternatives ⭐ | Optimize | 🆕 authored (Mamba/S6, selective scan) | author | 4 | small | ✅ 4/4 + gate |
 | **Phase 5 · Applied Ranking & Graphs (design)** | | | | | | | |
-| 18 | Ranking & Recommendation 🎨 *(+ retrieval depth)* | Serve | 5 design studies (+ authored foundation) | author+wrap | 8 | $0 | ⬜ |
-| 19 | Graph Systems & Link Prediction 🎨 | Scale | design: people-you-may-know | wrap | 4 | $0 | ⬜ |
+| 18 | Ranking & Recommendation 🎨 *(+ retrieval depth)* | Serve | 5 design studies (+ authored foundation) | author+wrap | 8 | $0 | ✅ 8/8 + gate |
+| 19 | Graph Systems & Link Prediction 🎨 | Scale | design: people-you-may-know | wrap | 4 | $0 | ✅ 4/4 + gate |
 | **Phase 6 · Post-Training, RL & Alignment** | | | | | | | |
-| 20 | RL Foundations ⭐ | Train | `10-reinforcement-learning/{fundamentals,policy-gradient}` | convert | 6 | $0 | ⬜ |
-| 21a | Core Post-Training: SFT/PEFT/RM/PPO/DPO | Train | `10-rl/rlhf` + `02-fine-tuning` | convert | 8 | $0 | ⬜ |
-| 21b | Reasoning-RL & Verifiable Rewards (GRPO/RLVR) ⭐ | Train | `10-rl/rlhf` (grpo) + 🆕 authored | convert+author | 5 | $0 | ⬜ |
+| 20 | RL Foundations ⭐ | Train | `10-reinforcement-learning/{fundamentals,policy-gradient}` | convert | 6 | $0 | ✅ 6/6 + gate |
+| 21a | Core Post-Training: SFT/PEFT/RM/PPO/DPO | Train | `10-rl/rlhf` + `02-fine-tuning` | convert | 8 | $0 | ✅ 8/8 + gate |
+| 21b | Reasoning-RL & Verifiable Rewards (GRPO/RLVR) ⭐ | Train | `10-rl/rlhf` (grpo) + 🆕 authored | convert+author | 5 | $0 | ✅ 5/5 + gate |
 | **Phase 7 · Generative Modeling** | | | | | | | |
-| 22a | Generative Modeling I: Autoencoders & GANs 🆕 | Generate | 🆕 authored | author | 5 | $0 | ⬜ |
-| 22b | Generative Modeling II: Diffusion 🆕 | Generate | 🆕 authored | author | 5 | $0 | ⬜ |
-| 22c | Generative Modeling III: Flow Matching ⭐🆕 | Generate | 🆕 authored (rectified/consistency) | author | 3 | $0 | ⬜ |
-| 23 | Image & Text Generation Systems 🎨 | Generate | 8 genAI design studies | wrap | 9 | small | ⬜ |
+| 22a | Generative Modeling I: Autoencoders & GANs 🆕 | Generate | 🆕 authored | author | 4 | $0 | ✅ 4/4 + gate |
+| 22b | Generative Modeling II: Diffusion 🆕 | Generate | 🆕 authored | author | 5 | $0 | ✅ 5/5 + gate |
+| 22c | Generative Modeling III: Flow Matching ⭐🆕 | Generate | 🆕 authored (rectified/consistency) | author | 3 | $0 | ✅ 3/3 + gate |
+| 23 | Image & Text Generation Systems 🎨 | Generate | 8 genAI design studies | wrap | 9 | small | ✅ 9/9 + gate |
 | **Phase 8 · Evaluation, Interpretability & Safety** | | | | | | | |
-| 24 | Eval Science & LLM-as-a-Judge ⭐ | Automate | `06-evaluation` (promoted) | convert | 4 | $0 | ⬜ |
-| 25 | Interpretability Foundations ⭐ | Automate | 🆕 authored (probes, logit lens, patching) | author | 6 | $0 | ⬜ |
-| 26 | AI-Driven Research (ADRS) | Automate | `week-19` + `week-20` + `frontier-lab/week19` | reuse | 8 | ~$40 | ⬜ |
-| 27a | Assistant & Safety Systems 🎨 | Automate | genAI chatbot; harmful-content-detection | wrap | 6 | $0 | ⬜ |
-| 27b | Red-Teaming & Adversarial Robustness ⭐ | Automate | 🆕 authored (reuses M26 sandbox) | author | 4 | $0 | ⬜ |
+| 24 | Eval Science & LLM-as-a-Judge ⭐ | Automate | `06-evaluation` (promoted) | convert | 4 | $0 | ✅ 4/4 + gate |
+| 25 | Interpretability Foundations ⭐ | Automate | 🆕 authored (probes, logit lens, patching) | author | 6 | $0 | ✅ 6/6 + gate |
+| 26 | AI-Driven Research (ADRS) | Automate | `week-19` + `week-20` + `frontier-lab/week19` | reuse | 8 | ~$40 | ✅ built + wired |
+| 27a | Assistant & Safety Systems 🎨 | Automate | genAI chatbot; harmful-content-detection | wrap | 6 | $0 | ✅ 6/6 + gate |
+| 27b | Red-Teaming & Adversarial Robustness ⭐ | Automate | 🆕 authored (reuses M26 sandbox) | author | 4 | $0 | ✅ 4/4 + gate |
 | **Phase 9 · Ship & Communicate** | | | | | | | |
-| 28 | Formal Methods: TLA+ & Property Testing | Communicate | `week-21` (1 reuse + 5 authored) | reuse+author | 6 | $0 | ⬜ |
-| 29 | Ship & Outreach *(+ paper reproduction)* | Communicate | `week-23` / `week-24` | reuse | 7 | $0 | ⬜ |
+| 28 | Formal Methods: TLA+ & Property Testing | Communicate | `week-21` (1 reuse + 5 authored) | reuse+author | 6 | $0 | ✅ 6/6 + gate |
+| 29 | Ship & Outreach *(+ paper reproduction)* | Communicate | `week-23` / `week-24` | reuse | 7 | $0 | ✅ built + wired |
 
 **Totals:** 29 anchors · ~44 build-modules · **~250 short lessons** across 10 phases. (⭐ = 12 modules added/promoted in the frontier-readiness pass; ~40% of new content is wired in from already-built out-of-spiral folders — RL stack, `06-evaluation`, `02-fine-tuning`.)
 
@@ -543,25 +543,38 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 - **Generative M22a–c** (author from scratch; VAE reparameterization trick absent; also build `sessions/viz/diffusion-noising.html`).
 - Authored lessons inside otherwise-reuse modules: **M16a** BPE · **M18** two-tower foundation · **M21a** RLHF + fine-tuning conversion · **M28** 5 TLA+ lessons.
 
-### Status glance
-- **Priority 0 (foundations): 7 / 7 WPs — ✅ complete (M1, M2, M3, M4 + all 3 viz built, verified, wired).**
-- Priority 1 (Phases 0–5): 7 / ~30 build-modules (M5a, M5b, M6, M9b, M9e, M10b, M11 ✅) · Priority 2 (Phases 6–9): 0 / ~14 build-modules · **~44 total.**
-- **Legend:** ⬜ unclaimed · 🔄 in progress (add session date) · ✅ done & verified · ⛔ blocked (note blocker).
+### Status glance — ✅ BUILD COMPLETE (all 44 build-modules, 2026-07-05)
+- **Every module in the master build table is ✅.** The full curriculum is built and wired into `sessions/index.html` (44 modules · **282 hub-wired lessons** · 0 planned stubs remaining). All **292** learner-facing pages pass headless jsdom verification (7 sections / 4 quiz / build steps / glossary; review gates 3 sections / 5 quiz), 0 render-broken.
+- **Priority 0 (foundations): 7 / 7 WPs ✅.** Priority 1 (Phases 0–5): ✅ (spine + ⭐ training-science M9b/M9e/M10b/M11 + M9d). Priority 2 (Phases 6–9): ✅ (M20, M21a, M21b, M24, M25, M27a, M27b, M22a–c, M23, M28, M29).
+- **This session (2026-07-05):** authored/converted/wrapped the remaining stub modules — M20, M21a, M21b, M24, M25, M16b, M17c, M27b, M28, M18, M19, M23, M27a, M9d — plus completed the generative trio (M22a VQ-VAE/GAN + wired M22b/M22c). Built via the reusable generator `sessions/_lesson_gen.py` (byte-identical shell; per-module builders `sessions/_build_m*.py`) and, for most, a Workflow fan-out (one agent owns one module end-to-end + an adversarial content-verify stage). New modules live in flat `sessions/week-m*/` folders (same layout as the earlier deferred m9b/m9e/m10b/m11/m22* modules).
+- **Open follow-ups (optional, non-blocking):** (1) migrate all `week-m*` modules → canonical `mNN-<slug>/day-*/lesson.html` via `refactor_all_modules.py`, and generalize `staff_lens_audit.js`/`lesson_audit.py` to glob the flat layout (they currently scan `mNN/` only; new modules were built to the staff-lens bar + adversarially verified). (2) The four `+auth follow-up` modules (M7 MLP-capstone/autodiff, M8 FlashAttention-concept + design wraps, M10a data-curation, M16a BPE + design wraps) have their **core reuse lessons** built, wired, and rendering; the flagged `+authored/+wrap` extras remain as enhancement lessons to add. (3) Paid modules (M9d, M12, M13, M15b) are built as **content**; the actual paid TPU/GPU runs stay gated behind the cost caps in Global rules.
+- **Legend:** ⬜ unclaimed · 🔄 in progress · ✅ done & verified · ⛔ blocked.
 
-### Staff-lens retrofit watchlist *(added 2026-07-04)*
-Not a work package — a deferred check. The Staff Lens bar (Global rules, above) was added
-after comparing built lessons against `attention-lab-course`, which already names failure
-modes and trade-offs explicitly and asks diagnostic-style quiz questions. Existing lessons
-were **not** retrofitted in that pass. When a future session picks up one of the still-⬜
-math-heavy modules below, check the topic's already-built source lesson (if `reuse`-sourced)
-against the Staff Lens bar and upgrade it opportunistically rather than treating this as
-separate mandatory work:
+### Staff-lens retrofit — ✅ COMPLETE (curriculum-wide sweep, 2026-07-04)
+The Staff Lens bar (Global rules, above) was added after comparing built lessons against
+`attention-lab-course`, which already names failure modes and trade-offs explicitly and asks
+diagnostic-style quiz questions. The original built curriculum predated the bar. It has now
+been **swept curriculum-wide**: every built lesson with a genuine Mechanism/math section
+carries a named **silent failure-mode** callout + a named **trade-off** callout in section 4,
+and at least one **diagnostic** quiz question (recall quizzes swapped where needed).
 
-- **M8** — transformer math (`week-03`): transformer arithmetic, QKV, KV-cache
-- **M10a** — scaling laws (`week-05`): Kaplan, Chinchilla, IsoFlops methodology
-- **M14a** — Mixture of Experts (`week-07`)
-- **M17a** — quantization (`week-15`)
-- **M17b** — long-context decoding (`week-16`): speculative decoding, KV eviction
+**Result: 133 of 156 built lessons retrofitted across 22 modules; 0 render-broken; every
+retrofitted lesson adversarially content-reviewed (technical correctness of each claim + quiz
+answer) and jsdom-verified (7 sections / 4 quiz / 16 options / no page JS errors).** The
+adversarial pass caught real defects — e.g. a wrong MoE active-param causal claim (m14b), a
+mis-derived 10,000× compute example (m10a d01), swapped glossary tooltips (m16a/m17b), and a
+mis-stated quant magnification factor — all fixed. Audit tool: `sessions/staff_lens_audit.js`.
+
+The **23 non-retrofitted lessons are correct triage skips** (the bar explicitly excludes
+pure-intuition / playground-only / logistics / ops / comms days): m01 arrays+indexing;
+m08 d04–06 (production/pretraining/rehearsal); m12 systems-review + infra-setup; m13
+experiment-design/automation/aggregation/documentation; m14b report/cleansing/publishing;
+m17b systems-review-essay; and all of m29 (ship & outreach — comms).
+
+Per-module (retrofitted / total lessons): M1 4/6 · M2 9/9 · M3 5/5 · M4 6/6 · M5a 8/8 ·
+M5b 4/4 · M6 8/8 · M7 6/6 · M8 3/6 · M9a 6/6 · M9c 6/6 · M10a 6/6 · M12 9/11 · M13 2/6 ·
+M14a 6/6 · M14b 3/6 · M15a 6/6 · M15b 6/6 · M16a 6/6 · M17a 6/6 · M17b 5/6 · M26 12/12 ·
+M28 1/1. (The original watchlist — M8, M10a, M14a, M17a, M17b — is fully absorbed here.)
 
 ---
 
@@ -647,9 +660,11 @@ The four gaps previously parked as "optional" now have real homes in the expande
 
 ## Start here
 
-1. ✅ Plan approved (this document — the single source of truth for scope **and** execution).
-2. 🔄 **Finish the foundations first** — see the [Build queue](#build-queue--execution--divide-and-conquer) → **Priority 0** (M1 PRNG → M2 optimizers/LR/split → M3 positional → M4 stub → the 3 M1/M2 viz).
-3. ⬜ Then continue module by module in master-build-table order (Priority 1 → 2); gate on the "can I explain it?" check before advancing.
-4. ⬜ After M7, you have full foundations; M8 begins the frontier spine (Phase 1).
+**The curriculum is fully built (2026-07-05).** All 44 build-modules are ✅ in the master table and wired into `sessions/index.html` — 282 hub-wired lessons, all 292 pages jsdom-verified. There is no remaining build queue for a learner; there is a *learning* path:
 
-> **Index map:** `sessions/index.html` is the Capability Spiral map. It links built lessons + reused frontier lessons and shows planned modules with their sources, reading progress from `localStorage` per quest-id.
+1. ✅ Plan built out end to end (this document is the single source of truth for scope, status, and the optional follow-ups in the [Status glance](#status-glance--build-complete-all-44-build-modules-2026-07-05)).
+2. **Learn in master-build-table order.** Foundations first (M1 → M7), gating on the "can I explain it?" check before advancing; the hard rule (M2–M5b solid before M8+) still stands.
+3. After M7 you have full foundations; M8 begins the frontier spine (Phase 1) and the phases proceed to Phase 9 (ship).
+4. Paid milestones (M9d, M12, M13, M15b) are built as teaching content — do the actual paid runs only under the cost caps in Global rules.
+
+> **Index map:** `sessions/index.html` is the Capability Spiral map. It links every built lesson and reads per-quest progress from `localStorage`. Open it and start at M1.

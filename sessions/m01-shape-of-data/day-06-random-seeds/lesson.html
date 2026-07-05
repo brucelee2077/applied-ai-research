@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-logs-and-exponents.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Logs &amp; Exponents</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../index.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M1 complete → Map</span></a>
+  <a class="lnav prev" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
   <header class="hero">
@@ -277,6 +277,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>A bridge to Module 8 (just so you've seen it)</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Awareness only — no code to run today.</b> In <span class="term" data-tip="A numerical computing library used for large ML models. It handles randomness by passing an explicit key you split yourself, instead of a hidden global state.">JAX</span> (Module 8) there is no hidden global state. You pass an explicit <span class="term" data-tip="In JAX, the piece of randomness you carry by hand. You split one key into two to make fresh, independent randomness. Same idea as a NumPy seed, made visible.">key</span> into every random call, and you <strong>split</strong> that key to make fresh randomness. Same idea as a seed — just made visible and explicit so it works across many chips at once. You do not need JAX today; just know the seed idea grows up into an explicit key.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A seed is a promise that the same recipe repeats. That promise becomes a trap when many workers get the <em>same</em> seed — the repetition is now happening where you did not want it.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): every worker shares one seed, so their "random" streams are identical (a bug that doesn't announce itself).</b> Training often splits data loading across several parallel workers, each meant to draw fresh random augmentations or a fresh shuffle. If each worker starts from the <em>same</em> fixed seed, they all produce the <strong>exact same</strong> stream — so the "random" crops or noise repeat across workers instead of varying. Nothing errors; results are perfectly reproducible; the data just secretly has far less variety than you think, and the model trains worse for no visible reason. A senior engineer catches this in <b>code review</b> by asking "is the seed offset by the worker id (and the epoch)?" — a single global seed shared by all workers is the tell.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: reproducibility vs. seeing the true variance.</b> Fixing one seed makes a run repeatable, which is priceless for debugging and for others rerunning your result. What you pay: a single seed shows you one draw of a random process, so a lucky (or unlucky) seed can make a change look better or worse than it really is. In a <b>design review</b> the rule is to fix the seed while debugging, but to report a result across <em>several</em> seeds — the spread across seeds is the honest error bar, and a claim backed by one seed is not yet evidence.</div></div>
       <button class="gotit" type="button">Got the mechanism</button>
     </div>
   </section>
@@ -308,20 +313,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Make "random" repeat on command yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m01_prng.py</code>. Draw two numbers with <code>np.random.rand()</code> and no seed (they differ). Then call <code>np.random.seed(0)</code>, draw an array, reseed with <code>np.random.seed(0)</code> again, draw again, and <code>assert</code> the two arrays are equal. Last, make <code>np.random.default_rng(0)</code> and <code>np.random.default_rng(1)</code> and show their first draws differ. Run it with <code>python3 m01_prng.py</code>.</p>
+      <p>Create <code>sessions/m01-shape-of-data/day-06-random-seeds/experiment.py</code>. Draw two numbers with <code>np.random.rand()</code> and no seed (they differ). Then call <code>np.random.seed(0)</code>, draw an array, reseed with <code>np.random.seed(0)</code> again, draw again, and <code>assert</code> the two arrays are equal. Last, make <code>np.random.default_rng(0)</code> and <code>np.random.default_rng(1)</code> and show their first draws differ. Run it with <code>python3 sessions/m01-shape-of-data/day-06-random-seeds/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 6 artifact.
 
-Create experiments/foundations/m01_prng.py that, with a comment on each step:
+Create sessions/m01-shape-of-data/day-06-random-seeds/experiment.py that, with a comment on each step:
 1. Draws two values with np.random.rand() and NO seed, prints both, and notes they differ run to run.
 2. Calls np.random.seed(0), draws a = np.random.rand(3); then calls np.random.seed(0) again, draws b = np.random.rand(3); prints a and b and asserts np.array_equal(a, b) — same seed reproduces the exact stream.
 3. Makes rng0 = np.random.default_rng(0) and rng1 = np.random.default_rng(1); draws s0 = rng0.random(3) and s1 = rng1.random(3); prints both and asserts NOT np.array_equal(s0, s1) — different seeds give different reproducible streams.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-06-seeds.md</code>: in your own words, why does the same seed always give the same "random" numbers?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-06-random-seeds/log.md</code>: in your own words, why does the same seed always give the same "random" numbers?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -330,15 +335,15 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <span class="em">🎉</span>
     <h3>Module 1 complete! 🏆</h3>
     <p>You can now read shapes, index and slice, broadcast, multiply matrices, read a log-log scaling plot, and make "random" repeat with a seed. That's the whole language the rest of the curriculum speaks.<br>Next module: <b>M2 · One Neuron, Then a Layer</b>.</p>
-    <a class="cta" href="../index.html">Back to the map →</a>
+    <a class="cta" href="../../index.html">Back to the map →</a>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-logs-and-exponents.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Logs &amp; Exponents</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../index.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M1 complete → Map</span></a>
+  <a class="lnav prev" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -457,9 +462,9 @@ var QS=[
  {q:'3. Is a PRNG truly random?',
   opts:['Yes, fully random','No — it is a fixed recipe fully decided by the seed, only made to look random','Only on Tuesdays','Only with a GPU'],
   ans:1, fb:'Right. "Pseudo" means fake. The seed fixes the whole stream in advance; it just looks scattered enough to pass as random.'},
- {q:'4. In JAX (Module 8), how is randomness handled compared to NumPy?',
-  opts:['It removes randomness entirely','You pass an explicit key and split it, instead of relying on a hidden global state','It uses the exact same np.random.seed call','Randomness is impossible in JAX'],
-  ans:1, fb:'Right. JAX makes the seed idea explicit: you carry a key by hand and split it for fresh randomness — same idea, made visible.'}
+ {q:'4. Training runs fine and is perfectly reproducible, but a model with data augmentation across 4 parallel data-loading workers trains worse than expected — as if it saw far less variety than the data holds. No error appears. Where do you look first, and why?',
+  opts:['The learning rate — low variety is always an optimizer problem','Whether all 4 workers were given the same fixed seed, so each produced the identical "random" augmentation stream instead of independent ones','The dtype of the images, since that controls randomness','Nothing — reproducible training cannot have a data problem'],
+  ans:1, fb:'Right. A PRNG stream is fully decided by its seed, so if every worker starts from the same seed they emit the exact same "random" augmentations — the data secretly repeats instead of varying. It stays reproducible and never errors, so the bug is silent. The fix is to offset each worker\'s seed by its worker id (and often the epoch) so the streams are independent.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

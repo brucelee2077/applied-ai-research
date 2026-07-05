@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Distributed MoE Routing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-routing-design-deep-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Routing Design &amp; Deep Synthesis</span></a>
+  <a class="lnav prev" href="../day-04-distributed-moe-routing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Distributed MoE Routing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-routing-design-deep-synthesis/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Routing Design &amp; Synthesis</span></a>
 </nav>
 
 
@@ -291,6 +291,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Real cost</strong> — the "free" capacity isn't free in memory: total params still need HBM for weights and optimizer states, so an MoE model can need many times the memory footprint of a dense model with the same compute bill.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Switch Transformer's top-1 routing (earlier this week) → splits total from active params → compute (FLOPs) tracks active only → Chinchilla's tokens-per-param ratio must use active params too, or you'll badly misjudge how "trained" the model is.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole day turns on two numbers that look like one: total params and active params. Confuse them and your benchmark lies; separate them and you see what you are really buying.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): comparing MoE and dense on the wrong parameter count.</b> Both counts are real numbers, so a comparison built on the wrong one never errors — it just quietly answers a different question. Line up a "1T-parameter" MoE against a 70B dense model on <em>total</em> params and the MoE looks like a giant; but its <em>active</em> count (dense parts + top-<em>k</em> experts) might be far smaller, so on a fair FLOPs-matched footing the story flips. The reverse trap is budgeting compute or the ~20-tokens-per-parameter data rule from total params, which overstates the FLOP bill and the token target. In <b>code review</b> a senior engineer asks which count every claim uses: quality and memory scale with <em>total</em>, but FLOPs and compute-optimal data scale with <em>active</em> — mixing them is how a benchmark quietly flatters (or slanders) a model.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: capacity per FLOP, paid for in memory.</b> Decoupling total from active is the win: you add experts to grow total params (more knowledge slots, better quality) without raising per-token FLOPs, so you get capacity almost for free on the compute side. The bill lands on memory — every expert's weights and optimizer states must sit in HBM whether or not a given token uses them, so an MoE can need many times the memory of a dense model with the same compute cost. In a <b>design review</b> this is the explicit choice: spend HBM and sharding complexity to buy quality-per-FLOP, versus a dense model that is cheaper to serve but caps capacity at its compute.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -332,23 +337,23 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Print a final summary table: total_params, active_params, train_FLOPs_at_100B_tokens, param_memory_at_bf16+adam_states, tokens_per_active_param_at_100B.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week07_jax/moe_vs_dense_params.py</code> with the six bullets above, using plain Python/NumPy (light <code>jax.numpy</code> is fine but not required — this is closed-form arithmetic, no training).</p>
+      <p>Create <code>sessions/m14a-mixture-of-experts/day-05-moe-vs-dense-benchmarks/experiment.py</code> with the six bullets above, using plain Python/NumPy (light <code>jax.numpy</code> is fine but not required — this is closed-form arithmetic, no training).</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 7 Day 5 artifact.
 
-Create experiments/week07_jax/moe_vs_dense_params.py that:
+Create sessions/m14a-mixture-of-experts/day-05-moe-vs-dense-benchmarks/experiment.py that:
 1. Parameterizes a dense baseline model (7B total params, ~50% in FFN layers) and derives its FFN-per-layer param count (3.5B).
 2. Builds the MoE-equivalent: same dense (attention+embedding) portion (3.5B, always active), FFN expanded into n_experts = 64 copies of 3.5B each, top-1 routing (Switch Transformer style).
 3. Computes and prints: MoE total params (227.5B), MoE active params per token (7B), dense total=active params (7B), and the ratio of MoE-total to dense-total (~32.5x).
 4. Computes training FLOPs for both models on D = 100e9 tokens using FLOPs ≈ 6 × N_active × D, and prints that they are equal (both 4.2e21 FLOPs) since both have equal active params.
 5. Computes the Chinchilla-implied compute-optimal token count (20 × N_active) for both models and compares against the given 100B token budget, printing whether each model is under/over/at the Chinchilla-optimal ratio. Also print the common-mistake number (20 × total params) and flag it as wrong.
 6. Prints a final summary table with columns: total_params, active_params, train_FLOPs_at_100B_tokens, param_memory_at_bf16+adam_states, tokens_per_active_param_at_100B.
-Then write experiments/week07_jax/moe_vs_dense_results.md (3-6 sentences) stating the headline finding: same active-compute cost, ~4.5x total capacity for the FFN-only comparison and ~32.5x for the full-model total-param ratio, with the actual numbers substituted. Run the script to confirm it works with no errors.</pre>
+Then write sessions/m14a-mixture-of-experts/day-05-moe-vs-dense-benchmarks/moe_vs_dense_results.md (3-6 sentences) stating the headline finding: same active-compute cost, ~4.5x total capacity for the FFN-only comparison and ~32.5x for the full-model total-param ratio, with the actual numbers substituted. Run the script to confirm it works with no errors.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to watch for:</b> applying Chinchilla's ~20-tokens-per-parameter ratio to the MoE model's <strong>total</strong> params (227.5B × 20 ≈ 4.55T tokens) instead of its <strong>active</strong> params (7B × 20 = 140B tokens). The first number is wildly inflated and leads to the false conclusion that the MoE model is drastically undertrained — Chinchilla's ratio only ever tracked compute, and compute tracks active params, not total.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-07/day-05-log.md</code>: why does training FLOPs for an MoE model track active parameters rather than total parameters? (Hint: what actually gets multiplied against a token that never visits a given expert?)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14a-mixture-of-experts/day-05-moe-vs-dense-benchmarks/log.md</code>: why does training FLOPs for an MoE model track active parameters rather than total parameters? (Hint: what actually gets multiplied against a token that never visits a given expert?)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -362,9 +367,9 @@ Then write experiments/week07_jax/moe_vs_dense_results.md (3-6 sentences) statin
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Distributed MoE Routing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-routing-design-deep-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Routing Design &amp; Deep Synthesis</span></a>
+  <a class="lnav prev" href="../day-04-distributed-moe-routing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Distributed MoE Routing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-routing-design-deep-synthesis/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Routing Design &amp; Synthesis</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -457,9 +462,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. In a 64-expert Mixture-of-Experts layer using top-1 routing, if each expert has 400M parameters, what is the active parameter count for that layer on a single token\'s forward pass?',
-  opts:['25.6B (64 × 400M, all experts)','400M (only the one chosen expert)','200M (half of one expert, since routing is probabilistic)','12.8B (32 experts, assuming average load balancing across two token halves)'],
-  ans:1, fb:'Right. Top-1 routing sends each token to exactly one expert, so only that expert\'s 400M parameters are multiplied against the token; the other 63 experts are not touched for that token.'},
+ {q:'1. A launch post claims your new "600B-parameter" MoE "matches a 70B dense model at a fraction of the training cost." A reviewer replies that the cost claim and the size claim can\'t both be read the same way. What is the reviewer catching, and what do you check first?',
+  opts:['Nothing — total parameters and active parameters are interchangeable, so both claims use the same 600B number','The two claims quietly use different parameter counts: the "600B" is total params (memory / quality story), but the training-cost win comes from the much smaller active count (dense parts + top-1 expert), so you check whether the cost comparison is FLOPs/active-matched and not silently comparing 600B-total against 70B-dense','The reviewer is wrong; training cost scales with total parameters, so a 600B MoE must cost more than a 70B dense model, not less','Just relabel the model as 70B so the two numbers agree'],
+  ans:1, fb:'Right. Both numbers are real, so nothing errors — but they answer different questions. Total params (600B) drive memory and are the capacity/quality headline; active params (dense parts + the one routed expert) drive FLOPs and thus training cost. The cost win comes from the small active count, so a fair claim must state the active count and compare compute on a FLOPs-matched footing. The trap is letting "600B" imply the model is 600B-worth of compute while quietly pricing it at its active size. Saying total = active (or that cost scales with total) is exactly the confusion the reviewer is flagging.'},
  {q:'2. Why does training compute (FLOPs) for an MoE model track its <em>active</em> parameter count rather than its <em>total</em> parameter count?',
   opts:['Total parameter count is a marketing number and isn\'t real memory usage','FLOPs for a forward/backward pass only involve the weights actually multiplied against each token\'s activations, and unselected experts contribute zero multiplications for that token','MoE models use lower precision (bf16) so unused experts don\'t count toward FLOPs','The router itself performs all the computation, so expert size doesn\'t matter'],
   ans:1, fb:'Right. FLOPs come from actual matrix multiplications performed; an expert a token never visits performs zero multiplications for that token, so it contributes zero FLOPs regardless of size — total params still matter for memory, just not for compute.'},

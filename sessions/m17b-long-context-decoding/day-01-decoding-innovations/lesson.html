@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-15/day-06-ptq-implementation-perplexity-benchmarking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">PTQ Implementation &amp; Perplexity Benchmarking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-cache-eviction-snapkv.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav prev" href="../../m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M17a · Quantization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
 </nav>
 
 
@@ -296,6 +296,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The #1 real mistake:</b> using query-head count in the formula when the model uses GQA/MQA. Llama-3-70B has 64 <em>query</em> heads but only 8 <em>KV</em> heads — plug in 64 and you overestimate the cache 8×. Also: the cache is <strong>per sequence</strong>, so serving 32 concurrent requests multiplies the whole number by 32. Always state the dtype too.</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> attention needs every past K/V → cache them to avoid O(N²) recompute → cache grows linearly with tokens × layers × heads → past ~30–53k tokens it rivals then exceeds the whole model on one card → the bottleneck migrates from weights to cache. That is the problem Week 16 solves.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The KV-cache formula is simple, which is exactly why the two ways it bites you never show up as an error message — they show up as a wrong number or a slow server.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): sizing the cache with query-head count.</b> The formula uses <code>n_kv_heads</code>, but on a GQA/MQA model that is much smaller than the number of query heads. If your capacity planner reads <code>n_heads</code> (64 query heads on Llama-3-70B) instead of <code>n_kv_heads</code> (8), the arithmetic still runs and prints a clean number — it is just 8&times; too large. You then reserve far more memory per request than needed and pack too few sequences per GPU, so the fleet looks "full" while HBM sits half empty. A senior engineer checks in <b>code review</b> that the head count fed to the KV-cache math is the config's <code>num_key_value_heads</code>, never <code>num_attention_heads</code>, and that the dtype and the per-sequence multiplier are both stated.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bigger batch vs. longer context on one card.</b> A fixed 80 GB card holds only so many cache bytes, and every factor in the formula competes for them. Serving more concurrent requests (bigger batch) and serving longer contexts (bigger <code>seq_len</code>) both eat the same budget, so raising one forces the other down. That budget split — favor throughput with many short sessions, or favor a few very long ones — is the <b>design-review</b> decision, and it is what pushes teams toward the cache-shrinking tricks (GQA, SnapKV, quantization) covered the rest of this week.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -336,13 +341,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>README states the one-line formula and which Week-16 lever attacks each factor.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week16_jax/kv_cache_growth/kv_cache_growth.py</code> plus <code>README.md</code> and <code>test_kv_cache_growth.py</code> in the same folder, matching the criteria above.</p>
+      <p>Create <code>sessions/m17b-long-context-decoding/day-01-decoding-innovations/experiment.py</code> plus <code>README.md</code> and <code>test_kv_cache_growth.py</code> in the same folder, matching the criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 16 Day 1 artifact.
 
-Create experiments/week16_jax/kv_cache_growth/kv_cache_growth.py (plus README.md and test_kv_cache_growth.py in the same folder) that:
+Create sessions/m17b-long-context-decoding/day-01-decoding-innovations/experiment.py (plus README.md and test_kv_cache_growth.py in the same folder) that:
 1. Defines a pure function kv_cache_bytes(seq_len, n_layers, n_kv_heads, head_dim, dtype_bytes) returning 2*n_layers*n_kv_heads*head_dim*seq_len*dtype_bytes.
 2. test_kv_cache_growth.py asserts the 100k-token MHA case (n_layers=80, n_kv_heads=64, head_dim=128, dtype_bytes=2) equals exactly 262_144_000_000 bytes (~244.1 GiB).
 3. A test asserts the GQA-8-head case (n_kv_heads=8, same else) ~= 30.5 GiB AND is exactly 8x smaller than the 64-head case.
@@ -351,7 +356,7 @@ Create experiments/week16_jax/kv_cache_growth/kv_cache_growth.py (plus README.md
 6. README.md states the one-line formula 2*n_layers*n_kv_heads*head_dim*seq_len*dtype and names which Week-16 lever attacks each factor (GQA/MQA -> n_kv_heads, SnapKV -> seq_len, quantization -> dtype).
 Add a brief comment on each step, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-16/day-01-log.md</code>: for Llama-3-70B (64 query heads, 8 KV heads), which head count goes in the formula — and by what factor would using the wrong one mis-size your GPUs?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17b-long-context-decoding/day-01-decoding-innovations/log.md</code>: for Llama-3-70B (64 query heads, 8 KV heads), which head count goes in the formula — and by what factor would using the wrong one mis-size your GPUs?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -365,9 +370,9 @@ Add a brief comment on each step, then run it to confirm it works.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-15/day-06-ptq-implementation-perplexity-benchmarking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">PTQ Implementation &amp; Perplexity Benchmarking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-cache-eviction-snapkv.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav prev" href="../../m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M17a · Quantization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -446,7 +451,7 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
    diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
    is the short explanation beside it. Engine below is fixed across all lessons. */
 var BUILD=[
- {viz:'<div class="build-embed"><iframe src="../viz/kv-cache.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/kv-cache.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+ {viz:'<div class="build-embed"><iframe src="../../viz/kv-cache.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/kv-cache.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
   note:'<b>Play with the real thing first.</b> Drag the sliders for sequence length, layers, KV heads, and dtype, and watch the cache size explode past the 80GB line. Get a feel for which knob hurts most — then scroll down and we\'ll rebuild the whole picture piece by piece.'},
  {viz:'<div class="dgram"><span class="node">token</span> <span class="arrow">▶</span> <span class="node dim">layer</span> <span class="arrow">▶</span> <span class="dgram col" style="width:auto"><span class="node k">K&nbsp;[1×128]</span><span class="node v">V&nbsp;[1×128]</span></span></div>',
   note:'<b>Step 1 — one token, one K and one V.</b> Every token that passes through a layer produces exactly one Key strip and one Value strip per head. <span class="node k">K</span> = "what I can be matched against," <span class="node v">V</span> = "what I contribute if matched." This pair is the atom of the cache.'},
@@ -516,9 +521,9 @@ var QS=[
  {q:'3. Going from MHA with 64 KV heads to GQA with 8 KV heads changes the cache size by roughly what factor?',
   opts:['No change','2× smaller','8× smaller','64× smaller'],
   ans:2, fb:'n_kv_heads is a linear multiplier, so 64→8 shrinks the cache 8× (≈244 GiB → ≈30.5 GiB).'},
- {q:'4. Why is per-token DECODE described as memory-bandwidth-bound rather than compute-bound?',
-  opts:['The GPU has too few CUDA cores','Each step must stream the full weights plus the entire growing KV cache from HBM, and that transfer time dwarfs the FLOPs','Attention has no matrix multiplies','Because prefill already used all the FLOPs'],
-  ans:1, fb:'Decode makes one token but must read ~140GB of weights + tens of GB of cache each step, so HBM bandwidth (~3.35 TB/s) sets the floor and the compute units sit idle.'}
+ {q:'4. Your KV-cache capacity planner runs fine and prints a memory estimate, but at serving time each GPU actually fits roughly 8&times; MORE concurrent requests than the planner said it would — no crash, just a surprisingly under-full fleet. The model is Llama-3-70B (64 query heads, 8 KV heads). Where do you look first, and why?',
+  opts:['The dtype field — it must be set to fp32 instead of fp16','The head count fed into the cache formula: it is almost certainly using the 64 query heads instead of the 8 KV heads, overestimating the cache 8&times;','The seq_len value — it is being counted twice','The GPU bandwidth number, which does not affect memory sizing at all'],
+  ans:1, fb:'Right. The formula needs n_kv_heads, but a GQA model has far fewer KV heads (8) than query heads (64). Feeding num_attention_heads (64) instead of num_key_value_heads (8) still produces a clean number — just 8&times; too large — so the planner over-reserves and the real fleet holds many more requests than predicted. Check that the head count is the config\'s num_key_value_heads. The dtype and seq_len options would change the estimate but not by exactly the 8&times; query/KV-head ratio, and bandwidth affects speed, not cache bytes.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

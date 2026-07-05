@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-scientific-documentation.html" title="Scientific Documentation"><span class="lnav-dir">← Prev</span><span class="lnav-t">Scientific Documentation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-moe-baseline-training.html" title="MoE Baseline Training"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Baseline Training</span></a>
+  <a class="lnav prev" href="../../m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M14a · Mixture of Experts</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-moe-baseline-training/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Baseline Training</span></a>
 </nav>
 
 
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Needs a governor</strong> — without the <span class="term" data-tip="An extra penalty that pushes the router to spread work evenly across experts, instead of always choosing the same few.">load-balancing auxiliary loss</span>, the router collapses onto a few favorite experts and the rest go untrained ("dead experts"): <code>L_aux = num_experts * Σᵢ(f_i · P_i)</code>, added to the loss scaled by a small coefficient (Switch Transformer uses α = 0.01).</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> dense FFN (Attention Is All You Need) → fixed compute per token limits total capacity → MoE splits the FFN into N experts + a router → top-1 dispatch with fixed capacity keeps JAX shapes static → sparse activation decouples parameters from compute → this week's weekend lab repeats the IsoFLOPs matrix on this new architecture.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The MoE layer runs and shapes match, so it looks correct — but two things can be quietly wrong: how you wire the gradient of the load-balancing loss, and what you pay to avoid dropping tokens.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the router's gradient gets cut off.</b> The load-balancing loss is <code>L_aux = num_experts &times; &Sigma;(f_i &middot; P_i)</code>. Here <code>f_i</code> is the fraction of tokens sent to each expert, counted from a hard <code>argmax</code>, and <code>P_i</code> is the router's soft average probability. You must stop the gradient on <code>f_i</code> (it comes from a non-differentiable count) and let it flow through <code>P_i</code>. If you accidentally stop it on <code>P_i</code> instead, the code still runs and the loss number still looks reasonable — but the router receives <b>no</b> balancing gradient, so it slowly collapses onto a few experts and your "sparse" model quietly becomes a small dense one with wasted parameters. A senior engineer catches this in <b>code review</b> by checking exactly which term carries <code>stop_gradient</code>, and by watching the per-expert token fractions <code>f_i</code> during a short run — flat, uniform fractions mean the gradient is wired right.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: capacity_factor buys fewer dropped tokens with wasted compute.</b> <code>expert_capacity</code> is a fixed integer, so any token beyond it is dropped (zero FFN output, residual only). Raising <code>capacity_factor</code> (say from 1.0 to 1.25) gives each expert more room, so fewer tokens are dropped and the model sees more of its input — but the extra slots are padded and computed even when empty, so you pay real FLOPs and memory for capacity you may not use. Setting it too low drops signal; too high wastes the compute you adopted MoE to save. Picking that number is a <b>design-review</b> decision: measure your real drop rate first, then buy only the headroom that measurably helps loss.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -326,11 +331,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A printed/logged count of dropped tokens for at least one deliberately-imbalanced routing case — the capacity-overflow mechanism, implemented and observable.</li>
         <li>The auxiliary load-balancing loss (<code>L_aux = num_experts * Σᵢ(f_i · P_i)</code>) computed and unit-tested against a hand-computed value for a small toy router-probability array.</li>
         <li>A backward pass (<code>jax.grad</code>) confirmed to produce non-error, correctly-shaped gradients for every expert's parameters — including experts that received zero tokens that forward pass (their gradient should be exactly zero, not NaN or a shape mismatch).</li>
-        <li><code>pytest experiments/week11_jax/thu_moe_gating/</code> passes with no failures.</li>
+        <li><code>pytest sessions/m14b-capstone-moe/day-01-moe-architecture-upgrade/thu_moe_gating/</code> passes with no failures.</li>
         <li>Total parameter count of the new MoE model printed and compared against the Week 9 dense baseline's parameter count, showing the expected roughly <code>num_experts</code>-times growth in total (not active) parameters.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week11_jax/thu_moe_gating/</code> containing <code>moe_layer.py</code> (Router + MixtureOfExperts modules), <code>model_moe.py</code> (transformer with MoE swapped in, reusing Week 9's attention/embedding code), and <code>test_moe_layer.py</code> with the six acceptance criteria above.</p>
+      <p>Create <code>sessions/m14b-capstone-moe/day-01-moe-architecture-upgrade/thu_moe_gating/</code> containing <code>moe_layer.py</code> (Router + MixtureOfExperts modules), <code>model_moe.py</code> (transformer with MoE swapped in, reusing Week 9's attention/embedding code), and <code>test_moe_layer.py</code> with the six acceptance criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -338,15 +343,15 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Modify the existing Flax addition-transformer (built Week 9 Friday, trained Week 9 Saturday-Sunday) by replacing its dense feed-forward nn.Module with a new MixtureOfExperts nn.Module containing a router/gate and top-1 dispatch logic. Implement the gating logic.
 
-Create these files in experiments/week11_jax/thu_moe_gating/:
+Create these files in sessions/m14b-capstone-moe/day-01-moe-architecture-upgrade/thu_moe_gating/:
 1. moe_layer.py — Router and MixtureOfExperts Flax modules: nn.Dense(num_experts, use_bias=False) router, nn.softmax, top-1 argmax dispatch, fixed expert_capacity = int((tokens_per_batch/num_experts)*capacity_factor), one-hot dispatch/combine via jnp.einsum, jax.vmap over experts, and the load-balancing auxiliary loss L_aux = num_experts * sum_i(f_i * P_i) with stop_gradient on the non-differentiable f_i term.
 2. model_moe.py — the transformer model with the MoE layer swapped in for the dense FFN, reusing the attention/embedding code from the Week 9 dense model.
 3. test_moe_layer.py — unit tests covering: output shape matches dense FFN shape (8,16,64), a deliberately-imbalanced routing case with a printed dropped-token count, L_aux checked against a hand-computed toy example, and a jax.grad backward pass showing zero (not NaN, not error) gradient for an unselected expert.
 
-Print the total MoE parameter count vs the Week 9 dense baseline's parameter count (expect roughly num_experts-times growth in total params). Then run pytest experiments/week11_jax/thu_moe_gating/ and confirm it passes.</pre>
+Print the total MoE parameter count vs the Week 9 dense baseline's parameter count (expect roughly num_experts-times growth in total params). Then run pytest sessions/m14b-capstone-moe/day-01-moe-architecture-upgrade/thu_moe_gating/ and confirm it passes.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> do not implement routing with boolean masking or <code>jnp.where</code>/<code>x[mask]</code> dynamic-shape gathers — the resulting shape depends on the data, and JAX can't trace that under <code>jit</code>. Always dispatch into a fixed <code>[num_experts, expert_capacity, d_model]</code> buffer via one-hot matmul. Separately: <code>f_i</code> (token-count fraction, from non-differentiable argmax) must have gradients stopped, while <code>P_i</code> (softmax probabilities) stays differentiable — mixing this up silently corrupts the router's gradients.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-11/day-04-log.md</code>: why does the load-balancing loss need <code>f_i</code> to be non-differentiable but <code>P_i</code> differentiable — what would go wrong if you backpropped through the hard routing decision itself?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14b-capstone-moe/day-01-moe-architecture-upgrade/log.md</code>: why does the load-balancing loss need <code>f_i</code> to be non-differentiable but <code>P_i</code> differentiable — what would go wrong if you backpropped through the hard routing decision itself?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Print the total MoE parameter count vs the Week 9 dense baseline's parameter cou
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-scientific-documentation.html" title="Scientific Documentation"><span class="lnav-dir">← Prev</span><span class="lnav-t">Scientific Documentation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-moe-baseline-training.html" title="MoE Baseline Training"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Baseline Training</span></a>
+  <a class="lnav prev" href="../../m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M14a · Mixture of Experts</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-moe-baseline-training/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Baseline Training</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -471,9 +476,9 @@ var QS=[
  {q:'3. Roughly, what does adding more experts change about the model, holding <code>d_ff</code> per expert and <code>capacity_factor</code> fixed?',
   opts:['It increases total parameter count with roughly the same active FLOPs per token','It increases both total parameters and active FLOPs per token proportionally','It decreases total parameter count but increases FLOPs per token','It has no effect on parameter count, only on training speed'],
   ans:0, fb:'Right. This is the entire point of sparse MoE scaling — total capacity (parameters) grows with the number of experts, while each token still only visits one expert, so compute per token stays roughly flat.'},
- {q:'4. Why must <code>expert_capacity</code> be a fixed integer computed before the forward pass, rather than "however many tokens actually get routed to this expert"?',
-  opts:['JAX/XLA requires array shapes to be static (known at trace/compile time) for jit-compiled code','Flax\'s nn.Dense layer does not support variable batch sizes','Fixed capacity is required by the Switch Transformer paper\'s license terms','It makes the auxiliary loss easier to differentiate'],
-  ans:0, fb:'Right. This is a direct continuation of the "static shape engineering" principle — dynamic, data-dependent tensor shapes trigger recompilation or are outright disallowed under jax.jit, so routing must use fixed-size dispatch buffers and explicit overflow handling.'}
+ {q:'4. Your MoE model trains without any error and the loss goes down, but after a while you print the per-expert token fractions and see one expert taking ~80% of tokens while others sit near zero. The auxiliary load-balancing loss is present in your code. Where do you look first?',
+  opts:['Increase capacity_factor, since dropped tokens are the only thing that causes imbalance','Check which term in L_aux carries stop_gradient — if the gradient was stopped on P_i (the differentiable softmax mass) instead of f_i (the non-differentiable count), the router gets no balancing gradient and collapses even though the loss term is present','Assume the dataset is imbalanced and rebalance the training data','Conclude MoE is unstable and switch back to a dense FFN'],
+  ans:1, fb:'Right. The load-balancing loss only works if stop_gradient is on f_i (the hard token-count fraction) and gradients flow through P_i (the router\'s soft probability). Swap those and the code still runs, the loss still shows a number, but the router receives no signal to spread load — so it collapses onto a few experts. Verify exactly which term is differentiable before blaming capacity or data; raising capacity_factor only changes drops, not the collapse.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

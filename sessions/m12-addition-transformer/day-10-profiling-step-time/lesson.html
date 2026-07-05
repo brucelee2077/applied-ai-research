@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-evaluation-infrastructure.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Infrastructure</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-hardware-optimization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Hardware Optimization</span></a>
+  <a class="lnav prev" href="../day-09-evaluation-infrastructure/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Infrastructure</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-11-hardware-optimization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Hardware Optimization</span></a>
 </nav>
 
 
@@ -288,6 +288,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Host-bound</strong> — the device sits idle waiting on Python, data loading, or dispatch overhead. The most common first-timer bug.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> <code>jit</code> compiles your step into an opaque program → wall-clock timing can't see inside it → <code>jax.profiler.trace()</code> records every op with a timestamp → the trace viewer's stats table ranks them by total time → you classify the step and name the specific offender.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A profiler always produces a number and a pretty timeline, so the danger is not a crash — it is trusting a measurement that quietly measured the wrong thing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): profiling the compile, not the step.</b> If you start <code>jax.profiler.trace()</code> on the very first call of a jitted step, the trace happily records — but it captures the one-time XLA tracing and compilation cost mixed into your per-step numbers. The profile looks authoritative and points you at "compilation" ops that never run again. You spend a day optimizing a phantom bottleneck while steady-state step time is untouched. Because async dispatch means the same setup can also flush the trace before the device finishes, the numbers can be both inflated and truncated. A senior engineer catches this in <b>code review</b> by requiring a warmup step (<code>jax.block_until_ready</code> on one unprofiled call) before the trace window, and a <code>block_until_ready</code> before the block exits, so the profile reflects steady state only.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: the profiler you turn on changes the thing you measure.</b> Recording every op with a timestamp buys you the visibility that plain wall-clock timing can never give — you can see device idle gaps, host stalls, and per-op durations. But collecting that trace adds real overhead and can perturb timing, so absolute numbers under the profiler run slower than production, and you must compare relative shares (which op dominates) rather than trust the raw microseconds. Whether to profile continuously in a long run or only in short targeted windows is a <b>design-review</b> decision about how much observer effect you can tolerate for how much insight.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -321,34 +326,34 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): capture a real device trace of your addition-transformer's training step with <code>jax.profiler.trace()</code>, inspect it in TensorBoard or Perfetto, and write up what you find.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>experiments/week10_jax/profile_step.py</code> loads/rebuilds the existing <code>train_step</code>, runs one warmup call with <code>block_until_ready()</code>, then wraps 5–10 further steps in <code>with jax.profiler.trace(log_dir):</code>.</li>
-        <li>Running the script exits 0 and produces a non-empty trace directory containing at least one <code>*.xplane.pb</code> file under <code>experiments/week10_jax/traces/run1/</code>.</li>
-        <li><code>experiments/week10_jax/reports/profiling_step_time.md</code> contains: (a) top 5–10 ops by total self-time as a markdown table, (b) a description of the timeline's biggest blocks and idle gaps, (c) a compute-bound / communication-bound / host-bound classification with evidence, (d) at least one specifically named op or gap that isn't compiling/scheduling efficiently, with a hypothesis.</li>
+        <li><code>sessions/m12-addition-transformer/day-10-profiling-step-time/experiment.py</code> loads/rebuilds the existing <code>train_step</code>, runs one warmup call with <code>block_until_ready()</code>, then wraps 5–10 further steps in <code>with jax.profiler.trace(log_dir):</code>.</li>
+        <li>Running the script exits 0 and produces a non-empty trace directory containing at least one <code>*.xplane.pb</code> file under <code>sessions/m12-addition-transformer/day-10-profiling-step-time/traces/run1/</code>.</li>
+        <li><code>sessions/m12-addition-transformer/day-10-profiling-step-time/reports/profiling_step_time.md</code> contains: (a) top 5–10 ops by total self-time as a markdown table, (b) a description of the timeline's biggest blocks and idle gaps, (c) a compute-bound / communication-bound / host-bound classification with evidence, (d) at least one specifically named op or gap that isn't compiling/scheduling efficiently, with a hypothesis.</li>
         <li>The report's finding in (d) must be traceable to a real row in your op-duration table or a real gap you saw — not a hypothetical guess.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week10_jax/profile_step.py</code> and <code>experiments/week10_jax/reports/profiling_step_time.md</code> with the bullets above. Keep the trace files under <code>experiments/week10_jax/traces/</code> as your baseline for later optimization.</p>
+      <p>Create <code>sessions/m12-addition-transformer/day-10-profiling-step-time/experiment.py</code> and <code>sessions/m12-addition-transformer/day-10-profiling-step-time/reports/profiling_step_time.md</code> with the bullets above. Keep the trace files under <code>sessions/m12-addition-transformer/day-10-profiling-step-time/traces/</code> as your baseline for later optimization.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 10 Day 2 artifact.
 
-Create experiments/week10_jax/profile_step.py that:
+Create sessions/m12-addition-transformer/day-10-profiling-step-time/experiment.py that:
 1. Imports/rebuilds the existing addition-transformer train_step (already wrapped in @jax.jit) from wherever earlier weeks' capstone code lives.
 2. Runs one warmup call on a real batch and calls jax.block_until_ready() on the output, so one-time compile cost is excluded.
-3. Wraps 5-10 further (already-compiled) steps in `with jax.profiler.trace(log_dir):`, using log_dir = experiments/week10_jax/traces/run1/.
+3. Wraps 5-10 further (already-compiled) steps in `with jax.profiler.trace(log_dir):`, using log_dir = sessions/m12-addition-transformer/day-10-profiling-step-time/traces/run1/.
 4. Calls jax.block_until_ready() again inside the with-block before it exits, so the trace isn't truncated.
 5. Prints the log directory path on completion and exits 0.
 
-Then create experiments/week10_jax/reports/profiling_step_time.md containing:
+Then create sessions/m12-addition-transformer/day-10-profiling-step-time/reports/profiling_step_time.md containing:
 (a) the top 5-10 ops by total self-time from the trace's stats table, as a markdown table with op name, category, and % of step,
 (b) a textual description of the trace-viewer timeline noting the biggest blocks and any idle gaps,
 (c) an explicit classification of the step as compute-bound, communication-bound, or host-bound, with evidence from the trace,
 (d) at least one specifically named op or gap that is not compiling/scheduling efficiently, with a one-paragraph hypothesis for the cause, traceable to a real row or gap in the actual captured trace.
 
-Keep the trace files under experiments/week10_jax/traces/ as a baseline for later optimization sessions.</pre>
+Keep the trace files under sessions/m12-addition-transformer/day-10-profiling-step-time/traces/ as a baseline for later optimization sessions.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-10/day-02-log.md</code>: what is the difference between a device idle gap that's a scheduling problem, and one that's just XLA correctly overlapping independent work?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-10-profiling-step-time/log.md</code>: what is the difference between a device idle gap that's a scheduling problem, and one that's just XLA correctly overlapping independent work?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -362,9 +367,9 @@ Keep the trace files under experiments/week10_jax/traces/ as a baseline for late
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-evaluation-infrastructure.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Infrastructure</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-hardware-optimization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Hardware Optimization</span></a>
+  <a class="lnav prev" href="../day-09-evaluation-infrastructure/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Infrastructure</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-11-hardware-optimization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Hardware Optimization</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -472,9 +477,9 @@ var QS=[
  {q:'2. In the trace viewer, a TPU device track shows a 300-microsecond gap every step, while the host track is busy at the same time. What does this most likely indicate?',
   opts:['The model is compute-bound and running at peak MXU utilization','XLA over-fused several small ops into one, artificially inflating displayed duration','The device is stalling waiting on the host (Python-side work, data loading, or dispatch) — a host-bound step','The gap represents compilation time, which is expected every step'],
   ans:2, fb:'Right. A device idle gap that lines up with host activity is the classic signature of a host-bound step — the accelerator has nothing to do because it is waiting on the host to hand off work.'},
- {q:'3. Why should you run the jitted training step once, unprofiled, and call <code>block_until_ready()</code> on it, before starting <code>jax.profiler.trace()</code>?',
-  opts:['To warm up the TPU\'s cooling system before heavy load','Because the first call includes one-time XLA tracing and compilation cost, which is not representative of steady-state per-step time and would distort the profile','Because jax.profiler.trace() only works on the second call of any jitted function','To populate the random number generator state'],
-  ans:1, fb:'Right. JIT compilation happens once on first call; including it in your profiled window mixes a one-time cost into your per-step measurement, which is exactly what you must avoid when deriving clean step-time numbers.'},
+ {q:'3. Your profile of the training step is dominated by ops labeled with fusion/compilation work that consume most of the timeline, yet actual training feels fast after the first few steps. You started the trace on the very first call. What went wrong and where do you look first?',
+  opts:['Nothing is wrong — compilation always dominates every step in JAX','You profiled the first call, so the trace captured one-time XLA tracing/compilation mixed into the numbers; add a warmup step with block_until_ready before opening the trace window and re-measure steady state','The model is too large, so shrink d_model until compilation disappears','Switch backends from GPU to CPU, since compilation only happens on GPU'],
+  ans:1, fb:'Right. Compilation runs once, on the first call of a jitted function. If your trace window opens on that first call, the profile folds a one-time cost into per-step numbers and points you at a phantom bottleneck. The fix is a warmup: run the step once unprofiled, block_until_ready on it, then open jax.profiler.trace() so the recorded window reflects steady state. Shrinking the model or switching backends both chase the symptom instead of fixing how the measurement was taken.'},
  {q:'4. The op-duration stats table shows recurring <code>copy-start</code>/<code>copy-done</code> ops consuming 8% of step time, every single step. What should you suspect first?',
   opts:['This is normal, unavoidable overhead present in every JAX program and can be ignored','The model has too many parameters for the accelerator\'s HBM','Some value is being synchronously transferred between host and device every step — likely an un-jitted Python-side read (e.g. pulling a scalar loss back to host inside the loop)','The optimizer state is being re-initialized every step'],
   ans:2, fb:'Right. Recurring host<->device copy ops on every step are the classic fingerprint of an accidental synchronous host round-trip inside an otherwise jitted loop, and are a prime target for the "operations failing to compile efficiently" hunt.'}

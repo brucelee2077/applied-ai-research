@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-modern-kernel-dsls.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-worker-overlapping.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
+  <a class="lnav prev" href="../day-01-modern-kernel-dsls/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-worker-overlapping/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
 </nav>
 
 
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Deeper buffering keeps everything saturated</strong> — TK's GEMM goes 260 → 484 → 683 → 760 TFLOPS as stages go 1 → 4. Same math, ~2.9× faster, purely from better TMA overlap.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> tensor cores are the expensive part → they stall waiting on slow HBM → TMA does the bulk async copy with hardware address generation → an mbarrier lets loads overlap compute → multi-stage buffering keeps both the TMA engine and the tensor cores busy → the memory bottleneck goes away.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>TMA's whole speedup comes from the copy being asynchronous — which is exactly why forgetting to wait on the barrier can corrupt data without ever crashing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): computing on a tile before its mbarrier says it arrived.</b> Because <code>tma::load_async</code> returns instantly, the tile is <em>not</em> in SMEM yet. If a consumer warp reads the slot before the mbarrier's <code>wait()</code> completes, it multiplies against a half-delivered (or stale, from the previous pipeline stage) tile. There is no crash and no error — the kernel just produces numbers that are subtly wrong, and often only some of the time, so the loss curve looks slightly off or a test flakes. A senior engineer checks in <b>code review</b> that every read of a TMA-loaded slot is guarded by the matching <code>wait()</code>, and that a slot is not refilled until the consumer has confirmed it finished the tile already there.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more pipeline stages hide more latency but burn scarce SMEM.</b> Going 1 → 4 stages climbed 260 → 760 TFLOPS because deeper buffering overlaps more loads with compute. But each stage is another full SMEM tile slot, and SMEM is tiny and shared. Past the point where loads are already fully hidden, extra stages only shrink the SMEM budget and lower occupancy (fewer blocks fit per SM), so throughput stops rising and can fall. In a <b>design review</b> you pick the smallest stage count that fully hides the load, not the largest one that fits.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -335,13 +340,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to encode:</b> never touch a slot before its mbarrier says "arrived" — use it early and you compute on a half-filled tile. And with N stages you have only N slots, so before loading into a slot, confirm the consumer finished reading the tile already there; skip that and the incoming copy overwrites data still in use — a silent data race, not a crash. More stages costs scarce SMEM, so past the point where loads are fully hidden, extra stages just lower occupancy.</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/w14-tue-tma/tma_pipeline_sim.py</code> (with <code>README.md</code> and <code>test_tma_pipeline.py</code> alongside) covering the criteria above.</p>
+      <p>Create <code>sessions/m15b-native-kernels/day-02-tensor-memory-acceleration/experiment.py</code> (with <code>README.md</code> and <code>test_tma_pipeline.py</code> alongside) covering the criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Tuesday artifact on the Tensor Memory Accelerator (TMA).
 
-Create experiments/w14-tue-tma/tma_pipeline_sim.py (plus README.md and test_tma_pipeline.py alongside), NumPy/Python only, no GPU required:
+Create sessions/m15b-native-kernels/day-02-tensor-memory-acceleration/experiment.py (plus README.md and test_tma_pipeline.py alongside), NumPy/Python only, no GPU required:
 1. address_gen_cost(tile_w, tile_h, mode): returns the number of address-generation instructions. Manual path = tile_w * tile_h (each thread computes base + row*stride + col). TMA path = 1 (one descriptor drives all addresses). For a 64x64 tile this is 4096 vs 1.
 2. A discrete-event pipeline simulator simulate_pipeline(load_times, compute_times, stages): models per-tile HBM load latency and per-tile compute time. With `stages` SMEM slots (a ring buffer), a producer issues async loads into empty/free slots while a consumer computes on filled slots, using an mbarrier-style arrival check; before reusing a slot it must confirm the consumer finished the tile there. Returns total wall-clock time. With stages=1 there is no overlap, so total == sum(load_i + compute_i).
 3. effective_throughput = total_flops / total_time. Run a stage sweep 1..4 and print throughput per stage, monotonically increasing (mirror TK's 260 -> 484 -> 683 -> 760 TFLOPS trend). Assert stage-4 > stage-1.
@@ -351,7 +356,7 @@ test_tma_pipeline.py must assert: address_gen_cost(64,64,'manual')==4096 and ...
 
 README.md: one paragraph on each of the two claims tested — (a) address generation moves off the compute cores, (b) async double/triple buffering hides HBM latency — with the one-line mapping to TK's tma::load_async / tma::store_async API. Then run everything to confirm pytest passes.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-14/day-02-log.md</code>: in the simulator, why does adding a 5th stage eventually <em>stop</em> helping? (Hint: once loads are fully hidden, extra slots only cost SMEM and lower occupancy.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15b-native-kernels/day-02-tensor-memory-acceleration/log.md</code>: in the simulator, why does adding a 5th stage eventually <em>stop</em> helping? (Hint: once loads are fully hidden, extra slots only cost SMEM and lower occupancy.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -365,9 +370,9 @@ README.md: one paragraph on each of the two claims tested — (a) address genera
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-modern-kernel-dsls.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-worker-overlapping.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
+  <a class="lnav prev" href="../day-01-modern-kernel-dsls/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-worker-overlapping/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Worker Overlapping</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -543,9 +548,9 @@ var QS=[
  {q:'2. Why is a tensor map descriptor set up once rather than per copy?',
   opts:['Because it stores the running result of the matmul','Because it holds base pointer, shape, strides, tile size, and swizzle — fixed facts TMA reuses to compute addresses for any tile','Because descriptors are encrypted and slow to build','Because it caches the data itself in registers'],
   ans:1, fb:'The descriptor is the reusable geometry of the tensor; once TMA has it, each copy is just a tile index, so one instruction replaces thousands of per-thread address calculations.'},
- {q:'3. In a TMA-based pipeline, what is the role of the mbarrier when using <code>tma::load_async</code>?',
-  opts:['It locks HBM so no other kernel can read it','It counts arriving bytes so a consumer warp knows when the tile has fully landed before using it','It converts the tile from bf16 to fp32','It picks which SMEM slot to load into automatically'],
-  ans:1, fb:'Because the copy is asynchronous, the compute (consumer) side must wait on the mbarrier\'s arrival count; touching the slot early reads a half-delivered tile.'},
+ {q:'3. Your TMA pipeline runs and produces almost-correct output, but the training loss is slightly noisy and one unit test fails intermittently — sometimes it passes on a re-run. The math and shapes are right. Where do you look first, and why?',
+  opts:['Lower the learning rate, since noisy loss always means the optimizer is unstable','Check that every read of a TMA-loaded slot waits on its mbarrier and that a slot is not refilled before the consumer finished it — an unguarded async load reads a half-delivered or stale tile without crashing','Assume the GPU hardware is faulty and swap to a different machine','Increase the number of pipeline stages until the flakiness disappears'],
+  ans:1, fb:'Right. Because tma::load_async returns before the data lands, an intermittent, no-crash wrong answer is the fingerprint of a synchronization bug: a consumer touching a slot before its mbarrier arrived, or a producer overwriting a slot still being read. Timing-dependent races flake exactly like this. Fix the wait()/slot-reuse guards before touching the learning rate or the hardware.'},
  {q:'4. TK\'s GEMM hits 260 TFLOPS with 1 pipeline stage and 760 with 4. What causes the speedup?',
   opts:['More stages use a faster matmul algorithm','More stages reduce the total number of floating-point operations','Deeper buffering lets TMA prefetch future tiles while tensor cores compute current ones, hiding HBM latency','More stages move the data into registers instead of SMEM'],
   ans:2, fb:'The math is identical; extra SMEM buffer stages overlap async TMA loads with compute so neither the memory engine nor the tensor cores stall.'}

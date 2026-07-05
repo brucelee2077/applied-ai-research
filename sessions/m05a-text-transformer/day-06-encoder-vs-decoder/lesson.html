@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-causal-masking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Causal Masking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-07-text-generation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Text Generation</span></a>
+  <a class="lnav prev" href="../day-05-causal-masking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Causal Masking</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-text-generation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Text Generation &amp; Sampling</span></a>
 </nav>
 
   <header class="hero">
@@ -303,6 +303,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>Why it matters — the interview one-liner</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> "The only architectural difference between an encoder and a decoder is the attention mask. Encoders use no mask (full attention); decoders use a causal mask. Everything else is identical." Most of today's largest chat models are <b>decoder-only</b> — a stack of the exact block you built, with the causal mask.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Because the mask is the <em>only</em> difference, it is one line — and one line is exactly what gets flipped or forgotten without any error to warn you.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): building a generation model but leaving attention bidirectional.</b> The block for an encoder and a decoder is byte-for-byte the same except <code>+ causal_mask</code>. If you copy an encoder block to build a text generator and forget to add the mask, every training token can see the words after it. It runs, and training loss looks great — but at generation time those future words do not exist yet, so the model was trained on information it will never have and produces degenerate output. A senior engineer in <b>code review</b> asserts the decoder's attention is actually masked (position <code>i</code> sees only <code>0…i</code>), because "generation model with no mask" fails silently, not loudly.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bidirectional understanding vs the ability to generate.</b> An encoder reads the whole input at once, so every token draws on both sides — richer for understanding tasks like classification and search. But that same full visibility means it cannot generate text left to right: it was never trained to predict a next token from the past alone. A decoder gives up right-side context to gain autoregressive generation. In a <b>design review</b> you choose the encoder when the job is to <em>understand</em> a fixed input and the decoder when the job is to <em>write</em> new text — and reach for an encoder-decoder only when you truly need both.</div></div>
       <button class="gotit" type="button">Got the difference</button>
     </div>
   </section>
@@ -334,21 +339,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the "mask is the only difference" idea to yourself. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_encoder_vs_decoder.py</code>. Write one <code>attention(scores, causal=False)</code> function. Run it once with <code>causal=False</code> (encoder) and once with <code>causal=True</code> (decoder) on the same random score grid. Print both weight grids and confirm the encoder fills the whole grid while the decoder has zeros above the diagonal. Run with <code>python3 m05a_encoder_vs_decoder.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py</code>. Write one <code>attention(scores, causal=False)</code> function. Run it once with <code>causal=False</code> (encoder) and once with <code>causal=True</code> (decoder) on the same random score grid. Print both weight grids and confirm the encoder fills the whole grid while the decoder has zeros above the diagonal. Run with <code>python3 m05a_encoder_vs_decoder.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 6 artifact.
 
-Create experiments/foundations/m05a_encoder_vs_decoder.py that, with a comment on each step, shows the mask is the only difference between an encoder and a decoder:
+Create sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py that, with a comment on each step, shows the mask is the only difference between an encoder and a decoder:
 1. Defines one attention(scores, causal=False) that softmaxes scores, optionally adding a causal mask when causal=True.
 2. Runs it on the SAME random (5,5) score grid twice: once as encoder (causal=False), once as decoder (causal=True).
 3. Prints both weight grids and asserts the encoder grid has all positive weights while the decoder grid is 0 strictly above the diagonal.
 4. Prints a small table mapping encoder→BERT, decoder→GPT, encoder-decoder→T5.
 Then run it and paste both weight grids at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-06-log.md</code>: in one sentence, what is the only architectural difference between an encoder and a decoder?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-06-encoder-vs-decoder/log.md</code>: in one sentence, what is the only architectural difference between an encoder and a decoder?</div></div>
       <button class="gotit" type="button">Done — on to Day 7</button>
     </div>
   </section>
@@ -362,9 +367,9 @@ Then run it and paste both weight grids at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-causal-masking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Causal Masking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-07-text-generation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Text Generation</span></a>
+  <a class="lnav prev" href="../day-05-causal-masking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Causal Masking</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-text-generation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Text Generation &amp; Sampling</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -477,9 +482,9 @@ var QS=[
  {q:'3. Which family powers BERT, and which powers GPT?',
   opts:['encoder → GPT, decoder → BERT','encoder → BERT, decoder → GPT','both are encoder-decoder','both are encoders'],
   ans:1, fb:'Right. BERT is an encoder (reader); GPT is a decoder (writer). T5 is the encoder-decoder (translator).'},
- {q:'4. The main architectural difference between an encoder and a decoder is:',
-  opts:['the number of layers','the attention mask (none vs causal)','the activation function','the embedding size'],
-  ans:1, fb:'Right. Everything else — attention, FFN, layer norm, residuals — is identical. Only the mask changes.'}
+ {q:'4. You are building a text generator and reuse an encoder block. Training loss looks great, but generated text is garbage — and there is no error. Where do you look first?',
+  opts:['the learning rate warmup','whether attention is actually masked: an encoder block has no causal mask, so during training each token saw future words it will not have at generation time — the model learned to lean on info it never gets','the tokenizer merge rules','the GPU memory limit'],
+  ans:1, fb:'Right. Encoder and decoder blocks are identical except for + causal_mask. If you build a generator from an unmasked encoder block, every training token could see the words after it, so training looks easy but generation fails because those future words do not exist yet. Assert the decoder attention is masked (position i sees only 0…i). The missing mask never crashes — that is why a code review checks for it.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

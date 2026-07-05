@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-static-shape-engineering.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Static Shape Engineering</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-training-loop-baseline-training.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training Loop &amp; Baseline Training</span></a>
+  <a class="lnav prev" href="../day-06-static-shape-engineering/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Static Shape Engineering</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable</strong> — because <code>params</code> is a pytree, the model you size today plugs straight into <code>jax.jit</code>, <code>jax.grad</code>, and tomorrow's Optax optimizer with zero extra glue code.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Tue–Thu's tokenizer + padding fix <code>vocab_size</code> and <code>max_seq_len</code> → the ~10M budget fixes <code>d_model</code>/<code>n_layers</code>/<code>d_ff</code> → Flax Linen assembles the block from <code>nn.Dense</code>/<code>nn.LayerNorm</code>/<code>nn.MultiHeadDotProductAttention</code> → tomorrow, Optax wires up the optimizer that updates these exact params.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Sizing a model is arithmetic, and arithmetic never throws an error — which is exactly why a wrong count can travel a long way before anyone notices.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the hand-derived N that nobody checked against the pytree.</b> The <code>12·n_layers·d_model²</code> heuristic counts only the big projection matrices. It quietly drops the bias vectors that <code>nn.Dense</code> adds by default, the scale and bias in every <code>nn.LayerNorm</code>, and the embedding tables. The model builds and trains fine, so the wrong number never surfaces — until it becomes a mislabeled rung on your scaling-law ladder and every curve fit through it is off. A senior engineer catches this in <b>code review</b> by refusing to trust the formula alone: sum <code>x.size for x in jax.tree_util.tree_leaves(params)</code> and require the real count and the derived count to agree before the model is called "~10M".</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: same parameter budget, wide-and-shallow vs. narrow-and-deep.</b> Because the block cost is <code>12·n_layers·d_model²</code>, you can hit the same <code>N</code> with few wide layers or many narrow ones. Wide (large <code>d_model</code>, few layers) gives fatter matmuls that keep the accelerator busy and cost less latency per token; deep (many small layers) often represents step-by-step reasoning like multi-digit carries better but adds sequential layers that are harder to parallelize. Equal <code>N</code> does not mean equal model. Which shape to pick for the same budget is the <b>design-review</b> decision, not something the count alone settles.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -327,20 +332,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>sizing_notes.md</code>'s hand-computed total matches the script's printed total — a mismatch means a term (often biases or LayerNorm scale/bias) was missed.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week09_jax/day05_architecture_sizing/model.py</code> and <code>count_params.py</code> using the vocabulary/tokenizer and padding conventions from Tuesday–Thursday of this week.</p>
+      <p>Create <code>sessions/m12-addition-transformer/day-07-architecture-sizing/experiment.py</code> and <code>count_params.py</code> using the vocabulary/tokenizer and padding conventions from Tuesday–Thursday of this week.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 9 Day 5 artifact.
 
-Create experiments/week09_jax/day05_architecture_sizing/ containing:
+Create sessions/m12-addition-transformer/day-07-architecture-sizing/day05_architecture_sizing/ containing:
 1. model.py — an AdditionTransformer(nn.Module) subclass with @nn.compact __call__, built on the vocabulary/tokenizer and padding conventions from Tuesday-Thursday this week. Size it so total parameters land at ~10 million: use d_model=352, n_layers=8, n_heads=4, d_ff=1056, vocab_size=16, max_seq_len=48 (or derive your own config that lands in the 9.5M-10.5M range, showing the 4*d_model^2 + 2*d_model*d_ff per-block derivation). Architecture: nn.Embed for tokens, nn.Embed for positions (summed), n_layers blocks of (LayerNorm -> nn.MultiHeadDotProductAttention -> residual -> LayerNorm -> nn.Dense(d_ff) -> gelu -> nn.Dense(d_model) -> residual), then a final LayerNorm and nn.Dense(vocab_size) for logits.
 2. count_params.py (or a __main__ block) that calls model.init(...) on a dummy batch, walks the params pytree with jax.tree_util.tree_leaves, sums .size across all leaves, and prints the total.
 3. sizing_notes.md — a short table showing the hand-derived parameter budget (embedding, positional embedding, per-layer attention, per-layer MLP, LayerNorm terms, final total) next to the number the script actually printed, plus the chosen d_model, n_layers, n_heads, d_ff, vocab_size, max_seq_len.
 Verify d_model % n_heads == 0, run a forward pass to confirm output shape (batch, seq_len, vocab_size), and reconcile any mismatch between the hand-derived total and the printed total (the pytree is ground truth).</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> <code>nn.Dense</code> includes a bias vector by default (<code>use_bias=True</code>), and <code>nn.LayerNorm</code> has its own learnable scale and bias — both are easy to leave out of a hand-derived count, quietly undercounting the true total by a few percent. Always reconcile by walking <code>jax.tree_util.tree_leaves(params)</code> — the pytree is ground truth, the formula is a sanity check on it, not the other way around.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-09/day-05-log.md</code>: which term did you almost forget when hand-deriving the parameter count, and by how much did it change the total?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-07-architecture-sizing/log.md</code>: which term did you almost forget when hand-deriving the parameter count, and by how much did it change the total?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -354,9 +359,9 @@ Verify d_model % n_heads == 0, run a forward pass to confirm output shape (batch
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-static-shape-engineering.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Static Shape Engineering</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-training-loop-baseline-training.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training Loop &amp; Baseline Training</span></a>
+  <a class="lnav prev" href="../day-06-static-shape-engineering/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Static Shape Engineering</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -462,9 +467,9 @@ var QS=[
  {q:'2. You picked <code>d_model=352</code> and <code>n_heads=4</code>. Why does <code>d_model % n_heads == 0</code> matter?',
   opts:['It doesn\'t matter — any n_heads works','nn.MultiHeadDotProductAttention splits d_model evenly across heads (head_dim = d_model / n_heads), so a non-divisible split raises a shape error at init','It only affects training speed, not correctness','It\'s only relevant for n_layers, not n_heads'],
   ans:1, fb:'Right. Multi-head attention slices the d_model-wide vector into n_heads equal chunks of size head_dim. If d_model isn\'t divisible by n_heads, that even split is impossible — 352/4 = 88 divides cleanly.'},
- {q:'3. After hand-deriving a parameter count, the walkthrough insists on also calling <code>jax.tree_util.tree_leaves(params)</code> and summing <code>.size</code>. Why not just trust the formula?',
-  opts:['The formula is always wrong','Hand-derived formulas easily miss bias vectors and LayerNorm scale/bias terms — the params pytree is the ground truth, the formula is just a sanity check on it','tree_leaves is faster to compute than the formula','The formula only works for CPUs'],
-  ans:1, fb:'Right. nn.Dense has a bias by default, and nn.LayerNorm has its own learnable scale and bias — both are easy to forget when deriving by hand. Walking the actual params pytree tells you the real total.'},
+ {q:'3. Weeks later, your scaling-law plot has one model that sits noticeably off the fitted loss-vs-N curve, even though its loss looks healthy and training was clean. You labeled its size from the <code>12·n_layers·d_model²</code> heuristic. Where do you look first?',
+  opts:['Retrain the model, because an off-curve point always means a bad training run','Recompute N directly from the params pytree — the heuristic drops bias vectors, LayerNorm scale/bias, and embedding tables, so the model was likely mislabeled and plotted at the wrong N','Assume the scaling law itself is wrong and discard the plot','Add more data points until the outlier averages out'],
+  ans:1, fb:'Right. The heuristic only counts the big projection matrices. When a point is off the curve but training was fine, suspect the x-axis, not the y-axis: sum x.size over jax.tree_util.tree_leaves(params) to get the true N. Biases, LayerNorm terms, and embeddings that the formula skipped can shift a small model\'s real count enough to move it off the fit. Retraining or discarding the law both skip the actual first check — that the size label is correct.'},
  {q:'4. Why does today\'s model need to land at a precisely known ~10 million parameters, rather than "whatever feels reasonably sized"?',
   opts:['Bigger numbers look better on a resume','Flax requires an exact parameter count to compile','Later scaling-law analysis needs models whose parameter count N is known exactly, so this ~10M model becomes one precise rung on a ladder of sizes','JAX crashes if the count is not exact'],
   ans:2, fb:'Right. Scaling-law curves (like the Chinchilla-style analysis planned for coming weeks) are built from data points with precisely known N — so each model size, including today\'s ~10M one, must be a deliberate, known number.'}

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-synthetic-data-generation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Synthetic Data Generation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-architecture-sizing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Architecture Sizing</span></a>
+  <a class="lnav prev" href="../day-05-synthetic-data-generation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Synthetic Data Generation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-architecture-sizing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Architecture Sizing</span></a>
 </nav>
 
 
@@ -292,6 +292,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>It must be end-to-end</strong> — every other shape-determining value derived from sequence length (position ids, mask builders, any <code>static_argnums</code> helper) has to use the fixed <code>MAX_LEN</code>, not a per-example dynamic length, or trigger #3 sneaks back in.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> variable-length addition strings (Wed) → naive tokenize-and-stack gives ragged shapes → <code>jit</code>'s cache keys on shape → new shape each batch → recompilation storm → fixed <code>MAX_LEN</code> + padding + mask → one shape forever → Sat's training loop and Weeks 11-12 scaling runs become computationally feasible.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Fixing the shape with padding is the easy half. The dangerous half is the mask that has to travel with it — get that wrong and nothing crashes, the model just quietly learns the wrong thing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): padded but unmasked.</b> You right-pad every example to <code>MAX_LEN</code> so compilation is fast, and the code runs perfectly — no shape error, loss goes down, training finishes. But if the loss or attention never applies the pad mask, the model is graded on the filler positions too. It learns to confidently predict the pad token, and your real-token accuracy plateaus below what it should. There is no exception to trace. A senior engineer catches this in <b>code review</b> by checking that the pad mask is threaded all the way into the loss reduction (loss is averaged over <em>real</em> tokens only, not over all <code>MAX_LEN</code> positions), not just built and then dropped.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: one big MAX_LEN buys stability but burns compute on air.</b> Padding every batch to a single large <code>MAX_LEN</code> gives you one compile forever, but every short example now carries filler positions that still cost forward and backward FLOPs. Set <code>MAX_LEN</code> too high and most of your compute is spent on padding; set it too low and long examples get truncated and silently lose their last digits. The <b>design-review</b> call is where to set that number — or whether to use a few bucketed lengths (a handful of compiles) to cut wasted compute while keeping the cache small.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -334,19 +339,19 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Everything runs end-to-end from a clean shell (<code>python3 recompilation_probe.py</code>), no manual notebook steps.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week09_jax/static_shape_padding/pad_sequences.py</code> (the <code>pad_batch</code> function) and <code>experiments/week09_jax/static_shape_padding/recompilation_probe.py</code> (the trace-counter probe), building on Wednesday's synthetic addition-string generator/tokenizer output. Write findings to <code>results.md</code> in the same folder.</p>
+      <p>Create <code>sessions/m12-addition-transformer/day-06-static-shape-engineering/experiment.py</code> (the <code>pad_batch</code> function) and <code>sessions/m12-addition-transformer/day-06-static-shape-engineering/experiment.py</code> (the trace-counter probe), building on Wednesday's synthetic addition-string generator/tokenizer output. Write findings to <code>results.md</code> in the same folder.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 9 Day 4 artifact.
 
-Create experiments/week09_jax/static_shape_padding/ containing:
+Create sessions/m12-addition-transformer/day-06-static-shape-engineering/static_shape_padding/ containing:
 1. pad_sequences.py — a pad_batch(examples: list[list[int]], max_len: int, pad_id: int = 0) -> tuple[jnp.ndarray, jnp.ndarray] function returning (padded_tokens, attention_mask), both of shape (batch_size, max_len), built on top of Wednesday's synthetic addition-string generator/tokenizer output. Define MAX_LEN and PAD_ID as named constants sized for the two-operand addition problem (longest plausible input + output digits, plus margin). Assert constant-shape output over at least 3 examples of different raw lengths, and hand-check the mask (1=real token, 0=pad) against one example.
 2. recompilation_probe.py — a small jax.jit-wrapped toy train step (a stub linear layer is fine) instrumented with a trace-counter (print-inside-trace or inspecting the jit cache), run once on a stream of unpadded variable-length batches and once on padded fixed-shape batches from pad_sequences.py, for ~200 batches drawn from the real synthetic data distribution. Must run end-to-end via `python3 recompilation_probe.py` with no manual steps.
 3. results.md recording, for both paths side by side: number of distinct shapes seen, number of compilation events, and wall-clock time — with the measured speedup as concrete evidence.
 Confirm the unpadded path shows >1 compile events and the padded path shows exactly 1, then run it to verify.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-09/day-04-log.md</code>: why does marking a helper's <code>seq_len</code> as <code>static_argnums</code> and passing a raw per-example length reintroduce the exact same recompilation storm that padding was meant to fix?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-06-static-shape-engineering/log.md</code>: why does marking a helper's <code>seq_len</code> as <code>static_argnums</code> and passing a raw per-example length reintroduce the exact same recompilation storm that padding was meant to fix?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Confirm the unpadded path shows >1 compile events and the padded path shows exac
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-synthetic-data-generation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Synthetic Data Generation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-architecture-sizing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Architecture Sizing</span></a>
+  <a class="lnav prev" href="../day-05-synthetic-data-generation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Synthetic Data Generation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-architecture-sizing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Architecture Sizing</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -465,9 +470,9 @@ var QS=[
  {q:'2. What is the fastest way to empirically prove a function is retracing (not just re-running from cache)?',
   opts:['Time the whole training loop and eyeball it','Put a print() statement inside the jit-ted function — it only executes during tracing, not on cache hits','Check the loss curve for spikes','Read the GPU utilization graph'],
   ans:1, fb:'Right. A print inside a jit-ted function only fires while JAX is tracing your code into a jaxpr. On a cache hit, JAX skips your Python function entirely and reuses the compiled executable, so nothing prints.'},
- {q:'3. You right-pad every tokenized example to one fixed <code>MAX_LEN</code>. What is the mask for, and why is it needed?',
-  opts:['The mask speeds up padding itself','The mask has no real function, it is just a convention','A same-shaped 1/0 (or True/False) mask marks which positions are real vs. padding, so the loss/attention ignores the padding — padding fixes the shape but the mask keeps the model from learning on filler','The mask replaces MAX_LEN entirely'],
-  ans:2, fb:'Right. Padding alone only solves the shape problem. Without the mask, the model would attend to and be graded on meaningless pad tokens, corrupting training even though every batch now compiles once.'},
+ {q:'3. Your training runs cleanly with padded fixed-shape batches, loss drops steadily, no errors — but real-digit accuracy stalls well below where it should, and sampling shows the model loves emitting the pad token. Where do you look first?',
+  opts:['Lower the learning rate, since stalling accuracy always means the optimizer is diverging','Check that the pad mask actually reaches the loss: if loss is averaged over all MAX_LEN positions instead of real tokens only, the model is rewarded for predicting padding and quietly optimizes the wrong target','Increase MAX_LEN, because the model has run out of positions to attend to','Switch to float32, since bfloat16 rounding is what makes accuracy plateau'],
+  ans:1, fb:'Right. This is the classic padded-but-unmasked bug. Padding fixes the shape so everything compiles and runs, but if the mask is built and never threaded into the loss reduction, the filler positions count toward the average. The model gets gradient for predicting the pad token, so loss looks healthy while real-token accuracy plateaus. First check: is loss reduced over real tokens only? The learning-rate and dtype answers are generic reflexes that ignore the tell-tale sign — the model preferring the pad token points straight at the mask.'},
  {q:'4. You mark a helper\'s sequence length as <code>static_argnums</code> but pass in the raw, unpadded per-example length instead of the fixed <code>MAX_LEN</code>. What happens?',
   opts:['Nothing — static_argnums always compiles once no matter what value is passed','It still recompiles on nearly every call: each distinct static value gets its own compiled executable, exactly like an unpadded shape would','It throws a TracerBoolConversionError','It silently gives wrong numerical results'],
   ans:1, fb:'Right. static_argnums bakes the literal Python value into the trace. A new value is treated as a new signature just like a new shape — so an un-bucketed raw length reintroduces the exact recompilation storm padding was meant to fix.'}

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-flashattention-paradigm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">FlashAttention Paradigm</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
+  <a class="lnav prev" href="../day-04-flashattention-paradigm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">FlashAttention Paradigm</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-moe-kernel-challenge-performance-proof/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Kernel Challenge</span></a>
 </nav>
 
 
@@ -292,6 +292,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Sets up next week.</strong> Hand-tuning this level of asynchrony in raw CUDA/Pallas is exactly what FA3's authors had to do by hand — which is why a dedicated DSL (ThunderKittens) exists to make this pattern reusable.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> tiling + online softmax (Thursday) solves memory traffic → work-partitioning (FA2) solves occupancy on the same hardware → new Hopper primitives (TMA, async WGMMA) enable a new execution model → warp-specialization + pingpong scheduling (FA3) hides softmax's slowness under matmul's speed.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Asynchrony is what makes FA3 fast, and it is also what makes it dangerous: the moment load and compute run at the same time, forgetting a single wait turns a fast kernel into a quietly wrong one.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the missing async wait (consuming a tile before TMA finishes).</b> In the synchronous world (FA2) the load fully completes before compute starts, so the data is always ready. FA3 breaks that: a producer warp issues a TMA copy and moves on, and a consumer warp must <em>wait</em> on that copy's completion before doing the matmul. Drop that wait and the consumer reads the tile while it is still being filled — it does not crash, and on your machine the copy may usually finish first, so tests pass. On a busier chip or a longer sequence the timing shifts and the output is quietly wrong, differently each run. In <b>code review</b>, a senior engineer checks that every async TMA load has a matching wait (or barrier) before its data is used, and treats a green run on one GPU as no proof at all that the synchronization is correct.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: peak utilization vs. hardware lock-in and complexity.</b> Warp-specialization and pingpong scheduling lifted the H100 from 35% to 75% utilization — a large real win. But that win is bought by writing directly against Hopper's TMA and async WGMMA, so the kernel is tied to one hardware generation: Ampere has no equivalent, and the next chip may need a rewrite. It is also far harder to reason about than a synchronous loop, which is exactly why a DSL like ThunderKittens exists to make the pattern reusable. In a <b>design review</b>, the call is whether this kernel is hot and long-lived enough to justify hand-owning a hardware-specific asynchronous pipeline rather than accepting a simpler, more portable kernel that leaves some peak on the table.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -325,25 +330,25 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): map the evolution of kernel optimizations tailored to the specific asynchronous capabilities of Hopper and Blackwell.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li>File exists at <code>experiments/week13_jax/day05_flashattention_hardware_evolution.md</code>.</li>
+        <li>File exists at <code>sessions/m15a-custom-kernels-pallas/day-05-hardware-evolution/day05_flashattention_hardware_evolution.md</code>.</li>
         <li>A 3-row comparison table (FA1 / FA2 / FA3) with columns: target GPU generation, primary bottleneck addressed, specific hardware primitive exploited, concrete mechanism (one sentence), and the paper's own reported speedup/utilization number — numbers must match the source papers: FA2 reaches 50–73% peak / 225 TFLOPs/s at 72% MFU; FA3 reaches 75% utilization / 740 TFLOPs/s FP16 / ~1.2 PFLOPs/s FP8.</li>
         <li>A 10–20 line pseudocode sketch of the FA3 producer/consumer warpgroup split and pingpong scheduling, in JAX/Pallas-flavored pseudocode. Must not need to compile, but must visibly show the producer-only-loads and consumer-only-compute roles as separate code paths, plus the barrier-forced ordering that creates the pingpong overlap.</li>
         <li>A one-paragraph section explicitly labeled "extrapolation, not paper fact" mapping FA3 mechanisms to their likely Blackwell (B200) analogues (5th-gen Tensor Cores / tcgen05, CTA-pair shared memory, native FP4/MXFP) — must state that the FA3 paper only mentions Blackwell/FP4 in passing, and must not cite any URL outside the five official links in Section 1.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week13_jax/day05_flashattention_hardware_evolution.md</code> with the three pieces above.</p>
+      <p>Create <code>sessions/m15a-custom-kernels-pallas/day-05-hardware-evolution/day05_flashattention_hardware_evolution.md</code> with the three pieces above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 13 Day 5 artifact.
 
-Create experiments/week13_jax/day05_flashattention_hardware_evolution.md containing:
+Create sessions/m15a-custom-kernels-pallas/day-05-hardware-evolution/day05_flashattention_hardware_evolution.md containing:
 1. A three-row comparison table (FA1 / FA2 / FA3) with columns: target GPU generation, primary bottleneck addressed, specific hardware primitive exploited, concrete mechanism (one sentence), and the paper's own reported speedup/utilization number. Use these exact numbers: FA1 = IO-awareness/tiling, A100, HBM traffic; FA2 = work-partitioning, A100, 50-73% peak / 225 TFLOPs/s 72% MFU; FA3 = asynchrony, H100, warp-specialization+pingpong+TMA+WGMMA, 75% util / 740 TFLOPs/s FP16 / ~1.2 PFLOPs/s FP8.
 2. A 10-20 line pseudocode sketch of the FA3 producer/consumer warpgroup split and pingpong scheduling, written in JAX/Pallas-flavored pseudocode. It does not need to compile, but must clearly show the producer-only-loads / consumer-only-compute role split and the barrier-forced ordering that creates the pingpong overlap.
 3. A one-paragraph section explicitly labeled "extrapolation, not paper fact" mapping each FA3 mechanism to its likely Blackwell (B200) analogue (5th-gen Tensor Cores / tcgen05, CTA-pair shared memory, native FP4/MXFP), noting the FA3 paper itself only mentions Blackwell/FP4 in passing as a forward-looking remark.
 Cite only these links where relevant: https://arxiv.org/abs/2205.14135, https://github.com/dao-ailab/flash-attention, https://arxiv.org/abs/2307.08691, https://arxiv.org/abs/2407.08608, https://tridao.me/blog/2024/flash3/</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After building it, write one line in <code>sessions/week-13/day-05-log.md</code>: why did FA2 measure only 35% utilization on H100 despite being the best-known algorithm at the time? If you can answer that without saying "it's just faster attention," you've separated the three engineering problems correctly.</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After building it, write one line in <code>sessions/m15a-custom-kernels-pallas/day-05-hardware-evolution/log.md</code>: why did FA2 measure only 35% utilization on H100 despite being the best-known algorithm at the time? If you can answer that without saying "it's just faster attention," you've separated the three engineering problems correctly.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Cite only these links where relevant: https://arxiv.org/abs/2205.14135, https://
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-flashattention-paradigm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">FlashAttention Paradigm</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
+  <a class="lnav prev" href="../day-04-flashattention-paradigm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">FlashAttention Paradigm</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-moe-kernel-challenge-performance-proof/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE Kernel Challenge</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -467,9 +472,9 @@ var QS=[
  {q:'3. Why does "pingpong scheduling" specifically target the softmax step rather than, say, the data loading step?',
   opts:['Because softmax must always run before data loading in the algorithm','Because softmax runs on a much lower-throughput hardware unit (H100: ~3.9 TFLOPS for exp vs. 989 TFLOPS for FP16 matmul), so hiding it under concurrent matmul work recovers a large fraction of otherwise-wasted Tensor Core idle time','Because data loading is already infinitely fast and needs no overlap','Because softmax cannot be computed on Hopper hardware at all'],
   ans:1, fb:'Right. The ~256x throughput gap between the multi-function unit (exp) and the Tensor Cores (matmul) means softmax, despite being FLOP-cheap, can dominate wall-clock time unless deliberately scheduled to overlap with a concurrent warpgroup\'s matmul.'},
- {q:'4. Why is multiplying Q and K by a random orthogonal Hadamard matrix M before FP8 quantization ("incoherent processing") mathematically free, i.e., it doesn\'t change the attention output?',
-  opts:['Because M is chosen to be the identity matrix, so it has no effect','Because orthogonal matrices satisfy MM^T = I, so (QM)(KM)^T = QMM^TK^T = QK^T, leaving the pre-softmax scores unchanged while spreading outlier magnitude across more entries','Because FP8 arithmetic automatically cancels out any linear transformation','Because the Hadamard matrix only affects the V tensor, not Q or K'],
-  ans:1, fb:'Right. The orthogonality property MM^T=I is exactly what makes the transform exact/lossless for the QK^T product while still "spreading" per-entry outlier magnitude, which is what reduces FP8 quantization error.'}
+ {q:'4. You port an FA2 (synchronous) kernel to an FA3-style asynchronous design: a producer warp issues a TMA load, and a consumer warp does the matmul. It passes on your H100, but on a busier machine and on longer sequences the output is wrong, and it changes from run to run. It never crashes. Where do you look first, and why?',
+  opts:['The softmax rescale factor — the online softmax math must be off','The synchronization: the consumer must wait on the TMA load to complete before using the tile, and a missing wait lets it read data that is still being copied (a timing-dependent race)','The block size — the tiles are too large for SRAM on the other machine','The FP8 quantization — it must be losing precision under load'],
+  ans:1, fb:'Right. Going asynchronous means the load no longer finishes before compute starts. The consumer warp must wait on the TMA copy before touching the tile; without that wait it reads a half-filled buffer — a data race that never crashes and only shows up when the timing shifts, so it varies by machine and by run. The synchronous FA2 version could not have this bug because the load always completed first. The fix is a matching wait/barrier per async load; the debugging move is to distrust a single green run as proof the sync is correct.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

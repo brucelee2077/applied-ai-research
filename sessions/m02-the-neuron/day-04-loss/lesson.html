@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-f2/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M2 · Review Gate</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-gradients-backprop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Gradients &amp; Backprop</span></a>
+  <a class="lnav prev" href="../review-part-a.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M2 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-gradients-backprop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Gradients &amp; Backpropagation</span></a>
 </nav>
 
   <header class="hero">
@@ -277,6 +277,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p>Loss is <em>the</em> number. Training minimizes it. The famous <strong>scaling laws</strong> (M1 Day 5, and the scaling modules later) plot <strong>loss vs compute</strong> — the whole game is predicting how low the loss goes as you spend more. "Lower loss = a better model" is the assumption under everything.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> forward pass → prediction → compare to truth with a loss → one "how wrong" number → training pushes it down. Tomorrow: <em>how</em> we know which way to nudge each weight to lower it (gradients).</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The loss is just one number, so a wrong loss looks exactly like a right one. Two mistakes here damage training without ever throwing an error.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): feeding probabilities where logits are expected.</b> Many cross-entropy functions (like PyTorch's <code>CrossEntropyLoss</code>) expect raw scores called <span class="term" data-tip="The raw, unsquashed output scores of a model, before softmax turns them into probabilities.">logits</span> and apply the softmax themselves. If you run softmax first and pass the resulting probabilities in, softmax gets applied <em>twice</em>. The loss still computes a finite, plausible-looking number — nothing crashes — but it is the wrong number, so training is weaker and slower for no visible reason. A senior engineer catches this in <b>code review</b> by checking exactly what the loss function expects: does it want logits or probabilities, and is there a stray extra softmax before it?</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which loss you choose for the task.</b> Using <code>MSE</code> on a classification problem runs perfectly and gives a valid number, so it is tempting — but it treats class labels as plain numbers and gives weak, slow-to-move gradients when the model is confidently wrong. <code>Cross-entropy</code> punishes confident mistakes hard (<code>−log(p)</code> blows up as <code>p</code> nears 0), which trains classifiers much faster, but it needs proper probabilities and can be numerically touchy. Picking the loss that matches the task — MSE for regressing a number, cross-entropy for choosing a class — is a <b>design-review</b> decision that quietly sets how well the whole model can learn.</div></div>
       <button class="gotit" type="button">Got why loss matters</button>
     </div>
   </section>
@@ -308,21 +313,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Compute a loss yourself and watch it fall — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03_loss.py</code>. Write <code>mse(pred, target) = np.mean((pred-target)**2)</code> and <code>cross_entropy(p_correct) = -np.log(p_correct)</code>. Print MSE for a close prediction vs a far one, and cross-entropy for <code>p_correct</code> in <code>[0.3, 0.6, 0.9]</code> — confirm the loss drops as the guess improves. Run with <code>python3 m03_loss.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-04-loss/experiment.py</code>. Write <code>mse(pred, target) = np.mean((pred-target)**2)</code> and <code>cross_entropy(p_correct) = -np.log(p_correct)</code>. Print MSE for a close prediction vs a far one, and cross-entropy for <code>p_correct</code> in <code>[0.3, 0.6, 0.9]</code> — confirm the loss drops as the guess improves. Run with <code>python3 sessions/m02-the-neuron/day-04-loss/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 3 Day 1 artifact.
 
-Create experiments/foundations/m03_loss.py that, with a comment on each step:
+Create sessions/m02-the-neuron/day-04-loss/experiment.py that, with a comment on each step:
 1. Defines mse(pred, target) = np.mean((pred - target)**2).
 2. Prints mse for a close prediction ([2.5,0.0,2.0] vs [3.0,-0.5,2.0], expect ~0.167) and a far prediction, showing the far one has higher loss.
 3. Defines cross_entropy(p_correct) = -np.log(p_correct).
 4. Prints cross_entropy for p_correct in [0.3, 0.6, 0.9] (expect ~1.204, 0.511, 0.105) and notes the loss falls as the model gets more confident in the correct class.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f3/day-01-log.md</code>: why does squaring the error (MSE) punish big misses more than small ones?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-04-loss/log.md</code>: why does squaring the error (MSE) punish big misses more than small ones?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -336,9 +341,9 @@ Then run it and paste the output at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-f2/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M2 · Review Gate</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-gradients-backprop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Gradients &amp; Backprop</span></a>
+  <a class="lnav prev" href="../review-part-a.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M2 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-gradients-backprop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Gradients &amp; Backpropagation</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -454,9 +459,9 @@ var QS=[
  {q:'3. MSE computes:',
   opts:['the sum of the predictions','the mean of the squared errors','the largest error','the number of classes'],
   ans:1, fb:'Right. MSE = mean((prediction − target)²) — squared so errors do not cancel and big misses hurt more.'},
- {q:'4. Cross-entropy loss uses which idea from M1 Day 5?',
-  opts:['matrix multiply','the logarithm','broadcasting','slicing'],
-  ans:1, fb:'Right. Cross-entropy = −log(probability of the correct class). It reuses the log you met in Day 5.'}
+ {q:'4. Your classifier trains without any error, but it learns slowly and the loss is oddly small even at the start. You notice your code runs <code>softmax</code> on the output and then passes that into a cross-entropy loss that already applies softmax internally. What is the problem?',
+  opts:['Nothing — running softmax twice makes the probabilities more accurate','Softmax is being applied twice, so the loss is computed on the wrong (double-squashed) numbers; it still returns a finite value, so training is quietly weakened with no error to see','The model has too few parameters, which is the only cause of slow learning','A small loss always means the model is already perfect'],
+  ans:1, fb:'Right. If the loss function expects logits and applies its own softmax, feeding it probabilities applies softmax twice. The number is still finite and plausible, so nothing crashes — but it is the wrong loss, so learning suffers. You check whether the loss wants logits or probabilities, not for a crash.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

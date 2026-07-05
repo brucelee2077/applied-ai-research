@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-additive-quantization-qtip.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-ptq-implementation-perplexity-benchmarking.html"><span class="lnav-dir">Next →</span><span class="lnav-t">PTQ Implementation &amp; Perplexity Benchmarking</span></a>
+  <a class="lnav prev" href="../day-04-additive-quantization-qtip/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-ptq-implementation-perplexity-benchmarking/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">PTQ &amp; Perplexity Benchmark</span></a>
 </nav>
 
 
@@ -290,6 +290,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>It connects three separate weeks into one argument</strong> — Week 2's roofline math, Week 14's FlashAttention IO-awareness (also a "bytes moved is the real cost" argument, applied to activations instead of weights), and this week's quantization algorithms are all instances of the same underlying economics.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> decode-step matmul has low AI (little reuse per weight byte) → it sits below the ridge point → it is memory-bound → achievable latency scales with bytes moved, not FLOPs → shrinking bytes (quantization) cuts latency almost directly, as long as the added dequant FLOPs don't push you past the ridge.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole argument holds only while you stay memory-bound and the dequant is cheap. When either assumption quietly breaks, the memory drops as expected but the speed-up doesn't show up.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): reporting the byte savings as if it were the latency win.</b> Quantization always shrinks the stored bytes, so a memory report looks like a clean success — the 7B model now takes 3.5 GB instead of 14 GB. But latency only drops if you actually stayed memory-bound <em>and</em> the dequant is fused into the matmul kernel. If the dequant runs as a separate unfused pass, it re-reads and re-writes the weights, adding memory traffic that can cancel most of the win; and at large batch or prefill the matmul is compute-bound, so the extra dequant FLOPs slow it down. Nothing errors — the model runs, memory is lower — but tokens/sec barely moved or got worse. In <b>code review</b> a senior engineer refuses to accept "bytes dropped 8x" as proof and asks for a measured tokens/sec (or ms/token) comparison at the real serving batch size, confirming the dequant is fused and the op is still below the ridge point.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: you trade a sliver of compute (and kernel complexity) for a large cut in memory traffic.</b> Every quantized matmul now spends extra FLOPs unpacking codebook or lattice entries back into numbers — cheap during memory-bound decode, where there is idle compute headroom to absorb it, but real. The design choice is workload-dependent: at decode-time (batch ≈ 1) the trade is almost pure upside, but the same scheme applied to high-AI prefill or training matmuls can eat the headroom and turn the dequant tax into the new bottleneck. In a <b>design review</b> the question is which phase you are optimizing — quantize aggressively for the memory-bound decode path, and think twice before forcing the same low-bit format onto compute-bound prefill.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -330,13 +335,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>The 8x byte reduction (fp16 → ~2-bit) and the resulting latency-ratio claim from today's demos must fall out of the script's own formulas generically — not be hardcoded to match this lesson.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week15_jax/roofline_quantization_proof.py</code> with the five bullets above.</p>
+      <p>Create <code>sessions/m17a-quantization/day-05-memory-economics-synthesis/experiment.py</code> with the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 5 artifact.
 
-Create experiments/week15_jax/roofline_quantization_proof.py that:
+Create sessions/m17a-quantization/day-05-memory-economics-synthesis/experiment.py that:
 1. Implements roofline_ai(flops, bytes_moved) -> float returning flops / bytes_moved, and
    roofline_knee(peak_flops, peak_bandwidth) -> float returning peak_flops / peak_bandwidth.
 2. Computes, for at least 3 precisions (fp16 = 2 bytes/param, int8 = 1 byte/param, ~2-bit
@@ -354,7 +359,7 @@ Do not hardcode the 8x byte-reduction or latency-ratio numbers — they must fal
 formulas applied generically to the configured shape and hardware specs. Add a brief comment
 on each step, then run it to confirm it works end-to-end with no errors.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-05-log.md</code>: at what arithmetic intensity would a decode-step matmul stop being memory-bound on your configured hardware, and roughly how much bigger would <code>d_ff</code> (or the batch size) need to get for that to happen?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-05-memory-economics-synthesis/log.md</code>: at what arithmetic intensity would a decode-step matmul stop being memory-bound on your configured hardware, and roughly how much bigger would <code>d_ff</code> (or the batch size) need to get for that to happen?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -368,9 +373,9 @@ on each step, then run it to confirm it works end-to-end with no errors.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-additive-quantization-qtip.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-ptq-implementation-perplexity-benchmarking.html"><span class="lnav-dir">Next →</span><span class="lnav-t">PTQ Implementation &amp; Perplexity Benchmarking</span></a>
+  <a class="lnav prev" href="../day-04-additive-quantization-qtip/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Additive Quantization (QTIP)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-ptq-implementation-perplexity-benchmarking/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">PTQ &amp; Perplexity Benchmark</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -470,9 +475,9 @@ var QS=[
  {q:'2. Shrinking weights from fp16 (2 bytes/param) to a ~2-bit lattice codebook (0.25 bytes/param) is an 8x byte reduction. In the memory-bound regime, what happens to estimated latency?',
   opts:['It increases 8x','It stays the same, because FLOPs are unchanged','It drops roughly 8x, because memory-bound latency scales with bytes moved','It only depends on peak FLOP/s, so nothing changes'],
   ans:2, fb:'Right. When memory-bound, achievable latency ≈ bytes_moved / bandwidth. Cutting bytes 8x cuts that latency estimate roughly 8x too, since FLOPs never become the bottleneck.'},
- {q:'3. Dequantizing a lattice codebook back to real numbers costs extra compute. Why does this not cancel out the latency win in decode?',
-  opts:['Dequantization costs zero FLOPs','The chip has almost no spare compute during decode, so any extra FLOPs are catastrophic','Decode is deeply memory-bound, so there is a large idle compute budget that absorbs the small dequant cost for free','Dequantization only happens once per model, not per token'],
-  ans:2, fb:'Right. Being memory-bound means peak_FLOP/s is far above what the memory-bound regime actually uses — that gap is idle compute headroom. A small dequant tax fits inside it without pushing the operation past the ridge point.'},
+ {q:'3. You quantize a 7B model to 4 bits. The weight footprint drops as expected (about 4x smaller), but decode tokens/sec barely improves. The model is correct, nothing errors. Where do you look first, and why?',
+  opts:['Nowhere — a memory drop guarantees a proportional latency drop, so your measurement must be wrong','Check whether the dequant step is fused into the matmul kernel: an unfused dequant re-reads and re-writes the weights as a separate pass, adding memory traffic that cancels most of the byte savings the memory-bound argument promised','Assume the GPU is broken and swap hardware','Raise the batch size, since decode is always faster at larger batch'],
+  ans:1, fb:'The latency argument only pays off if shrinking the stored bytes actually shrinks the bytes moved through the memory-bound matmul. If the dequant runs as a separate, unfused pass, it re-reads the weights and writes out dequantized values, injecting extra memory traffic that eats the win — memory footprint still drops (the giveaway), but tokens/sec stalls. The fix is to confirm the dequant is fused into the matmul and the op is still below the ridge point, measured in tokens/sec, not just bytes. A memory drop does not guarantee a latency drop, and raising decode batch changes the AI regime rather than diagnosing this.'},
  {q:'4. Under what condition would shrinking weight bytes stop being a clear win for latency?',
   opts:['If the operation were already close to or above the ridge point (compute-bound), where extra dequant FLOPs could become the new bottleneck','If bandwidth increased','If the weight matrix got smaller','Never — it always helps regardless of hardware'],
   ans:0, fb:'Right. The whole argument depends on being memory-bound. Large-batch prefill or training matmuls with much higher AI can sit near or above the ridge point, where the dequant compute tax can start to matter and the win shrinks or reverses.'}

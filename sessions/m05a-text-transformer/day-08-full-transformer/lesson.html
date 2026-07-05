@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-07-text-generation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Text Generation and Sampling</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-07-text-generation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Text Generation &amp; Sampling</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
   <header class="hero">
@@ -294,6 +294,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>Why it matters — you built the frontier's shape</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this is the real architecture of a decoder-only LLM. Your toy has maybe a thousand parameters; GPT-4 has trillions. Same embeddings, same stacked blocks, same causal mask, same head. The only differences are size and training data. You now understand, end to end, how a large language model turns text into text.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Assembling the full model means one line adds position and one pair of big matrices bookends the stack — and both are places where a quiet mistake or a quiet saving lives.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to add the positional embedding.</b> Attention has no built-in sense of order — it treats the tokens as an unordered bag. The <code>+ pos_embed</code> line is what tells the model where each token sits. If you drop it, every shape still matches and the model still trains and produces fluent-looking text, but it cannot tell "dog bites man" from "man bites dog" because word order carries no signal. There is no crash — just a quality ceiling you cannot explain. A senior engineer in <b>code review</b> confirms position information is actually added (or a positional scheme like RoPE is applied inside attention), because a transformer with no positions fails silently, not loudly.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: weight tying saves parameters but couples two jobs.</b> The input token embedding and the output head are both <code>vocab_size × d_model</code> matrices, so for a large vocabulary they can dominate the parameter count. Tying them — using the same matrix for "id → vector" and "vector → word score" — cuts that cost roughly in half and often helps small models. The price is that one matrix must now serve both the input and output roles, which can slightly limit a very large model. In a <b>design review</b> weight tying is the classic choice: worth it to shrink smaller models, sometimes dropped when you have parameters to spare.</div></div>
       <button class="gotit" type="button">Got the full forward pass</button>
     </div>
   </section>
@@ -325,21 +330,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Assemble the whole tower and watch it generate — that is what makes the finale count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_full_transformer.py</code>. Reuse your block, causal mask, and sampling from earlier days. Add a token embedding table, a positional embedding, <code>N</code> stacked blocks, and a final linear head. Feed a tiny prompt through, print the shape at each stage (embed → blocks → head), and run a short generation loop on a toy vocabulary. The output will be gibberish (untrained weights) but the shapes and the loop will be real. Run with <code>python3 m05a_full_transformer.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-08-full-transformer/experiment.py</code>. Reuse your block, causal mask, and sampling from earlier days. Add a token embedding table, a positional embedding, <code>N</code> stacked blocks, and a final linear head. Feed a tiny prompt through, print the shape at each stage (embed → blocks → head), and run a short generation loop on a toy vocabulary. The output will be gibberish (untrained weights) but the shapes and the loop will be real. Run with <code>python3 m05a_full_transformer.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 8 (finale) artifact.
 
-Create experiments/foundations/m05a_full_transformer.py that, with a comment on each step, assembles a small decoder-only transformer end to end:
+Create sessions/m05a-text-transformer/day-08-full-transformer/experiment.py that, with a comment on each step, assembles a small decoder-only transformer end to end:
 1. Builds a token embedding table (vocab_size, d_model) plus a positional embedding, and a stack of N pre-LN decoder blocks (attention + FFN + LayerNorm + residual) each with a causal mask.
 2. Adds a final linear head (d_model, vocab_size) and PRINTS the shape after embed, after the block stack, and after the head (should be (seq_len, vocab_size)).
 3. Runs a short autoregressive generation loop on a toy vocabulary using temperature + top-p sampling; prints the generated token ids.
 4. Prints the total parameter count so the learner can compare their toy model to real LLM sizes.
 Then run it and paste the per-stage shapes and the parameter count at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-08-log.md</code>: what shape came out of the final head, and how many parameters did your toy transformer have?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-08-full-transformer/log.md</code>: what shape came out of the final head, and how many parameters did your toy transformer have?</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
   </section>
@@ -353,9 +358,9 @@ Then run it and paste the per-stage shapes and the parameter count at the bottom
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-07-text-generation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Text Generation and Sampling</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-07-text-generation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Text Generation &amp; Sampling</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -467,9 +472,9 @@ var QS=[
  {q:'3. The final linear head turns the top block\'s numbers into:',
   opts:['a single word','one score (logit) per word in the vocabulary','a positional embedding','a smaller model'],
   ans:1, fb:'Right. The head maps (seq_len, d_model) → (seq_len, vocab_size); softmax then gives next-word probabilities.'},
- {q:'4. Compared to GPT-4, your toy transformer differs mainly in:',
-  opts:['a completely different architecture','size (parameters, depth, width) and training data — same shape','having no attention','using no embeddings'],
-  ans:1, fb:'Right. Same embeddings, stacked blocks, causal mask, and head. GPT-4 is just far bigger and trained on far more text.'}
+ {q:'4. Your full transformer trains and generates fluent-looking text, but it cannot tell "dog bites man" from "man bites dog" — reordering words barely changes its behavior, and there is no error. Where do you look first?',
+  opts:['the softmax temperature','whether the positional embedding is actually added: attention alone treats tokens as an unordered bag, so if + pos_embed is missing the model has no sense of word order even though every shape matches','the number of decoder blocks','the file format of the checkpoint'],
+  ans:1, fb:'Right. Attention is order-agnostic on its own; the + pos_embed line (or a scheme like RoPE inside attention) is what carries position. Drop it and shapes still match, training still runs, and text still looks fluent, but word order stops mattering. That is a silent quality bug a code review catches by confirming position information is really added.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

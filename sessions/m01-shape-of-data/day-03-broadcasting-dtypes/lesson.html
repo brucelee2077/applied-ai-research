@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav prev" href="../day-02-indexing-slicing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-matmul-and-shapes/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
 </nav>
 
   <header class="hero">
@@ -280,6 +280,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p>Bytes are money and speed. A 7-billion-parameter model in <code>float32</code> needs ~28 GB just for weights; in <code>bfloat16</code>, ~14 GB — the difference between fitting on one chip or not. Broadcasting is how a bias vector <code>(features,)</code> gets added to a whole batch <code>(batch, features)</code> with no copy.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> broadcasting → one op covers many shapes, no copies → less code + less memory. dtype → fewer bytes per number → bigger models fit on the same hardware. <strong>Every quantization trick later is just this dial.</strong></div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Broadcasting and dtypes are the two places in array math where a bug does not announce itself — the code runs, prints numbers, and is quietly wrong.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the accidental broadcast (a bug that doesn't announce itself).</b> You expect two vectors of the same length to add element-wise. But if one is a row of shape <code>(n,)</code> and the other is a column of shape <code>(n, 1)</code>, broadcasting does not error — it stretches both and hands back an <code>(n, n)</code> grid (every pair added). No crash, no warning; you just have <code>n</code> times too many numbers, and a mean or loss computed over them looks plausible but is wrong. A senior engineer catches this in <b>code review</b> by asking "print the <code>.shape</code> right after the operation" — if the result gained a dimension you didn't intend, an accidental broadcast happened.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fewer bytes vs. less precision and range.</b> Dropping from <code>float32</code> (4 bytes) to <code>bfloat16</code> (2 bytes) halves the memory bill and lets a bigger model fit on the same chip. What you pay: each number now carries fewer significant digits, so tiny values can round to zero and long sums drift. In a <b>design review</b> the question is not "is float32 or bfloat16 better" — it is "which numbers can tolerate the lower precision (most weights and activations) and which must stay high precision (the running totals that accumulate error)." That split is exactly what mixed-precision training decides.</div></div>
       <button class="gotit" type="button">Got the rule and the bytes</button>
     </div>
   </section>
@@ -289,8 +294,8 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch shapes stretch, then shrink the bytes — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>Here is broadcasting and dtype, built one piece at a time. First, <strong>play with the live tool</strong> below — set two shapes and watch the rule fire or fail. Then <strong>scroll down slowly</strong> through the static build underneath, where each piece fades in with a short note. By the bottom you'll predict any broadcast and any memory bill.</p>
-      <div class="build-embed"><iframe src="../viz/broadcasting.html" title="Interactive broadcasting rule" loading="lazy"></iframe>
-      <div class="cap">↑ interactive — pick the two shapes and watch them align from the right. <a href="../viz/broadcasting.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
+      <div class="build-embed"><iframe src="../../viz/broadcasting.html" title="Interactive broadcasting rule" loading="lazy"></iframe>
+      <div class="cap">↑ interactive — pick the two shapes and watch them align from the right. <a href="../../viz/broadcasting.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -313,21 +318,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Broadcast a few shapes and weigh a few dtypes yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03_broadcasting.py</code>. Add a scalar to an array; add a <code>(3,)</code> row to a <code>(2,3)</code> grid; try <code>(2,3) + (2,)</code> inside a <code>try/except</code> and print the error; then print <code>.dtype</code> and <code>.nbytes</code> for the same data as <code>float64</code> vs <code>float32</code>. Run it with <code>python3 m03_broadcasting.py</code>.</p>
+      <p>Create <code>sessions/m01-shape-of-data/day-03-broadcasting-dtypes/experiment.py</code>. Add a scalar to an array; add a <code>(3,)</code> row to a <code>(2,3)</code> grid; try <code>(2,3) + (2,)</code> inside a <code>try/except</code> and print the error; then print <code>.dtype</code> and <code>.nbytes</code> for the same data as <code>float64</code> vs <code>float32</code>. Run it with <code>python3 sessions/m01-shape-of-data/day-03-broadcasting-dtypes/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 3 artifact.
 
-Create experiments/foundations/m03_broadcasting.py that, with a comment on each step:
+Create sessions/m01-shape-of-data/day-03-broadcasting-dtypes/experiment.py that, with a comment on each step:
 1. Prints x + 10 for x = np.array([1,2,3]) (scalar broadcast).
 2. Adds row = np.array([10,20,30]) to g = np.array([[1,2,3],[4,5,6]]) and prints the (2,3) result, noting the (3,) row was stretched across both rows.
 3. Wraps g + np.array([1,2]) in try/except and prints the broadcasting error (shapes (2,3) and (2,) do not align).
 4. Builds b = np.array([1.,2.,3.]) as float64, makes f = b.astype(np.float32), and prints b.dtype, f.dtype, b.nbytes, f.nbytes — showing float32 uses half the bytes.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-03-log.md</code>: which broadcast surprised you, or which dtype fact stuck?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-03-broadcasting-dtypes/log.md</code>: which broadcast surprised you, or which dtype fact stuck?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -341,9 +346,9 @@ Then run it and paste the output at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-indexing-slicing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav prev" href="../day-02-indexing-slicing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Indexing &amp; Slicing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-matmul-and-shapes/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -448,9 +453,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. <code>g</code> has shape (2,3) and <code>row</code> has shape (3,). Does <code>g + row</code> work, and what shape is the result?',
-  opts:['Error — shapes differ','Yes → shape (2,3)','Yes → shape (3,)','Yes → shape (2,)'],
-  ans:1, fb:'Right. Align from the right: 3=3 ✓, then 2 vs missing ✓. The row stretches down both rows → (2,3).'},
+ {q:'1. You add two arrays you believe are the same-length vectors and expect a vector back, but a later mean comes out strangely small. No error was raised. You print shapes: one is <code>(100,)</code>, the other is <code>(100, 1)</code>, and the sum is <code>(100, 100)</code>. What happened?',
+  opts:['NumPy silently truncated the longer array','Broadcasting stretched a row against a column and built a 100&times;100 grid of every pair, so your mean averaged 10,000 numbers instead of 100','The dtypes disagreed and NumPy zero-filled the gap','Nothing is wrong; (100,1) and (100,) are identical shapes'],
+  ans:1, fb:'Right. <code>(100,)</code> vs <code>(100, 1)</code> are broadcast-compatible: align from the right, 1 stretches to 100, then the leading 100 stretches too, giving a <code>(100, 100)</code> grid of every pairwise sum. No error fires, so the bug is silent — the fix is to check <code>.shape</code> right after the op and reshape one operand (e.g. <code>.ravel()</code>) so both are truly 1-D.'},
  {q:'2. Two dimensions are broadcast-compatible if they are equal, or if one of them is ___.',
   opts:['0','1','even','a float'],
   ans:1, fb:'Right. A dimension of size 1 (or missing) is the one that gets stretched to match the other.'},

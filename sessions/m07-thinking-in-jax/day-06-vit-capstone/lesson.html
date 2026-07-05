@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-flax-optax.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Flax &amp; Optax</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-02/day-01-rooflines.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
+  <a class="lnav prev" href="../day-05-flax-optax/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Flax &amp; Optax</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m08-transformer-math/day-01-transformer-arithmetic/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M8 · Transformer Math + Search</span></a>
 </nav>
 
 
@@ -297,6 +297,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Everything is still pure functions with explicit params</strong> — same purity theme from Day 1. A Flax module's <code>__call__</code> doesn't hide any mutable state; params (<code>cls_token</code>, <code>pos_emb</code>, every <code>Dense</code> layer's weights) are just values threaded through explicitly, exactly like Day 1's immutable arrays.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> patches (Day 1 arrays) → params created via PRNG keys (Day 2) → batched over many images with vmap (Day 3, wrapped inside jit — Day 4) → trained with Flax modules and an Optax optimizer (Day 5) → all of it composes into one ViT trained on CIFAR-10 (today).</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The ViT pipeline has many correct-shape ways to be quietly wrong, and it buys its flexibility at a real cost — here is the one silent bug and the one trade-off to have ready.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): positional information that is present in shape but wrong in meaning.</b> Attention treats the 65 tokens as an unordered bag, so the positional embeddings are the <em>only</em> thing telling the model which patch sat where. If you accidentally add the <em>same</em> positional row to every token (a broadcasting slip), or forget the positional add entirely, the shapes still line up at <code>(65, 128)</code> and nothing errors. The model just can no longer tell top-left from bottom-right, so it learns a weaker, position-blind classifier — you only notice as lower accuracy, never as a crash. A senior engineer checks in code review that the positional table is shape <code>(num_patches + 1, embed_dim)</code> (the <code>+1</code> is the class token) and that distinct rows reach distinct positions.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: no built-in inductive bias for the price of flexibility.</b> Unlike a convolutional network, a ViT has no built-in assumption that nearby pixels belong together — it must learn spatial structure from scratch through attention and positional embeddings. That makes it very flexible and strong when data is plentiful, but data-hungry: on a small set like CIFAR-10 from scratch, it can underperform a much simpler CNN. The design-review question: do you have enough data (or a pretrained model) to earn back the missing inductive bias? If not, a CNN may be the better call.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -330,7 +335,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task is a two-part artifact — the weekend capstone. <strong>Part A (Saturday)</strong> proves your model's plumbing is correct. <strong>Part B (Sunday)</strong> proves it can actually learn.</p>
 
       <h4>Part A — overfit a single batch (correctness proof)</h4>
-      <p>File: <code>experiments/week01_jax/vit_overfit_batch.py</code></p>
+      <p>File: <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py</code></p>
       <ul>
         <li>Build a from-scratch Flax ViT: <code>patchify</code> → <code>PatchEmbed</code> (Dense projection + learnable <code>cls</code> token + <code>pos</code> embedding table) → a small stack of Transformer encoder blocks → <code>Dense(10)</code> head on the class token.</li>
         <li>Take ONE batch of 8–16 CIFAR-10 images and train on <em>only that batch</em>, repeatedly, for a few hundred steps.</li>
@@ -339,7 +344,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
 
       <h4>Part B — train on the full CIFAR-10 train split (real learning)</h4>
-      <p>File: <code>experiments/week01_jax/vit_train_full.py</code></p>
+      <p>File: <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py</code></p>
       <ul>
         <li>Reuse the same ViT architecture from Part A.</li>
         <li>Train on the <strong>full</strong> CIFAR-10 training set (not one batch) to convergence.</li>
@@ -347,7 +352,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
 
       <h4>Plus — document the architecture</h4>
-      <p>File: <code>experiments/week01_jax/WEEK1_ARCHITECTURE.md</code></p>
+      <p>File: <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/WEEK1_ARCHITECTURE.md</code></p>
       <ul>
         <li>Document the <strong>functional state-passing design</strong>: where do <code>params</code> and <code>opt_state</code> actually live? (Hint: nowhere inside the model or optimizer object — they're values you pass in and get new values back.)</li>
         <li>Explain how <code>jit</code>, <code>vmap</code>, and <code>grad</code> compose around pure functions in this codebase.</li>
@@ -361,16 +366,16 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 1 Weekend Lab (Day 6) capstone artifact.
 
-Create experiments/week01_jax/vit_overfit_batch.py that:
+Create sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py that:
 1. Implements a from-scratch Flax ViT for CIFAR-10: patchify(img, patch_size=4) turning (32,32,3) into (64,48) patches; a PatchEmbed module doing nn.Dense(embed_dim) projection, a learnable cls_token param of shape (1,1,embed_dim), a pos_emb param of shape (num_patches+1, embed_dim), concatenating cls_token in front of the projected patches and adding pos_emb; a small stack of encoder blocks (LayerNorm -> MultiHeadAttention -> residual -> LayerNorm -> MLP -> residual); and a final logits = nn.Dense(10)(x[:, 0]) head on the class token.
 2. Takes ONE batch of 8-16 CIFAR-10 images and trains on only that batch for a few hundred steps using Optax, printing (step, loss) as a loss curve.
 3. Asserts the final loss is below 0.05, proving gradients flow correctly through the whole model.
 
-Then create experiments/week01_jax/vit_train_full.py that reuses the same ViT architecture, trains it on the FULL CIFAR-10 training set to convergence, and reports held-out test accuracy.
+Then create sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py that reuses the same ViT architecture, trains it on the FULL CIFAR-10 training set to convergence, and reports held-out test accuracy.
 
-Then create experiments/week01_jax/WEEK1_ARCHITECTURE.md documenting the functional state-passing design: where params and opt_state actually live (as explicit values, not hidden object state), how jit/vmap/grad compose around pure functions here, and how this ties back to Day 1 (immutability), Day 2 (PRNG keys), Day 3 (vmap), Day 4 (jit), and Day 5 (Flax/Optax).</pre>
+Then create sessions/m07-thinking-in-jax/day-06-vit-capstone/WEEK1_ARCHITECTURE.md documenting the functional state-passing design: where params and opt_state actually live (as explicit values, not hidden object state), how jit/vmap/grad compose around pure functions here, and how this ties back to Day 1 (immutability), Day 2 (PRNG keys), Day 3 (vmap), Day 4 (jit), and Day 5 (Flax/Optax).</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running both scripts, write one line in <code>sessions/week-01/day-06-log.md</code>: what was your single-batch overfit loss after the last step, and what was your full-training held-out accuracy?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running both scripts, write one line in <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/log.md</code>: what was your single-batch overfit loss after the last step, and what was your full-training held-out accuracy?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -384,9 +389,9 @@ Then create experiments/week01_jax/WEEK1_ARCHITECTURE.md documenting the functio
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-flax-optax.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Flax &amp; Optax</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-02/day-01-rooflines.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
+  <a class="lnav prev" href="../day-05-flax-optax/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Flax &amp; Optax</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m08-transformer-math/day-01-transformer-arithmetic/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M8 · Transformer Math + Search</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -438,7 +443,7 @@ var DEMOS = {
     take:'<b>①  patchify.</b> A grid image becomes a flat list of 64 patch-vectors. This reshape is the entire trick that lets a Transformer "read" an image.'},
   shapes:{html:'<span class="prompt">&gt;&gt;&gt;</span> patches.shape                    <span class="ok">(64, 48)</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> embed = nn.Dense(<span class="num">128</span>)(patches)\n<span class="prompt">&gt;&gt;&gt;</span> embed.shape   <span class="dim"># linear projection into embed dim</span>\n<span class="ok">(64, 128)</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> x = jnp.concatenate([cls_token, embed], axis=<span class="num">1</span>) + pos_emb\n<span class="prompt">&gt;&gt;&gt;</span> x.shape      <span class="hl"># class token prepended, position added</span>\n<span class="ok">(65, 128)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> x = jnp.concatenate([cls_token, embed], axis=<span class="num">0</span>) + pos_emb\n<span class="prompt">&gt;&gt;&gt;</span> x.shape      <span class="hl"># class token prepended, position added</span>\n<span class="ok">(65, 128)</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> block <span class="kw">in</span> encoder_blocks: x = block(x)\n<span class="prompt">&gt;&gt;&gt;</span> x.shape      <span class="dim"># unchanged through every block</span>\n<span class="ok">(65, 128)</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> logits = nn.Dense(<span class="num">10</span>)(x[:, <span class="num">0</span>])\n<span class="prompt">&gt;&gt;&gt;</span> logits.shape <span class="dim"># only the class token feeds the head</span>\n<span class="ok">(10,)</span>',
     take:'<b>②  the full shape trace.</b> (64,48) → (64,128) → (65,128) → N blocks, unchanged → (128,) → (10,). Every step is checkable — if a shape breaks here, you know exactly where.'},
@@ -487,9 +492,9 @@ var QS=[
  {q:'1. What does a ViT do to an image before feeding it to a transformer?',
   opts:['Cuts it into patches, flattens each patch, and linearly projects them into tokens','Resizes it to a single pixel','Runs a convolutional neural network on it first','Converts it to grayscale'],
   ans:0, fb:'Right. The image is cut into a grid of patches, each patch is flattened into a vector, and a Dense layer projects that vector into the model\'s embedding dimension — turning the image into a sequence of tokens.'},
- {q:'2. Why add a learnable <code>[class]</code> token to the sequence?',
-  opts:['It makes the image bigger','It gives you a dedicated token whose final representation is used for classification, not tied to any single patch\'s content','It replaces the need for positional embeddings','It speeds up patchify'],
-  ans:1, fb:'Right. The class token is not one specific patch — it starts as a generic learnable vector and, through attention, gathers information from every patch. Its final state is what the classification head reads.'},
+ {q:'2. Your ViT trains with no error and the loss drops, but held-out accuracy plateaus low and the model seems unable to tell where a patch was in the image. You added positional embeddings, but a broadcasting slip made the <em>same</em> row get added to every token. Where do you look first, and why?',
+  opts:['The learning rate — it must be too small for a transformer','The positional embeddings: attention treats the 65 tokens as an unordered bag, so those embeddings are the only source of position. Adding one identical row to all tokens keeps the shape at <code>(65,128)</code> (no error) but erases position, so the model learns a position-blind classifier. Check that distinct rows reach distinct positions and the table is sized <code>num_patches + 1</code>','The class token — it must be initialized wrong','The patch size — 4 must not divide 32 evenly'],
+  ans:1, fb:'Right. This is the silent position bug. Because self-attention is permutation-agnostic, the positional embeddings carry all the "where" information. A broadcast that adds one identical row to every token is shape-correct, so JAX raises nothing — but every position now looks the same, and the model can only ever learn a bag-of-patches classifier. Verify the table is shape <code>(num_patches + 1, embed_dim)</code> and that each position gets its own row.'},
  {q:'3. What is the Saturday acceptance signal for this capstone task?',
   opts:['Loss on ONE batch drops to near zero, proving gradients flow correctly through the full model end to end','Test accuracy above 90%','The model runs without a Python error','Training finishes in under a minute'],
   ans:0, fb:'Right. Overfitting a single small batch to near-zero loss is a correctness check, not a performance claim — it proves the forward and backward pass are wired correctly before you commit to a long full-dataset training run.'},

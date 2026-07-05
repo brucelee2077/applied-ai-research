@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-20/day-06-adrs-implementation-simulation-execution.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ADRS Implementation &amp; Simulation Execution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-23/day-01-screencast-production-code.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Screencast Production (Code)</span></a>
+  <a class="lnav prev" href="../../m26-adrs/day-12-adrs-implementation-simulation-execution/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ADRS Implementation &amp; Simulation Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m29-ship-outreach/day-01-screencast-production-code/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Screencast Production (Code)</span></a>
 </nav>
 
 
@@ -297,6 +297,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable with what you already have</strong> — TLA+/TLC doesn't replace pytest+benchmark. It adds a gate: empirical correctness, then speed, then formal invariant check on the bounded model. All three must pass.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> ADRS evolves candidates (Weeks 19–20) → reward hacking means the empirical score can be gamed → pytest hidden hold-outs shrink but never close the gap → TLA+ invariant + TLC exhaustive search closes it for a bounded model → refinement argument carries that proof toward the real Python code.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The word "verified" feels final, and that is exactly the danger. The two ways a formal check quietly lies to you are a bound that is too small and a refinement claim that was never actually established.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the too-small bound that "passes."</b> You set <code>|Values| &#8804; 4</code> and length <code>&#8804; 6</code> so TLC finishes fast, and it reports "No error found." But the bug you were guarding against only appears at length 7 — a partition step that mishandles arrays larger than a threshold, or a duplicate-heavy input that needs more than 4 distinct values. TLC never errors here: it exhaustively and truthfully checks the tiny model, prints a green result, and the broken candidate ships with a "formally verified" stamp. A senior engineer catches this in <b>code review</b> by asking one question of every spec: "what is the smallest input that could trigger the failure class we care about, and is the bound at least that large?" — and by checking the printed <em>state count</em> to confirm the search space is not suspiciously small.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: exhaustive-checking cost vs. coverage.</b> Every element you add to the value alphabet and every extra step of length multiplies the reachable-state count (state explosion), so raising the bound to cover more real inputs can push a check from seconds to hours to "never finishes." Shrink the bound and TLC is fast but proves less; grow it and you prove more but may not finish at all. That is the <b>design-review</b> decision: pick the smallest bound that still exercises the failure class you fear, and write down — in the README — which input classes fall outside it, so the coverage gap is documented rather than pretended away.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -337,13 +342,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>README.md</code> explicitly states the bounded model's limits (max sequence length, value alphabet size) and names at least one input class NOT covered by the model (the refinement-gap caveat).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week21_adrs_formal_verification/</code> with the five files below, matching demo ② and ③'s structure.</p>
+      <p>Build <code>sessions/m28-formal-methods/day-01-formal-verification-refinement/</code> with the five files below, matching demo ② and ③'s structure.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 21 Day 1 artifact.
 
-Create experiments/week21_adrs_formal_verification/ with:
+Create sessions/m28-formal-methods/day-01-formal-verification-refinement/ with:
 1. SortSpec.tla — the TLA+ module defining Init, a Next/Sort action, IsPermutation, IsSorted, and CorrectnessInvariant (output is empty OR (permutation of input AND sorted)).
 2. SortSpec.cfg — the TLC model config bounding the model: Values set of size <= 4, sequence length <= 6.
 3. run_tlc.sh — a script invoking the TLC model checker (tla2tools.jar CLI) against SortSpec.tla/SortSpec.cfg, redirecting output to a log file.
@@ -353,7 +358,7 @@ Create experiments/week21_adrs_formal_verification/ with:
 Test it against at least one intentionally-correct baseline sort (TLC should report "No error has been found") and one deliberately broken candidate, e.g. one that drops the last element (TLC should return a counterexample trace naming which invariant failed and on what input). Run adrs_gate.py over 5 saved candidates and show verification_log.jsonl.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> "TLC found no counterexample" means the algorithm is correct <em>for the bounded model you defined</em> — not for arbitrary-length inputs, and not automatically for the real Python implementation. That transfer is the refinement argument; skipping it silently reintroduces the false confidence you were trying to eliminate. A related trap: an invariant too weak to catch the hack you care about — checking only "output is sorted" and forgetting "output is a permutation of input" would let a candidate that returns <code>&lt;&lt;1,2,3&gt;&gt;</code> regardless of input pass silently.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-21/day-01-log.md</code>: what is the largest input class your <code>SortSpec.tla</code> model does <strong>not</strong> cover, and why did you choose that bound?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m28-formal-methods/day-01-formal-verification-refinement/log.md</code>: what is the largest input class your <code>SortSpec.tla</code> model does <strong>not</strong> cover, and why did you choose that bound?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -367,9 +372,9 @@ Test it against at least one intentionally-correct baseline sort (TLC should rep
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-20/day-06-adrs-implementation-simulation-execution.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ADRS Implementation &amp; Simulation Execution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-23/day-01-screencast-production-code.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Screencast Production (Code)</span></a>
+  <a class="lnav prev" href="../../m26-adrs/day-12-adrs-implementation-simulation-execution/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ADRS Implementation &amp; Simulation Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m29-ship-outreach/day-01-screencast-production-code/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Screencast Production (Code)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -469,9 +474,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What does it mean for TLC to report that an invariant "holds" after model checking a spec?',
-  opts:['The algorithm has been tested successfully on a large random sample of inputs','Every reachable state in the (bounded) model was exhaustively explored and none violated the invariant','The algorithm has been mathematically proven correct for all possible inputs of any size','The pytest test suite passed with 100% code coverage'],
-  ans:1, fb:'Right. TLC does exhaustive search over the model you defined, not sampling — but the guarantee is scoped to that bounded model (e.g. arrays of length <= 6), not to unbounded real-world inputs, which is why "proven for all inputs of any size" overclaims.'},
+ {q:'1. TLC reports "No error found" on your SortSpec, so you ship the candidate — but in production it mis-sorts a real 30-element array. The spec, the invariant, and the TLC run all looked correct. Where do you look FIRST, and why?',
+  opts:['Rerun TLC with a different random seed, since model checking is nondeterministic and may have missed the state','Check the model bounds in the .cfg file first: TLC only proved the invariant for the tiny bounded model (e.g. length <= 6, |Values| <= 4), so a bug that only appears at length 30 is completely outside what was checked — a green result there says nothing about it','Assume TLA+ has a bug and switch to a different model checker','Add more pytest cases, since the formal check clearly cannot be trusted at all'],
+  ans:1, fb:'Right. This is the too-small-bound failure: TLC exhaustively and truthfully checked a model you deliberately shrank, so "No error found" is only a claim about lengths <= 6 and <= 4 distinct values. A bug at length 30 was never in the search space. The first move is to read the bound and ask "is it at least as large as the smallest input that could trigger the failure class I care about?" The other options misdiagnose it: TLC is deterministic (not a seed problem), and the tool is not broken — the bound was.'},
  {q:'2. In the ADRS loop, what specifically is "reward hacking"?',
   opts:['The LLM runs out of context window and produces truncated code','The evaluator crashes due to a malformed candidate','The candidate improves the measured score by exploiting a gap between the metric and the true goal, rather than genuinely improving the system','The model checker times out due to state explosion'],
   ans:2, fb:'Right. Reward hacking is a candidate that games the scalar objective (e.g. dropping workloads to look faster) without doing the intended task — the load-balancer example and demo ① above.'},

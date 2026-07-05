@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-architecture-sizing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Architecture Sizing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-10/day-01-evaluation-infrastructure.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Infrastructure</span></a>
+  <a class="lnav prev" href="../day-07-architecture-sizing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Architecture Sizing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-evaluation-infrastructure/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Infrastructure</span></a>
 </nav>
 
 
@@ -298,6 +298,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The overfit-10 check</strong> — the cheapest possible test that your loss, mask, and gradients are wired correctly, before you spend an hour training on millions of examples.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Friday's architecture (random weights) → today's loss function scores the guesses → <code>jax.value_and_grad</code> turns loss into a direction of improvement → the Optax chain (clip then Adam, on a schedule) turns that direction into a safe parameter update → repeated thousands of times → a model that can add.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The loss reduction is one line of code, and it is the line most likely to be quietly wrong. The optimizer chain gives you stability, but not for free.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): naive mean instead of masked mean.</b> Writing <code>jnp.mean(losses)</code> over the whole <code>[batch, seq_len]</code> loss array is a one-word change from the correct masked reduction, and it runs without any error — the loss is still a scalar, gradients still flow, the curve still goes down. But now the model is graded on the prompt digits and the pad positions, not just the answer it is supposed to produce. It spends most of its gradient learning to copy the input, and answer accuracy stays low while loss looks fine. A senior engineer catches this in <b>code review</b> by insisting the reduction is <code>jnp.sum(losses * mask) / jnp.sum(mask)</code> over answer positions only, and by sanity-checking that a masked and unmasked loss on the same batch give clearly different numbers.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: gradient clipping trades peak speed for not blowing up.</b> Clipping the global gradient norm to 1.0 guarantees no single hard batch can send a giant gradient through and wreck the weights in one step. The cost is that on the rare batch where a large, honest gradient really was warranted, you have thrown away magnitude and taken a smaller step than the data called for — so clipping can slightly slow convergence in exchange for stability. Whether to clip, and at what norm, is a <b>design-review</b> decision: too tight and you crawl, too loose and one bad batch can undo hours of training.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -328,41 +333,41 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
   <section class="sec" id="s7" data-sec="produce">
     <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Prove the loop works, then record the baseline</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>Today's task (from the curriculum) is two linked artifacts, one per day, both under <code>experiments/week09_jax/</code>.</p>
+      <p>Today's task (from the curriculum) is two linked artifacts, one per day, both under <code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/</code>.</p>
       <h4>Saturday artifact — the training loop + gradient-flow proof</h4>
       <ul>
-        <li><code>experiments/week09_jax/src/train.py</code> — the masked cross-entropy <code>loss_fn</code>, the Optax chain (<code>clip_by_global_norm</code> + <code>adam</code> with a <code>warmup_cosine_decay_schedule</code>), the jitted <code>train_step</code>, and a <code>run_overfit_check()</code> function that trains on a frozen 10-example batch.</li>
-        <li><code>experiments/week09_jax/tests/test_overfit.py</code> — a <code>pytest</code> test asserting the loss on the frozen 10-example batch drops below a fixed threshold (e.g. <code>1e-4</code>) within a fixed step budget (e.g. 500 steps).</li>
-        <li><code>experiments/week09_jax/results/overfit_loss_curve.png</code> (or a <code>.json</code> of logged losses) showing loss vs. step trending to ~0.</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py</code> — the masked cross-entropy <code>loss_fn</code>, the Optax chain (<code>clip_by_global_norm</code> + <code>adam</code> with a <code>warmup_cosine_decay_schedule</code>), the jitted <code>train_step</code>, and a <code>run_overfit_check()</code> function that trains on a frozen 10-example batch.</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py</code> — a <code>pytest</code> test asserting the loss on the frozen 10-example batch drops below a fixed threshold (e.g. <code>1e-4</code>) within a fixed step budget (e.g. 500 steps).</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/results/overfit_loss_curve.png</code> (or a <code>.json</code> of logged losses) showing loss vs. step trending to ~0.</li>
       </ul>
       <h4>Sunday artifact — baseline full-dataset training run</h4>
       <ul>
-        <li><code>experiments/week09_jax/src/train_full.py</code> (or extend <code>train.py</code>) — reuses <code>train_step</code>, now fed by the full synthetic generator with a held-out split, plus an <code>exact_match_accuracy(model, params, holdout_batch)</code> function that greedy-decodes and compares full answer strings.</li>
-        <li><code>experiments/week09_jax/results/baseline_metrics.json</code> — final training loss, hold-out exact-match accuracy, total training steps, wall-clock time, and (from a <code>jax.profiler.trace</code>) whether the step was compute-bound.</li>
-        <li><code>experiments/week09_jax/EXPERIMENT_LOG.md</code> — filled out per the skill's template, explicitly recording the baseline exact-match accuracy number that later weeks (scaling-law sweep, MoE upgrade) will be measured against.</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py</code> (or extend <code>train.py</code>) — reuses <code>train_step</code>, now fed by the full synthetic generator with a held-out split, plus an <code>exact_match_accuracy(model, params, holdout_batch)</code> function that greedy-decodes and compares full answer strings.</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/results/baseline_metrics.json</code> — final training loss, hold-out exact-match accuracy, total training steps, wall-clock time, and (from a <code>jax.profiler.trace</code>) whether the step was compute-bound.</li>
+        <li><code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/EXPERIMENT_LOG.md</code> — filled out per the skill's template, explicitly recording the baseline exact-match accuracy number that later weeks (scaling-law sweep, MoE upgrade) will be measured against.</li>
       </ul>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>pytest experiments/week09_jax/tests/test_overfit.py</code> passes; the logged loss curve visibly reaches near-zero, not a plateau; the run is reproducible from <code>experiments/week09_jax/README.md</code>'s documented command.</li>
+        <li><code>pytest sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py</code> passes; the logged loss curve visibly reaches near-zero, not a plateau; the run is reproducible from <code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/README.md</code>'s documented command.</li>
         <li><code>baseline_metrics.json</code> exists with a non-null <code>exact_match_accuracy</code> field measured on data the model never trained on; <code>EXPERIMENT_LOG.md</code> documents that number as "baseline" in plain language a future you can reread without re-deriving it.</li>
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> the most common silent failure is averaging the loss over ALL sequence positions (prompt tokens and padding) instead of only the answer digits. Prompt and padding are trivially easy to predict, so the averaged loss looks like it's decreasing nicely — while the real signal for learning arithmetic gets diluted. Always build an explicit loss mask over the answer span, and sanity-check by printing <code>mask.sum()</code> per example.</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week09_jax/src/train.py</code> and <code>tests/test_overfit.py</code> with the bullets above, then extend into <code>train_full.py</code> for Sunday.</p>
+      <p>Build <code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py</code> and <code>tests/test_overfit.py</code> with the bullets above, then extend into <code>train_full.py</code> for Sunday.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 9 Day 6 artifact.
 
-Two linked artifacts under experiments/week09_jax/:
+Two linked artifacts under sessions/m12-addition-transformer/day-08-training-loop-baseline-training/:
 
 Saturday — src/train.py: a masked cross-entropy loss_fn (optax.softmax_cross_entropy_with_integer_labels, masked mean over answer positions only, NOT plain jnp.mean), an Optax chain of optax.clip_by_global_norm(1.0) + optax.adam(learning_rate=optax.warmup_cosine_decay_schedule(...)), a jax.jit-wrapped train_step built from jax.value_and_grad(loss_fn), and a run_overfit_check() that trains on a frozen 10-example batch for 500 steps. tests/test_overfit.py: a pytest test asserting the loss on that frozen batch drops below 1e-4 within 500 steps. results/overfit_loss_curve.png (or .json) showing loss vs. step trending to ~0.
 
 Sunday — extend into train_full.py: reuse train_step, feed it from the full synthetic generator (Wednesday's work) with a held-out split, add exact_match_accuracy(model, params, holdout_batch) that greedy-decodes and compares full answer strings. Write results/baseline_metrics.json (final loss, hold-out exact-match accuracy, total steps, wall-clock time, compute-bound check from jax.profiler.trace) and EXPERIMENT_LOG.md per the skill's template, recording the baseline exact-match accuracy number in plain language.
 
-Acceptance: pytest experiments/week09_jax/tests/test_overfit.py passes; loss curve visibly reaches near-zero; baseline_metrics.json has a non-null exact_match_accuracy measured on held-out data.</pre>
+Acceptance: pytest sessions/m12-addition-transformer/day-08-training-loop-baseline-training/experiment.py passes; loss curve visibly reaches near-zero; baseline_metrics.json has a non-null exact_match_accuracy measured on held-out data.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-09/day-06-log.md</code>: why does clipping come before Adam in <code>optax.chain(...)</code>, and what would go wrong if the order were reversed?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-08-training-loop-baseline-training/log.md</code>: why does clipping come before Adam in <code>optax.chain(...)</code>, and what would go wrong if the order were reversed?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -376,9 +381,9 @@ Acceptance: pytest experiments/week09_jax/tests/test_overfit.py passes; loss cur
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-architecture-sizing.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Architecture Sizing</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-10/day-01-evaluation-infrastructure.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Infrastructure</span></a>
+  <a class="lnav prev" href="../day-07-architecture-sizing/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Architecture Sizing</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-evaluation-infrastructure/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evaluation Infrastructure</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -482,9 +487,9 @@ var QS=[
  {q:'2. You overfit a batch of 10 examples and the loss plateaus at exactly log(13) (~2.56) instead of going to zero, where 13 is your vocab size. What does this number specifically suggest?',
   opts:['The learning rate is too high and gradients are exploding','The model is behaving like it\'s guessing uniformly at random over the vocabulary — a sign gradients aren\'t flowing or the loss/labels are misaligned','This is expected behavior after full convergence','The padding mask is too aggressive and is removing all real tokens'],
   ans:1, fb:'Right. log(V) for vocab size V is exactly the cross-entropy loss of a uniform random guess; sitting at that number means the model\'s output distribution isn\'t updating meaningfully toward the correct answer, pointing to a gradient-flow or label-alignment bug.'},
- {q:'3. Why must the padded, fixed-length input shape from Thursday\'s work be reused unchanged by today\'s <code>@jax.jit</code>-wrapped <code>train_step</code>?',
-  opts:['Flax modules require fixed shapes to initialize parameters at all','JAX\'s JIT traces and compiles a new XLA program whenever it sees a new input shape, so varying shapes across training steps would trigger constant, expensive recompilation','optax.apply_updates only accepts arrays of a single fixed shape globally','Fixed shapes are required only for TPU, not for GPU or CPU backends'],
-  ans:1, fb:'Right. JAX\'s JIT compiles per unique input shape/dtype signature; an addition-transformer training loop that received variable-length sequences would recompile on nearly every batch, dominating wall-clock time with compilation rather than computation.'},
+ {q:'3. Training runs with no errors and the loss drops smoothly to a low value, but held-out exact-match accuracy barely moves and sampled outputs look like the model is echoing the input digits rather than computing the sum. Where do you look first?',
+  opts:['Raise the learning rate, since low accuracy always means the model is training too slowly','Check the loss reduction: if it uses jnp.mean over the whole [batch, seq_len] array instead of a masked mean over answer positions, the model is being graded on prompt and pad tokens and learns to copy the input','Add more layers, because the model is clearly too small to add','Increase the batch size to smooth out the accuracy metric'],
+  ans:1, fb:'Right. A loss that looks great while accuracy stalls and outputs echo the prompt is the signature of a naive-mean bug. jnp.mean(losses) averages over prompt, answer, and pad positions, so most of the gradient teaches the model to reproduce positions it was already given. Switch to jnp.sum(losses * mask) / jnp.sum(mask) over answer positions only. The learning-rate, depth, and batch-size answers all treat a symptom without checking the one line most likely to be wrong.'},
  {q:'4. What is the correct definition of the baseline exact-match accuracy metric for this capstone, as distinct from training loss?',
   opts:['The fraction of individual output tokens (including padding) that match the target, averaged over the training set','The masked cross-entropy loss evaluated on the hold-out set instead of the training set','The fraction of hold-out addition problems where the model\'s full greedy-decoded answer string matches the true sum exactly, digit for digit','The percentage improvement in loss between the first and last training step'],
   ans:2, fb:'Right. Exact-match accuracy is a discrete, per-problem pass/fail metric on held-out (unseen) problems — the whole predicted answer must match the true sum exactly — a stricter and more interpretable signal than the smooth, per-token loss value used to drive gradients.'}

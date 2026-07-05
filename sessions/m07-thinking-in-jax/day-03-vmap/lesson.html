@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-prng-keys.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Randomness: Explicit Keys</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-jit.html"><span class="lnav-dir">Next →</span><span class="lnav-t">jit: Compilation</span></a>
+  <a class="lnav prev" href="../day-02-prng-keys/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Randomness: Explicit Keys</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-jit/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">jit: Compilation</span></a>
 </nav>
 
 
@@ -291,6 +291,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable</strong> — <code>vmap</code> stacks with <code>jit</code> (compile) and <code>grad</code> (gradients). E.g. <code>vmap(grad(loss))</code> gives you a per-example gradient with no extra code.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> pure functions (Days 1–2) → JAX can transform them → <code>vmap</code> rewrites "one example" into "whole batch" automatically → fast, correct, composable batching.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p><code>vmap</code> is powerful because it hides the batch dimension, but that same hiding is exactly what lets a wrong-axis bug slip through without a crash.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mapping the wrong axis with a bad <code>in_axes</code>.</b> Say your batch is <code>X</code> of shape <code>(batch, features)</code> but you (or a transpose upstream) hand vmap data shaped <code>(features, batch)</code> and leave <code>in_axes=0</code>. vmap dutifully slices along axis 0 — now it treats each <em>feature</em> as an "example" and each real example as a "feature". The shapes can still line up, so there is no error; the numbers just come out subtly wrong and the model learns garbage. A senior engineer checks in code review that <code>in_axes</code> points at the true batch axis of <em>each</em> argument, and prints the shape going in and the shape coming out.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hidden batching for lost visibility.</b> vmap lets you write clean single-example code and get batching for free, which removes a whole class of manual batch-dimension bugs. The cost is that the batch axis is now invisible in your function body — when a shape goes wrong, there is no explicit loop to read, so you must reason about <code>in_axes</code> instead of a line of code. The design-review question: is the cleaner single-example logic worth giving up the explicit, easy-to-eyeball loop? For accelerator code, almost always yes.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -329,20 +334,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Prove it matches a for-loop: assert <code>batched(X)</code> equals <code>jnp.stack([forward(x) for x in X])</code>.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Extend <code>experiments/week01_jax/mlp_prng.py</code> into <code>experiments/week01_jax/mlp_vmap.py</code> with the four bullets above.</p>
+      <p>Extend <code>sessions/m07-thinking-in-jax/day-03-vmap/experiment.py</code> into <code>sessions/m07-thinking-in-jax/day-03-vmap/experiment.py</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 1 Day 3 artifact.
 
-Create experiments/week01_jax/mlp_vmap.py that:
+Create sessions/m07-thinking-in-jax/day-03-vmap/experiment.py that:
 1. Reuses the Day 2 MLP: weights W1 (4x8), b1, W2 (8x2), b2 initialized from split keys, and forward(x) = tanh(x @ W1 + b1) @ W2 + b2 for a single input vector of shape (4,).
 2. Builds a batch X of shape (32, 4) from a random key.
 3. Defines batched = jax.vmap(forward) and calls batched(X); prints the output shape (should be (32, 2)).
 4. Asserts batched(X) equals jnp.stack([forward(x) for x in X]) to prove vmap matches the for-loop.
 Add a brief comment on each step explaining vmap, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-01/day-03-log.md</code>: in <code>vmap(forward)</code>, why don't the weights <code>W1, W2</code> need a batch dimension? (Hint: <code>in_axes</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-03-vmap/log.md</code>: in <code>vmap(forward)</code>, why don't the weights <code>W1, W2</code> need a batch dimension? (Hint: <code>in_axes</code>.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -356,9 +361,9 @@ Add a brief comment on each step explaining vmap, then run it to confirm it work
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-prng-keys.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Randomness: Explicit Keys</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-jit.html"><span class="lnav-dir">Next →</span><span class="lnav-t">jit: Compilation</span></a>
+  <a class="lnav prev" href="../day-02-prng-keys/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Randomness: Explicit Keys</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-jit/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">jit: Compilation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -473,9 +478,9 @@ var QS=[
  {q:'2. You wrote <code>f</code> for a single example. To run it on a batch <code>X</code>, the JAX way is...',
   opts:['for x in X: f(x)','jax.vmap(f)(X)','f(X) and hope broadcasting works','rewrite f by hand with batch dimensions'],
   ans:1, fb:'Right. jax.vmap(f)(X) batches it for you — no loop, and f stays written for one example.'},
- {q:'3. What does <code>in_axes</code> control?',
-  opts:['How fast vmap runs','Which argument/axis is the batch — and None means "hold this one fixed / broadcast it"','The output data type','The random seed'],
-  ans:1, fb:'Right. in_axes=0 maps over axis 0 of an argument; in_axes=None keeps that argument fixed across the batch (e.g. shared weights).'},
+ {q:'3. Your batched model runs with no shape error, but the loss never drops and the outputs look scrambled. Your input <code>X</code> is shaped <code>(features, batch)</code> after an upstream transpose, and you call <code>jax.vmap(f, in_axes=0)(X)</code>. Where do you look first, and why?',
+  opts:['The optimizer — it must be diverging on this data','The <code>in_axes</code>: with <code>in_axes=0</code> vmap maps over axis 0, but axis 0 here is <em>features</em>, not the batch — so it slices along the wrong dimension and treats each feature as an example. Fix the axis (or the transpose) so vmap maps the true batch axis','The activation function — <code>tanh</code> is scrambling the outputs','Nothing — vmap always maps the correct axis automatically'],
+  ans:1, fb:'Right. This is the wrong-axis trap. <code>in_axes=0</code> tells vmap the batch lives on axis 0, but after the transpose axis 0 is features. The shapes can still be consistent, so JAX raises no error — the mapping is just semantically wrong and the model learns nothing useful. Print the shape going into vmap and confirm <code>in_axes</code> points at the real batch axis.'},
  {q:'4. Why prefer <code>vmap</code> over a Python <code>for</code> loop in JAX?',
   opts:['It looks shorter','It\'s a real vectorized op (fast on GPU/TPU), composes with jit and grad, and avoids manual batch-dimension bugs','Loops are not allowed in Python','vmap uses less memory always'],
   ans:1, fb:'Right. A Python loop is slow and doesn\'t compile into one efficient kernel; vmap vectorizes, runs fast on accelerators, and composes with jit/grad.'}

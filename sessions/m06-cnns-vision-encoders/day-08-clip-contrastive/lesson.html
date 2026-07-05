@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-07-object-detection-intuition.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection Intuition</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-07-object-detection-intuition/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection (Intuition)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
   <header class="hero">
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>A bridge to bigger models:</strong> CLIP's shared space feeds image generators and vision-language chat models.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> "encode two things into one space, then compare" is the same idea you met on Day 6, now spanning images and text. It is the foundation under image search, captioning, and the vision half of multimodal AI.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Cosine only works if you normalize the vectors first, and the contrastive objective quietly depends on a large batch to give a strong signal.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): comparing with a raw dot product instead of cosine.</b> Cosine similarity divides the dot product by both vectors' lengths, so it measures only direction. If you skip the normalization and rank matches by the plain dot product <code>a · b</code>, longer embeddings score higher just for being long — a caption whose vector happens to be large can beat the truly matching one. The code runs and returns scores, so nothing errors; the ranking is just quietly wrong, and zero-shot accuracy drops. A senior engineer, in <b>code review</b>, checks that both image and text embeddings are L2-normalized (unit length) before any dot product, so magnitude cannot leak into the score.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: contrastive learning gets sharper with a bigger batch, which costs memory.</b> The training signal comes from the N×N grid: for each image, the one matching caption is the positive and the other N−1 captions are negatives to push away. A larger batch means more negatives per step, which gives a stronger, cleaner signal and is a big reason CLIP trained on huge batches. What you pay is memory and hardware — the grid and its gradients grow with the batch. How large a batch to run (and whether to use tricks that gather negatives across devices) is the <b>design-review</b> decision.</div></div>
       <button class="gotit" type="button">Got the CLIP idea</button>
     </div>
   </section>
@@ -326,20 +331,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the shared space to yourself — the finale of the whole module. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_clip_zeroshot.py</code>. If you can install <code>open_clip</code> or <code>transformers</code>, load a small CLIP, encode one image and a few text labels ("a photo of a cat", "a photo of a dog", "a photo of a car"), compute cosine similarities, and print which label wins. If you cannot download a model, do a tiny NumPy version: make small fake image and text embeddings, normalize them, and compute the cosine-similarity grid by hand. Run with <code>python3 m06_clip_zeroshot.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py</code>. If you can install <code>open_clip</code> or <code>transformers</code>, load a small CLIP, encode one image and a few text labels ("a photo of a cat", "a photo of a dog", "a photo of a car"), compute cosine similarities, and print which label wins. If you cannot download a model, do a tiny NumPy version: make small fake image and text embeddings, normalize them, and compute the cosine-similarity grid by hand. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 8 (finale) artifact.
 
-Create experiments/foundations/m06_clip_zeroshot.py that, with a comment on each step, demonstrates CLIP-style contrastive matching and zero-shot classification:
+Create sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py that, with a comment on each step, demonstrates CLIP-style contrastive matching and zero-shot classification:
 1. If open_clip or transformers CLIP can be loaded, encodes one image plus a list of text prompts ("a photo of a cat/dog/car"), normalizes the embeddings, computes cosine similarities, and prints the winning label.
 2. Also builds a small pure-NumPy fallback: makes 3 fake image embeddings and 3 fake matching text embeddings, normalizes them, computes the 3x3 cosine-similarity grid, and asserts the diagonal (matching pairs) has the highest score in each row — this is the contrastive objective in miniature.
 3. Prints the similarity grid and clearly states which path (real CLIP or NumPy fallback) ran.
 Then run it and paste the winning label (or the grid) at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-08-log.md</code>: did the matching pair get the highest cosine score, and what surprised you about labeling an image with only text?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/log.md</code>: did the matching pair get the highest cosine score, and what surprised you about labeling an image with only text?</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
   </section>
@@ -353,9 +358,9 @@ Then run it and paste the winning label (or the grid) at the bottom as a comment
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-07-object-detection-intuition.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection Intuition</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-07-object-detection-intuition/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Object Detection (Intuition)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -471,9 +476,9 @@ var QS=[
  {q:'3. Cosine similarity of 1 between an image and a text embedding means:',
   opts:['they are unrelated','they point the same way — a strong match','the image is blank','the text is empty'],
   ans:1, fb:'Right. Cosine measures the angle between vectors; 1 means same direction, so the image and caption match well.'},
- {q:'4. Why can CLIP do zero-shot classification?',
-  opts:['it was trained on every class','you can describe any class as text and compare it to the image embedding, even for unseen classes','it guesses randomly','it only works on training images'],
-  ans:1, fb:'Right. Encode the class names as text and pick the highest cosine score — no training on those specific categories needed.'}
+ {q:'4. Your CLIP-style zero-shot classifier runs fine but keeps picking a few captions far too often, no matter the image, and accuracy is low. You are ranking matches by a[i]·b[i] summed over the vector. What is the most likely cause?',
+  opts:['The image encoder is too small','You skipped L2-normalization: a plain dot product rewards longer embeddings, so captions whose vectors happen to be large win regardless of direction; normalize both embeddings to unit length first so cosine measures only direction','There are too few classes to compare against','The captions must all be the same length in words'],
+  ans:1, fb:'Right. Cosine similarity divides the dot product by both vector lengths, so it measures only direction. If you rank by the raw dot product without normalizing, longer vectors score higher just for being long, so a few large-magnitude captions dominate every image. L2-normalize both embeddings to unit length before the dot product. It is not the encoder size, the class count, or the caption word length.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

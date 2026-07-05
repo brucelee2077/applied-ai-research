@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-data-engineering-automation-ruleflow.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Engineering Automation (RuleFlow)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-adrs-implementation-simulation-execution.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ADRS Implementation & Simulation Execution</span></a>
+  <a class="lnav prev" href="../day-10-data-engineering-automation-ruleflow/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Eng Automation (RuleFlow)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-12-adrs-implementation-simulation-execution/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ADRS Implementation</span></a>
 </nav>
 
 
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> ADRS concept (Week 19) → research results show the loop works at scale (FunSearch/AlphaEvolve/EvoPrompt) → running that loop unattended requires orchestration + context management + reliable parsing → Saturday's script can only survive 12 hours because this layer exists.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The most consequential mistake:</b> treating parsing as an afterthought ("just wrap the exec in a try/except") instead of a strict, deny-by-default gate. A too-permissive parser can let syntactically-valid-but-semantically-wrong code (e.g. code that special-cases the test inputs — reward hacking, same risk flagged Week 19 Friday, now surfacing at the engineering layer) reach the evaluator and get selected as a "winner." The fix: parse strictly, execute only inside a resource-and-time-limited subprocess (never in-process <code>exec</code>), and always fail closed — a broken candidate is discarded, never silently stored as "score 0 but valid."</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Context management keeps the prompt small enough to run for hours — but the same trimming that prevents a crash can quietly throw away the one thing the search depends on.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): context trimming evicts the champion.</b> A prompt that grows forever eventually crashes (the loud failure) — so you summarize or keep only the top-K past candidates. The quiet danger is the trimming policy dropping the current best program, or dropping all the diverse-but-lower-scoring parents, so the LLM stops seeing what it should build on. The loop keeps running with no error; the score just quietly plateaus or drifts back down as the model regenerates ideas it had already surpassed. A senior engineer catches this in <b>code review</b> by checking that the context policy <em>always</em> retains the best-so-far candidate (and some diversity) no matter how it summarizes the rest, and by logging what got evicted each generation to confirm the champion never silently leaves the prompt.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: prompt richness vs. token budget and cost.</b> Feeding the LLM more history — every past candidate, its score, and its feedback — gives it more to learn from and usually better offspring, but it burns tokens fast, costs more per call, and eventually overflows the fixed context window. Aggressively summarizing keeps every call cheap and safe from overflow but risks starving the model of the signal it needs. In a <b>design review</b> this is the explicit knob for a long unattended run: how much history to keep verbatim, how much to compress into a short natural-language summary, and what you promise never to drop (the champion).</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -328,19 +333,19 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): review the system-level Python code required to orchestrate an LLM agent, manage its context window, and parse its code outputs reliably — then build a small, testable skeleton of exactly that, using a stub/mock LLM function so no live API calls are required.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>experiments/week20_adrs/day05_agent_scaffolding/orchestrator.py</code> exists and defines <code>select_context</code>, <code>build_prompt</code>, and <code>parse_llm_output</code>.</li>
-        <li><code>pytest experiments/week20_adrs/day05_agent_scaffolding/test_orchestrator.py</code> passes with at least 4 test cases, including one malformed-code case and one oversized-context case.</li>
+        <li><code>sessions/m26-adrs/day-11-agentic-scaffolding/experiment.py</code> exists and defines <code>select_context</code>, <code>build_prompt</code>, and <code>parse_llm_output</code>.</li>
+        <li><code>pytest sessions/m26-adrs/day-11-agentic-scaffolding/experiment.py</code> passes with at least 4 test cases, including one malformed-code case and one oversized-context case.</li>
         <li>No live network/API calls required for tests to pass (mock/stub the LLM call).</li>
         <li><code>README.md</code> in the same directory explains, in plain language, the malformed-output failure mode each test guards against.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week20_adrs/day05_agent_scaffolding/orchestrator.py</code> with the three functions above, plus a <code>test_orchestrator.py</code> and a <code>README.md</code> naming which piece of Karpathy's <code>autoresearch</code> repo (or equivalent reasoning) inspired each function.</p>
+      <p>Create <code>sessions/m26-adrs/day-11-agentic-scaffolding/experiment.py</code> with the three functions above, plus a <code>test_orchestrator.py</code> and a <code>README.md</code> naming which piece of Karpathy's <code>autoresearch</code> repo (or equivalent reasoning) inspired each function.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 20 Day 5 artifact.
 
-Create experiments/week20_adrs/day05_agent_scaffolding/orchestrator.py that implements:
+Create sessions/m26-adrs/day-11-agentic-scaffolding/experiment.py that implements:
 1. select_context(storage) -- a function choosing which past candidates to include in the next prompt (e.g. top-K by score plus one diverse/low-score example).
 2. build_prompt(selected_candidates, failure_summary, token_budget) -- a function that assembles and token-counts a prompt and truncates/summarizes history when over the configurable token_budget.
 3. parse_llm_output(raw_text) -- a function that extracts a fenced ```python code block from raw_text, validates it with ast.parse, and returns either a valid Candidate or a structured parse-failure result (never raises on malformed input).
@@ -352,7 +357,7 @@ Also create README.md explaining, in plain language, which part of Karpathy's au
 
 Run pytest to confirm all tests pass before finishing.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-20/day-05-log.md</code>: why must <code>parse_llm_output</code> fail closed (discard on error) instead of falling back to "score 0 but still stored as valid"? (Hint: reward hacking risk from Week 19 Friday, now at the engineering layer.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m26-adrs/day-11-agentic-scaffolding/log.md</code>: why must <code>parse_llm_output</code> fail closed (discard on error) instead of falling back to "score 0 but still stored as valid"? (Hint: reward hacking risk from Week 19 Friday, now at the engineering layer.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -366,9 +371,9 @@ Run pytest to confirm all tests pass before finishing.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-data-engineering-automation-ruleflow.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Engineering Automation (RuleFlow)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-adrs-implementation-simulation-execution.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ADRS Implementation & Simulation Execution</span></a>
+  <a class="lnav prev" href="../day-10-data-engineering-automation-ruleflow/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Eng Automation (RuleFlow)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-12-adrs-implementation-simulation-execution/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ADRS Implementation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -473,9 +478,9 @@ var QS=[
  {q:'1. What is the primary job of "orchestration" in an ADRS agent loop?',
   opts:['Training the LLM\'s weights on evaluator feedback','Deciding which past candidates to show the LLM next and when to call the API, evaluator, and storage','Compiling the generated code to machine instructions for speed','Formally verifying the final candidate with TLA+'],
   ans:1, fb:'Right. Orchestration is the control-flow/selection logic that drives the loop — it does not train weights or verify correctness; those are separate concerns.'},
- {q:'2. Why is context window management necessary in a long-running ADRS loop, even though the model\'s context window is fixed and known in advance?',
-  opts:['Because the LLM API charges a flat fee regardless of prompt length, so length doesn\'t matter','Because if you naively append every past candidate and log to the prompt every generation, the prompt eventually exceeds the token limit and the API call fails','Because longer prompts always produce lower-quality code from the LLM','Because context window limits only apply to output tokens, not input tokens'],
-  ans:1, fb:'Right. Prompt size grows with history if you don\'t prune/summarize it, so an unmanaged 12-hour run will eventually hit context_length_exceeded and crash unattended.'},
+ {q:'2. You added context management to keep the prompt under the token limit, so the 12-hour run no longer crashes. But the best score, which had been climbing, quietly plateaus and even drifts down for a while. No errors. Where do you look first, and why?',
+  opts:['The LLM API must be rate-limiting you, so add longer sleeps between calls','The context-trimming policy: an over-aggressive summarize/top-K rule can evict the current champion or the diverse parents the LLM needs to build on, so the model stops seeing its best prior work and regenerates ideas it had already beaten — check that the policy always retains the best-so-far candidate and log what gets evicted each generation','The evaluator sandbox is too strict, so loosen the correctness gate','Nothing is wrong — a plateau always means the search found the optimum'],
+  ans:1, fb:'Right. Fixing the overflow crash is the loud win; the quiet cost is what the trimming throws away. If the policy can drop the champion or all the useful diversity, the LLM loses the signal it needs and the score stalls or regresses — with no error, because dropping context is "normal." The first move is to verify the context policy never evicts the best-so-far candidate (and keeps some diversity), and to log evictions. Rate limits would show as errors/timeouts, not a silent quality plateau.'},
  {q:'3. In reliable output parsing, what should happen immediately after extracting a code block from the LLM\'s raw text response, and before sending it to the evaluator sandbox?',
   opts:['Execute it directly to save time, since the evaluator will catch errors anyway','Run a syntax check (e.g. ast.parse) so a SyntaxError is caught before ever attempting to run untrusted, possibly malformed code','Immediately discard it and end the run, since any parsing step implies the candidate is unusable','Translate it into a different programming language for portability'],
   ans:1, fb:'Right. Validating syntax first prevents wasting evaluator time/resources on code that can\'t even parse, and avoids treating garbage as a real evaluated candidate.'},

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-batching-economics.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-quantization-intro.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro (LLM.int8)</span></a>
+  <a class="lnav prev" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-quantization-intro/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro</span></a>
 </nav>
 
 
@@ -223,7 +223,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Training gives you a big pile of weights that can predict the next word. <span class="term" data-tip="The job of running a trained model in real use, so many people can use it at the same time, cheaply and fast.">Serving</span> is the separate engineering job of taking those weights and running them in production so <strong>many people at once</strong> can chat with the model, cheaply and fast. This is called <span class="term" data-tip="The full design for running a big language model in real use, handling chips, memory, and many waiting users.">LLM serving architecture</span>. It is where scaling-law theory meets real chips, real memory limits, and real angry users waiting for a reply.</p>
 
       <h4>Term 1 — the KV cache</h4>
-      <p>A transformer generates text one word (<span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span>) at a time. Each new token needs to "look back" at every earlier token using attention. Recomputing that look-back from scratch at every step would be wastefully slow. So instead, the model saves each token's <span class="term" data-tip="A tiny array in JAX that controls randomness. You pass it into random calls so results are explicit and repeatable.">key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">value</span> vectors — small number lists produced by attention — the first time it computes them, into a buffer called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>. Every later token just reads this cache instead of recomputing it.</p>
+      <p>A transformer generates text one word (<span class="term" data-tip="One small chunk of text, roughly a word or part of a word, that a model reads or writes one at a time.">token</span>) at a time. Each new token needs to "look back" at every earlier token using attention. Recomputing that look-back from scratch at every step would be wastefully slow. So instead, the model saves each token's <span class="term" data-tip="One of two small number lists (with the value) that attention makes per token, used so later tokens can look back at this one.">key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">value</span> vectors — small number lists produced by attention — the first time it computes them, into a buffer called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>. Every later token just reads this cache instead of recomputing it.</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>KV cache size = 2 × bytes_per_element × H × K × L × T</code><br><span style="font-size:.85rem;color:var(--text2)">H = size of one attention head, K = number of KV heads, L = number of layers, T = tokens cached so far, and the 2 is because you store both keys AND values.</span></div></div>
 
       <h4>Term 2 — prefill vs. decode</h4>
@@ -291,6 +291,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The fix composes</strong> — PagedAttention (no padding waste) + continuous batching (no idle slots) + disaggregated serving (each phase gets hardware suited to its bottleneck) is the backbone of vLLM, JetStream, and TensorRT-LLM.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> roofline math (compute-bound vs. memory-bound) → decode is memory-bound because FLOPs per token are tiny but the KV cache must reload every step → fragmentation wastes the very memory decode depends on → PagedAttention + continuous batching + disaggregation fix it in production.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Serving math looks like accounting, so the numbers always add up on the whiteboard. The two things below are what a staff engineer watches for once that math meets a real, fixed-size chip.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): sizing concurrency from average KV cache size.</b> A common bug is to compute how many concurrent users fit by dividing free HBM by the KV cache of an <em>average-length</em> request. Nothing errors — the capacity plan looks generous and the service runs fine most of the time. But KV cache grows with context length, so a handful of long conversations quietly consume the memory budgeted for many short ones; the scheduler then either evicts/preempts running requests or refuses new ones, and <span class="term" data-tip="The 95th/99th percentile of latency — the slow tail a small fraction of users actually feel.">tail latency</span> spikes exactly when traffic is heaviest. In <b>code review</b>, a senior engineer asks whether the concurrency limit is sized against the <em>maximum</em> context length (or a real length distribution with headroom), not the mean, and whether there is an admission/eviction policy for when the KV budget is exceeded.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: PagedAttention trades a little kernel complexity for a lot of usable memory.</b> Storing each sequence's KV cache in fixed-size pages (instead of one contiguous block sized to the max length) almost eliminates the padding fragmentation that otherwise wastes HBM — so you fit far more concurrent users per chip. The bill is a more complex attention kernel that follows a page table (a small indirection cost per step) and a memory manager to track pages. In a <b>design review</b> the question is whether the throughput and concurrency gain justifies that complexity — for a high-traffic multi-tenant service it clearly does, which is why vLLM and JetStream build on it, but a single-user, fixed-length workload may not need it at all.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -333,29 +338,29 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li>File exists at <code>experiments/week06_jax/day04_llama3_serving_roofline.py</code>, runs end-to-end with <code>python3 day04_llama3_serving_roofline.py</code>, no errors, only numpy/matplotlib.</li>
+        <li>File exists at <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py</code>, runs end-to-end with <code>python3 day04_llama3_serving_roofline.py</code>, no errors, only numpy/matplotlib.</li>
         <li>Printed output reproduces, within 5%: (a) 160kB/token KV cache, (b) 112GB total memory / 17ms step time at batch 32 on 4x2, (c) 0.91s prefill latency at 8192 tokens/40% MFU/16 chips, (d) P≈3G prefill:decode server ratio.</li>
         <li>At least one saved PNG plot showing the latency/throughput tradeoff curve across batch sizes.</li>
         <li>The fragmentation simulation prints a concrete wasted-HBM percentage under naive allocation and a concrete "how many more concurrent users fit" number under paged allocation.</li>
         <li>A short (under 1 page) <code>day04_llama3_serving_roofline.md</code> writeup stating the four numbers above and one sentence on what PagedAttention buys you concretely (the wasted-memory percentage found).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week06_jax/day04_llama3_serving_roofline.py</code> and its writeup directly from the bullets above.</p>
+      <p>Build <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py</code> and its writeup directly from the bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 6 Day 4 artifact: analyze the deployment architecture necessary to serve concurrent users without catastrophic memory fragmentation.
 
-Create experiments/week06_jax/day04_llama3_serving_roofline.py (pure numpy/matplotlib) that:
+Create sessions/m16a-inference-economics/day-04-serving-llama3-tpus/experiment.py (pure numpy/matplotlib) that:
 1. Hardcodes LLaMA 3-70B's config (L=80, D=8192, F=28672, N=64, K=8, H=128) and TPU v5e specs (HBM bandwidth 8.2e11 B/s, bf16 FLOPs/s 1.97e14).
 2. Implements kv_cache_size_per_token(K, H, L, bytes_per_element) and reproduces the 160kB/token int8 result.
 3. Implements step_time(batch_size, seq_len, param_bytes, kv_bytes_per_token, num_chips, hbm_bw, flops) matching the curriculum's roofline formula, and reproduces the 17ms/batch-32/4x2 worked example (within 5%).
-4. Sweeps batch size 1-512 at TPU v5e 4x4 (16 chips) for seq lengths 2048 and 8192, and saves a PNG plot of latency vs. throughput under experiments/week06_jax/.
+4. Sweeps batch size 1-512 at TPU v5e 4x4 (16 chips) for seq lengths 2048 and 8192, and saves a PNG plot of latency vs. throughput under sessions/m16a-inference-economics/day-04-serving-llama3-tpus/.
 5. Adds a naive-contiguous vs. paged-allocation memory-fragmentation simulation (N requests, random prompt/decode lengths, max context 8192, median decode 512, 256-token pages) and prints the wasted-memory percentage and how many more concurrent requests paging serves in a 16GB/chip budget.
 6. Computes the prefill:decode server ratio as a standalone parameterized function, reproducing P≈3G for the 8192-prefill/512-decode example.
-Also write experiments/week06_jax/day04_llama3_serving_roofline.md (under 1 page) stating the four reproduced numbers and one sentence on what PagedAttention buys you concretely. Run it to confirm everything works and matches within 5%.</pre>
+Also write sessions/m16a-inference-economics/day-04-serving-llama3-tpus/day04_llama3_serving_roofline.md (under 1 page) stating the four reproduced numbers and one sentence on what PagedAttention buys you concretely. Run it to confirm everything works and matches within 5%.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-06/day-04-log.md</code>: what wasted-memory percentage did naive allocation produce, and how many more concurrent users did paging buy you at the same 16GB/chip budget?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-04-serving-llama3-tpus/log.md</code>: what wasted-memory percentage did naive allocation produce, and how many more concurrent users did paging buy you at the same 16GB/chip budget?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -369,9 +374,9 @@ Also write experiments/week06_jax/day04_llama3_serving_roofline.md (under 1 page
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-batching-economics.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-quantization-intro.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro (LLM.int8)</span></a>
+  <a class="lnav prev" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-quantization-intro/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Intro</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -470,9 +475,9 @@ var QS=[
  {q:'1. Why is the decode (generation) phase of LLM inference typically memory-bandwidth-bound rather than compute-bound?',
   opts:['Decode uses a different, slower attention algorithm than prefill','Decode processes only one new token per step, so FLOPs per step are tiny while the KV cache and parameters still have to be loaded from HBM every step','TPUs have no matrix multiply hardware for batch size 1','Decode always runs on CPU instead of the accelerator'],
   ans:1, fb:'Right. Decode\'s arithmetic intensity collapses because the sequence dimension T=1 for the new token while the "reused" data (params + KV cache) stays large; you pay full memory-loading cost for almost no new compute.'},
- {q:'2. LLaMA 3-70B has K=8 KV heads, H=128, L=80. In int8, what is the KV cache size per token?',
-  opts:['16kB','80kB','160kB','320kB'],
-  ans:2, fb:'Right. 2 × K × H × L × bytes_per_element = 2 × 8 × 128 × 80 × 1 = 163,840 bytes ≈ 160kB, matching the Scaling Book\'s worked answer.'},
+ {q:'2. You size your serving fleet by dividing free HBM by the KV cache of an average-length request, and the capacity plan says you can hold plenty of concurrent users. In production the service runs fine most of the day, but during busy periods it starts refusing or preempting requests and tail latency spikes — with no error in the logs. What did the sizing miss?',
+  opts:['The average GPU clock speed drops under load, halving effective throughput','KV cache grows with context length, so a few long conversations consume the memory budgeted for many short ones; concurrency must be sized against the maximum (or a real length distribution with headroom) plus an admission/eviction policy, not the mean','int8 quantization silently doubled the KV cache size at runtime','The tokenizer counts tokens differently in production, inflating every request'],
+  ans:1, fb:'Right. Sizing from the mean hides the tail: KV cache is proportional to context length, so a handful of long sessions can eat the HBM you reserved for many short ones. Nothing errors — the scheduler simply preempts running requests or refuses new ones once the KV budget is exceeded, and that happens exactly when traffic is heaviest, so tail latency spikes. The fix is to size concurrency against the maximum context (or a measured length distribution with headroom) and to define an explicit admission/eviction policy. The tempting wrong answers (clock speed, tokenizer, quantization) all reach for an unrelated mechanism instead of the capacity math that actually failed.'},
  {q:'3. On TPU v5e (240 bf16 arithmetic intensity), what happens to the critical batch size B_crit if you quantize parameters to int8 but still compute your matmul FLOPs in bf16?',
   opts:['B_crit stays at 240 because FLOPs precision is unchanged','B_crit doubles to 480','B_crit halves to 120','B_crit becomes irrelevant because attention dominates'],
   ans:2, fb:'Right. int8 weights halve the bytes you need to load per parameter, so you need only half the batch size to keep the FLOPs unit as busy as the (now faster) memory-loading unit: B_crit = 120.'},

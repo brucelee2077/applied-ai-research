@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-06-encoder-vs-decoder.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Encoder vs Decoder</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-08-full-transformer.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Transformer</span></a>
+  <a class="lnav prev" href="../day-06-encoder-vs-decoder/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Encoder vs Decoder</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-full-transformer/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Transformer</span></a>
 </nav>
 
   <header class="hero">
@@ -297,6 +297,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><b>Top-p (nucleus):</b> keep the smallest group of top words whose probabilities add up to <code>p</code> (say 0.9), drop the rest, renormalize, then sample. The size of the group changes with how confident the model is.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> greedy decoding tends to loop and repeat. A little temperature plus top-p is what makes chat models sound natural. This sampling step is the last piece — the model plus a way to pick turns scores into real text.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Temperature is one division, and where you put that division decides whether the dial actually works or only pretends to.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dividing by T after softmax instead of before.</b> Temperature must scale the <em>logits</em>: <code>softmax(logits / T)</code>. If you compute <code>softmax(logits)</code> first and then divide those probabilities by <code>T</code> and renormalize, the numbers stay a valid probability distribution and generation still runs — but the shape barely changes, so the temperature slider quietly does almost nothing. Users report "temperature has no effect" and there is no error to chase. A senior engineer in <b>code review</b> checks that <code>/ T</code> is applied to the raw logits <em>before</em> the softmax, because dividing after softmax and renormalizing is a no-op in disguise.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: coherence vs diversity, set by one number.</b> Low temperature (or greedy) makes the model pick its safest word every time — coherent, but it repeats itself and can fall into loops. High temperature spreads probability to the long tail — creative and varied, but it starts producing off-topic or nonsense words. In a <b>design review</b> this is a product decision: a factual assistant leans low (with top-p to trim the tail) while a brainstorming or story tool leans higher, and you tune <code>T</code>, top-k, and top-p together rather than in isolation.</div></div>
       <button class="gotit" type="button">Got how sampling works</button>
     </div>
   </section>
@@ -328,21 +333,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the temperature effect to yourself with a tiny experiment. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_sampling.py</code>. Start from fixed logits like <code>[2, 1, 0]</code>. Write <code>softmax(logits / T)</code> and print the probabilities for <code>T = 0.5</code>, <code>1.0</code>, and <code>2.0</code>. Then add <code>top_k</code> and <code>top_p</code> functions that zero out the unwanted words and renormalize. Confirm lower <code>T</code> makes the top word bigger. Run with <code>python3 m05a_sampling.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-07-text-generation/experiment.py</code>. Start from fixed logits like <code>[2, 1, 0]</code>. Write <code>softmax(logits / T)</code> and print the probabilities for <code>T = 0.5</code>, <code>1.0</code>, and <code>2.0</code>. Then add <code>top_k</code> and <code>top_p</code> functions that zero out the unwanted words and renormalize. Confirm lower <code>T</code> makes the top word bigger. Run with <code>python3 m05a_sampling.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 7 artifact.
 
-Create experiments/foundations/m05a_sampling.py that, with a comment on each step, shows how temperature, top-k, and top-p reshape a next-token distribution:
+Create sessions/m05a-text-transformer/day-07-text-generation/experiment.py that, with a comment on each step, shows how temperature, top-k, and top-p reshape a next-token distribution:
 1. Uses fixed logits [2, 1, 0] and a softmax(logits / T); prints the probabilities for T = 0.5, 1.0, 2.0 and asserts the top probability grows as T shrinks.
 2. Adds top_k(probs, k) that keeps the k largest, zeros the rest, and renormalizes.
 3. Adds top_p(probs, p) that keeps the smallest set of top words summing to >= p, zeros the rest, and renormalizes.
 4. Runs a tiny greedy-vs-sampled generation loop on a toy vocabulary to show greedy repeats while sampling varies.
 Then run it and paste the three temperature distributions at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-07-log.md</code>: what happened to the top word's probability as you lowered the temperature from 2.0 to 0.5?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-07-text-generation/log.md</code>: what happened to the top word's probability as you lowered the temperature from 2.0 to 0.5?</div></div>
       <button class="gotit" type="button">Done — on to Day 8</button>
     </div>
   </section>
@@ -356,9 +361,9 @@ Then run it and paste the three temperature distributions at the bottom as a com
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-06-encoder-vs-decoder.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Encoder vs Decoder</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-08-full-transformer.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Transformer</span></a>
+  <a class="lnav prev" href="../day-06-encoder-vs-decoder/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Encoder vs Decoder</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-full-transformer/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Transformer</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -471,9 +476,9 @@ var QS=[
  {q:'3. Lowering the temperature (T below 1) makes the model:',
   opts:['more random and creative','more sure and predictable (top word gets more probability)','ignore the logits','stop generating'],
   ans:1, fb:'Right. Dividing logits by a small T sharpens the softmax, so the top word dominates. High T flattens it for creativity.'},
- {q:'4. Top-p (nucleus) sampling keeps:',
-  opts:['exactly p words','the smallest set of top words whose probabilities sum to at least p, then samples','only the top word','all words equally'],
-  ans:1, fb:'Right. It keeps the nucleus (top words summing to p, e.g. 0.9), drops the rest, renormalizes, and samples — blocking rare nonsense.'}
+ {q:'4. Users say the temperature slider seems to do almost nothing — cranking it up or down barely changes the output, and there is no error. Where do you look first?',
+  opts:['the random seed, since seeds control temperature','where T is applied: temperature must divide the raw logits before softmax; if the code does softmax(logits) first and then divides the probabilities by T and renormalizes, the distribution barely changes so the dial is a near no-op','the size of the vocabulary','the length of the prompt'],
+  ans:1, fb:'Right. Temperature works by sharpening or flattening the logits: softmax(logits / T). If you apply / T to the probabilities after the softmax and renormalize, you get back almost the same distribution, so the slider appears dead even though nothing crashes. Move the division before the softmax — a code review catches this by checking exactly where / T sits.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

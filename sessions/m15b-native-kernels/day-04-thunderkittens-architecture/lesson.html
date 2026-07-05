@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-worker-overlapping.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Worker Overlapping</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-comparative-benchmarking.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comparative Benchmarking</span></a>
+  <a class="lnav prev" href="../day-03-worker-overlapping/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Worker Overlapping</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-comparative-benchmarking/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comparative Benchmarking</span></a>
 </nav>
 
 
@@ -290,6 +290,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Matches or beats hand-tuned code</strong> — the paper reports matching CuBLAS and FlashAttention-3 on GEMM/attention, and beating hand-written baselines by 8× (state-space models) and 14× (linear attention) — because those newer ops had rarely been carefully re-mapped onto all three layers by hand before.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> tiles (Mon) → TMA async loads (Tue) → load/compute-warp overlap (Wed) → today: all three, plus grid scheduling, working as one system → near-peak throughput with far less code.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole point of TK is that the three layers only pay off <em>together</em> — using some but not all of them is the quiet way to leave most of the speedup on the table.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a partial stack that looks "optimized" but sits far below peak.</b> You adopt TK's tile ops and get a correct, noticeably-faster kernel — but you skipped the load/compute overlap, or left blocks launching per output tile instead of using grid-level scheduling. Nothing errors, the numbers are right, and the kernel is faster than your old code, so it looks done. It is quietly stalling on memory or paying launch/teardown tax on every wave, running at maybe half of what all three layers together would reach. A senior engineer catches this in <b>code review</b> by asking for the achieved-vs-peak (MFU) number and a profile: correct-and-faster is not the same as near-peak, and each missing layer shows up as a specific stall the profiler names.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a small fixed abstraction set buys composability and less code, at the cost of the last few percent.</b> TK deliberately offers a handful of tile ops and two scheduling patterns instead of dozens of per-kernel tricks — that is why the three layers stack cleanly and a kernel is a few small functions. You give up the freedom to hand-tune one specific op past what the abstractions express, so a truly bespoke kernel can sometimes still edge out TK on that single op. In a <b>design review</b> the choice is reusable-and-near-peak-everywhere versus hand-tuned-and-maximal on one kernel you must then maintain forever.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -323,7 +328,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): ThunderKittens itself needs a CUDA-capable NVIDIA GPU (Hopper-class hardware, for the TMA), which this sandbox almost certainly does not have. Actual compilation is deferred to the weekend, once CUDA 12.8 is set up. Today's artifact is instead a <strong>simulation of the abstraction mapping</strong>: model the timing math from the playground's demo ②, in plain NumPy/JAX.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li>File exists at <code>experiments/week14_thunderkittens/thunderkittens_architecture_trace.py</code>.</li>
+        <li>File exists at <code>sessions/m15b-native-kernels/day-04-thunderkittens-architecture/experiment.py</code>.</li>
         <li>Models a toy tiled-attention computation over 8 K/V tiles of shape 16×16, using plain NumPy or JAX arrays to stand in for register tiles.</li>
         <li>Implements two loop versions: (a) <strong>no-overlap</strong> — load then compute sequentially, with sleep/timer stand-ins for the 200ns/100ns costs from demo ②; (b) <strong>overlapped</strong> — loads tile <em>i+1</em> while "computing" tile <em>i</em>, matching walkthrough steps 8–12.</li>
         <li>Running it prints/plots total simulated time for both versions across a sweep of tile counts (2, 4, 8, 16, 32), showing overlapped time <code>&lt;</code> non-overlapped time for every count ≥ 2, with the gap widening as tile count grows — confirming overlapped converges toward <code>max(load, compute) × N</code> while non-overlapped stays at <code>(load + compute) × N</code>.</li>
@@ -331,20 +336,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A short docstring at the top states the real-hardware analogy being modeled (TMA async load warps vs. compute warps) and links back to today's sources.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week14_thunderkittens/thunderkittens_architecture_trace.py</code> with the bullets above.</p>
+      <p>Create <code>sessions/m15b-native-kernels/day-04-thunderkittens-architecture/experiment.py</code> with the bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Day 4 artifact.
 
-Create experiments/week14_thunderkittens/thunderkittens_architecture_trace.py that:
+Create sessions/m15b-native-kernels/day-04-thunderkittens-architecture/experiment.py that:
 1. Models a toy tiled-attention computation over 8 K/V tiles of shape 16x16, using plain NumPy or JAX arrays to stand in for register tiles.
 2. Implements two versions of the tile-processing loop: (a) a "no-overlap" version that simulates load-then-compute sequentially with sleep/timer stand-ins for 200ns load / 100ns compute per tile, and (b) an "overlapped" version that models the load-ahead pipeline (load tile i+1 while "computing" tile i).
 3. Prints/plots the total simulated time for both versions across a sweep of tile counts (2, 4, 8, 16, 32) and confirms the overlapped version converges toward max(load_cost, compute_cost) * N while the non-overlapped version stays at (load_cost + compute_cost) * N.
 4. Adds an assertion that the overlapped and non-overlapped versions produce matching output tile values, proving overlap changes WHEN work happens, not WHAT is computed.
 Add a docstring at the top naming the real-hardware analogy (TMA async load warps vs. compute warps) and linking to arxiv.org/abs/2410.20399 and github.com/HazyResearch/ThunderKittens. Then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-14/day-04-log.md</code>: what would go <em>wrong numerically</em> (not crash — silently wrong numbers) if load warps and compute warps shared the <em>same</em> SRAM buffer instead of double-buffering?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15b-native-kernels/day-04-thunderkittens-architecture/log.md</code>: what would go <em>wrong numerically</em> (not crash — silently wrong numbers) if load warps and compute warps shared the <em>same</em> SRAM buffer instead of double-buffering?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Add a docstring at the top naming the real-hardware analogy (TMA async load warp
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-worker-overlapping.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Worker Overlapping</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-comparative-benchmarking.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comparative Benchmarking</span></a>
+  <a class="lnav prev" href="../day-03-worker-overlapping/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Worker Overlapping</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-comparative-benchmarking/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comparative Benchmarking</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -465,9 +470,9 @@ var QS=[
  {q:'3. What specific cost does ThunderKittens\'s grid-level scheduling support aim to hide?',
   opts:['The cost of computing softmax normalization','The cost of transferring weights from disk to HBM before the program starts','The cost of kernel launch and teardown across thread blocks','The cost of compiling the CUDA kernel to PTX'],
   ans:2, fb:'Right. Launching and tearing down thread blocks has real overhead; TK\'s grid-level support overlaps this launch/teardown cost with blocks that are already mid-execution, rather than paying it serially.'},
- {q:'4. According to the ThunderKittens paper\'s reported results, where does TK show its largest performance multiplier over the strongest prior baselines, and what does that suggest about why the gain was so large there?',
-  opts:['Dense GEMM, 2x — because matrix multiply was already well optimized by CuBLAS','Linear attention, 14x — because that operation had rarely been carefully re-mapped onto all three GPU hardware layers by hand before TK made doing so cheap','Standard softmax attention forward pass, 1.1x — because FlashAttention-3 already saturates hardware limits','Embedding lookup, 20x — because embedding tables are purely memory-bound'],
-  ans:1, fb:'Right. The paper reports up to 14x on linear attention and 8x on state-space models, precisely because these newer, less-optimized operations hadn\'t previously received the same layer-by-layer hand-tuning that GEMM/attention had, so TK\'s systematic abstractions delivered the biggest jump there.'}
+ {q:'4. You rewrite a kernel with TK\'s 16×16 tile ops. It is correct and about 1.8× faster than your old CUDA — but a profile shows the tensor cores are idle much of the time and achieved throughput is around half of the GPU\'s peak. The tile math is right. Where do you look first, and why?',
+  opts:['Nowhere — it is correct and faster, so the job is done','Check whether you also applied the other two layers: without load/compute overlap the tensor cores stall on HBM, and without grid-level scheduling you pay launch/teardown on every wave — a partial stack is correct and faster but far from peak','Switch the tiles from 16×16 to 32×32 so each op does more work','Assume the peak number in the datasheet is wrong for your GPU'],
+  ans:1, fb:'Right. TK\'s three layers pay off together. Fast tile ops alone still leave the tensor cores waiting on memory, and per-tile block launches still burn launch/teardown time. Idle tensor cores plus half-of-peak throughput on correct tile math is the fingerprint of a partial stack. Confirm the overlap template and grid-level scheduling are in place before blaming the tile size or the datasheet.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

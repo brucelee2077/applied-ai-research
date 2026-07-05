@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-training-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Training Loop</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-learning-rate.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Learning Rate</span></a>
+  <a class="lnav prev" href="../day-06-training-loop/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Training Loop</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-learning-rate/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Learning-Rate Intuition</span></a>
 </nav>
 
   <header class="hero">
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares about that "two extra numbers"</h4>
       <p>Adam keeps <code>m</code> and <code>v</code> for <em>every</em> weight. So the <span class="term" data-tip="The extra numbers an optimizer stores per weight; for Adam that is m and v, roughly doubling the memory beyond the weights themselves.">optimizer state</span> is about <b>2× the size of the model's weights</b> — extra memory a frontier lab must pay for on every accelerator. When you reach the memory and parallelism modules (Module 10), this "Adam doubles your state" fact is a big reason huge models are split across many chips.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> SGD steps by <code>lr × g</code>; momentum stores a speed so it rolls through bumps; Adam stores <code>m</code> and <code>v</code> per weight for a smart per-weight step — at the cost of ~2× optimizer memory.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Adam's power comes from the two extra numbers it stores per weight — and those numbers are also where a quiet bug and a real memory bill both come from.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): resuming training without the optimizer state.</b> When you save and reload a model, the weights are the obvious thing to save — but Adam's smart step depends on its running averages <code>m</code> and <code>v</code> for every weight. If you reload only the weights and let the optimizer start fresh, <code>m</code> and <code>v</code> reset to zero. Training resumes with no error, but Adam has forgotten every per-weight step size it learned, so the first steps after resume are crude and can quietly slow or destabilize training. A senior engineer catches this in <b>code review</b> by confirming the checkpoint saves and restores the optimizer state, not just the model weights.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast convergence vs. its memory bill.</b> Adam usually trains faster and needs less learning-rate tuning than plain SGD, because its per-weight step adapts automatically. You pay for that with memory: storing <code>m</code> and <code>v</code> roughly doubles the optimizer state beyond the weights themselves. At frontier scale that extra memory decides how a model must be split across chips. Choosing Adam versus a lighter optimizer is a <b>design-review</b> decision that trades convergence speed against memory footprint.</div></div>
       <button class="gotit" type="button">Got the three rules</button>
     </div>
   </section>
@@ -302,7 +307,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Play with the ball, then watch the three optimizers build up</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>First, the live version. Drag the learning-rate slider and press <strong>Step</strong> or <strong>Run</strong> to roll a weight down a loss curve. Then <strong>scroll</strong> through the static build underneath — SGD, then momentum, then Adam.</p>
-      <div class="build-embed"><iframe src="../viz/gradient-descent.html" title="interactive gradient descent" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive gradient descent" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -325,14 +330,14 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Race SGD against momentum on the same tiny problem and watch momentum win — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03d_optimizers.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 m03d_optimizers.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 m03d_optimizers.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2-3 Day 4 artifact.
 
-Create experiments/foundations/m03d_optimizers.py that, with a comment on each step:
+Create sessions/m02-the-neuron/day-07-optimizers/experiment.py that, with a comment on each step:
 1. Sets a tiny model pred = w*x, with x=2.0, target y=6.0 (ideal w=3), lr=0.05.
 2. Runs plain SGD from w=1.0 for 15 steps: pred=w*x; grad=2*(pred-y)*x; w = w - lr*grad; print step, round(w,4), round((w*x-y)**2,4).
 3. Runs momentum from w=1.0, v=0.0, beta=0.9 for 15 steps: grad=2*(w*x-y)*x; v = beta*v + grad; w = w - lr*v; print step, round(w,4), round(loss,4).
@@ -340,7 +345,7 @@ Create experiments/foundations/m03d_optimizers.py that, with a comment on each s
 5. Adds a comment noting that Adam keeps two extra numbers (m and v) per weight, so its optimizer state is about 2x the model weights.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f3/day-04-log.md</code>: on which step did momentum first pull ahead of plain SGD, and why?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-07-optimizers/log.md</code>: on which step did momentum first pull ahead of plain SGD, and why?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -349,15 +354,15 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <span class="em">⚙️</span>
     <h3>Day 4 done — you can pick an optimizer</h3>
     <p>You know three ways to take the update step: SGD walks, momentum rolls through bumps, and Adam gives each weight its own step size (at ~2× the memory).<br>Next up: how big should that step be? Day 5 is all about the <b>learning rate</b> — the single knob that can make training smooth, slow, or blow up.</p>
-    <a class="cta" href="day-05-learning-rate.html">Next: Learning Rate →</a>
+    <a class="cta" href="../day-08-learning-rate/lesson.html">Next: Learning Rate →</a>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-training-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Training Loop</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-learning-rate.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Learning Rate</span></a>
+  <a class="lnav prev" href="../day-06-training-loop/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Training Loop</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-learning-rate/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Learning-Rate Intuition</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -475,9 +480,9 @@ var QS=[
  {q:'1. Which part of the training loop does an optimizer control?',
   opts:['the forward pass','the update step (how gradients change the weights)','the loss function','the data loading'],
   ans:1, fb:'Right. Forward, loss, and backprop stay the same. The optimizer only decides step 4 — how to turn gradients into a weight change.'},
- {q:'2. What does momentum add on top of plain SGD?',
-  opts:['a bigger dataset','a running velocity that carries the weight through small bumps','a second loss function','more layers'],
-  ans:1, fb:'Right. Momentum keeps a running speed (v ← β·v + g) so the weight builds up speed in a steady direction and coasts over small bumps.'},
+ {q:'2. You stop a training run and resume it later. You load the saved model weights, but your code creates a brand-new Adam optimizer instead of restoring the saved one. Training resumes with no error, yet the loss briefly gets worse right after resuming. Where do you look first, and why?',
+  opts:['The dataset changed, which is the only thing that can raise the loss on resume','A fresh Adam optimizer has its running averages m and v reset to zero, so it has forgotten every per-weight step size it had learned — the first steps after resume are crude and can bump the loss up','The learning rate doubled itself on resume, which always happens','A loss bump on resume is impossible and must be a display glitch'],
+  ans:1, fb:'Right. Adam\'s smart step depends on m and v per weight. Restoring only the model weights and starting the optimizer fresh throws that state away, so Adam behaves crudely for the first steps. Nothing crashes — you check that the checkpoint saves and restores the optimizer state, not just the weights.'},
  {q:'3. Starting w=1.0 with gradient −16 and lr=0.05, what is w after one SGD step?',
   opts:['1.8','−0.8','16.8','0.2'],
   ans:0, fb:'Right. Step = lr × grad = 0.05 × (−16) = −0.8, so w = 1.0 − (−0.8) = 1.8. The first momentum step gives the same 1.8 (no speed built up yet).'},

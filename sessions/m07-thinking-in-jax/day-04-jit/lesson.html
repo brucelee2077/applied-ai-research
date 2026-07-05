@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-vmap.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">vmap: Vectorization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-flax-optax.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Flax &amp; Optax</span></a>
+  <a class="lnav prev" href="../day-03-vmap/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">vmap: Vectorization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-flax-optax/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Flax &amp; Optax</span></a>
 </nav>
 
 
@@ -307,6 +307,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable</strong> — <code>jit</code> stacks with <code>grad</code> (gradients) and <code>vmap</code> (batching, Day 3). E.g. <code>jit(vmap(grad(loss)))</code> compiles a fast, batched, per-example gradient.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> pure functions (Days 1–2) → JAX can trace them safely → XLA fuses and compiles the trace → cache by shape/dtype → the first call is slow, every later call is fast.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The shape-keyed cache and the trace-time-only body are what make <code>jit</code> fast, but each hides a way to be quietly wrong — a slowdown that never errors, and a side effect that runs once.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): recompiling on every call because the shape keeps changing.</b> The compiled program is cached by input shape + dtype. If you feed a jitted function a slightly different shape each step — say the last batch of an epoch is smaller, or sequence length varies — JAX sees a new cache key and <em>recompiles</em> every time. Nothing errors; results are correct. But you are paying the one-time compile cost on every call, so the "fast" jitted code is actually slower than no jit at all. A senior engineer checks in code review that batch/sequence shapes are padded to fixed sizes, and watches for a compile log printing repeatedly. (Related trap: a Python <code>print</code> inside the function runs only at <em>trace time</em>, so it fires once — do not rely on it to confirm per-call behavior.)</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: pay compile time up front for fast steady-state.</b> <code>jit</code> spends real wall-clock time tracing and compiling before the first useful result — sometimes seconds. You get that back many times over on every later call, but only if the function is called many times at a stable shape. The design-review question: is this code hot enough (called often, fixed shapes) to earn back the compile cost? For a one-off call, or shapes that never repeat, <code>jit</code> can be a net loss.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -346,20 +351,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Time many calls of <code>forward</code> vs. <code>forward_jit</code>, using <code>block_until_ready()</code> on each for honest timing, and print both times — jit should be clearly faster.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Extend <code>experiments/week01_jax/mlp_vmap.py</code> into <code>experiments/week01_jax/mlp_jit.py</code> with the four bullets above.</p>
+      <p>Extend <code>sessions/m07-thinking-in-jax/day-04-jit/experiment.py</code> into <code>sessions/m07-thinking-in-jax/day-04-jit/experiment.py</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 1 Day 4 artifact.
 
-Create experiments/week01_jax/mlp_jit.py that:
+Create sessions/m07-thinking-in-jax/day-04-jit/experiment.py that:
 1. Reuses the Day 2/3 MLP: weights W1 (4x8), b1, W2 (8x2), b2 from split keys, and a batched forward that maps forward(x) = tanh(x @ W1 + b1) @ W2 + b2 over a batch X of shape (256, 4).
 2. Defines forward_jit = jax.jit(forward), then warms it up once with forward_jit(X).block_until_ready() so the one-time compile cost is not timed.
 3. Benchmarks: time many calls of the uncompiled forward vs. forward_jit, calling .block_until_ready() on each result for honest timing, and prints both average times.
 4. Asserts jnp.allclose(forward(X), forward_jit(X)) so the compiled result matches the uncompiled one.
 Add a brief comment on each step explaining trace/compile/cache, then run it to confirm jit is faster.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-01/day-04-log.md</code>: why is the very first <code>forward_jit(X)</code> call slower than the rest? (Hint: trace + compile, cached by shape.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-04-jit/log.md</code>: why is the very first <code>forward_jit(X)</code> call slower than the rest? (Hint: trace + compile, cached by shape.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -373,9 +378,9 @@ Add a brief comment on each step explaining trace/compile/cache, then run it to 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-vmap.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">vmap: Vectorization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-flax-optax.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Flax &amp; Optax</span></a>
+  <a class="lnav prev" href="../day-03-vmap/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">vmap: Vectorization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-flax-optax/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Flax &amp; Optax</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -473,9 +478,9 @@ var QS=[
  {q:'2. Why is the <strong>first</strong> call to a jitted function slow?',
   opts:['The hardware is cold and needs to warm up','It traces the function and compiles it — a one-time cost paid on the first call','It runs the function twice to double-check the answer','jit always adds a fixed delay to every call'],
   ans:1, fb:'Right. The first call traces (records the ops on abstract shapes) and compiles with XLA. That happens once; later calls reuse the cached program.'},
- {q:'3. What triggers a <strong>recompile</strong> (a fresh trace + compile)?',
-  opts:['Calling the function more than 1000 times','Calling it with a new input shape or dtype (a new cache key)','Using tanh instead of relu','Running on a different day'],
-  ans:1, fb:'Right. The compiled program is cached by input shape + dtype. A new shape or dtype is a new key, so JAX traces and compiles again.'},
+ {q:'3. A teammate wraps their step function in <code>jax.jit</code> to speed up training, but it runs no faster — sometimes slower — than the un-jitted version, with no errors. Their batches vary in size (the last batch of each epoch is smaller). Where do you look first, and why?',
+  opts:['The learning rate — jit changes how gradients scale','The input shapes: jit caches the compiled program by shape + dtype, so a changing batch size makes a new cache key every step and forces a recompile each call — pay the compile cost repeatedly. Pad batches to a fixed shape','The GPU temperature — it must be throttling','jit only speeds up functions that return a single scalar'],
+  ans:1, fb:'Right. This is the recompile trap. jit\'s cache key is input shape + dtype, so a varying batch size never hits the cache — every call re-traces and re-compiles, paying the one-time cost over and over. It never errors and results are correct; it is just silently slow. Fix by padding to fixed shapes (or bucketing), and watch for a compile message printing on every step.'},
  {q:'4. Why must the function be <strong>pure</strong> for jit to be safe?',
   opts:['Pure functions run faster on their own','With no hidden side effects, XLA can trace, reorder, and fuse the ops without changing the result (Days 1–2)','Impure functions crash the GPU','Purity lets you skip block_until_ready'],
   ans:1, fb:'Right. A pure function has no hidden state (immutable arrays, explicit keys). That lets XLA safely trace, reorder, and fuse the operations and still get the same answer.'}

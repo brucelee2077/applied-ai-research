@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-extreme-compression-quip-sharp.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-memory-economics-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Economics Synthesis</span></a>
+  <a class="lnav prev" href="../day-03-extreme-compression-quip-sharp/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-memory-economics-synthesis/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Economics Synthesis</span></a>
 </nav>
 
 
@@ -292,6 +292,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable with kernels</strong> — like <code>vmap</code> composes with <code>jit</code>/<code>grad</code>, AQ's tiny stored codebooks compose with fused GPU/CPU kernels that reconstruct weights on the fly during the matmul.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> fast kernels (earlier this week) → need small operands to stay fast → scalar PTQ wastes correlation between weights → AQ sums learned codebooks to capture it → QTIP's trellis pushes even further by decoupling bitrate from codebook size.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>AQ and QTIP store only tiny indices; the real weights are rebuilt on the fly by a decoder that must match the encoder exactly — and when it doesn't, there is no error to catch.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): decode config drifts from the encode config.</b> A group is stored as indices into codebooks (<code>C_1[b_1] + … + C_M[b_m]</code> for AQ, or a state + surprise-bits path for QTIP's trellis). The fused decode kernel must reconstruct with the <em>exact same</em> codebook tables, group size <code>g</code>, number of codebooks <code>M</code>, and bit layout that quantization produced. If any of these drifts — a stale codebook shipped from a different run, a group size the kernel assumes but the file doesn't use, or a trellis with the wrong transition rule — the indices are still valid integers, the lookups still succeed, and the matmul still returns numbers. It just reconstructs the wrong weights. No crash, no NaN — only degraded output that looks like "quantization is a bit lossy." In <b>code review</b> a senior engineer checks that the codebooks and group/trellis parameters are versioned <em>together</em> with the weight file, and adds a reconstruction check (decode a few groups, compare against the original FP16 weights within tolerance).</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: additive/trellis codebooks buy expressiveness but cost search time and decode complexity.</b> Summing <code>M</code> codebooks (or walking a trellis) reaches combinations a single scalar grid never could, which is what makes ~2 bits usable — but finding the best code assignment is a hard combinatorial search (beam search for AQ, Viterbi for the trellis), and every matmul now pays a reconstruct-on-the-fly step in a custom kernel. In a <b>design review</b> the question is whether that extra encode-time compute and the more complex, harder-to-port decode kernel are worth it versus a simpler scalar or group-wise scheme that is easier to serve and debug — the additive/trellis route earns its keep mainly at the extreme low-bit end.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -333,13 +338,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Prints a table showing reconstruction MSE strictly decreasing as M increases at fixed bit budget, plus one plot of MSE vs. number of codebooks M.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week15_jax/additive_quantization/aq_demo.py</code> with the six bullets above, running end-to-end on a synthetic or small real weight matrix.</p>
+      <p>Create <code>sessions/m17a-quantization/day-04-additive-quantization-qtip/experiment.py</code> with the six bullets above, running end-to-end on a synthetic or small real weight matrix.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 4 artifact.
 
-Create experiments/week15_jax/additive_quantization/aq_demo.py that:
+Create sessions/m17a-quantization/day-04-additive-quantization-qtip/experiment.py that:
 1. Splits a synthetic weight matrix into groups of g consecutive elements (e.g. g=8).
 2. Initializes M codebooks via residual K-means: cluster the groups to get codebook 1, subtract the nearest centers, cluster the residuals to get codebook 2, and so on.
 3. Implements a beam-search (or brute-force for small M and 2^B) code-assignment step that picks the one-hot codes b_1..b_M minimizing reconstruction MSE for each group.
@@ -348,7 +353,7 @@ Create experiments/week15_jax/additive_quantization/aq_demo.py that:
 6. Prints a table showing MSE strictly decreasing as M increases, and produces one plot of MSE vs. number of codebooks M.
 Add a brief comment on each step explaining the AQ mechanism, then run it to confirm it works end-to-end without errors.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-04-log.md</code>: why are the discrete codes frozen during AQLM's Phase 3 joint fine-tuning, and what actually gets a gradient update instead? (Hint: think about what has a meaningful gradient.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-04-additive-quantization-qtip/log.md</code>: why are the discrete codes frozen during AQLM's Phase 3 joint fine-tuning, and what actually gets a gradient update instead? (Hint: think about what has a meaningful gradient.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -362,9 +367,9 @@ Add a brief comment on each step explaining the AQ mechanism, then run it to con
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-extreme-compression-quip-sharp.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-memory-economics-synthesis.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Economics Synthesis</span></a>
+  <a class="lnav prev" href="../day-03-extreme-compression-quip-sharp/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Extreme Compression (QuiP#)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-memory-economics-synthesis/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Economics Synthesis</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -476,9 +481,9 @@ var QS=[
  {q:'3. Why does QTIP move from AQ-style additive codebooks to trellis-coded quantization (TCQ) for extreme compression?',
   opts:['TCQ requires no calibration data at all','AQ codebook size grows exponentially with group dimension, which forces AQLM to use small groups (~8) and expensive beam search; TCQ\'s stateful decoder decouples bitrate from codebook size, enabling much higher effective dimension cheaply','TCQ was invented specifically for LLMs and has no prior use elsewhere','AQ cannot represent negative weight values'],
   ans:1, fb:'Right. A fixed-size codebook of 2^B entries covering g dimensions blows up combinatorially as g grows; a trellis\'s sliding "state" lets far more effective dimensionality be captured with a tiny stored lookup table and cheaper (Viterbi-style) decoding than AQ\'s beam search.'},
- {q:'4. On LLaMA-2-7B at roughly 2 bits/parameter, what did the AQLM paper report relative to the FP16 baseline (5.12 WikiText-2 perplexity) and the prior state-of-the-art QuIP# at the same bit-width?',
-  opts:['AQLM matched FP16 exactly with zero perplexity loss','AQLM was worse than QuIP# at every bit-width tested','AQLM reached about 6.59 perplexity, clearly better (lower) than QuIP#\'s 8.22 at the same ~2-bit budget, while still trailing the FP16 baseline of 5.12','AQLM only worked above 4 bits/parameter and failed below that'],
-  ans:2, fb:'Right. This is the concrete Pareto-frontier claim from the paper — AQLM improves over the prior best (QuIP#) specifically in the extreme 2-bit regime, though there is still a real accuracy gap versus full FP16.'}
+ {q:'4. You load an AQLM-quantized model with a fused decode kernel. It runs with no errors and produces text, but quality is clearly below the offline results the paper reported — and there are no NaNs or crashes. Where do you look first, and why?',
+  opts:['Assume 2-bit is simply too aggressive and give up on the quantized model','Verify the decode kernel is using the exact codebooks, group size, and bit layout that this weight file was quantized with — a stale or mismatched codebook still returns valid lookups and runs, but reconstructs the wrong weights, so output degrades silently','Increase the batch size, since larger batches always improve quantized quality','Blame the calibration data, since AQLM does not use any'],
+  ans:1, fb:'AQLM stores only indices; the real weights are rebuilt by the decoder from codebook tables. If the kernel uses a different codebook, group size, or bit layout than the file was encoded with, the indices are still valid integers and every lookup succeeds — it just reconstructs wrong weights. That is the silent failure: runs fine, no crash, only degraded output. Versioning the codebooks with the weight file and adding a reconstruction check (decode a few groups, compare to FP16 within tolerance) catches it. Batch size is irrelevant, and AQLM does in fact use calibration inputs, so that option is doubly wrong.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

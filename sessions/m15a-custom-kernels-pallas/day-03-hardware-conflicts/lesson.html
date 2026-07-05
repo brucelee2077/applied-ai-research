@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-basic-kernel-construction.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Basic Kernel Construction</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-flashattention-paradigm.html"><span class="lnav-dir">Next →</span><span class="lnav-t">FlashAttention Paradigm</span></a>
+  <a class="lnav prev" href="../day-02-basic-kernel-construction/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Basic Kernel Construction</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-flashattention-paradigm/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">FlashAttention Paradigm</span></a>
 </nav>
 
 
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>It's the prerequisite mental model for the rest of Phase 4</strong> — quantized kernels and long-context attention kernels all live or die by memory-access patterns, not FLOPs.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Pallas BlockSpec (Mon/Tue) → compiler picks a physical shared-memory layout from your strides → a stride that's a multiple of 32 → every thread in the warp collides on one bank → padding the stride breaks the collision → conflict-free, same result, faster.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A bank conflict only costs you speed. Its dangerous cousin — a missing barrier between writing shared memory and reading it back — costs you the answer, and neither one announces itself.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the missing barrier (data race).</b> When threads write a tile into shared memory and then read each other's writes, every thread must reach a barrier (a sync point) before anyone reads, or a thread reads a slot its neighbor has not written yet. This is a data race: it does not crash, and it often produces the <em>right</em> answer on small inputs or one hardware queue, because the timing happens to line up. On a different chip, a larger tile, or a different day it returns quietly wrong numbers that you cannot reproduce. In <b>code review</b>, a senior engineer scans every "write shared memory, then read it across threads" pattern and checks there is a barrier between the write phase and the read phase — a green test run is not proof the sync is there.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: padding for speed vs. spending SRAM you may need.</b> Padding the row stride from 32 to 33 removes the bank conflict for free in FLOPs — but it grows every tile by one ghost column, and SRAM is the scarcest resource on the chip. Spend those bytes on padding and you may be forced to shrink the tile, which lowers arithmetic intensity and can cost more than the conflict you removed. It is also purely a performance fix, not a correctness fix, so it is easy to over-invest in. In a <b>design review</b>, the question is whether this access pattern is hot enough to profile and justify the padding, or whether the SRAM is better spent on a bigger tile.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -333,7 +338,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>EXPERIMENT_LOG.md</code> states the hypothesis, the result, and one concrete next experiment (e.g. sweep pad amount 0/1/2/4 and plot conflict count vs. pad size).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build the files by hand under <code>experiments/week13_pallas_bank_conflicts/</code> following the structure in the prompt below.</p>
+      <p>Build the files by hand under <code>sessions/m15a-custom-kernels-pallas/day-03-hardware-conflicts/</code> following the structure in the prompt below.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -341,7 +346,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Build a small reproducible Pallas kernel experiment that demonstrates and fixes a bank-conflict-style striding problem: "Analyze the compiled execution of the Pallas kernel. Modify the memory striding to avoid simultaneous thread access to the same memory banks."
 
-Create these files under experiments/week13_pallas_bank_conflicts/:
+Create these files under sessions/m15a-custom-kernels-pallas/day-03-hardware-conflicts/:
 1. README.md — question/hypothesis/setup/results per the experiment-lab template.
 2. src/kernel_unpadded.py — a Pallas kernel (e.g. tiled transpose or column-reduction) using a [TILE, 32]-shaped scratch/block whose access pattern is designed to trigger bank-conflict-style striding.
 3. src/kernel_padded.py — the same kernel with the block/scratch shape padded (e.g. [TILE, 33]) to break the stride-multiple-of-32 pattern.
@@ -351,7 +356,7 @@ Create these files under experiments/week13_pallas_bank_conflicts/:
 
 If not running on NVIDIA hardware, explicitly note that limitation in EXPERIMENT_LOG.md and fall back to a CPU/TPU-safe timing-only comparison plus the hand-computed bank-index arithmetic (address = (t*stride + c)*4, bank = (t*stride + c) % 32) as the analytical evidence. Do not pad by a multiple of 32 (e.g. 64) — that fixes nothing.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-13/day-03-log.md</code>: why does padding <code>[32,32]</code> to <code>[32,64]</code> fix nothing, while padding to <code>[32,33]</code> fixes everything? (Hint: check <code>64 % 32</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15a-custom-kernels-pallas/day-03-hardware-conflicts/log.md</code>: why does padding <code>[32,32]</code> to <code>[32,64]</code> fix nothing, while padding to <code>[32,33]</code> fixes everything? (Hint: check <code>64 % 32</code>.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -365,9 +370,9 @@ If not running on NVIDIA hardware, explicitly note that limitation in EXPERIMENT
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-basic-kernel-construction.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Basic Kernel Construction</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-flashattention-paradigm.html"><span class="lnav-dir">Next →</span><span class="lnav-t">FlashAttention Paradigm</span></a>
+  <a class="lnav prev" href="../day-02-basic-kernel-construction/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Basic Kernel Construction</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-flashattention-paradigm/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">FlashAttention Paradigm</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -469,9 +474,9 @@ var QS=[
  {q:'3. Why does padding the tile from <code>[32,32]</code> to <code>[32,33]</code> fix the conflict, while padding to <code>[32,64]</code> does not?',
   opts:['64 is bigger so it always works','33 is not a multiple of 32, so the stride shift spreads threads across all 32 banks; 64 is still a multiple of 32, so the collision stays','Padding to 64 uses too much SRAM','Padding never changes which bank is used'],
   ans:1, fb:'Right. What matters is stride mod 32, not the absolute size. 33 % 32 = 1, which shifts each row by one bank (bijection over 0..31). 64 % 32 = 0, so the conflict is identical to the unpadded case.'},
- {q:'4. Two threads in the same warp request the exact same shared-memory address in the same cycle. What happens?',
-  opts:['It is a 2-way bank conflict, costing 2 cycles','It is a broadcast — the hardware serves both from one request for free, no conflict','The kernel crashes','Only one thread gets the correct value'],
-  ans:1, fb:'Right. A conflict is about different addresses colliding on the same bank. Identical addresses are a broadcast: the hardware serves every requester in one transaction, no serialization.'}
+ {q:'4. Your kernel writes a tile into shared memory across threads, then each thread reads a slot its neighbor wrote. It passes every test on your GPU, but a teammate on a different chip gets numbers that are wrong and change from run to run. It never crashes. Where do you look first, and why?',
+  opts:['The bank-conflict padding — a conflict must be corrupting the data','The barrier between the write phase and the read phase — a missing sync lets a thread read a slot before its neighbor has written it (a data race), which is timing-dependent so it only shows up on some hardware','The output BlockSpec — it is probably writing the wrong tile','The float32 dtype — it must be losing precision on the other chip'],
+  ans:1, fb:'Right. A bank conflict only slows a kernel down; it never changes the result. Wrong numbers that vary by chip and by run are the signature of a data race: threads read shared memory that a barrier should have guaranteed was already written. It passed locally only because your hardware happened to schedule the writes first. The fix is a barrier between the write phase and the read phase, and the debugging move is to stop trusting a single green run to prove the sync is present.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

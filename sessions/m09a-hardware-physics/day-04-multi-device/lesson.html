@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-sharding.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sharding Fundamentals</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-memory-footprint.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Footprint</span></a>
+  <a class="lnav prev" href="../day-03-sharding/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sharding Fundamentals</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-memory-footprint/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Footprint</span></a>
 </nav>
 
 
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Correctness</strong> — <code>pmean</code> guarantees every replica takes the exact same update, so the copies never drift apart.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> sharding (Day 3) splits data across devices → <code>pmap</code> runs one program on every device (SPMD) → <code>pmean</code> averages gradients so all replicas agree → data-parallel training that scales across hardware.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole correctness of data-parallel training rests on one line — the gradient average — and forgetting it fails quietly, not loudly.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting <code>pmean</code>, so replicas drift apart.</b> <code>pmap</code> happily runs your step on every device even if you never average the gradients. Each replica then updates its weights using only its own slice of the batch, so the copies slowly diverge. Shapes are fine, no exception is raised, and the loss still falls — but you are no longer doing one coherent large-batch update, you are running N different half-trained models that print one averaged-looking number. In <b>code review</b>, a senior engineer checks that gradients pass through <code>jax.lax.pmean(grads, axis_name)</code> before the optimizer step, and that the <code>axis_name</code> in <code>pmap</code> and in <code>pmean</code> match.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more throughput vs. a fixed sync cost every step.</b> Data parallelism lets you process a bigger batch per step by copying the model to every device — near-linear speedup on the compute. What you pay is a gradient AllReduce on every single step: as you add devices, that fixed communication cost grows and eventually caps the speedup. In a <b>design review</b>, this is why very large runs mix data parallelism with other strategies (sharding the model itself) instead of just adding more data-parallel replicas forever.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -328,20 +333,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Make a dummy per-device gradient, then use <code>jax.lax.pmean(g, axis_name='devices')</code> inside a <code>pmap</code> and confirm every device gets the identical averaged value.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week02/pmap_mlp.py</code> covering the four bullets above.</p>
+      <p>Create <code>sessions/m09a-hardware-physics/day-04-multi-device/experiment.py</code> covering the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Day 4 artifact.
 
-Create experiments/week02/pmap_mlp.py that:
+Create sessions/m09a-hardware-physics/day-04-multi-device/experiment.py that:
 1. BEFORE importing jax, sets os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4" so JAX simulates 4 devices on one CPU. Print jax.device_count() to confirm it is 4.
 2. Defines a single-example MLP: params (W1 4x8, b1, W2 8x2, b2) from split PRNG keys, and forward(params, x) = tanh(x @ W1 + b1) @ W2 + b2 for one input vector of shape (4,).
 3. Builds a sharded batch X of shape (4, 8, 4) — one shard of 8 inputs per device — from a random key. Uses jax.pmap over the device axis (each device vmaps forward over its 8 inputs) and prints the output shape (should be (4, 8, 2)).
 4. Makes a dummy per-device gradient grads of shape (4,), then runs jax.pmap(lambda g: jax.lax.pmean(g, axis_name="devices"), axis_name="devices")(grads) and asserts every entry equals the mean, proving all replicas agree.
 Add a brief comment on each step explaining pmap and pmean, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-02/day-04-log.md</code>: in data-parallel training, why is <code>pmean</code> on the gradients what keeps every device's copy of the model identical?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-04-multi-device/log.md</code>: in data-parallel training, why is <code>pmean</code> on the gradients what keeps every device's copy of the model identical?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -355,9 +360,9 @@ Add a brief comment on each step explaining pmap and pmean, then run it to confi
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-sharding.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sharding Fundamentals</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-memory-footprint.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Footprint</span></a>
+  <a class="lnav prev" href="../day-03-sharding/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Sharding Fundamentals</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-memory-footprint/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Memory Footprint</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -449,9 +454,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What does <code>jax.pmap(f)</code> do?',
-  opts:['Compiles f to run faster on one device','Runs the same function f across multiple devices, each on its own slice of data (SPMD)','Loops over the batch inside one device','Averages f\'s output across the batch'],
-  ans:1, fb:'Right. pmap maps f across physical devices — every device runs the same program on its own shard, all at once. That is SPMD.'},
+ {q:'1. Your data-parallel training runs across 8 devices with <code>pmap</code>, throws no error, and the printed loss goes down — but the final model is worse than the same run on one device, and the 8 replicas end up holding different weights. Where do you look first?',
+  opts:['The learning rate is too high; lower it and the replicas will re-converge','Check that gradients pass through <code>jax.lax.pmean(grads, axis_name)</code> before the optimizer step — without the average, each replica updates on only its own batch slice and they drift apart','<code>pmap</code> only works on CPUs, so switch to <code>vmap</code>','Add more devices — replica drift always shrinks with scale'],
+  ans:1, fb:'Right. <code>pmap</code> will run the step on every device whether or not you average gradients. If <code>pmean</code> is missing (or the <code>axis_name</code> does not match the one you gave <code>pmap</code>), each replica updates using only its local slice, so the copies diverge — shapes are fine, no error, loss still falls, but you are training N different models. The first check is the gradient-average line and its axis name, not the learning rate.'},
  {q:'2. How does <code>pmap</code> relate to <code>vmap</code>?',
   opts:['They are unrelated','Same core idea — mapping a function over a leading axis — but pmap maps over devices instead of a batch axis','pmap is just a slower vmap','vmap works on GPUs, pmap only on CPUs'],
   ans:1, fb:'Right. Both map a function over the leading axis. vmap spreads it across a batch dimension inside one device; pmap spreads it across the real devices.'},

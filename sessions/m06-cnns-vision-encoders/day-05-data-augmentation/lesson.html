@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-batch-normalization.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batch Normalization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-transfer-learning-embeddings.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
+  <a class="lnav prev" href="../day-04-batch-normalization/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batch Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-transfer-learning-embeddings/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
 </nav>
 
   <header class="hero">
@@ -300,6 +300,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Harder to memorize:</strong> the model cannot lock onto exact pixels that keep changing, so it is pushed to learn the real pattern.</li>
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Keep the label honest.</b> Only use transforms that do not change the answer. Flipping a face is fine; flipping a "6" into a "9" is not. Cropping too aggressively can cut the object out entirely. Match the augmentation to the task.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Augmentation belongs on training data only, and it can be turned up so far that it hurts — both go wrong quietly.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): augmenting the validation or test set too.</b> Augmentation is a training trick. If you wire the same random flips, crops, and color jitter into the validation or test pipeline, everything still runs and you still get an accuracy number — but that number is now measured on distorted images, not on the clean data you will actually face. Your reported score no longer reflects real-world performance, and you may pick the wrong model or ship one that looks better than it is. A senior engineer, in <b>code review</b>, checks that random augmentation lives in the <em>train</em> transform only, and that validation and test use a fixed, deterministic transform (resize and normalize, nothing random).</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: stronger augmentation guards against overfitting but can wash out the real signal.</b> Heavier transforms (big random crops, strong color shifts, heavy rotation) make the training images harder and force the model to learn the true pattern instead of memorizing pixels. Push too far and the images drift away from the distribution the model will actually see, so it underfits and learns a task that is harder than the real one. How strong to make augmentation is a <b>design-review</b> decision, tuned to how much data you have and how far the transforms can go while still keeping the label true.</div></div>
       <button class="gotit" type="button">Got why augmentation works</button>
     </div>
   </section>
@@ -331,20 +336,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Apply real augmentations and watch one image become many. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_augment.py</code>. Make a small image as a NumPy array. Write a horizontal-flip by reversing the column axis, and a crop by slicing a smaller window. Print the shapes and a few pixels before and after so you can see the change. Then build a <code>torchvision.transforms</code> pipeline (RandomHorizontalFlip, RandomCrop, ColorJitter) and apply it a few times to confirm you get different outputs each run. Run with <code>python3 m06_augment.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py</code>. Make a small image as a NumPy array. Write a horizontal-flip by reversing the column axis, and a crop by slicing a smaller window. Print the shapes and a few pixels before and after so you can see the change. Then build a <code>torchvision.transforms</code> pipeline (RandomHorizontalFlip, RandomCrop, ColorJitter) and apply it a few times to confirm you get different outputs each run. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 5 artifact.
 
-Create experiments/foundations/m06_augment.py that, with a comment on each step, shows data augmentation and why it helps:
+Create sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py that, with a comment on each step, shows data augmentation and why it helps:
 1. Makes a small NumPy image; does a horizontal flip by reversing the last axis and a crop by slicing; prints one row before and after so the mirror is visible.
 2. Builds a torchvision.transforms pipeline (RandomHorizontalFlip, RandomResizedCrop, ColorJitter) and applies it to the same image 3 times, asserting the 3 outputs are not all identical (randomness is working).
 3. Trains a tiny CNN on a small subset twice — once with augmentation, once without — for a few epochs and prints train vs validation accuracy, showing the gap (overfitting) is smaller with augmentation.
 Then run it and paste the before/after row and the two train-vs-val accuracy gaps at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-05-log.md</code>: did the flip reverse the row as expected, and was the train-vs-validation gap smaller with augmentation?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-05-data-augmentation/log.md</code>: did the flip reverse the row as expected, and was the train-vs-validation gap smaller with augmentation?</div></div>
       <button class="gotit" type="button">Done — on to Day 6</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Then run it and paste the before/after row and the two train-vs-val accuracy gap
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-batch-normalization.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batch Normalization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-transfer-learning-embeddings.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
+  <a class="lnav prev" href="../day-04-batch-normalization/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Batch Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-transfer-learning-embeddings/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -478,9 +483,9 @@ var QS=[
  {q:'3. Why does augmentation fight overfitting?',
   opts:['it makes the model smaller','the images keep changing, so the model must learn the pattern instead of memorizing pixels','it lowers the loss to zero','it removes the validation set'],
   ans:1, fb:'Right. A model that sees many variants of each image cannot memorize exact pixels, so it learns what really defines the object.'},
- {q:'4. Which is the key rule when choosing augmentations?',
-  opts:['always flip everything','keep the label true — do not use a change that alters the correct answer','use as few as possible','only change the file name'],
-  ans:1, fb:'Right. A flip that turns a "6" into a "9" gives a wrong label. Pick transforms that preserve the label for your task.'}
+ {q:'4. Your validation accuracy jumps around a lot between runs and does not match how the model does on fresh real images. You notice the same random flips and crops used in training are also applied in the validation pipeline. What is the problem?',
+  opts:['Validation needs even more augmentation to be reliable','Augmentation is a training-only trick — running random transforms on the validation set means you are scoring on distorted images, so the metric is noisy and does not reflect clean real-world data; use a fixed deterministic transform (resize + normalize) for validation and test','The learning rate should be raised during validation','Validation images must be a different resolution than training images'],
+  ans:1, fb:'Right. Random augmentation belongs only in the train transform. Applying it to validation means each pass scores a different, distorted version of each image, so the number is both noisy and not representative of the clean data you will face. Fix it by giving validation and test a fixed, deterministic transform. More augmentation on validation only makes it worse, and the issue is not learning rate or resolution.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

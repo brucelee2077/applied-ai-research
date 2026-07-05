@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-mlp-mnist.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-minibatch-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mini-Batch Loop</span></a>
+  <a class="lnav prev" href="../day-01-mlp-mnist/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST (from scratch)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-minibatch-loop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
 </nav>
 
   <header class="hero">
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why this is the whole game</h4>
       <p>Every deep network — including a giant LLM — learns with exactly this backward sweep: start with <code>probs − y_true</code>, then repeat "transpose the input, multiply the blame" through each layer, gating at each nonlinearity. Tomorrow you will run it in a loop over mini-batches.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The check:</b> a numerical gradient nudges one weight by a tiny <code>ε</code>, measures <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code>, and should match your hand-wired <code>dW</code> to several decimal places. If it doesn't, a transpose or a gate is wrong.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A hand-wired backward pass is where wrong gradients hide — the arithmetic still runs, so nothing tells you the math is off.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a wrong gradient that still runs.</b> This is a bug that doesn't announce itself. If you write <code>dW2 = dlogits @ h.T</code> instead of <code>h.T @ dlogits</code>, or forget the ReLU gate <code>(z1 &gt; 0)</code>, or flip a sign, the shapes can still line up and the code runs with no error. But the gradient points in the wrong direction, so training crawls, wanders, or the loss slowly rises. There is nothing to see in the output. A senior engineer never trusts a hand-wired backward pass without a <b>code-review</b> gradient check: nudge one weight by a tiny <code>ε</code> and confirm <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code> matches your <code>dW</code> to several decimals before running any real training.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hand-wiring gradients vs. automatic differentiation.</b> Deriving each <code>dW</code> by hand teaches you exactly how learning works and lets you optimize a specific layer, but it is slow to write and easy to get subtly wrong. A framework's autograd (M5 later) computes gradients for you and is almost never wrong, at the cost of hiding the mechanism. In a <b>design review</b> the call is clear for anything real: use autograd and keep the hand-derivation for understanding and for the rare custom kernel where you must.</div></div>
       <button class="gotit" type="button">Got the full backward pass</button>
     </div>
   </section>
@@ -320,14 +325,14 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Wire the backward pass yourself and prove it with a numerical check — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05_backward_pass.py</code>. Build the 784→128→10 forward pass, then hand-write <code>dW2, db2, dW1, db1</code> from <code>dlogits = probs − y_true</code>. Add a numerical-gradient checker that nudges each weight by <code>ε = 1e-5</code> and compares. Print the largest difference between your gradient and the numerical one — it should be tiny (below about <code>1e-6</code>). Run with <code>python3 m05_backward_pass.py</code>.</p>
+      <p>Create <code>sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py</code>. Build the 784→128→10 forward pass, then hand-write <code>dW2, db2, dW1, db1</code> from <code>dlogits = probs − y_true</code>. Add a numerical-gradient checker that nudges each weight by <code>ε = 1e-5</code> and compares. Print the largest difference between your gradient and the numerical one — it should be tiny (below about <code>1e-6</code>). Run with <code>python3 sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 2 artifact.
 
-Create experiments/foundations/m05_backward_pass.py that, with a comment on each step, wires the backward pass of a 2-layer MLP by hand in NumPy:
+Create sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py that, with a comment on each step, wires the backward pass of a 2-layer MLP by hand in NumPy:
 1. A 784 -> 128 (ReLU) -> 10 forward pass on one small random input, saving z1, h, logits.
 2. Softmax + cross-entropy loss against a one-hot label.
 3. Manual gradients using the chain rule: dlogits = probs - y_true, then dW2 = h.T @ dlogits, db2, dh = dlogits @ W2.T, dz1 = dh * (z1 > 0), dW1 = x.T @ dz1, db1.
@@ -335,7 +340,7 @@ Create experiments/foundations/m05_backward_pass.py that, with a comment on each
 Print the maximum absolute difference for W1 and W2 and confirm it is below 1e-6.
 Then run it and paste the max difference at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-02-log.md</code>: what was the largest gap between your hand-wired gradient and the numerical one, and did any layer surprise you?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-02-backward-pass/log.md</code>: what was the largest gap between your hand-wired gradient and the numerical one, and did any layer surprise you?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -349,9 +354,9 @@ Then run it and paste the max difference at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-mlp-mnist.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-minibatch-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Mini-Batch Loop</span></a>
+  <a class="lnav prev" href="../day-01-mlp-mnist/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MLP on MNIST (from scratch)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-minibatch-loop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -471,9 +476,9 @@ var QS=[
  {q:'3. A layer\'s weight gradient follows which pattern?',
   opts:['weight × blame','the input transposed, times the blame flowing in','blame ÷ input','just the blame'],
   ans:1, fb:'Right. dW = input.T @ incoming_blame — e.g. dW2 = h.T @ dlogits, dW1 = x.T @ dz1.'},
- {q:'4. What is a numerical gradient used for here?',
-  opts:['to train the model faster','to check the hand-wired gradients are correct','to replace backprop in production','to add more layers'],
-  ans:1, fb:'Right. Nudge a weight, watch the loss; if the estimate matches your dW, the chain rule was applied correctly.'}
+ {q:'4. Your hand-wired backward pass runs with no error and the shapes all match, but the training loss barely moves (or slowly drifts up). Where do you look first?',
+  opts:['increase the number of hidden units','run a numerical gradient check — a swapped transpose (h.T @ dlogits vs dlogits @ h.T), a missing ReLU gate (z1 > 0), or a flipped sign can still run yet point the gradient the wrong way','collect more training data','make the batch size larger'],
+  ans:1, fb:'Right. A wrong gradient that still runs is the classic silent backprop bug. Nudge one weight by a tiny ε and check (loss(W+ε) − loss(W−ε)) / (2ε) against your dW; a mismatch pinpoints the bad transpose, gate, or sign. Nothing in the raw output would reveal it — more units, data, or batch size cannot fix a gradient that points the wrong way.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

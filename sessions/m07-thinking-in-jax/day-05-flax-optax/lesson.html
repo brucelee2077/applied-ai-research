@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-jit.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">jit: Compilation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-vit-capstone.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ViT Capstone: Build &amp; Train</span></a>
+  <a class="lnav prev" href="../day-04-jit/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">jit: Compilation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-vit-capstone/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ViT Capstone (bridge)</span></a>
 </nav>
 
 
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable optimizers</strong> — Optax transforms are like building blocks. You can chain gradient clipping, weight decay, and Adam into one optimizer with <code>optax.chain(...)</code>.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> JAX is pure (Days 1–2) → params and optimizer state must be explicit → Flax hands you a params pytree and Optax hands you opt_state → the whole training step is pure → it composes with <code>jit</code> and <code>grad</code>.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Explicit params and optimizer state give you purity, but the very fact that state is passed in and out by hand is what lets one dropped return value quietly break training.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dropping the returned <code>opt_state</code>.</b> <code>tx.update(grads, opt_state)</code> returns <em>two</em> things: the updates and a <em>fresh</em> <code>opt_state</code>. If you only keep the updates — <code>updates, _ = tx.update(...)</code>, or you feed the same old <code>opt_state</code> into every step — the optimizer's running memory never advances. For Adam that means the momentum and variance estimates reset each step, so Adam quietly degrades toward plain SGD. Training still runs and loss still drops a bit, so nothing errors; it just converges worse than it should. A senior engineer checks in code review that <em>both</em> the new <code>params</code> and the new <code>opt_state</code> are captured and threaded into the next step.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: explicit state threading for purity and composability.</b> A framework that hid params and optimizer state inside the model would be shorter to write — no passing things in and out. Flax and Optax make you carry both by hand, which is more boilerplate and one more thing to thread correctly. In exchange the whole training step stays a pure function, so it composes cleanly with <code>jit</code>, <code>grad</code>, and <code>vmap</code>, and you always know exactly what your weights are. The design-review question: is the extra threading worth a training step you can compile and reason about with zero hidden state? At scale, yes.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -334,20 +339,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Do one step: define a <code>loss_fn(params)</code>, compute <code>grads = jax.grad(loss_fn)(params)</code>, then <code>updates, opt_state = tx.update(grads, opt_state)</code> and <code>params = optax.apply_updates(params, updates)</code>. Print the loss before and after.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week01_jax/mlp_flax_optax.py</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m07-thinking-in-jax/day-05-flax-optax/experiment.py</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 1 Day 5 artifact.
 
-Create experiments/week01_jax/mlp_flax_optax.py that:
+Create sessions/m07-thinking-in-jax/day-05-flax-optax/experiment.py that:
 1. Defines a tiny Flax MLP using flax.linen: nn.Dense(8) -> jnp.tanh -> nn.Dense(2), via nn.Sequential or a custom nn.Module.
 2. Builds params with params = model.init(key, x) for one input x of shape (4,) from a PRNGKey, and prints the params pytree structure (jax.tree_util.tree_map on shapes).
 3. Sets tx = optax.adam(1e-3) and opt_state = tx.init(params).
 4. Runs ONE training step: loss_fn(params) = sum(model.apply(params, x)**2); grads = jax.grad(loss_fn)(params); updates, opt_state = tx.update(grads, opt_state); params = optax.apply_updates(params, updates). Print the loss before and after to show it dropped.
 Add a brief comment on each step explaining Flax (init/apply) and Optax (init/update/apply_updates), then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-01/day-05-log.md</code>: why does <code>model.apply</code> take <code>params</code> as an argument instead of the model just holding them? (Hint: purity, so it composes with <code>jit</code> and <code>grad</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-05-flax-optax/log.md</code>: why does <code>model.apply</code> take <code>params</code> as an argument instead of the model just holding them? (Hint: purity, so it composes with <code>jit</code> and <code>grad</code>.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -361,9 +366,9 @@ Add a brief comment on each step explaining Flax (init/apply) and Optax (init/up
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-jit.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">jit: Compilation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-vit-capstone.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ViT Capstone: Build &amp; Train</span></a>
+  <a class="lnav prev" href="../day-04-jit/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">jit: Compilation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-vit-capstone/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ViT Capstone (bridge)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -466,9 +471,9 @@ var QS=[
  {q:'2. What does Optax provide?',
   opts:['Neural-network layers like Dense and Conv','Composable gradient transformations / optimizers, each with an init and an update','A replacement for jax.grad','Automatic batching of functions'],
   ans:1, fb:'Right. Optax gives you optimizers (like adam) as composable transforms with init and update. Flax provides the layers; Optax updates them.'},
- {q:'3. How do you actually apply the changes to the parameters?',
-  opts:['params += grads directly','optax.apply_updates(params, updates), where updates came from tx.update','model.init(key, x) again','The optimizer mutates params in place'],
-  ans:1, fb:'Right. tx.update(grads, opt_state) turns grads into updates and fresh opt_state; optax.apply_updates(params, updates) returns the new params.'},
+ {q:'3. Your Adam training loop runs with no error, but it converges much slower than expected — almost like plain SGD. Your step does <code>updates, _ = tx.update(grads, opt_state)</code> and reuses the original <code>opt_state</code> every step. Where do you look first, and why?',
+  opts:['The learning rate — Adam needs a bigger one than SGD','The dropped <code>opt_state</code>: <code>tx.update</code> returns a <em>new</em> opt_state carrying Adam\'s momentum/variance, but you threw it away and reused the initial state — so those running estimates never advance and Adam degrades toward SGD. Capture and thread the new opt_state each step','The loss function — it must be numerically unstable','Nothing; Adam and SGD always converge at the same rate'],
+  ans:1, fb:'Right. This is the dropped-state trap. Optax is stateful-by-passing: <code>tx.update</code> hands back a fresh opt_state holding Adam\'s momentum and second-moment estimates. Discarding it (or reusing the initial state) means those estimates reset every step, so Adam behaves like a much weaker optimizer. It never errors — just converges worse. Fix: <code>updates, opt_state = tx.update(grads, opt_state)</code> and carry opt_state forward.'},
  {q:'4. Why keep params and optimizer state explicit instead of hidden inside the model?',
   opts:['To use more memory','Because it keeps the functions pure, so they compose with jit and grad — and nothing mutates behind your back','Because Python does not allow hidden state','It makes the code shorter but slower'],
   ans:1, fb:'Right. Passing state in and out keeps everything pure, which is exactly what lets Flax/Optax compose with jit (compile) and grad (gradients) from earlier days.'}

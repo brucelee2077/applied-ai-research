@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-data-augmentation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Augmentation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-07-object-detection-intuition.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Object Detection Intuition</span></a>
+  <a class="lnav prev" href="../day-05-data-augmentation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Augmentation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-object-detection-intuition/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Object Detection (Intuition)</span></a>
 </nav>
 
   <header class="hero">
@@ -298,6 +298,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Search &amp; clustering:</strong> compare embeddings directly to find similar images or group them — no classifier at all.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> "turn an input into an embedding, then compare embeddings" is one of the most reused ideas in all of AI. Tomorrow's finale, CLIP, puts image and text embeddings into the same space so you can compare a photo to a sentence.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A borrowed network only gives good embeddings if you feed it the way it was trained, and choosing to freeze it or keep training it is a real decision.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): feeding the pretrained network the wrong input preprocessing.</b> A borrowed model was trained on images prepared a specific way — a fixed input size, a fixed channel order (RGB vs BGR), and normalized by a specific mean and standard deviation. If you hand it images normalized differently (say pixels in 0–255 instead of the expected scaled-and-normalized range, or the mean it never saw), the model still runs and still returns an embedding of the right length. But that embedding is now degraded, so your distances are unreliable and your accuracy quietly sits below what the pretrained weights should deliver. A senior engineer, in <b>code review</b>, checks that the exact preprocessing (size, channel order, mean and std) matches what the pretrained model documents.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: freeze for speed and small data, fine-tune for a fit to your task.</b> Feature extraction freezes the borrowed weights: it is fast, needs little data, and cannot overfit the backbone — but it is stuck with whatever the original model learned. Fine-tuning unfreezes layers so they adapt to your images: it can reach higher accuracy on an unusual task, but it needs more data and a careful (usually small) learning rate, or it will wash away the useful pretrained features. Which side to pick — how much of the network to unfreeze given your data size — is the <b>design-review</b> decision.</div></div>
       <button class="gotit" type="button">Got the embedding idea</button>
     </div>
   </section>
@@ -329,21 +334,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Chop a real network's head, read embeddings, and compare them. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_transfer_embeddings.py</code>. Load a small pretrained model (for example <code>torchvision.models.resnet18(weights="DEFAULT")</code>). Replace its final <code>fc</code> layer with <code>nn.Identity()</code> so it outputs the penultimate features. Put it in eval mode. Feed two similar dummy images and one different one, get their embeddings, and print the Euclidean distances — the similar pair should be closer. Run with <code>python3 m06_transfer_embeddings.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py</code>. Load a small pretrained model (for example <code>torchvision.models.resnet18(weights="DEFAULT")</code>). Replace its final <code>fc</code> layer with <code>nn.Identity()</code> so it outputs the penultimate features. Put it in eval mode. Feed two similar dummy images and one different one, get their embeddings, and print the Euclidean distances — the similar pair should be closer. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 6 artifact.
 
-Create experiments/foundations/m06_transfer_embeddings.py that, with a comment on each step, shows transfer learning and embeddings:
+Create sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py that, with a comment on each step, shows transfer learning and embeddings:
 1. Loads a pretrained torchvision.models.resnet18(weights="DEFAULT"), replaces model.fc with nn.Identity() to chop the head, and calls model.eval().
 2. Passes three input tensors of shape (1,3,224,224) through the model: two that are near-copies of each other and one that is very different; prints the embedding length (should be 512 for resnet18).
 3. Computes and prints the Euclidean distance between the similar pair and between a similar and the different one, asserting the similar pair's distance is smaller.
 4. Falls back to a randomly-initialized model if weights cannot be downloaded, and prints which path it took.
 Then run it and paste the embedding length and the two distances at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-06-log.md</code>: how long was the embedding, and was the similar pair really closer than the different pair?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/log.md</code>: how long was the embedding, and was the similar pair really closer than the different pair?</div></div>
       <button class="gotit" type="button">Done — on to Day 7</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Then run it and paste the embedding length and the two distances at the bottom a
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-data-augmentation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Augmentation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-07-object-detection-intuition.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Object Detection Intuition</span></a>
+  <a class="lnav prev" href="../day-05-data-augmentation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Data Augmentation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-object-detection-intuition/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Object Detection (Intuition)</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -474,9 +479,9 @@ var QS=[
  {q:'3. The penultimate layer\'s output is called:',
   opts:['the loss','an embedding — a fixed-length list of numbers summarizing the image','the label','a filter'],
   ans:1, fb:'Right. That fixed-length vector captures what the image looks like; similar images give similar embeddings.'},
- {q:'4. If two image embeddings have a small Euclidean distance, the images are:',
-  opts:['unrelated','similar to the network','the same size file','always identical'],
-  ans:1, fb:'Right. Small distance means the network sees them as similar — this is what powers image search and clustering.'}
+ {q:'4. You freeze a pretrained network as a feature extractor and train a small classifier on its embeddings, but accuracy is far below what this backbone usually reaches on similar tasks. The code runs without errors. What do you check first?',
+  opts:['Whether the embeddings are exactly identical for every image','Whether your input preprocessing matches what the pretrained model expects — size, channel order (RGB vs BGR), and the mean/std normalization; a mismatch (e.g. raw 0–255 pixels) still returns a right-length embedding but a degraded one, quietly capping accuracy','Whether you have too many training classes','Whether the images were saved as PNG instead of JPEG'],
+  ans:1, fb:'Right. A pretrained model gives good embeddings only when fed images prepared the way it was trained — correct size, channel order, and mean/std normalization. Feed it differently and it still returns an embedding of the right length, so nothing errors, but that embedding is degraded and your distances (and accuracy) suffer with no obvious cause. Match the documented preprocessing. It is not the class count or file format, and embeddings are not supposed to be identical across images.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

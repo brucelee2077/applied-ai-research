@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-moe-architecture-upgrade.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Architecture Upgrade</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-moe-isoflops-matrix-law-derivation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE IsoFLOPs Matrix &amp; Law Derivation</span></a>
+  <a class="lnav prev" href="../day-01-moe-architecture-upgrade/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Architecture Upgrade</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-moe-isoflops-matrix-law-derivation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE IsoFlops &amp; Law Derivation</span></a>
 </nav>
 
 
@@ -291,6 +291,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The auxiliary loss is what prevents this</strong> — without it, nothing in the architecture stops collapse. The capacity cutoff plus <code>L_aux</code> together give the router both a hard limit and a gradient-based incentive to spread load.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> dense FFN (same weights for every token) → replace with <code>E</code> experts + a router → router's argmax is discrete, so pair it with a differentiable proxy (<code>L_aux</code>) → <code>ragged_dot</code> executes the resulting variable-sized groups as one fused matmul → check <code>f_i</code> empirically to confirm the incentive actually worked.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A baseline run is about proving the router is healthy — so the dangerous bugs here are the ones that leave shapes and loss looking fine while the numbers underneath are wrong.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): tokens and group_sizes fall out of sync.</b> <code>lax.ragged_dot(sorted_tokens, W1_all, group_sizes)</code> assumes the token rows are sorted so the first <code>group_sizes[0]</code> rows belong to expert 0, the next <code>group_sizes[1]</code> to expert 1, and so on. If the sort that groups tokens by expert and the <code>group_sizes</code> vector are computed from slightly different routing arrays — for example one includes dropped tokens and the other does not — the shapes still match and the matmul still returns a full-size output with no error. But some tokens get multiplied by the wrong expert's weights, so the loss curve looks plausible while the model learns from scrambled routing. A senior engineer catches this in <b>code review</b> by asserting <code>group_sizes.sum() == number_of_rows_fed_to_ragged_dot</code> and by checking that the token-sort permutation and the group counts come from the exact same routing decision.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: ragged_dot's fused speed vs. the padded loop's simplicity.</b> A padded, per-expert dense matmul in a Python loop is easy to read and easy to debug — but it wastes FLOPs on padding rows and stops XLA from fusing the experts into one kernel. <code>ragged_dot</code> does the whole grouped matmul as a single fused primitive with no padding, which is why it is faster and lighter, but the payment is that you now own the token-sorting and <code>group_sizes</code> bookkeeping, and a mistake there fails silently instead of loudly. Choosing between them is a <b>design-review</b> decision: use the simple padded loop while you are still validating correctness, then move to <code>ragged_dot</code> once the routing is trusted and speed matters.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -332,19 +337,19 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A plot (bar or line chart, per expert over steps) exists showing the routing distribution visually, not just as raw numbers in a log.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week11_jax/moe_baseline_training/</code> with <code>moe_layer.py</code> and <code>train_moe_baseline.py</code> covering the bullets above.</p>
+      <p>Create <code>sessions/m14b-capstone-moe/day-02-moe-baseline-training/moe_baseline_training/</code> with <code>moe_layer.py</code> and <code>train_moe_baseline.py</code> covering the bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 11 Day 5 artifact.
 
-Create experiments/week11_jax/moe_baseline_training/ containing:
+Create sessions/m14b-capstone-moe/day-02-moe-baseline-training/moe_baseline_training/ containing:
 1. moe_layer.py — an MoE FFN block using jax.lax.ragged_dot: a router (Dense(num_experts) + softmax), top-1 dispatch via argmax, an expert-capacity cutoff (capacity_factor * tokens_per_batch / num_experts), token sorting/grouping into group_sizes, stacked expert weights W1_all (E, d_model, d_ff) and W2_all (E, d_ff, d_model), and the Switch Transformer auxiliary load-balancing loss L_aux = E * sum_i(f_i * P_i). Wire this block into my existing Phase 3 dense addition-transformer in place of its FFN block, sized to ~10M total parameters.
 2. train_moe_baseline.py — a training script that runs this MoE model on the same synthetic integer-addition task/data pipeline used for the dense model in prior weeks, logging per-expert token counts (f_i) at regular step intervals plus the raw L_aux value.
-3. reports/week11_moe_baseline_routing.md (or .json + a plot) — a table or plot of f_i per expert over training steps, plus a written verdict ("routers distributing evenly: yes/no") with the numeric band used to define "even" (e.g., all f_i within some tolerance of 1/E).
+3. sessions/m14b-capstone-moe/day-02-moe-baseline-training/reports/week11_moe_baseline_routing.md (or .json + a plot) — a table or plot of f_i per expert over training steps, plus a written verdict ("routers distributing evenly: yes/no") with the numeric band used to define "even" (e.g., all f_i within some tolerance of 1/E).
 Print and log the total parameter count to confirm ~10M. Log f_i for every expert at every interval, not just the final step. State explicit thresholds for "dead expert" and "collapsed expert" and report whether the run passed them. Comment on whether L_aux trended down as balance improved. Include a bar or line chart of the routing distribution, not just raw numbers.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-11/day-05-log.md</code>: why can <code>L_aux</code> look healthy (low, falling) even while the actual per-expert token counts are still lopsided? (Hint: soft proxy vs. hard argmax.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14b-capstone-moe/day-02-moe-baseline-training/log.md</code>: why can <code>L_aux</code> look healthy (low, falling) even while the actual per-expert token counts are still lopsided? (Hint: soft proxy vs. hard argmax.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Print and log the total parameter count to confirm ~10M. Log f_i for every exper
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-moe-architecture-upgrade.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Architecture Upgrade</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-moe-isoflops-matrix-law-derivation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE IsoFLOPs Matrix &amp; Law Derivation</span></a>
+  <a class="lnav prev" href="../day-01-moe-architecture-upgrade/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Architecture Upgrade</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-moe-isoflops-matrix-law-derivation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">MoE IsoFlops &amp; Law Derivation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -462,9 +467,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. In <code>jax.lax.ragged_dot(lhs, rhs, group_sizes)</code>, if <code>lhs</code> has shape <code>(m, k)</code> and there are <code>g</code> experts each with a <code>(k, n)</code> weight matrix, what must be true of <code>group_sizes</code>?',
-  opts:['It must have shape (g,) and its entries must sum to m','It must have shape (m,) and its entries must sum to g','It must have shape (g, g) representing a routing matrix','It is optional and defaults to an even split'],
-  ans:0, fb:'Right. group_sizes is a length-g vector of per-expert row counts that partitions the m rows of lhs, and those counts must sum to m since every token belongs to exactly one contiguous group.'},
+ {q:'1. Your MoE baseline trains with no error, shapes all match, and the loss falls — but validation accuracy is far worse than the dense baseline at the same compute, and it never recovers. You use <code>lax.ragged_dot(sorted_tokens, W1_all, group_sizes)</code> for the expert matmul. What is the first thing you check?',
+  opts:['Lower the learning rate, since a bad loss curve is always an optimizer problem','Whether the token-sort permutation and group_sizes come from the exact same routing decision — if one array counts dropped tokens and the other does not, group_sizes drifts out of sync with the sorted rows and tokens get multiplied by the wrong expert\'s weights, with no shape error','Add more experts, since 8 is too few for this task','Switch from bfloat16 to float32 to fix numerical instability'],
+  ans:1, fb:'Right. ragged_dot trusts that the first group_sizes[0] sorted rows are expert 0\'s tokens, the next group_sizes[1] are expert 1\'s, and so on. If the sort permutation and the group_sizes counts are derived from slightly different routing arrays, shapes still line up and no error fires, but tokens get routed to the wrong expert\'s weights — a silent corruption that shows up only as a quietly-bad metric. Assert group_sizes.sum() equals the number of rows you fed in, and that both come from the same routing decision, before reaching for the learning rate.'},
  {q:'2. Why does Switch Transformer\'s auxiliary load-balancing loss multiply <code>f_i</code> (fraction of tokens actually routed to expert i) by <code>P_i</code> (average router probability for expert i), instead of just penalizing <code>f_i</code> directly?',
   opts:['f_i alone is non-differentiable (it comes from argmax/counting), so multiplying by the differentiable P_i lets gradients flow back into the router','It doubles the loss magnitude for numerical stability','P_i is unused elsewhere and this reuses it for efficiency','It converts the loss from a sum to a product for scale invariance'],
   ans:0, fb:'Right. The hard routing decision (top-1 argmax) blocks gradients; pairing the non-differentiable count f_i with the differentiable softmax mass P_i gives the router a real gradient signal to push probability mass away from overloaded experts.'},

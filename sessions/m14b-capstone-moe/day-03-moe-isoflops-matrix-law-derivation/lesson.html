@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-moe-baseline-training.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Baseline Training</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-12/day-01-report-finalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Report Finalization</span></a>
+  <a class="lnav prev" href="../day-02-moe-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Baseline Training</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-report-finalization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Report Finalization</span></a>
 </nav>
 
 
@@ -286,6 +286,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>This is the capstone's central empirical payoff</strong> — the Dense-vs-MoE <code>beta</code> comparison is the number that anchors Week 12's final report.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> dense IsoFlops matrix + power-law fit (Week 11 Mon–Tue) → same launcher, same budgets, MoE model swapped in → same parabola + power-law fits, now on MoE minima → <code>beta_moe</code> vs. <code>beta_dense</code> → a measured answer to "is MoE more data-hungry?"</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>This whole study rests on each <code>(N, loss)</code> point describing the model you meant to measure. When a run's loss stops matching its costed capacity, the <code>beta</code> comparison keeps producing clean-looking curves that mean nothing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a collapsed router poisons the loss, not the active-N.</b> With top-1 routing every token still activates exactly one expert's worth of parameters, so if the router collapses and only 2 of 8 experts ever carry signal, the <em>per-token active parameters are unchanged</em> — the <code>N</code> in <code>C &approx; 6&middot;N&middot;D</code> is still correct. What breaks is the loss: the run now trains a model with far less usable capacity than the <code>N</code>-expert model you costed, because 6 of the experts are dead weight. So the <code>(N, loss)</code> point you feed the fit no longer describes the model you intended to measure. The parabolas still look U-shaped and <code>beta_moe</code> still comes out as a tidy number, while silently fitting corrupted loss points. A senior engineer catches this in <b>code review</b> by logging the per-expert token fractions <code>f_i</code> at several checkpoints in every run of the matrix, and rejecting any run whose router is not balanced before its loss ever enters the fit.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: active-parameter accounting is fair for compute but hides the real cost of the weights.</b> Counting only active parameters in <code>C ≈ 6&middot;N&middot;D</code> is the correct way to compare MoE against dense on equal FLOPs — it is what makes the <code>beta</code> comparison honest. But it deliberately says nothing about the <em>total</em> parameters that must still sit in memory and be moved across devices. An MoE model can win the compute-matched <code>beta</code> comparison while costing far more HBM and interconnect bandwidth to actually train and serve. Reporting <code>beta</code> on active parameters alone is a <b>design-review</b> trap: pair it with the total-parameter and memory-footprint numbers, or a reader will conclude MoE is a free lunch it is not.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -327,20 +332,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>The overlay plot renders both frontiers on shared log-log axes with a legend.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week11_jax/moe_isoflops_and_scaling_law/launch_isoflops_moe.py</code> and <code>fit_moe_scaling_law.py</code> with the six criteria above, reusing Week 10's launcher and Week 11 Mon–Tue's fitting code.</p>
+      <p>Build <code>sessions/m14b-capstone-moe/day-03-moe-isoflops-matrix-law-derivation/experiment.py</code> and <code>fit_moe_scaling_law.py</code> with the six criteria above, reusing Week 10's launcher and Week 11 Mon–Tue's fitting code.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 11 Day 6 artifact.
 
-Create experiments/week11_jax/moe_isoflops_and_scaling_law/ containing:
+Create sessions/m14b-capstone-moe/day-03-moe-isoflops-matrix-law-derivation/moe_isoflops_and_scaling_law/ containing:
 1. launch_isoflops_moe.py — the reused/adapted subprocess+argparse launcher from Week 10, extended with --model moe and --num_experts flags, that runs the full (budget x active-param-size) grid against the MoE addition transformer and writes one JSON result file per run to results/moe/ (with final_loss, active_params, tokens_seen, router load-balance metric).
 2. fit_moe_scaling_law.py — loads all MoE result JSONs, fits per-budget parabolas via scipy.optimize.curve_fit to get (N*, D*, L_min) per budget, then fits the power laws N*(C) = a*C^alpha and D*(C) = b*C^beta across budgets, printing beta_moe with its fit residual/R².
-3. reports/week11_jax/dense_vs_moe_beta_comparison.md — states beta_dense (pulled from the Week 11 Mon/Tue dense-fit artifact, not refit), beta_moe (freshly fit today), the numeric delta, and one sentence connecting the direction of the delta to the Switch Transformer / GShard data-hunger claim.
+3. sessions/m14b-capstone-moe/day-03-moe-isoflops-matrix-law-derivation/reports/week11_jax/dense_vs_moe_beta_comparison.md — states beta_dense (pulled from the Week 11 Mon/Tue dense-fit artifact, not refit), beta_moe (freshly fit today), the numeric delta, and one sentence connecting the direction of the delta to the Switch Transformer / GShard data-hunger claim.
 4. dense_vs_moe_frontier.png — a saved log-log plot overlaying both architectures' loss-vs-compute Pareto frontiers with a legend.
 Use the identical FLOP budget list as the earlier dense sweep, and count active_params as embeddings + attention + router + routed expert(s) only — never the total parameter count across all experts.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-11/day-06-log.md</code>: what sign was <code>beta_moe - beta_dense</code>, and does that match what Switch Transformer / GShard predict about MoE data hunger?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14b-capstone-moe/day-03-moe-isoflops-matrix-law-derivation/log.md</code>: what sign was <code>beta_moe - beta_dense</code>, and does that match what Switch Transformer / GShard predict about MoE data hunger?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -354,9 +359,9 @@ Use the identical FLOP budget list as the earlier dense sweep, and count active_
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-moe-baseline-training.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Baseline Training</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-12/day-01-report-finalization.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Report Finalization</span></a>
+  <a class="lnav prev" href="../day-02-moe-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Baseline Training</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-report-finalization/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Report Finalization</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -457,9 +462,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. In the Chinchilla IsoFlops method, what does the bottom of the parabola (loss vs. model size, at fixed compute budget C) represent?',
-  opts:['The largest model that fits in memory','The compute-optimal model size N* for that specific budget C','The model size where the router is perfectly load-balanced','The number of experts that minimizes communication cost'],
-  ans:1, fb:'Right. For a fixed FLOP budget, sweeping model size traces a U-shaped loss curve; its minimum marks the compute-optimal N* for that budget — that is the entire point of the IsoFlops sweep.'},
+ {q:'1. Your MoE IsoFlops sweep runs cleanly, every parabola is nicely U-shaped, and the fit reports a suspiciously good beta_moe that makes MoE look far more efficient than expected. Nothing errored. Where do you look first before trusting the number?',
+  opts:['Re-run scipy.optimize.curve_fit with more iterations, since a surprising fit means the optimizer did not converge','Check the per-expert token fractions f_i logged during each run — if the router collapsed and only a few experts carried signal, per-token active params are unchanged (top-1 still hits one expert) but the loss is now that of a much lower-capacity model, so the (N, loss) point no longer corresponds to a healthy N-active model and beta_moe is fit on corrupted points','Assume the result is correct, since a clean U-shaped parabola proves the run was valid','Lower all the FLOP budgets C so the models are smaller and easier to fit'],
+  ans:1, fb:'Right. The fit machinery cannot tell you whether each loss point describes the model you costed — it will happily fit tidy parabolas to numbers from a collapsed router. Under top-1 routing the per-token active-parameter count does not change when experts go dead, so N stays right; what breaks is the loss, which now reflects a model with far less usable capacity than the N experts you paid for. That corrupts the (N, loss) point, so beta_moe fits a model that never actually was. Verify f_i is balanced at several checkpoints in every run before letting its loss into the fit; a clean parabola alone proves nothing about routing health.'},
  {q:'2. When building the MoE version of the IsoFlops matrix, "active parameters" N should be counted as...',
   opts:['The sum of parameters across all experts, since they all exist in memory','Only the router\'s parameters','The parameters actually used in a single forward pass (embeddings + attention + router + the routed expert(s)), excluding unused experts','The total parameter count divided by the number of GPUs'],
   ans:2, fb:'Right. MoE\'s whole point is constant per-token compute despite huge total parameter counts; comparing against dense models on a compute-matched basis requires counting only the parameters actually touched per forward pass, not the full sparse parameter count.'},

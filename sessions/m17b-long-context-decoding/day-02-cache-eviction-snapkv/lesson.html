@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-decoding-innovations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Decoding Innovations</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-gqa-mqa.html"><span class="lnav-dir">Next →</span><span class="lnav-t">GQA &amp; MQA</span></a>
+  <a class="lnav prev" href="../day-01-decoding-innovations/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Decoding Innovations</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-gqa-mqa/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">GQA &amp; MQA</span></a>
 </nav>
 
 
@@ -220,7 +220,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Monday's lesson on GQA/MQA (sharing K/V heads to shrink the cache). <b>No prior knowledge of eviction needed.</b></div></div>
 
       <h4>The problem: re-reading everything, every single step</h4>
-      <p>When a transformer generates text one token at a time, it must look back at every earlier token to decide what comes next. To avoid recomputing each earlier token's <span class="term" data-tip="A tiny array in JAX that controls randomness. You pass it into random calls so results are explicit and repeatable.">Key</span> and <span class="term" data-tip="One of two small number lists (with the key) that attention makes per token, used to look back at earlier tokens.">Value</span> vectors (the two things attention needs to "look back"), the model stores them the first time it computes them. This storage is called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>.</p>
+      <p>When a transformer generates text one token at a time, it must look back at every earlier token to decide what comes next. To avoid recomputing each earlier token's <span class="term" data-tip="A small list of numbers for a token that says 'what I can be matched against' when attention looks for connections.">Key</span> and <span class="term" data-tip="A small list of numbers for a token that says 'what I contribute if I get matched' during attention.">Value</span> vectors (the two things attention needs to "look back"), the model stores them the first time it computes them. This storage is called the <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span>.</p>
       <p>The KV cache's size is:</p>
       <div class="callout c-info"><span class="ic">🧮</span><div><code>cache size = 2 × num_layers × num_kv_heads × head_dim × seq_len × bytes_per_element</code><br><span style="font-size:.85rem;color:var(--text2)">The <code>2</code> is for K and V. Every other factor is fixed by the model — except <code>seq_len</code>, which grows with how much text you feed in.</span></div></div>
       <p>That last factor is the problem. Feed the model 100,000+ tokens of context, and the cache can become <strong>many times larger than the model's own weights</strong>. And on every single decode step, the chip must read the <em>entire</em> cache from GPU memory (HBM) before it can produce the next token. Reading data, not doing math, becomes the bottleneck — this is why decoding is called <span class="term" data-tip="When a program is slow because it spends most time moving data from memory, not doing math.">memory-bandwidth bound</span>, a bottleneck formalized in Pope et al.'s inference-scaling analysis (linked below).</p>
@@ -303,6 +303,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>The catch: SnapKV only touches the prompt</h4>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>SnapKV's eviction happens <strong>once</strong>, at the end of prefill, based only on the prompt. It does not re-evaluate as new tokens get generated. So it bounds the <em>prompt's</em> contribution to the cache — but every newly generated token's own K/V still gets appended during decode, growing the cache regardless, unless you add a separate decode-time eviction policy (e.g. sliding-window or H2O).</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> long prompt → huge KV cache → memory-bandwidth-bound decode (Pope et al.) → GQA/MQA shrinks it structurally, per-token → SnapKV shrinks it further, per-position, using attention patterns already computed during prefill → smaller cache, faster decode, same prompt understanding (mostly).</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>SnapKV throws prompt tokens away for good, and the danger is that the throwing-away never announces itself — the model just answers a little worse.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): evicting a token you needed later.</b> The vote is cast at the end of prefill using only the observation-window queries. A prompt fact that no window query happened to attend to — a date, a name, one clause buried in a contract — gets a low vote and is dropped from the cache forever. Later in the generation the model needs it, but the K/V is gone, so it quietly makes something up. No exception, no warning: the output is fluent and just wrong. A senior engineer catches this in <b>code review</b> by refusing to trust perplexity alone and instead gating any eviction ratio on a retrieval-style check (needle-in-a-haystack across many needle positions), because average-quality metrics hide these rare-but-critical misses.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: compression ratio vs. recall safety.</b> A smaller kept budget <code>k = floor(p × L_prefix)</code> means less cache, faster decode, more concurrent requests — but every token you drop is a fact the model can no longer see. Push <code>p</code> down and you win throughput while slowly losing answers that depend on obscure prompt details. Choosing that ratio — and whether some heads or some token spans (system prompt, tool schemas) are exempt from eviction entirely — is the <b>design-review</b> decision, not a knob to set by feel.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -341,7 +346,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A short <code>README.md</code> in that directory states the measured compression ratio achieved (e.g. <code>input_len / max_capacity_prompt</code>) and cites the 380x / 3.6x / 8.2x figures from the SnapKV paper for comparison.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week16_jax/day2_snapkv_eviction/</code> with <code>snap_kv.py</code>, <code>test_snap_kv.py</code>, and <code>benchmark.py</code> as described above.</p>
+      <p>Create <code>sessions/m17b-long-context-decoding/day-02-cache-eviction-snapkv/day2_snapkv_eviction/</code> with <code>snap_kv.py</code>, <code>test_snap_kv.py</code>, and <code>benchmark.py</code> as described above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -349,14 +354,14 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Implement and benchmark a from-scratch SnapKV-style KV cache eviction simulator in JAX/NumPy, reusing the Phase 3 transformer capstone's attention weights as the input signal (synthetic or capstone-model attention matrices — no live HF model needed).
 
-Create experiments/week16_jax/day2_snapkv_eviction/ containing:
+Create sessions/m17b-long-context-decoding/day-02-cache-eviction-snapkv/day2_snapkv_eviction/ containing:
 1. snap_kv.py — implement the exact voting → 1D-pooling → top-k → gather pipeline (from the walkthrough: slice observation window, compute attention weights against prefix keys, sum over the window to get votes, 1D max-pool the votes, top-k select, gather K/V, concat with the always-kept observation window), parameterized by window_size, max_capacity_prompt, kernel_size, operating on a [batch, num_heads, q_len, head_dim] synthetic Q/K/V tensor (or real attention outputs saved from the Phase 3 capstone transformer on a long synthetic sequence).
 2. test_snap_kv.py — unit tests asserting: (a) output cache size equals max_capacity_prompt exactly whenever q_len >= max_capacity_prompt; (b) the observation window's own K/V are always present unmodified in the output; (c) a no-pooling (kernel_size=1) run versus kernel_size=5 run select measurably different index sets on a synthetic vote signal with implanted "spiky" vs "clustered" importance regions, confirming the clustering effect.
 3. benchmark.py — reproduces the shape of the paper's Figure 7: for input lengths in [1024, 4096, 16384, 65536] and a fixed max_capacity_prompt (e.g. 1024), measure and print/plot simulated decode-step cost (e.g. total K/V positions read) for baseline (no eviction, grows linearly) vs. SnapKV (flat, bounded by max_capacity_prompt).
 4. README.md stating the measured compression ratio (input_len / max_capacity_prompt) and citing the paper's 380x compression, 3.6x faster decoding, 8.2x more memory-efficient figures at 16K tokens for comparison.
-Run python experiments/week16_jax/day2_snapkv_eviction/test_snap_kv.py to confirm it exits 0.</pre>
+Run python sessions/m17b-long-context-decoding/day-02-cache-eviction-snapkv/experiment.py to confirm it exits 0.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-16/day-02-log.md</code>: why does SnapKV's guard clause (<code>if q_len &lt; max_capacity_prompt: return unchanged</code>) only fire once, and what does that mean for cache growth during a very long decode run?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17b-long-context-decoding/day-02-cache-eviction-snapkv/log.md</code>: why does SnapKV's guard clause (<code>if q_len &lt; max_capacity_prompt: return unchanged</code>) only fire once, and what does that mean for cache growth during a very long decode run?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -370,9 +375,9 @@ Run python experiments/week16_jax/day2_snapkv_eviction/test_snap_kv.py to confir
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-decoding-innovations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Decoding Innovations</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-gqa-mqa.html"><span class="lnav-dir">Next →</span><span class="lnav-t">GQA &amp; MQA</span></a>
+  <a class="lnav prev" href="../day-01-decoding-innovations/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Decoding Innovations</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-gqa-mqa/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">GQA &amp; MQA</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -473,9 +478,9 @@ var QS=[
  {q:'3. How does SnapKV\'s approach to reducing KV cache size differ fundamentally from GQA/MQA\'s approach?',
   opts:['SnapKV reduces cache size by sharing K/V heads across query heads; GQA/MQA evicts unimportant token positions','SnapKV evicts token positions based on observed attention patterns at inference time; GQA/MQA reduces cache size by sharing K/V heads across multiple query heads, fixed at training time','They are the same technique with different names','SnapKV only works on TPUs while GQA/MQA only works on GPUs'],
   ans:1, fb:'Right. GQA/MQA is a structural, training-time reduction (fewer K/V heads shared across query heads, applied uniformly). SnapKV is an inference-time, content-dependent reduction (drop specific token positions predicted to be unimportant) that can be layered on top of GQA/MQA.'},
- {q:'4. In the paper\'s Needle-in-a-Haystack benchmark, SnapKV processes a 380K-token input using a KV cache budget of 1024 positions per head. What compression ratio does this represent, and what happened to the uncompressed baseline at a much shorter input?',
-  opts:['38x compression; the baseline was equally fast but used more memory','380x compression; the baseline ran out of memory (OOM) at only 33K input tokens','1024x compression; the baseline was never tested','No compression occurs until the input exceeds 1 million tokens'],
-  ans:1, fb:'Right. 380,000 / 1,024 ≈ 380x compression. The paper explicitly reports the uncompressed baseline hitting an OOM error at 33K tokens on the same A100-80GB, while SnapKV scales to 380K.'}
+ {q:'4. You enable SnapKV in production. Aggregate metrics look fine — perplexity is unchanged and average answer quality holds — but users start reporting that the model occasionally invents a wrong date or name that WAS present in a long prompt. No errors are thrown. Where do you look first, and why?',
+  opts:['The 1D pooling kernel size — a wrong kernel size always throws a shape error','The eviction decision itself: SnapKV votes once at end-of-prefill using only the observation-window queries, so a prompt fact no window query attended to gets dropped and is gone forever, and the model then fabricates it','The top-k sort — an unstable sort would corrupt every answer, not just some','The model weights, which SnapKV modifies during compression'],
+  ans:1, fb:'Right. This is the signature silent failure of KV eviction. The vote is cast once, from the observation window; a fact those queries did not happen to look at gets a low score, is evicted, and cannot be recovered during decode — so the model quietly makes something up. Average metrics hide it because it is rare per prompt but severe when it hits, which is why you gate eviction on a needle-in-a-haystack check across many needle positions rather than on perplexity. Pooling and sort bugs would fail loudly or corrupt everything; SnapKV does not touch the model weights.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

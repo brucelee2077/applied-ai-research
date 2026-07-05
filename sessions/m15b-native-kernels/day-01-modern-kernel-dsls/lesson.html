@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-13/day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+  <a class="lnav prev" href="../../m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M15a · Custom Kernels I: Pallas &amp; FlashAttention</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-tensor-memory-acceleration/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
 </nav>
 
 
@@ -302,6 +302,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>One tool per level.</strong> Tiles (warp), producer-consumer (block), persistent grid (grid). Three abstractions map onto the three layers of the GPU — that is the entire ThunderKittens philosophy.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> GPU is a swarm of cores → tensor cores are ~16× faster but only eat <code>16×16</code> tiles → tile the matrix and keep the tensor cores fed → overlap loads with producer/consumer → hide bubbles with a persistent grid → peak throughput.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The three abstractions only pay off if the tensor cores stay fed with clean <code>16×16</code> tiles — and the ways that quietly fails are exactly what a reviewer looks for.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the tensor cores never ran, but the answer is still right.</b> Your kernel compiles, runs, and returns the correct matrix — yet the shapes did not tile cleanly into <code>16×16</code>, so the work silently fell back to the slow general units (or masked off partial tiles). Nothing crashes; the numbers are correct; you just quietly lost the ~16× speedup and think TK "didn't help". A senior engineer checks in <b>code review</b> that the matmul dimensions are actual multiples of the tile size and that a profiler confirms the <code>mma</code> (tensor-core) path is the hot path — not <code>exp</code>, loads, or a scalar fallback.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: writing in tiles buys peak throughput but costs generality and portability.</b> TK's tile-shaped model wins when your op is a big, regular, tensor-core-friendly matmul. You pay for it: your code is now tied to a specific tile size and hardware generation, and memory-bound or irregular ops (heavy <code>exp</code>/softmax, tiny or ragged shapes) get little from it while still carrying the complexity. In a <b>design review</b> the real question is whether the op is compute-bound enough to earn a hand-tiled kernel, or whether a simpler library call is the right call.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -344,13 +349,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>All numbers match the ThunderKittens paper (arXiv:2410.20399) — no invented figures.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>frontier-lab/visualizations/thunderkittens-tile-philosophy.html</code> covering all criteria above.</p>
+      <p>Create <code>sessions/m15b-native-kernels/day-01-modern-kernel-dsls/thunderkittens-tile-philosophy.html</code> covering all criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-d3-visual-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-d3-visual-lab to build my Week 14 Day 1 artifact.
 
-Create frontier-lab/visualizations/thunderkittens-tile-philosophy.html — an interactive D3 explainer titled "ThunderKittens: the GPU is a swarm of 16x16 tile cooks". Requirements:
+Create sessions/m15b-native-kernels/day-01-modern-kernel-dsls/thunderkittens-tile-philosophy.html — an interactive D3 explainer titled "ThunderKittens: the GPU is a swarm of 16x16 tile cooks". Requirements:
 1. Single self-contained HTML file; opens with `open <path>`; NO external CDN — bundle D3 locally (public CDNs are 403-blocked).
 2. A "myth vs reality" toggle: flip a one-giant-matrix-multiplier view to a swarm-of-16x16-tiles view.
 3. A tensor-core-vs-general-core bar chart showing the ~16x FLOP gap (general ~65 TFLOPS vs BF16 tensor cores ~1000 TFLOPS), labeled with the numbers.
@@ -360,7 +365,7 @@ Create frontier-lab/visualizations/thunderkittens-tile-philosophy.html — an in
 7. Ground-zero captions that define warp, tile, tensor core, and swizzling before using them.
 8. All performance numbers must match the ThunderKittens paper (arXiv:2410.20399) — do not invent figures.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After building it, write one line in <code>sessions/week-14/day-01-log.md</code>: why is TK <em>not</em> a magic autotuner? (Hint: what happens if your matmul dimension isn't a multiple of 16, or your op is memory-bound with almost no <code>mma</code>?)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After building it, write one line in <code>sessions/m15b-native-kernels/day-01-modern-kernel-dsls/log.md</code>: why is TK <em>not</em> a magic autotuner? (Hint: what happens if your matmul dimension isn't a multiple of 16, or your op is memory-bound with almost no <code>mma</code>?)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -374,9 +379,9 @@ Create frontier-lab/visualizations/thunderkittens-tile-philosophy.html — an in
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-13/day-06-moe-kernel-challenge-performance-proof.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Kernel Challenge &amp; Performance Proof</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+  <a class="lnav prev" href="../../m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M15a · Custom Kernels I: Pallas &amp; FlashAttention</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-tensor-memory-acceleration/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -571,9 +576,9 @@ var QS=[
  {q:'3. In TK\'s block-level template, what is the job of the "producer" warps?',
   opts:['Run the tensor-core matrix multiplies','Compute the softmax and exp','Load the next tiles from slow memory into shared buffers while consumers compute','Launch the grid and manage the CPU'],
   ans:2, fb:'Right. Producers only fetch upcoming tiles into pipeline buffers so consumers (tensor cores) never stall waiting on HBM.'},
- {q:'4. Why does TK "swizzle" the layout of tiles in shared memory?',
-  opts:['To compress the data and save HBM space','To reorder elements across the 32 memory banks and avoid bank conflicts','To encrypt the tiles for security','To convert BF16 into FP32 automatically'],
-  ans:1, fb:'Right. Swizzling spreads elements across banks 0–31 so many threads don\'t collide on the same bank, keeping shared-memory access fast.'}
+ {q:'4. You port a matmul to ThunderKittens. It compiles, runs, and returns numerically correct output — but the profiler shows it is barely faster than your old code, and the tensor cores are almost idle. Where do you look first, and why?',
+  opts:['The output is correct, so the kernel is fine — the profiler must be misreading tensor-core usage','Check whether the matmul dimensions are true multiples of the 16×16 tile size; if they are not, the work can silently fall back to the slow general units while still producing the right numbers','Assume TK is broken for this GPU and rewrite the whole thing in raw CUDA','Add more print statements inside the kernel to slow it down until the numbers change'],
+  ans:1, fb:'Right. Correct output does not prove the fast path ran. If shapes do not tile cleanly into 16×16, TK can mask partial tiles or fall back to general units — the answer stays correct, but the ~16× tensor-core speedup silently disappears. Confirm the dimensions are real multiples of the tile size and that the profiler shows mma as the hot path.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

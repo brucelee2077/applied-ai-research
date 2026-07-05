@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-05/day-06-scaling-simulator-visualization.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Scaling Simulator &amp; Visualization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-memory-wall.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Memory Wall</span></a>
+  <a class="lnav prev" href="../../m15b-native-kernels/day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M15b · Native Kernels: C++/CUDA + ThunderKittens</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-memory-wall/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Memory Wall</span></a>
 </nav>
 
 
@@ -291,6 +291,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Multiquery attention</strong> (many query heads sharing one shared K/V head) shrinks the KV cache dramatically, which is the dominant memory cost during long-context decode — letting the same memory budget hold far more context.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Roofline model (earlier weeks) → apply it to real transformer matrix shapes → prefill is one big matmul (compute-bound) → decode is a repeated matvec limited by the KV cache and weight loads (memory-bound) → this split decides where engineering effort and hardware budget go in production.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The prefill/decode split is the whole game in serving. Here is the mistake it quietly hides, and the price you pay for the standard fix.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): benchmarking with a long prompt, then sizing the whole service from it.</b> A common bug is to measure throughput by feeding one big prompt (that is mostly prefill, which is compute-bound) and quote that number for the service. Nothing errors — the benchmark runs and the tokens/sec looks great — but real users spend most of their time in decode, which is memory-bound and often much slower per token. You ship a system that hits its promised speed on the benchmark and misses it badly in production. In <b>code review</b>, a senior engineer checks that the latency test actually <em>generates</em> many tokens (a real decode loop), not just <em>reads</em> a long prompt, before trusting the number.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bigger decode batches buy throughput but cost per-user latency.</b> Batching many <em>concurrent</em> requests together raises decode's arithmetic intensity back toward compute-bound, so you serve far more total tokens per second per chip. But every user now waits for the whole batch to step forward together, so one user's time-per-token goes up. In a <b>design review</b> this is the core dial: an interactive chat product caps the batch size to protect latency, while an offline batch-generation job cranks it up to squeeze the hardware. Same model, opposite settings.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -331,22 +336,22 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Produce one plot: arithmetic intensity of prefill vs. decode (bar or roofline-style scatter with a marked ridge point), saved explicitly to a file.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week06_jax/day1_inference_mechanics/prefill_vs_decode.py</code> with the bullets above, plus a short <code>RESULTS.md</code> in the same directory.</p>
+      <p>Create <code>sessions/m16a-inference-economics/day-01-inference-mechanics/experiment.py</code> with the bullets above, plus a short <code>RESULTS.md</code> in the same directory.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 6 Day 1 artifact.
 
-Create experiments/week06_jax/day1_inference_mechanics/prefill_vs_decode.py that:
+Create sessions/m16a-inference-economics/day-01-inference-mechanics/experiment.py that:
 1. Builds one toy transformer layer in JAX (configurable d_model, n_heads, d_head).
 2. Runs a prefill pass over a [B, T, d_model] activation batch (T e.g. 512) doing the full QKV projection + attention + output projection as one matmul-heavy pass.
 3. Separately simulates a decode loop that runs T' steps (e.g. 100) each processing a [B, 1, d_model] activation against a growing KV cache implemented as a preallocated buffer that gets written into (not regrown each step — regrowing every step would itself be a bug worth flagging).
 4. Measures and prints, for both phases: (a) total FLOPs computed analytically from the shapes, (b) total bytes moved (weight bytes reloaded per step for decode; loaded once for prefill), (c) resulting arithmetic intensity (FLOPs/byte), and (d) measured wall-clock time per phase using jax.block_until_ready timing, run at least 2 batch sizes for decode (e.g. B=1 and B=64) to show throughput improving with batch size while per-token latency does not collapse to zero.
-5. Produces one plot: arithmetic intensity of prefill vs. decode (bar or roofline-style scatter against a marked ridge point), saved explicitly with plt.savefig("experiments/week06_jax/day1_inference_mechanics/roofline_plot.png").
+5. Produces one plot: arithmetic intensity of prefill vs. decode (bar or roofline-style scatter against a marked ridge point), saved explicitly with plt.savefig("sessions/m16a-inference-economics/day-01-inference-mechanics/day1_inference_mechanics/roofline_plot.png").
 6. Writes a short RESULTS.md in the same directory stating, in 3-5 bullet points, the measured intensity numbers and which phase was compute-bound vs. memory-bound, in language repeatable in an interview.
 Add a brief comment on each step explaining prefill vs. decode, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-06/day-01-log.md</code>: why does batching <em>concurrent</em> decode requests fix memory-boundedness, while making one sequence's prompt <em>longer</em> does not? (Hint: which dimension gets reused against the same loaded weights.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-01-inference-mechanics/log.md</code>: why does batching <em>concurrent</em> decode requests fix memory-boundedness, while making one sequence's prompt <em>longer</em> does not? (Hint: which dimension gets reused against the same loaded weights.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Add a brief comment on each step explaining prefill vs. decode, then run it to c
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-05/day-06-scaling-simulator-visualization.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Scaling Simulator &amp; Visualization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-memory-wall.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Memory Wall</span></a>
+  <a class="lnav prev" href="../../m15b-native-kernels/day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M15b · Native Kernels: C++/CUDA + ThunderKittens</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-memory-wall/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Memory Wall</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -463,9 +468,9 @@ var QS=[
  {q:'2. What is the purpose of the KV cache during autoregressive decoding?',
   opts:['It stores the model\'s output logits so they can be re-ranked later','It stores the Key and Value vectors for all previously processed tokens so they don\'t need to be recomputed on every new decode step','It compresses the model\'s weights to reduce memory usage','It stores a copy of the input prompt for use in beam search'],
   ans:1, fb:'Right. The K/V vectors for earlier tokens never change once computed, so caching and appending to them (rather than recomputing) is what makes incremental decoding tractable.'},
- {q:'3. According to Pope et al. (2022) on PaLM 540B, roughly what generation latency per token did they achieve at low batch size using int8 weight quantization?',
-  opts:['29 milliseconds per token','290 microseconds per token','2.9 seconds per token','29 seconds per token'],
-  ans:0, fb:'Right. The paper reports a low-batch-size generation latency of 29ms per token with int8 weight quantization, alongside a separate 76% MFU figure for large-batch prefill.'},
+ {q:'3. Your load test feeds the model one very long prompt, and it reports a high tokens/sec. But in production, users report the model feels slow. The code runs fine and the numbers were measured correctly — where do you look first, and why?',
+  opts:['Assume the production GPUs are simply slower than the test GPUs and ask for faster hardware','Realize the load test measured mostly prefill (compute-bound, fast per token), while real users spend most of their time in decode (memory-bound, much slower per token) — so re-measure with a test that generates many output tokens','Conclude the KV cache is disabled in production and must be recomputing attention every step','Blame the tokenizer for counting tokens differently in the two environments'],
+  ans:1, fb:'Right. A long prompt is dominated by the one big prefill matmul, which is compute-bound and gets high arithmetic intensity — so tokens/sec looks great. But interactive users mostly experience decode, one token per step, which is memory-bound and far slower per token. The benchmark and production disagree not because of a bug but because they exercise different phases. The fix is to benchmark a realistic decode loop (generate hundreds of tokens), not just process a long prompt. Blaming hardware or the tokenizer skips the real, phase-level explanation.'},
  {q:'4. Why does multiquery attention (many query heads sharing a single key/value head) let a model support a much larger context length under a fixed memory budget?',
   opts:['It reduces the number of transformer layers needed','It shrinks the per-token size of the KV cache, since far fewer K/V vectors need to be stored per token, so more tokens\' worth of cache fit in the same memory','It eliminates the need for a causal attention mask','It reduces the FLOPs required per matrix multiply during prefill'],
   ans:1, fb:'Right. The KV cache size scales with the number of KV heads; sharing one KV head across many query heads cuts that dimension dramatically, shrinking per-token cache size and letting a fixed memory budget hold a much longer sequence.'}

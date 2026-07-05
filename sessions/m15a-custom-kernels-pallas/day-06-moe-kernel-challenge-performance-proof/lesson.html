@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-hardware-evolution.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Hardware Evolution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-14/day-01-modern-kernel-dsls.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav prev" href="../day-05-hardware-evolution/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Hardware Evolution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m15b-native-kernels/day-01-modern-kernel-dsls/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M15b · Native Kernels: C++/CUDA + ThunderKittens</span></a>
 </nav>
 
 
@@ -294,6 +294,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>When F ≤ D, fusion can LOSE.</strong> The deleted intermediate is smaller than the output, so there is little traffic to save, and the hand-written kernel's launch/tiling overhead can make it slower than the vendor-tuned <code>ragged_dot</code>. Honest engineers scope the claim.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> HBM is ~100× slower than SRAM → the <code>(M, F)</code> hidden activation is the biggest array when F &gt; D → two <code>ragged_dot</code> calls round-trip it through HBM → a fused Pallas kernel keeps it on-chip → less HBM traffic → faster, provably, in the F &gt; D regime.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The <code>group_sizes</code> array is where an MoE kernel goes quietly wrong, and fusing the kernel at all is a bet you should only make in one regime.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): <code>group_sizes</code> that don't sum to M.</b> <code>group_sizes</code> tells the kernel how many consecutive token rows each expert owns; its entries must total <code>M</code>, the number of routed rows. If a routing bug makes them sum to <em>less</em> than <code>M</code>, the tail rows are never assigned to any expert — those tokens silently get stale or zero output while every shape stays legal and nothing crashes. If they sum to <em>more</em>, the kernel reads past the token buffer. Either way the model still trains and the loss still moves; it just quietly ignores or corrupts a slice of tokens, which is nearly invisible in an average loss. In <b>code review</b>, a senior engineer asserts <code>group_sizes.sum() == M</code> right after routing and checks it stays true after any token dropping or capacity change — not just once at startup.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fusion wins only when F &gt; D.</b> Fusing the up- and down-projections deletes the HBM round-trip of the fat <code>(M, F)</code> hidden activation — a real win when the hidden size <code>F</code> is larger than the model dimension <code>D</code>, because that intermediate is then the biggest array. But it cuts zero FLOPs, and when <code>F ≤ D</code> the deleted intermediate is smaller than the output, so there is little traffic to save and your hand-written kernel's launch and tiling overhead can make it <em>slower</em> than the vendor-tuned <code>ragged_dot</code>. In a <b>design review</b>, the honest move is to scope the claim to the <code>F &gt; D</code> regime and benchmark against the library baseline before committing to owning the kernel.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -336,13 +341,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The trap:</b> "proving" fusion wins without actually keeping the intermediate on-chip — e.g. computing <code>h = x @ W_up</code> as one full JAX op (which materializes <code>(M, F)</code> in HBM) then <code>h @ W_down</code>, and calling that "fused." That is just the baseline with extra steps. Also: without <code>block_until_ready()</code> you time async dispatch, not compute; and without a warm-up run the first call's JIT compile time counts as runtime. Both give fake speedups.</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Build the experiment folder <code>experiments/week-13-moe-kernel-challenge/</code> with the four files above.</p>
+      <p>Build the experiment folder <code>sessions/m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/</code> with the four files above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 13 Day 6 capstone artifact: a fused MoE up/down-projection Pallas kernel that PROVES it beats jax.lax.ragged_dot when F > D.
 
-Create these files in experiments/week-13-moe-kernel-challenge/:
+Create these files in sessions/m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/:
 
 1. moe_fused_kernel.py
    - A fused kernel via pallas_call computing y = act(x @ W_up) @ W_down for grouped/ragged expert assignment. The (block x F) hidden activation MUST stay in on-chip memory (SRAM/VMEM) inside a single pallas_call and never be written to HBM. Tile over F if the hidden block does not fit.
@@ -360,7 +365,7 @@ Create these files in experiments/week-13-moe-kernel-challenge/:
 
 Do NOT fake the fusion: h = x @ W_up as a full JAX op materializes (M, F) in HBM and is NOT fusion. Do not forget block_until_ready() (or you time async dispatch) or the warm-up run (or you count JIT compile). Then run test_correctness.py and bench.py and paste the results.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-13/day-06-log.md</code>: at F = D your fused kernel roughly ties <code>ragged_dot</code>. Why does the win only appear once F &gt; D? (Hint: the size of the intermediate you deleted.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/log.md</code>: at F = D your fused kernel roughly ties <code>ragged_dot</code>. Why does the win only appear once F &gt; D? (Hint: the size of the intermediate you deleted.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -374,9 +379,9 @@ Do NOT fake the fusion: h = x @ W_up as a full JAX op materializes (M, F) in HBM
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-hardware-evolution.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Hardware Evolution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-14/day-01-modern-kernel-dsls.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Modern Kernel DSLs (TK)</span></a>
+  <a class="lnav prev" href="../day-05-hardware-evolution/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Hardware Evolution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m15b-native-kernels/day-01-modern-kernel-dsls/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M15b · Native Kernels: C++/CUDA + ThunderKittens</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -534,9 +539,9 @@ var QS=[
  {q:'1. Why does fusing the up- and down-projections into one Pallas kernel save time specifically when F &gt; D?',
   opts:['It reduces the number of floating-point multiplications performed','It avoids writing and re-reading the large (M × F) hidden activation to HBM, and that intermediate is the biggest array when F &gt; D','It lets the router send tokens to more experts at once','It converts the matmul from bf16 to int8 automatically'],
   ans:1, fb:'Fusion doesn\'t cut FLOPs; it keeps the fat (M × F) intermediate in SRAM, saving an HBM round-trip that dominates when F > D.'},
- {q:'2. In <code>jax.lax.ragged_dot(lhs, rhs, group_sizes)</code>, what must be true of <code>group_sizes</code>?',
-  opts:['It must be a float array normalized to sum to 1.0','Its length equals the number of experts G and its entries sum to M, the number of rows in lhs','It must be sorted in descending order','It must equal the feature dimension F'],
-  ans:1, fb:'group_sizes has one integer per expert saying how many consecutive lhs rows that expert owns; they must total M or the tail rows are undefined.'},
+ {q:'2. Your fused MoE kernel trains fine — no crash, loss still falls — but a small, fixed fraction of tokens seem to get ignored, and validation is slightly worse than the reference. You pass <code>group_sizes</code> into <code>jax.lax.ragged_dot</code>. Where do you look first, and why?',
+  opts:['The SRAM budget — some tiles must be spilling to HBM','Whether <code>group_sizes.sum()</code> equals M, the number of routed rows: if the entries sum to less than M after a routing/token-drop change, the tail rows are assigned to no expert and silently get stale output','The activation function — GELU must be saturating','The grid size — it is one block too large'],
+  ans:1, fb:'Right. group_sizes says how many consecutive rows each expert owns, and the entries must total M. When a routing or capacity change makes them sum to less than M, the tail token rows belong to no expert and quietly receive stale or zero output — no crash, legal shapes, and the loss barely notices because it is averaged over all tokens. The fix and the debugging move are the same: assert group_sizes.sum() == M right after routing, and re-check it after any token dropping.'},
  {q:'3. Why is a Pallas kernel launched over a "grid" of blocks instead of processing the whole matrices at once?',
   opts:['Because JAX requires every kernel to run exactly once','Because on-chip SRAM is tiny, so each grid instance loads only its tile (e.g. a block of tokens and a block of F) into fast memory','Because the grid randomizes token order for better routing','Because grids are the only way to call GELU on hardware'],
   ans:1, fb:'SRAM can\'t hold the full arrays, so the grid tiles the problem: each instance streams in just its block, computes, and writes back.'},

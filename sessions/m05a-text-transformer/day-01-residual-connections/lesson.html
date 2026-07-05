@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Curriculum Map</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-layer-norm.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav prev" href="../../m04-first-model-mlp/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M4 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layer Normalization</span></a>
 </nav>
 
   <header class="hero">
@@ -297,6 +297,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>Why it matters — before and after</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the original ResNet paper (2015) used this exact idea to train networks over 100 layers deep for the first time. Every modern transformer wraps <b>both</b> its attention sublayer and its feed-forward sublayer in a residual connection. Without it, a 96-layer model like GPT-3 could not be trained at all.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The residual add looks like the safest line in the model. But it is exactly the line where a wrong shape can hide instead of crash, and where "just add a skip" quietly costs memory.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a broadcast add that does not match.</b> The skip is <code>y = F(x) + x</code>, an element-by-element add that needs <code>F(x)</code> and <code>x</code> to have the exact same shape. If a reshape or a projection leaves them differing on a size-1 axis, PyTorch does not raise an error — it <b>broadcasts</b> the smaller one and adds anyway. The model trains, the loss goes down, but you have quietly mixed the wrong numbers together, and accuracy tops out low for no visible reason. A senior engineer reads the residual line in <b>code review</b> and asserts <code>F(x).shape == x.shape</code> right before the add, because the shapes are what the <code>+</code> silently forgives.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: trainability now, memory later.</b> The skip gives the gradient a clean road home, which is what lets you stack 96 layers at all. What you pay is memory: the input <code>x</code> must be kept around until the backward pass so the <code>+1</code> road can be used, so every residual point holds an extra activation in memory. In a <b>design review</b> for a very deep or long-context model this shows up as an activation-memory bill, and it is the reason techniques like activation checkpointing exist — you re-compute the skipped activations later instead of storing them.</div></div>
       <button class="gotit" type="button">Got why the +x matters</button>
     </div>
   </section>
@@ -328,20 +333,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the residual effect to yourself with a tiny experiment — measuring it makes it real. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_residual.py</code>. Build a stack of, say, 30 tiny layers two ways: (1) plain <code>x = layer(x)</code>, and (2) residual <code>x = layer(x) + x</code>. Feed in a fixed input, run the backward pass, and print the size of the gradient that reaches the <b>first</b> layer in each case. You should see the plain stack's gradient near zero and the residual stack's gradient healthy. Run with <code>python3 m05a_residual.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-01-residual-connections/experiment.py</code>. Build a stack of, say, 30 tiny layers two ways: (1) plain <code>x = layer(x)</code>, and (2) residual <code>x = layer(x) + x</code>. Feed in a fixed input, run the backward pass, and print the size of the gradient that reaches the <b>first</b> layer in each case. You should see the plain stack's gradient near zero and the residual stack's gradient healthy. Run with <code>python3 m05a_residual.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 1 artifact.
 
-Create experiments/foundations/m05a_residual.py that, with a comment on each step, shows why residual connections keep gradients alive in a deep stack:
+Create sessions/m05a-text-transformer/day-01-residual-connections/experiment.py that, with a comment on each step, shows why residual connections keep gradients alive in a deep stack:
 1. Builds a stack of 30 tiny layers where each layer multiplies by a small factor (about 0.2), run in two modes: PLAIN (x = layer(x)) and RESIDUAL (x = layer(x) + x).
 2. Runs a forward pass on a fixed input, then a backward pass, and records the L2 norm of the gradient that reaches the FIRST layer in each mode.
 3. Prints both gradient norms side by side and asserts the residual norm is much larger than the plain norm.
 Then run it and paste the two gradient norms at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-01-log.md</code>: how much bigger was the first-layer gradient with the skip connection than without it?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-01-residual-connections/log.md</code>: how much bigger was the first-layer gradient with the skip connection than without it?</div></div>
       <button class="gotit" type="button">Done — on to Day 2</button>
     </div>
   </section>
@@ -355,9 +360,9 @@ Then run it and paste the two gradient norms at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Curriculum Map</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-layer-norm.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav prev" href="../../m04-first-model-mlp/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M4 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layer Normalization</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -471,9 +476,9 @@ var QS=[
  {q:'3. Why does the +x help the gradient flow backward?',
   opts:['it deletes the layer','it adds a +1 term, so gradients always have a road that never fully vanishes','it makes the numbers bigger by luck','it turns off training'],
   ans:1, fb:'Right. dy/dx = F′(x) + 1. The +1 comes from the skip, giving the gradient a clean path home through every layer.'},
- {q:'4. For the addition to work, the layer output and the skipped input must:',
-  opts:['have different shapes','have the exact same shape','both be zero','be on the GPU'],
-  ans:1, fb:'Right. output = sublayer(x) + x is an element-by-element add, so both must have the same shape.'}
+ {q:'4. You add a residual skip and the model still trains and the loss drops, but final accuracy is stuck lower than the same model without the skip — and there is no error. Where do you look first?',
+  opts:['the learning rate, since accuracy is always a learning-rate problem','the shapes at the add: if sublayer(x) and x differ on a size-1 axis, the + broadcasts silently instead of erroring, mixing the wrong numbers','the GPU driver version','the number of tokens in the dataset'],
+  ans:1, fb:'Right. output = sublayer(x) + x is an element-by-element add. If the two tensors differ on a size-1 axis, PyTorch broadcasts instead of raising an error, so the run looks healthy while quietly adding mismatched values. Print or assert that sublayer(x).shape == x.shape right before the add — the silent broadcast is exactly what a code review catches.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

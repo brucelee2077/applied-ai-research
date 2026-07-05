@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-agentic-scaffolding.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Agentic Scaffolding</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-21/day-01-formal-verification-refinement.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Verification &amp; Refinement (TLA+)</span></a>
+  <a class="lnav prev" href="../day-11-agentic-scaffolding/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Agentic Scaffolding</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m27a/day-01-two-kinds-of-safety.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M27a · Assistant &amp; Safety Systems</span></a>
 </nav>
 
 
@@ -294,6 +294,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Held-out inputs catch cheats</strong> — a fast score on the training arrays can be a memorized special-case; re-checking the champion on unseen arrays separates a real discovery from a trick.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> a mechanical benchmark → the Evaluator can judge code automatically → the LLM can mutate freely and be scored → keep winners, feed them back → over many generations fitness improves → re-verify on held-out inputs to confirm it is real.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The Selector trusts the fitness number completely — so if that number is noise, the whole search follows the noise, and nothing ever tells you.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): ranking candidates by a noisy single timing.</b> A wall-clock timing wobbles run to run because of OS scheduling, CPU caches, and other processes on the machine. If fitness is one <code>timeit</code> call instead of a median over many runs, a genuinely slower algorithm can post a faster number just because it happened to run during a quiet moment. The Selector, which only sees the score, keeps that candidate and breeds from it — so the search chases measurement noise instead of real speedups. It runs cleanly and the "best" score even improves, but it is improving toward whatever times well by luck, not what is actually fast. A senior engineer catches this in <b>code review</b> by checking the fitness is a median (or min) over enough repeated runs — for example via <code>pytest-benchmark</code> — on a quiet machine, and by re-measuring the champion to confirm its win is stable and not a one-off.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: measurement stability vs. candidates per hour.</b> Timing each candidate N times and taking the median gives a stable score the Selector can trust, but it makes every evaluation roughly N times slower — so you test far fewer candidates in a fixed 12-hour run. Timing once is fast and lets you search more, but the ranking is noisy and can mislead the whole search. In a <b>design review</b> you pick N deliberately: enough repeats that the fitness is stable relative to the speedups you care about, but no more, because every extra repeat is a candidate you did not get to try.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -324,7 +329,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build the loop, run it ~12h, extract the winner</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>This weekend's task (from the curriculum): <strong>Saturday</strong> — write the autonomous ADRS loop. <strong>Sunday</strong> — run it for ~12 hours, log every mutation and score, then extract the final optimized sorting algorithm and confirm it is faster than the seed.</p>
-      <h4>Files to build (under <code>experiments/week20_adrs/</code>)</h4>
+      <h4>Files to build (under <code>sessions/m26-adrs/day-12-adrs-implementation-simulation-execution/</code>)</h4>
       <ul>
         <li><code>sorting_sandbox.py</code> — reference sort + fixed <code>test_arrays</code> + a separate <strong>held-out</strong> array set (adapted from Week 19).</li>
         <li><code>evaluator.py</code> — correctness gate, then fitness = median seconds (pytest-benchmark or timeit).</li>
@@ -348,7 +353,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 20 Day 6 artifact: an autonomous ADRS loop that evolves a faster sorting algorithm.
 
-Create experiments/week20_adrs/ with:
+Create sessions/m26-adrs/day-12-adrs-implementation-simulation-execution/ with:
 1. sorting_sandbox.py — a correct reference_sort(), a fixed set of test_arrays, and a SEPARATE held-out array set the loop never sees during the run (adapt from Week 19).
 2. evaluator.py — first a correctness gate (candidate output must equal reference on every array, else fitness = float("inf")), then fitness = MEDIAN seconds over >=5 runs (pytest-benchmark or timeit). Randomize array contents/sizes each generation so nothing can be memorized.
 3. adrs_loop.py — wire the five components: Prompt Generator (pastes the top-k programs + scores and asks for a faster one), Solution Generator (LLM API via the local genAI bridge at http://localhost:11211 OpenAI-compatible path, or OpenAI/Anthropic SDK), Evaluator, Storage (JSON or SQLite keyed by score, islands optional), Selector. Add an --hours flag, wrap the LLM call in try/except with retry + back-off, and checkpoint state to disk so a 12h run can resume. Halt cleanly on the time limit and print the final champion + its score.
@@ -359,7 +364,7 @@ Create experiments/week20_adrs/ with:
 Acceptance: `python adrs_loop.py --hours 0.05` runs end-to-end and appends to run_log.csv; the wrong-candidate test passes; best_algorithm.py beats the seed on the held-out set. Then run it and show me the output.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The trap: reward hacking through the Evaluator, not the algorithm.</b> If fitness is measured only on a small fixed set of arrays, the LLM will eventually produce code that special-cases or memorizes those exact inputs — scoring a blazing "speed" that vanishes on real input. It is not being sneaky; it is optimizing exactly what you measured. Defenses: (1) always re-verify the champion on a HELD-OUT set it never saw, (2) randomize array contents/sizes each generation, (3) keep the correctness gate strict. Second, mundane trap: timing noise — one <code>time.time()</code> call can rank a worse algorithm faster, so use a median over many runs.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After the run, write one line in <code>sessions/week-20/day-06-log.md</code>: what was the final speedup vs. the seed, and did it hold up on the held-out arrays?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After the run, write one line in <code>sessions/m26-adrs/day-12-adrs-implementation-simulation-execution/log.md</code>: what was the final speedup vs. the seed, and did it hold up on the held-out arrays?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -373,9 +378,9 @@ Acceptance: `python adrs_loop.py --hours 0.05` runs end-to-end and appends to ru
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-agentic-scaffolding.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Agentic Scaffolding</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-21/day-01-formal-verification-refinement.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Verification &amp; Refinement (TLA+)</span></a>
+  <a class="lnav prev" href="../day-11-agentic-scaffolding/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Agentic Scaffolding</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m27a/day-01-two-kinds-of-safety.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M27a · Assistant &amp; Safety Systems</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -530,9 +535,9 @@ var QS=[
  {q:'2. Why must the Evaluator check correctness BEFORE it uses the speed measurement?',
   opts:['Because timing is slower than correctness checks','Because a program that returns instantly but sorts wrong would otherwise win on speed','Because the LLM refuses to submit incorrect code','Because pandas cannot rank incorrect results'],
   ans:1, fb:'A wrong sort (e.g. return a unchanged) is extremely fast; without a correctness gate the loop optimizes for cheating, not sorting.'},
- {q:'3. Why does <code>pytest-benchmark</code> report the median over many runs instead of a single timing?',
-  opts:['To make the script run for a full 12 hours','Because a single timing is noisy and could rank a worse algorithm above a better one','Because the LLM requires median values in its prompt','To reduce the number of API calls'],
-  ans:1, fb:'One measurement is noisy from OS scheduling and caching; a median over repeated runs gives a stable fitness so the selector ranks algorithms correctly.'},
+ {q:'3. Your ADRS sort-optimization loop scores each candidate with a single timeit() call. It runs fine and the "best" fitness keeps improving, but when you re-time the champion later it is no faster than the baseline — and reruns give wildly different rankings. What is happening, and what do you fix first?',
+  opts:['The correctness gate is failing, so the sorts are wrong','A single timing is too noisy (OS scheduling, caches, other processes), so the Selector is ranking on measurement noise and breeding from candidates that were merely lucky — score fitness as a median (or min) over many repeated runs on a quiet machine, e.g. via pytest-benchmark','The LLM is too small to write fast sorts, so swap in a bigger model','Nothing is wrong — timings always vary, so accept the champion'],
+  ans:1, fb:'Right. The Selector only sees the number, so if the number is noise it faithfully chases noise. Wildly different rankings on reruns plus a champion that does not hold up is the signature of noisy single-shot timing, not a correctness bug. The fix is to make fitness stable — a median or min over enough repeated runs on a quiet machine — and to re-measure the champion to confirm the win is real. A bigger model does not help when the ranking signal itself is unreliable.'},
  {q:'4. What is the purpose of splitting Storage into separate "islands"?',
   opts:['To run the loop on multiple machines','To keep several independent sub-populations so the search keeps diverse ideas and doesn\'t converge too early','To store correct and incorrect programs separately','To reduce the cost of API calls'],
   ans:1, fb:'Islands are semi-isolated populations; they preserve diversity so one early good-but-mediocre idea does not dominate and trap the search in a local optimum.'}

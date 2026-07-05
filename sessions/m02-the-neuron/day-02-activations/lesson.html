@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-single-neuron.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Single Neuron</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-layers-forward-pass.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layers &amp; the Forward Pass</span></a>
+  <a class="lnav prev" href="../day-01-single-neuron/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Single Neuron</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-layers-forward-pass/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layers &amp; the Forward Pass</span></a>
 </nav>
 
   <header class="hero">
@@ -273,6 +273,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p><strong>ReLU</strong> is the workhorse: it's dirt cheap (just a max) and it avoids the <span class="term" data-tip="When gradients shrink toward zero as they pass back through many layers, so early layers barely learn. Sigmoid suffers from this; ReLU largely avoids it.">vanishing-gradient</span> problem that plagues sigmoid in deep stacks (you'll meet gradients in M3). Sigmoid and its cousin <span class="term" data-tip="Turns a vector of scores into probabilities that sum to 1. Used at the output of a classifier.">softmax</span> live mostly at the output, where you want probabilities.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> linear ∘ linear = linear → depth alone buys nothing → a non-linear activation per layer breaks the collapse → deep networks can learn complex functions. The activation is the reason "deep" learning is a thing.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The activation you pick decides whether a neuron keeps learning. Both common activations have a quiet way to stop learning that throws no error.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): saturated units that stop learning.</b> A <code>sigmoid</code> squashes into <code>(0, 1)</code>; when its input is far from zero (say <code>z = 10</code> or <code>z = −10</code>), the output flattens near <code>1</code> or <code>0</code> and barely moves when the input changes. A <code>ReLU</code> that always sees a negative input outputs a flat <code>0</code> — a "dead" ReLU. In both cases the neuron's output is nearly constant, so training can no longer nudge it, and the network quietly learns less than it could. Nothing crashes; the loss just plateaus higher than expected. A senior engineer catches this in <b>code review</b> by logging activation statistics — the fraction of ReLUs stuck at zero, or how many sigmoids sit pinned near 0 or 1 — instead of only watching the loss number.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: ReLU's speed and sparsity vs. its dead-neuron risk.</b> Choosing <code>ReLU</code> buys you a cheap activation (just a <code>max</code>) that keeps gradients healthy in deep stacks and turns off many neurons at once, which is often useful. What you give up is safety at zero: any neuron pushed permanently negative dies and never comes back. Softer activations that never fully flatten (they keep a small slope for negative inputs) trade a little extra math and less sparsity for never dying. Which one to use, and where, is a <b>design-review</b> decision — commonly ReLU-family in the hidden layers, sigmoid or softmax only at the output.</div></div>
       <button class="gotit" type="button">Got why depth needs a bend</button>
     </div>
   </section>
@@ -304,20 +309,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the collapse yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m02b_activations.py</code>. Write <code>relu</code> and <code>sigmoid</code>; print each on <code>[-2,0,2]</code>. Then pick two weight matrices <code>W1</code>, <code>W2</code>, and show that <code>(x@W1)@W2</code> equals <code>x@(W1@W2)</code> for a random <code>x</code> (proving two linear layers = one). Run with <code>python3 m02b_activations.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-02-activations/experiment.py</code>. Write <code>relu</code> and <code>sigmoid</code>; print each on <code>[-2,0,2]</code>. Then pick two weight matrices <code>W1</code>, <code>W2</code>, and show that <code>(x@W1)@W2</code> equals <code>x@(W1@W2)</code> for a random <code>x</code> (proving two linear layers = one). Run with <code>python3 m02b_activations.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 2 artifact.
 
-Create experiments/foundations/m02b_activations.py that, with a comment on each step:
+Create sessions/m02-the-neuron/day-02-activations/experiment.py that, with a comment on each step:
 1. Defines relu(z)=np.maximum(0,z) and sigmoid(z)=1/(1+np.exp(-z)); prints each applied to np.array([-2,0,2]).
 2. Shows the collapse: with W1, W2 random matrices and x random, asserts np.allclose((x@W1)@W2, x@(W1@W2)) — two linear layers equal one.
 3. Then inserts relu between them: shows relu(x@W1)@W2 is NOT equal to any single x@W, i.e. the bend prevents the collapse.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f2/day-02-log.md</code>: in your own words, why would a 100-layer network with no activations be useless?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-02-activations/log.md</code>: in your own words, why would a 100-layer network with no activations be useless?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -331,9 +336,9 @@ Then run it and paste the output at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-single-neuron.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Single Neuron</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-layers-forward-pass.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layers &amp; the Forward Pass</span></a>
+  <a class="lnav prev" href="../day-01-single-neuron/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Single Neuron</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-layers-forward-pass/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Layers &amp; the Forward Pass</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -447,9 +452,9 @@ var QS=[
  {q:'3. <code>ReLU(z)</code> equals:',
   opts:['1/(1+e^(−z))','max(0, z)','z²','−z'],
   ans:1, fb:'Right. ReLU keeps positives and zeroes negatives: max(0, z).'},
- {q:'4. Sigmoid squashes any input into which range?',
-  opts:['(−1, 1)','(0, 1)','(0, ∞)','all real numbers'],
-  ans:1, fb:'Right. sigmoid = 1/(1+e^(−z)) maps everything into (0, 1) — handy for a probability.'}
+ {q:'4. Your network trains without any error, but the loss stops dropping early and stays high. You log the hidden ReLU outputs and find that most of them are exactly <code>0</code> for every input in the batch. What is the most likely explanation?',
+  opts:['The loss is high because sigmoid was used at the output, which is always a bug','Many ReLU units are "dead": their input stays negative for all inputs, so max(0, z) is always 0 and they can no longer learn — the network is effectively much smaller than it looks','The GPU ran out of memory, which always makes ReLU output zero','A high loss with zero activations means the network has already converged'],
+  ans:1, fb:'Right. A ReLU that always sees a negative input outputs a flat 0 for every example — a dead unit. Many dead units mean much of the network does nothing, so the loss plateaus. You look at activation statistics (fraction of zeros), not at a crash, because the failure is silent.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

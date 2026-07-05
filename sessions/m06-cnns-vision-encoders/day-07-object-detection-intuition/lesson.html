@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-06-transfer-learning-embeddings.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-08-clip-contrastive.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CLIP &amp; Contrastive Learning</span></a>
+  <a class="lnav prev" href="../day-06-transfer-learning-embeddings/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-clip-contrastive/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CLIP: Contrastive Image-Text</span></a>
 </nav>
 
   <header class="hero">
@@ -302,6 +302,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <tr><td style="padding:.5rem;border:1px solid var(--border)"><b>One-stage</b> (e.g. YOLO)</td><td style="padding:.5rem;border:1px solid var(--border)">predict boxes + labels in one pass</td><td style="padding:.5rem;border:1px solid var(--border)">faster, great for real time</td></tr>
       </table>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> detection reuses the CNN backbone you already understand and adds a "where" head on top. This is awareness-level — you do not need the full loss math, just the shape of the problem and the two families.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Even the simple IoU score has a quiet trap in how boxes are written down, and the one-stage vs two-stage choice is a real design decision.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mixing up the box coordinate format.</b> A box can be written as <code>(x1, y1, x2, y2)</code> — two opposite corners — or as <code>(center_x, center_y, width, height)</code>. Both are four numbers. If your IoU code assumes corners but the boxes arrive as center-and-size (or the other way round), the math still returns a number between 0 and 1, so nothing errors. But it is the overlap of the <em>wrong</em> rectangles, so good predictions get scored as misses and your reported accuracy is quietly wrong. A senior engineer, in <b>code review</b>, checks that every box entering an IoU or loss function is in the one agreed format, and converts explicitly at each boundary.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: one-stage detectors buy speed, two-stage buy accuracy.</b> A one-stage detector (like YOLO) predicts boxes and labels in a single pass, which is fast enough for real-time video but tends to be weaker on small or crowded objects. A two-stage detector (like Faster R-CNN) first proposes regions and then classifies each, which is more accurate but slower and heavier. Which family fits — real-time speed versus top accuracy under a latency and hardware budget — is the <b>design-review</b> decision.</div></div>
       <button class="gotit" type="button">Got the detection picture</button>
     </div>
   </section>
@@ -333,20 +338,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>This is an awareness day, so keep it light. Pick one small thing to make the idea concrete:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_iou.py</code>. Write a function <code>iou(boxA, boxB)</code> where each box is <code>(x1, y1, x2, y2)</code>. Compute the intersection area, the union area, and their ratio. Test it on two overlapping boxes and confirm the number matches your hand calculation (for example the 40/160 = 0.25 case from the lesson). Run with <code>python3 m06_iou.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py</code>. Write a function <code>iou(boxA, boxB)</code> where each box is <code>(x1, y1, x2, y2)</code>. Compute the intersection area, the union area, and their ratio. Test it on two overlapping boxes and confirm the number matches your hand calculation (for example the 40/160 = 0.25 case from the lesson). Run with <code>python3 sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 7 artifact.
 
-Create experiments/foundations/m06_iou.py that, with a comment on each step, makes object-detection scoring concrete:
+Create sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py that, with a comment on each step, makes object-detection scoring concrete:
 1. Defines iou(boxA, boxB) where each box is (x1, y1, x2, y2); computes the intersection width/height (clamped at 0), the intersection area, the union area, and returns intersection/union.
 2. Tests it on: two boxes that overlap partially (assert the IoU matches a hand-computed value), two identical boxes (assert IoU == 1.0), and two non-touching boxes (assert IoU == 0.0).
 3. Prints a one-line explanation of why IoU above ~0.5 usually counts as a correct detection.
 Then run it and paste the three IoU values at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-07-log.md</code>: what IoU did two identical boxes give, and in one sentence, what does object detection add over classification?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/log.md</code>: what IoU did two identical boxes give, and in one sentence, what does object detection add over classification?</div></div>
       <button class="gotit" type="button">Done — on to the finale</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Then run it and paste the three IoU values at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-06-transfer-learning-embeddings.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-08-clip-contrastive.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CLIP &amp; Contrastive Learning</span></a>
+  <a class="lnav prev" href="../day-06-transfer-learning-embeddings/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transfer Learning &amp; Embeddings</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-clip-contrastive/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CLIP: Contrastive Image-Text</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -475,9 +480,9 @@ var QS=[
  {q:'3. IoU (Intersection over Union) measures:',
   opts:['the model speed','how much a predicted box overlaps the true box (overlap ÷ union)','the number of classes','the image size'],
   ans:1, fb:'Right. IoU is overlap area divided by union area, between 0 and 1; higher means a better-placed box.'},
- {q:'4. Compared to a two-stage detector, a one-stage detector is:',
-  opts:['always more accurate','faster, predicting boxes and labels in a single pass','unable to find objects','only for text'],
-  ans:1, fb:'Right. One-stage detectors (like YOLO) run in one pass — faster, great for real time; two-stage ones are often more accurate but slower.'}
+ {q:'4. Your detector visibly draws boxes right on top of the objects, yet its measured IoU-based accuracy is terrible and no error is thrown. Where do you look first?',
+  opts:['The confidence scores must be too low','A box-format mismatch: IoU code assuming corner coordinates (x1,y1,x2,y2) fed boxes stored as center+size (cx,cy,w,h) — both are four numbers, so it computes overlap of the wrong rectangles and returns a valid-looking but wrong score; make the format consistent and convert at each boundary','The images are the wrong resolution','The model needs a two-stage design to score correctly'],
+  ans:1, fb:'Right. A box written as two corners (x1,y1,x2,y2) and one written as center-and-size (cx,cy,w,h) are both four numbers. If IoU assumes one format but gets the other, it still returns a number in 0–1, so nothing crashes — but it is the overlap of the wrong rectangles, so correct boxes score as misses. Fix the format and convert explicitly. It is not confidence, resolution, or the number of stages.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-transformer-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transformer Arithmetic</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-kv-cache.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The KV Cache</span></a>
+  <a class="lnav prev" href="../day-01-transformer-arithmetic/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transformer Arithmetic (C≈6ND)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-kv-cache/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The KV Cache</span></a>
 </nav>
 
 
@@ -304,6 +304,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>FFN dominates</strong> — the funnel holds <code>8d²</code> vs attention's <code>4d²</code>, so two-thirds of a block's weights live in the feed-forward part.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> token = <code>d</code>-vector → each matrix is <code>rows × cols</code> params → 4 attention (<code>4d²</code>) + 2 FFN (<code>8d²</code>) = <code>12d²</code> per block → × <code>n_layers</code> = model size.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The <code>12d²</code> rule is a fast estimate, and fast estimates hide what they skip. A staff engineer knows the term that quietly goes missing, and the knob this budget is really about.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting the embedding and output layers.</b> <code>12d²·n_layers</code> counts only the transformer blocks. It leaves out the token embedding and the LM head — each roughly <code>vocab × d</code>, often tens of millions of parameters. For a small model with a large vocabulary, those two matrices can be a big fraction of the real total. Nothing errors; your checkpoint is just noticeably bigger than your napkin math promised. A senior engineer adds the <code>2 · vocab · d</code> term before quoting a size.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: where the <code>d²</code> budget goes.</b> Two-thirds of a block already lives in the FFN (<code>8d²</code> vs attention's <code>4d²</code>). Widening the FFN multiple (the usual 4×) adds representational capacity but grows parameters and memory the fastest; narrowing it saves memory but caps the per-token nonlinearity. The FFN multiplier and <code>d</code> are the two knobs that set model size — a classic <b>design-review</b> call.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -343,13 +348,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Verify: for <code>d_model=768, n_heads=12, n_layers=1</code>, per-block ≈ <code>7,077,888</code> (~7.08M).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week03/param_counter.py</code> with the four bullets above and print a small table for a couple of configs.</p>
+      <p>Create <code>sessions/m08-transformer-math/day-02-qkv-matrices/experiment.py</code> with the four bullets above and print a small table for a couple of configs.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 3 Day 2 artifact.
 
-Create experiments/week03/param_counter.py that:
+Create sessions/m08-transformer-math/day-02-qkv-matrices/experiment.py that:
 1. Defines count_params(d_model, n_heads, n_layers) and asserts d_model % n_heads == 0 (so head_dim = d_model // n_heads is a whole number).
 2. Computes attention params = 4 * d_model**2 (Wq, Wk, Wv, Wo each d_model x d_model).
 3. Computes FFN params = (d_model * 4*d_model) + (4*d_model * d_model) = 8 * d_model**2 (up d x 4d, down 4d x d).
@@ -357,7 +362,7 @@ Create experiments/week03/param_counter.py that:
 5. Verifies that count_params(768, 12, 1) gives per_block == 7_077_888 (~7.08M), then prints a small table for d_model=768/n_layers=12 and d_model=1024/n_layers=24.
 Add a brief comment on each step, then run it to confirm the numbers.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-03/day-02-log.md</code>: why does the FFN hold twice as many parameters (<code>8d²</code>) as attention (<code>4d²</code>) in one block?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m08-transformer-math/day-02-qkv-matrices/log.md</code>: why does the FFN hold twice as many parameters (<code>8d²</code>) as attention (<code>4d²</code>) in one block?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -371,9 +376,9 @@ Add a brief comment on each step, then run it to confirm the numbers.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-transformer-arithmetic.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transformer Arithmetic</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-kv-cache.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The KV Cache</span></a>
+  <a class="lnav prev" href="../day-01-transformer-arithmetic/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Transformer Arithmetic (C≈6ND)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-kv-cache/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The KV Cache</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -465,9 +470,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. How many big weight matrices are in the attention sub-part of a block?',
-  opts:['2 (up and down)','3 (Q, K, V)','4 (Wq, Wk, Wv, Wo)','1 (just Wq)'],
-  ans:2, fb:'Right. Attention has 4: Wq, Wk, Wv to build the queries/keys/values, and Wo to recombine the result. Each is roughly d × d.'},
+ {q:'1. You size a small model as <code>12·d²·n_layers</code>, but the saved checkpoint is much larger than your estimate. What did the rule most likely leave out?',
+  opts:['the optimizer state','the token embedding and LM head (each ≈ vocab × d), which dominate for a small model with a large vocab','the attention bias vectors','the activation memory'],
+  ans:1, fb:'Right — a diagnostic read. 12·d²·n_layers counts only the blocks. The embedding and output projection are each about vocab × d; with a large vocab and small d they can rival the block parameters. Add 2·vocab·d before quoting a size.'},
  {q:'2. The FFN\'s hidden width is usually how big compared to <code>d_model</code>?',
   opts:['The same as d_model','About 4× d_model','Half of d_model','It depends on n_heads'],
   ans:1, fb:'Right. The FFN goes wide first — typically 4× d_model — then back down. That is the up-projection d × 4d and down-projection 4d × d.'},

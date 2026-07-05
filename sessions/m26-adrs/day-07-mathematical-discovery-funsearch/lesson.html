@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-19/day-06-evaluation-engineering-holdout.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out Workloads</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-formal-theorem-proving-alphageometry.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Theorem Proving (AlphaGeometry)</span></a>
+  <a class="lnav prev" href="../day-06-evaluation-engineering-holdout/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-formal-theorem-proving-alphageometry/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Theorem Proving</span></a>
 </nav>
 
 
@@ -295,6 +295,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The one requirement:</b> you must have a cheap, <em>trustworthy</em> automated evaluator. A subtly wrong evaluator (measuring the wrong quantity, or awarding points for invalid answers) makes the search "succeed" loudly while producing garbage — the loop optimizes exactly what you measure. A flawed verifier is far more dangerous here than a flawed LLM.</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> a scorable-but-hard problem → an LLM proposes program mutations → a trusted evaluator filters every one → an islands database keeps diverse winners → the loop, spun millions of times, climbs past the human best → the same loop finds new systems routing algorithms.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The islands are what keep FunSearch exploring — and they can quietly stop doing their job while the loop keeps running exactly as before.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): island collapse (diversity dies).</b> Islands only preserve variety if they stay isolated. If one island's champion is allowed to seed every other island too often, or islands are never reset, one lineage takes over the whole database. From then on the LLM only ever sees minor edits of a single idea, so the search is effectively one island pretending to be many. It keeps running, keeps scoring, and the best number creeps up slowly — but it has quietly converged early and can no longer reach a genuinely different heuristic. Nothing errors. A senior engineer catches this in <b>code review</b> by checking the island policy: are islands actually isolated, is there a reset/migration schedule, and if you log per-island best programs, are they still meaningfully different or all near-duplicates?</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: number of islands (diversity) vs. progress per island.</b> Splitting the population into many isolated islands preserves many competing ideas, so the search is far less likely to freeze on one mediocre heuristic — but each island gets fewer samples, so any single good idea improves more slowly. Fewer, larger islands push one lineage forward fast but risk collapsing onto it. In a <b>design review</b> this island count (and the migration/reset schedule) is the explicit exploration-vs-exploitation knob for the whole search.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -336,13 +341,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A tiny score-vs-iteration line chart is saved as a PNG.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Implement the four components — a deterministic (LLM-free) evaluator, a mutation step (genAI bridge or stub), an islands database, and the loop — in <code>frontier-lab/week20/monday-funsearch/funsearch_mini.py</code> with <code>README.md</code> and <code>writeup.md</code> beside it.</p>
+      <p>Implement the four components — a deterministic (LLM-free) evaluator, a mutation step (genAI bridge or stub), an islands database, and the loop — in <code>sessions/m26-adrs/day-07-mathematical-discovery-funsearch/monday-funsearch/funsearch_mini.py</code> with <code>README.md</code> and <code>writeup.md</code> beside it.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 20 Day 1 artifact: a runnable FunSearch-style mini-loop.
 
-Create frontier-lab/week20/monday-funsearch/funsearch_mini.py (plus README.md and writeup.md in the same folder) that implements the four FunSearch components on a small verifiable toy problem (online bin-packing OR cap-set at small n):
+Create sessions/m26-adrs/day-07-mathematical-discovery-funsearch/monday-funsearch/funsearch_mini.py (plus README.md and writeup.md in the same folder) that implements the four FunSearch components on a small verifiable toy problem (online bin-packing OR cap-set at small n):
 1. Evaluator: an LLM-free, deterministic function that runs a candidate priority function and returns a real numeric score; any candidate that crashes, times out, or violates constraints is scored -inf.
 2. Mutation step: ask the local genAI bridge at http://localhost:11211 (OpenAI-compatible, model aws:anthropic.claude-opus-4-8) to write a new priority function from 1-2 example programs; if the bridge is unreachable, catch the openai error, print "bridge down, using stub mutator", and fall back to a random mutator.
 3. Islands program database: >=2 islands, each keeping its top-k programs by score.
@@ -358,7 +363,7 @@ Acceptance criteria (all checkable):
 Then run it and the tests to confirm everything passes.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The #1 mistake:</b> trusting the LLM's claimed answer instead of the evaluator's score — e.g. letting a program "self-report" that it found a 520-point cap set and storing it without independently running the checker. In FunSearch the LLM output is never trusted: the deterministic evaluator re-derives and re-scores everything, and anything that crashes, times out, or breaks the rules gets −infinity and is dropped.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>frontier-lab/week20/monday-funsearch/writeup.md</code>: why is a subtly buggy <em>evaluator</em> more dangerous to this loop than a buggy <em>LLM</em>? (Hint: the loop optimizes exactly what you measure.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m26-adrs/day-07-mathematical-discovery-funsearch/monday-funsearch/writeup.md</code>: why is a subtly buggy <em>evaluator</em> more dangerous to this loop than a buggy <em>LLM</em>? (Hint: the loop optimizes exactly what you measure.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -372,9 +377,9 @@ Then run it and the tests to confirm everything passes.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-19/day-06-evaluation-engineering-holdout.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out Workloads</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-formal-theorem-proving-alphageometry.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Theorem Proving (AlphaGeometry)</span></a>
+  <a class="lnav prev" href="../day-06-evaluation-engineering-holdout/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evaluation Engineering &amp; Hold-out</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-08-formal-theorem-proving-alphageometry/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Formal Theorem Proving</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -530,9 +535,9 @@ var QS=[
  {q:'2. Why can FunSearch tolerate an LLM that hallucinates or writes buggy code much of the time?',
   opts:['The LLM is fine-tuned until it stops making mistakes','A human reviews every program before it is stored','The deterministic evaluator scores every program and discards invalid or low-scoring ones automatically','It only samples the single most probable token, so errors are rare'],
   ans:2, fb:'The trusted automated evaluator is the gate; only verifiably valid, high-scoring programs survive, so wrong outputs are simply filtered out.'},
- {q:'3. What is the purpose of keeping multiple "islands" in the program database?',
-  opts:['To split work across GPUs for faster inference','To store training data for fine-tuning the LLM','To preserve population diversity so the search does not prematurely converge on one idea','To keep a backup copy in case the evaluator crashes'],
-  ans:2, fb:'Isolated sub-populations (islands) maintain diverse strategies, preventing the evolutionary search from collapsing onto a single local optimum.'},
+ {q:'3. Your FunSearch run improved steadily, then the best score nearly flatlined. It still runs without errors, but when you log each island\'s top programs they are now almost identical across all islands. What happened, and what do you check first?',
+  opts:['The evaluator crashed silently, so restart it','Island collapse: diversity died — likely one champion is seeding every island too often, or islands are never reset, so one lineage took over and the LLM now only sees one idea; check the island isolation, migration frequency, and reset schedule','pytest ran out of memory, so lower the array sizes','Nothing is wrong — identical islands mean the search found the global optimum'],
+  ans:1, fb:'Right. Islands only preserve variety while they stay isolated. Near-identical islands plus a plateau is the signature of collapse: one lineage has spread everywhere, so the search is effectively a single island and can no longer explore a genuinely different heuristic. The first move is to inspect the island policy (isolation, how often a champion migrates, whether islands are ever reset), not to blame the evaluator — the loop is running fine, it just stopped exploring.'},
  {q:'4. What is the core requirement a problem must meet before FunSearch (or ADRS) can be applied to it?',
   opts:['A large labeled training dataset must exist','A cheap, reliable automated verifier / evaluator must exist to score any candidate solution','The optimal answer must already be known to check against','The model must be fine-tuned on the specific domain first'],
   ans:1, fb:'The whole method rests on generate-then-verify; without a trustworthy automated evaluator you cannot filter LLM outputs, which is exactly the point the Barbarians / ADRS paper stresses.'}

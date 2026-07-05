@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-pytorch-version.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Same Model in PyTorch</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-05-pytorch-version/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Same Model in PyTorch</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
   <header class="hero">
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The GPU:</strong> one <code>.to(device)</code> and the same code runs thousands of times faster.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> every frontier model — the largest LLMs included — is built from tensors, autograd, and these same layers. You now understand the foundation the whole field stands on. That is the point of Module 5.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Autograd's "just track everything" convenience is exactly what quietly costs you memory when you forget to turn the tracking off.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): keeping the autograd graph alive when you don't need gradients.</b> This is a bug that doesn't announce itself. Every operation on a <code>requires_grad=True</code> tensor gets recorded so <code>.backward()</code> can walk it later. If you evaluate the model without wrapping it in <code>torch.no_grad()</code>, or you sum a running total with <code>total_loss += loss</code> instead of <code>total_loss += loss.item()</code>, PyTorch keeps that whole graph in memory. The code runs and the numbers are correct — but memory creeps up every step until the run slows to a crawl or dies with an out-of-memory error much later, far from the real cause. A senior engineer in <b>code review</b> checks that evaluation is inside <code>torch.no_grad()</code> and that any value you only want to <em>read</em> (a loss to log, an accuracy) is pulled out with <code>.item()</code> or <code>.detach()</code> so the graph can be freed.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: automatic gradients vs. the memory they cost.</b> Autograd gives you <code>.backward()</code> for any expression you can write, so you never hand-derive a gradient again — a huge win over the Day-2 NumPy work. What you pay is memory: to differentiate later, PyTorch must store the intermediate values and the graph from the forward pass. In a <b>design review</b> you accept that cost during training (you need the graph), but you deliberately switch it off everywhere you don't — inference, evaluation, and metric logging — with <code>torch.no_grad()</code> and <code>.item()</code>, because paying for gradients you never use is wasted memory.</div></div>
       <button class="gotit" type="button">Got why it mirrors NumPy</button>
     </div>
   </section>
@@ -324,20 +329,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the mirror to yourself with a small side-by-side — that's what makes the finale count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05_numpy_vs_pytorch.py</code>. For a simple expression like <code>loss = ((x @ W) - y)**2</code>, compute the gradient of <code>W</code> two ways: (1) by hand in NumPy, and (2) with PyTorch autograd (<code>requires_grad=True</code> then <code>loss.backward()</code>). Print both and confirm they match. Add a line that moves a tensor to the GPU if one is available. Run with <code>python3 m05_numpy_vs_pytorch.py</code>.</p>
+      <p>Create <code>sessions/m04-first-model-mlp/day-06-why-pytorch/experiment.py</code>. For a simple expression like <code>loss = ((x @ W) - y)**2</code>, compute the gradient of <code>W</code> two ways: (1) by hand in NumPy, and (2) with PyTorch autograd (<code>requires_grad=True</code> then <code>loss.backward()</code>). Print both and confirm they match. Add a line that moves a tensor to the GPU if one is available. Run with <code>python3 sessions/m04-first-model-mlp/day-06-why-pytorch/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 6 (finale) artifact.
 
-Create experiments/foundations/m05_numpy_vs_pytorch.py that, with a comment on each step, shows PyTorch tensors mirror NumPy arrays and add autograd + GPU:
+Create sessions/m04-first-model-mlp/day-06-why-pytorch/experiment.py that, with a comment on each step, shows PyTorch tensors mirror NumPy arrays and add autograd + GPU:
 1. Runs the SAME operations in NumPy and in torch (create, reshape, broadcasting add, matmul with @) and asserts the results are equal.
 2. Takes a simple expression loss = sum(((x @ W) - y)**2); computes dL/dW by hand in NumPy, and with autograd (W.requires_grad_(True); loss.backward(); W.grad); prints both and asserts they match to 1e-6.
 3. Prints whether a GPU (cuda) is available and, if so, moves a tensor with .to("cuda") and confirms its device.
 Then run it and paste the max gradient difference and the device at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-06-log.md</code>: did the by-hand and autograd gradients match, and which NumPy operation surprised you by working identically in torch?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-06-why-pytorch/log.md</code>: did the by-hand and autograd gradients match, and which NumPy operation surprised you by working identically in torch?</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
   </section>
@@ -351,9 +356,9 @@ Then run it and paste the max gradient difference and the device at the bottom a
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-pytorch-version.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Same Model in PyTorch</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
+  <a class="lnav prev" href="../day-05-pytorch-version/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Same Model in PyTorch</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Review Gate</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -470,9 +475,9 @@ var QS=[
  {q:'3. What does .to("cuda") do?',
   opts:['deletes the tensor','moves the tensor onto a GPU for much faster math','changes the shape','turns on dropout'],
   ans:1, fb:'Right. It moves the tensor to a GPU, whose thousands of cores do the matrix math far faster. NumPy stays on the CPU.'},
- {q:'4. Layers, losses, and optimizers in PyTorch are built from:',
-  opts:['a secret engine','the same tensor operations plus autograd','pure C with no math you know','random numbers'],
-  ans:1, fb:'Right. They are reusable blocks made from tensor ops and autograd — the same math you wrote by hand, organized.'}
+ {q:'4. Your evaluation loop runs correctly and the accuracy numbers look right, but the longer it runs the more GPU memory it uses, until a long run finally dies with an out-of-memory error. Where do you look first?',
+  opts:['switch from Adam back to SGD to save memory','check that evaluation is wrapped in torch.no_grad() and that logged values use .item() — otherwise autograd keeps recording every op and holds the whole graph in memory, so it grows step by step','lower the number of hidden units','move the tensors back to the CPU with .to("cpu")'],
+  ans:1, fb:'Right. A tensor with requires_grad=True records its operations so .backward() can walk them later. If you never call .backward() (evaluation, logging), that graph is pure waste — but PyTorch still keeps it unless you tell it not to. Wrap evaluation in torch.no_grad() and pull read-only values out with .item() or .detach() so the graph is freed. Nothing errors until memory finally runs out, far from the real cause — which is why this one is easy to miss.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-random-seeds.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Random Seeds &amp; PRNG</span></a>
+  <a class="lnav prev" href="../day-04-matmul-and-shapes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-random-seeds/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Random Seeds &amp; PRNG</span></a>
 </nav>
 
   <header class="hero">
@@ -275,6 +275,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p>The Kaplan and Chinchilla <strong>scaling laws</strong> say model loss falls as a power law of compute: roughly <code>L ≈ (C/C₀)^(−α)</code>. Labs plot loss versus compute on log-log axes, fit a straight line, and read the slope <code>α</code>. That one number predicts how much better the model gets for every 10× more compute — the business case for spending millions on a training run.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> loss vs compute is a power law → on log-log it's a straight line → the slope is the scaling exponent → the exponent predicts the payoff of more compute. You'll <em>derive</em> these laws in the scaling modules; today you learned to read the axes.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Logs and exponents are also how we keep very small and very large numbers from breaking the arithmetic — and getting that wrong fails quietly.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): underflow to zero, then <code>log(0)</code> (a bug that doesn't announce itself).</b> A model's probability for one token might be <code>0.001</code>. Multiply a few hundred of those together — as you would to score a sentence — and the product falls below the smallest number the dtype can hold, so it rounds to <em>exactly</em> <code>0.0</code>. No error fires. Then <code>log(0.0)</code> returns <code>-inf</code>, and one <code>-inf</code> poisons the average into <code>nan</code>, which quietly makes the whole loss useless. The fix, which a senior engineer looks for in <b>code review</b>, is to add the logs instead of logging the product: <code>log(a) + log(b) + ...</code> stays in a safe range because it never forms the tiny product at all. Seeing a raw <code>np.log(product_of_probs)</code> is the red flag.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: work in log-space for safety vs. remembering the numbers changed meaning.</b> Moving to logs turns underflow-prone multiplication into safe addition (<code>log(a·b) = log a + log b</code>) and squashes a huge range into a small one. What you pay: your values are no longer probabilities or counts — they are log-units, so you must combine them by adding (not multiplying) and exponentiate only at the very end to read a real number back. In a <b>design review</b> this is the choice to keep an entire pipeline in log-space: safer arithmetic, but every step must respect that the numbers are logs.</div></div>
       <button class="gotit" type="button">Got the derivation</button>
     </div>
   </section>
@@ -306,20 +311,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Turn a power law into a line yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05_logs.py</code>. Show that <code>np.log(np.exp(3))</code> is 3; print <code>np.log10([1,10,100,1000])</code>; then make <code>x = [1,10,100]</code>, <code>y = x**2</code>, and print <code>np.log10(x)</code> and <code>np.log10(y)</code> — check the log values rise by 2 for every 1 (slope 2). Run it with <code>python3 m05_logs.py</code>.</p>
+      <p>Create <code>sessions/m01-shape-of-data/day-05-logs-and-exponents/experiment.py</code>. Show that <code>np.log(np.exp(3))</code> is 3; print <code>np.log10([1,10,100,1000])</code>; then make <code>x = [1,10,100]</code>, <code>y = x**2</code>, and print <code>np.log10(x)</code> and <code>np.log10(y)</code> — check the log values rise by 2 for every 1 (slope 2). Run it with <code>python3 sessions/m01-shape-of-data/day-05-logs-and-exponents/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 5 artifact.
 
-Create experiments/foundations/m05_logs.py that, with a comment on each step:
+Create sessions/m01-shape-of-data/day-05-logs-and-exponents/experiment.py that, with a comment on each step:
 1. Prints 2**3, np.exp(1), and np.log(np.exp(3)) to show exponent vs log and that they undo each other.
 2. Prints np.log10([1,10,100,1000]) → [0,1,2,3], noting each ×10 adds 1 (orders of magnitude).
 3. Builds x=np.array([1,10,100]); y=x**2; prints y, then np.log10(x) and np.log10(y); computes the slope (rise/run) of log10(y) vs log10(x) and asserts it equals 2 (the exponent).
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-05-log.md</code>: in your own words, why does a power law become a straight line on log-log axes?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-05-logs-and-exponents/log.md</code>: in your own words, why does a power law become a straight line on log-log axes?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -328,15 +333,15 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <span class="em">🎉</span>
     <h3>Day 5 done! 🏆</h3>
     <p>You can now read shapes, index and slice, broadcast, multiply matrices, and read a log-log scaling plot. One short lesson left to close Module 1.<br>Next up: <b>Day 6 · Random Seeds &amp; PRNG</b> — make "random" repeat on command.</p>
-    <a class="cta" href="day-06-random-seeds.html">Next: Random Seeds &amp; PRNG →</a>
+    <a class="cta" href="../day-06-random-seeds/lesson.html">Next: Random Seeds &amp; PRNG →</a>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-matmul-and-shapes.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-random-seeds.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Random Seeds &amp; PRNG</span></a>
+  <a class="lnav prev" href="../day-04-matmul-and-shapes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Matmul &amp; Shapes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-random-seeds/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Random Seeds &amp; PRNG</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -451,9 +456,9 @@ var QS=[
  {q:'3. For <code>y = a·x^b</code>, the slope of that log-log line equals:',
   opts:['a','b (the exponent)','log a','1'],
   ans:1, fb:'Right. The slope is b — the exponent. The intercept is log a.'},
- {q:'4. Why do labs plot loss versus compute on log-log axes?',
-  opts:['It looks nicer','To turn the power-law curve into a straight line whose slope (the exponent) they can read and fit','Because compute is always negative','To hide the trend'],
-  ans:1, fb:'Right. Log-log makes the scaling law a line; the slope is the exponent that predicts payoff per 10× more compute.'}
+ {q:'4. Your sentence-scoring code multiplies a few hundred per-token probabilities together and then takes <code>np.log</code> of the product. It runs with no error, but the score comes out as <code>-inf</code> or <code>nan</code> for long sentences only. Where do you look first, and why?',
+  opts:['The log function is broken and should be replaced','The product underflowed to exactly 0.0 (many small numbers multiplied), so <code>log(0.0)</code> is <code>-inf</code>; add the logs instead of logging the product','The sentences are simply too rare, so nan is correct','The exponent slope is negative, which always yields nan'],
+  ans:1, fb:'Right. Multiplying hundreds of values below 1 drives the product under the smallest representable number, so it rounds to <code>0.0</code> with no warning; <code>log(0.0) = -inf</code> then poisons the average into <code>nan</code>. Only long sentences hit it because they have more factors. The fix is to sum the logs — <code>log(a)+log(b)+...</code> — which never forms the tiny product.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

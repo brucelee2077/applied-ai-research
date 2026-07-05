@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-07/day-06-routing-design-deep-synthesis.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Routing Design &amp; Deep Synthesis</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-systems-review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Systems Review</span></a>
+  <a class="lnav prev" href="../../week-m11/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M11 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-systems-review/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Systems Review</span></a>
 </nav>
 
 
@@ -309,6 +309,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Cheap to capture, precise to read</strong> — a few lines of code produce a timeline detailed enough to see individual HLO ops.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> roofline (Weeks 6-7) tells you the best-case step time → you measure the real step time and see a gap → profiling shows <em>where</em> in the timeline the gap lives → the trace viewer tells you <em>why</em> (data starvation vs. compiler issue) → you fix the right thing.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A trace never tells you the wrong thing — but the summary number on top of it can, and that is where good engineers get sent chasing the wrong fix.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): trusting the utilization headline instead of the timeline.</b> The profiler prints a clean summary like "accelerator busy 76%" and you conclude the matmul is the bottleneck and reach for a faster kernel or a bigger chip. Nothing errors — the number is real. But 76% busy can be a compute-bound step, or it can be a fast step riddled with recurring 12ms bubbles where the device sat idle waiting on the input pipeline. The headline can't tell those apart, so you spend weeks optimizing the wrong thing. A senior engineer catches this in <b>code review</b> by refusing to act on the aggregate number alone: open the timeline, find whether the idle gaps line up with host input-pipeline boxes (data starvation) or with wide <code>XlaCompile</code> boxes (recompilation), and only then pick a fix.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: one utilization number is cheap but blind; the full trace is heavy but precise.</b> A single "% busy" metric is trivial to log continuously and great for spotting that <em>something</em> regressed, but it hides where and why. A full trace shows every op with a timestamp so you can locate the exact bubble and its cause — at the cost of larger trace files, more collection overhead, and some perturbation of the timing itself. The <b>design-review</b> decision is which to rely on when: track the cheap number continuously, and capture the expensive trace only in a short targeted window once the number says something is wrong.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -339,12 +344,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
   <section class="sec" id="s7" data-sec="produce">
     <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Find and fix a recompile bug and an infeed bug</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
-      <p>This is a <strong>multi-day practice arc</strong> for Week 8, not a single sitting. Build it incrementally across the week at <code>experiments/week08_jax/profiling/</code>.</p>
+      <p>This is a <strong>multi-day practice arc</strong> for Week 8, not a single sitting. Build it incrementally across the week at <code>sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/</code>.</p>
       <h4>Acceptance criteria ("done" looks like)</h4>
       <ul>
-        <li><code>experiments/week08_jax/profiling/train_loop.py</code> runs end-to-end and produces trace directories under <code>traces/</code> for a baseline run, both bug variants, and a fixed version.</li>
-        <li><code>experiments/week08_jax/profiling/findings.md</code> contains: (a) a table of step-time and utilization numbers for at least 3 runs (buggy-recompile, buggy-infeed, fixed), (b) for each bug, one sentence naming the specific trace-viewer visual signature that diagnosed it (e.g. "repeated wide XlaCompile boxes on host track"), (c) confirmation that the fixed version's utilization number is measurably higher than at least one buggy version's.</li>
-        <li>All three profiling runs are viewable via <code>tensorboard --logdir=experiments/week08_jax/profiling/traces/&lt;run&gt;</code> without errors.</li>
+        <li><code>sessions/m12-addition-transformer/day-01-comprehensive-profiling/experiment.py</code> runs end-to-end and produces trace directories under <code>traces/</code> for a baseline run, both bug variants, and a fixed version.</li>
+        <li><code>sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/findings.md</code> contains: (a) a table of step-time and utilization numbers for at least 3 runs (buggy-recompile, buggy-infeed, fixed), (b) for each bug, one sentence naming the specific trace-viewer visual signature that diagnosed it (e.g. "repeated wide XlaCompile boxes on host track"), (c) confirmation that the fixed version's utilization number is measurably higher than at least one buggy version's.</li>
+        <li>All three profiling runs are viewable via <code>tensorboard --logdir=sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/traces/&lt;run&gt;</code> without errors.</li>
         <li>No claim in <code>findings.md</code> is asserted without a corresponding number or trace-viewer observation backing it.</li>
       </ul>
       <h4>The arc, step by step</h4>
@@ -354,26 +359,26 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Late:</strong> fix both bugs, re-capture traces into <code>traces/fixed/</code>, and compute before/after step time and device-utilization (busy_time / total_step_time) for buggy vs. fixed, recorded in <code>findings.md</code>.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week08_jax/profiling/train_loop.py</code> and <code>findings.md</code> following the acceptance criteria above.</p>
+      <p>Build <code>sessions/m12-addition-transformer/day-01-comprehensive-profiling/experiment.py</code> and <code>findings.md</code> following the acceptance criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 8 Day 1 artifact.
 
-Week 8 artifact directory: experiments/week08_jax/profiling/
+Week 8 artifact directory: sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/
 
 Day-by-day arc (self-paced within the week, not tied to specific weekdays):
-- Early: write a minimal but non-trivial JAX training loop (reuse the MLP/ViT from Weeks 1-5) at experiments/week08_jax/profiling/train_loop.py, instrumented with jax.profiler.trace(...) around a warmed-up steady-state window of at least 10 steps, saving traces to experiments/week08_jax/profiling/traces/baseline/.
-- Mid: deliberately introduce one bug from each category taught (an unwanted-recompilation bug via an unstable static arg, and a host-to-device bottleneck via an unprefetched/synchronous data-loading step), capture a trace for each into traces/bug_recompile/ and traces/bug_infeed/, and write down in experiments/week08_jax/profiling/findings.md exactly which visual pattern in the trace viewer (screenshot or written description of the tracks/boxes) revealed each bug.
+- Early: write a minimal but non-trivial JAX training loop (reuse the MLP/ViT from Weeks 1-5) at sessions/m12-addition-transformer/day-01-comprehensive-profiling/experiment.py, instrumented with jax.profiler.trace(...) around a warmed-up steady-state window of at least 10 steps, saving traces to sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/traces/baseline/.
+- Mid: deliberately introduce one bug from each category taught (an unwanted-recompilation bug via an unstable static arg, and a host-to-device bottleneck via an unprefetched/synchronous data-loading step), capture a trace for each into traces/bug_recompile/ and traces/bug_infeed/, and write down in sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/findings.md exactly which visual pattern in the trace viewer (screenshot or written description of the tracks/boxes) revealed each bug.
 - Late: fix both bugs, re-capture traces into traces/fixed/, and compute before/after numbers -- step time and device-utilization ratio (busy_time / total_step_time) -- for baseline-with-bug vs. fixed, recorded in findings.md.
 
 Acceptance criteria ("done" looks like):
-- experiments/week08_jax/profiling/train_loop.py runs end-to-end and produces trace directories under traces/ for baseline, both bug variants, and fixed versions.
-- experiments/week08_jax/profiling/findings.md contains: (a) a table of step-time and utilization numbers for at least 3 runs (buggy-recompile, buggy-infeed, fixed), (b) for each bug, one sentence naming the specific trace-viewer visual signature that diagnosed it (e.g., "repeated wide XlaCompile boxes on host track"), (c) confirmation that the fixed version's utilization number is measurably higher than at least one buggy version's.
-- All three profiling runs are viewable via tensorboard --logdir=experiments/week08_jax/profiling/traces/<run> without errors.
+- sessions/m12-addition-transformer/day-01-comprehensive-profiling/experiment.py runs end-to-end and produces trace directories under traces/ for baseline, both bug variants, and fixed versions.
+- sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/findings.md contains: (a) a table of step-time and utilization numbers for at least 3 runs (buggy-recompile, buggy-infeed, fixed), (b) for each bug, one sentence naming the specific trace-viewer visual signature that diagnosed it (e.g., "repeated wide XlaCompile boxes on host track"), (c) confirmation that the fixed version's utilization number is measurably higher than at least one buggy version's.
+- All three profiling runs are viewable via tensorboard --logdir=sessions/m12-addition-transformer/day-01-comprehensive-profiling/profiling/traces/<run> without errors.
 - No claim in findings.md is asserted without a corresponding number or trace-viewer observation backing it -- this is the evidence-based habit the curriculum's "Practical execution" line is training.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-08/day-01-log.md</code>: what is the single most common mistake when capturing a profile, and why does it happen? (Hint: warm-up.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-01-comprehensive-profiling/log.md</code>: what is the single most common mistake when capturing a profile, and why does it happen? (Hint: warm-up.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -387,9 +392,9 @@ Acceptance criteria ("done" looks like):
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-07/day-06-routing-design-deep-synthesis.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Routing Design &amp; Deep Synthesis</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-systems-review.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Systems Review</span></a>
+  <a class="lnav prev" href="../../week-m11/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M11 · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-systems-review/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Systems Review</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -500,9 +505,9 @@ var QS=[
  {q:'3. Why must you call <code>.block_until_ready()</code> on the output of your computation before exiting a <code>jax.profiler.trace(...)</code> block?',
   opts:['It reduces the trace file size on disk','JAX dispatches computation asynchronously, so without forcing a wait, the trace can be closed and written before the device has actually finished the work, producing a misleadingly incomplete or empty-looking trace','It is required syntax and has no functional effect on the profile','It converts the trace from HLO format into Python bytecode'],
   ans:1, fb:'Right. JAX\'s async dispatch model means the host returns immediately after queuing work; forcing a block ensures the profiled window actually covers the device execution you care about.'},
- {q:'4. What is the key practical difference between the TensorBoard trace viewer and <code>jax.profiler.save_device_memory_profile(...)</code> (viewed with pprof)?',
-  opts:['They are two names for exactly the same tool with no difference','The trace viewer only works on GPU, the memory profiler only works on TPU','The trace viewer shows a timeline of when operations executed (for diagnosing speed/bottlenecks); the memory profiler shows per-buffer HBM/device memory allocation at a point in time (for diagnosing OOMs), and neither substitutes for the other','The memory profiler is deprecated and replaced entirely by the trace viewer'],
-  ans:2, fb:'Right. Time-debugging and memory-debugging are separate problems needing separate tools; conflating them is a common early mistake.'}
+ {q:'4. A dashboard shows your training step at "accelerator busy 76%" and a teammate proposes buying faster chips to close the gap. Before spending anything, where do you look first and why?',
+  opts:['Nowhere — 76% busy already proves the step is compute-bound, so faster chips are the right call','Open the full trace timeline: a 76% headline cannot distinguish a genuinely compute-bound step from a fast step riddled with recurring bubbles where the device idled waiting on the input pipeline, and only the timeline shows which','Immediately reduce the model size, since 76% means it is too big for the chip','Restart the run, because utilization below 100% is always a transient glitch'],
+  ans:1, fb:'Right. An aggregate "% busy" number is a great regression alarm but a blind diagnostician. 76% could be honest compute, or it could be idle bubbles adding up while the accelerator waits on data or recompilation. Buying faster chips only helps a compute-bound step; if the real cause is input-pipeline starvation, faster chips waste money and change nothing. Open the timeline, line up the idle gaps against the host tracks, and identify the cause before spending. Shrinking the model or restarting both act on a number that has not been explained yet.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

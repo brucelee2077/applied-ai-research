@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-cache-eviction-snapkv.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-speculative-decoding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
+  <a class="lnav prev" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-speculative-decoding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
 </nav>
 
 
@@ -296,6 +296,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common misunderstanding:</b> GQA/MQA do <strong>not</strong> reduce the number of query heads, and they do not change the attention computation's parallelism across heads — every query head still produces its own separate output. The only thing that shrinks is how many <em>distinct</em> K and V projections exist and get cached.</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> KV cache size scales with num_kv_heads (Monday) → most of those heads' K/V content is redundant across heads that attend similarly → group query heads and share one K/V per group (GQA/MQA) → fewer distinct K/V heads to store, fixed at training time → smaller cache at every context length, with SnapKV (Tuesday) able to shrink it further on top.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>GQA shares one K/V head across several query heads, and both the way you implement that sharing and the amount of sharing you choose can go quietly wrong.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mismatched broadcast of shared K/V heads.</b> Because there are fewer K/V heads than query heads, the attention kernel must repeat each shared K/V head to line it up with the right query heads (a <code>repeat_interleave</code>, not a plain <code>reshape</code>). If someone uses <code>reshape</code>/<code>repeat</code> with the wrong grouping — or transposes the group axis — the shapes still match, the matmul still runs, and no error fires. The queries just get paired with the wrong K/V group, so attention is subtly scrambled and the model's quality quietly drops. A senior engineer catches this in <b>code review</b> by testing that a GQA layer with <code>num_groups = num_heads</code> gives bit-for-bit the same output as plain MHA (the identity case), which any wrong-axis expansion would break.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how much K/V sharing to bake in.</b> Fewer groups (toward MQA, <code>num_groups = 1</code>) shrinks the cache the most and speeds decode the most, but concentrates all query heads onto one K/V representation, which can cost quality and training stability. More groups (toward MHA) keeps quality but saves less memory. Where to sit on that dial — the paper's finding that GQA-8 nearly matches MHA quality at close to MQA speed is a starting point, not a law — is the <b>design-review</b> decision, because it is fixed at training time and every future request inherits it.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -337,7 +342,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>No GPU/TPU required — this is about parameter structure, not measuring real decoding latency.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week16_jax/gqa_parameter_surgery/gqa_checkpoint_surgery.py</code> with the bullets above.</p>
+      <p>Create <code>sessions/m17b-long-context-decoding/day-03-gqa-mqa/experiment.py</code> with the bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -345,7 +350,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Analyze how GQA physically changes the parameter structure of the model to reduce the KV footprint during the initial training phase.
 
-Create experiments/week16_jax/gqa_parameter_surgery/gqa_checkpoint_surgery.py that:
+Create sessions/m17b-long-context-decoding/day-03-gqa-mqa/experiment.py that:
 1. Defines a toy MHA attention block in JAX/Flax (or plain JAX with explicit weight dicts) with configurable d_model, num_heads, head_dim.
 2. Implements a pure function mha_to_gqa(params, num_groups) that mean-pools the K and V projection weight tensors from shape [d_model, num_heads, head_dim] down to [d_model, num_groups, head_dim], leaving W_Q untouched.
 3. Prints/asserts the exact parameter-count reduction (before/after shapes and total element counts) for at least 3 group settings: num_groups=1 (MQA), num_groups=8 (GQA-8), num_groups=num_heads (identity/MHA).
@@ -353,7 +358,7 @@ Create experiments/week16_jax/gqa_parameter_surgery/gqa_checkpoint_surgery.py th
 5. Includes a unit test asserting mha_to_gqa output shapes, that num_groups=num_heads returns weights numerically identical to the original (mean-pool of a group of 1 is a no-op), and that num_groups=1 produces a single merged head equal to the mean of all original heads.
 No GPU/TPU required. Run it end-to-end to confirm it exits 0.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-16/day-03-log.md</code>: why does <code>mha_to_gqa</code> leave <code>W_Q</code> completely unchanged — what would go wrong (for the cache, and for correctness) if you pooled the query heads too?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17b-long-context-decoding/day-03-gqa-mqa/log.md</code>: why does <code>mha_to_gqa</code> leave <code>W_Q</code> completely unchanged — what would go wrong (for the cache, and for correctness) if you pooled the query heads too?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -367,9 +372,9 @@ No GPU/TPU required. Run it end-to-end to confirm it exits 0.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-cache-eviction-snapkv.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-speculative-decoding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
+  <a class="lnav prev" href="../day-02-cache-eviction-snapkv/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Cache Eviction (SnapKV)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-speculative-decoding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Speculative Decoding</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -470,9 +475,9 @@ var QS=[
  {q:'2. A model has num_heads=32. Under GQA with num_groups=8, how many query heads share each single K/V head?',
   opts:['1 query head per K/V head (same as MHA)','32 query heads per K/V head (same as MQA)','4 query heads per K/V head (32 / 8 = 4)','8 query heads per K/V head'],
   ans:2, fb:'Right. Query heads are partitioned into num_groups equal-sized groups: 32 heads / 8 groups = 4 query heads sharing each of the 8 K/V heads.'},
- {q:'3. The GQA paper converts an existing trained MHA checkpoint into a GQA checkpoint. How does it compute each new shared K (or V) head?',
-  opts:['It picks the single best-performing original head in each group and discards the rest','It takes the mean (average) of the original K (or V) projection weights for every head that falls into that group','It reinitializes the K/V weights randomly and trains from scratch','It concatenates all the original heads\' weights into one larger matrix'],
-  ans:1, fb:'Right. Mean-pooling the original heads within each group is the paper\'s conversion recipe — averaging keeps the new checkpoint close to the original model\'s behavior, which is what makes the follow-up "uptraining" fast.'},
+ {q:'3. You convert a model to GQA (num_heads=32, num_groups=8). The code runs with no shape errors and loss looks only slightly worse, so it ships — but downstream quality is mysteriously degraded. You suspect the shared K/V heads are being matched to the wrong query heads. What is the fastest check that would have caught this in review?',
+  opts:['Verify the total parameter count dropped after conversion','Run the GQA layer with num_groups set equal to num_heads and confirm it produces the exact same output as plain MHA; any wrong-axis expansion of the shared K/V heads breaks this identity case','Confirm the model still loads on a single GPU','Check that num_groups evenly divides num_heads'],
+  ans:1, fb:'Right. GQA must repeat each shared K/V head to line it up with its query heads (repeat_interleave along the correct axis). A wrong reshape/transpose keeps the shapes valid — so no error — but pairs queries with the wrong K/V group, scrambling attention and quietly hurting quality. Setting num_groups=num_heads should reduce to plain MHA exactly; if the outputs do not match bit-for-bit, the broadcast axis is wrong. The other options are true facts but none of them detects a mismatched grouping.'},
  {q:'4. Setting num_groups=1 and setting num_groups=num_heads are both special cases of GQA. What does each one correspond to?',
   opts:['num_groups=1 is MHA; num_groups=num_heads is MQA','num_groups=1 is MQA (one shared K/V head for all queries); num_groups=num_heads is MHA (every head keeps its own K/V, a no-op)','Both settings are mathematically identical','num_groups=1 disables attention entirely'],
   ans:1, fb:'Right. num_groups=1 collapses every query head onto one shared K/V head — that is exactly Multi-Query Attention (MQA). num_groups=num_heads makes every group size 1, so mean-pooling a group of 1 just returns that head unchanged — that is plain Multi-Head Attention (MHA), the identity case.'}

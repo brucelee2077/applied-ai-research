@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-cnn-classifier.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Small CNN Classifier</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-data-augmentation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Data Augmentation</span></a>
+  <a class="lnav prev" href="../day-03-cnn-classifier/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A CNN Classifier</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-data-augmentation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Data Augmentation</span></a>
 </nav>
 
   <header class="hero">
@@ -305,6 +305,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>A little regularizing:</strong> the batch mean/variance are slightly noisy, which gently discourages overfitting (like a mild version of dropout).</li>
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Train vs test:</b> during training, batchnorm uses the current batch's mean and variance. At test time it uses a saved running average, so a single test image gets a consistent answer. Forgetting to switch to eval mode is a classic bug.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Batchnorm behaves differently in training and evaluation, and it quietly makes every image in a batch depend on the others — both bite when you are not watching.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): running inference without switching to eval mode.</b> If you forget to put the model in eval mode (<code>model.eval()</code>) before testing or serving, batchnorm keeps using the <em>current batch's</em> mean and variance instead of the saved running averages. Nothing crashes. But now a prediction depends on whatever other images happen to share the batch, so the same image gets different answers in different batches, and a batch of size 1 normalizes against itself and comes out near zero. Your training curves looked great, so the accuracy drop at serving time is a mystery. A senior engineer, in <b>code review</b>, checks that <code>eval()</code> is called (and gradients disabled) on every inference and validation path.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batchnorm's speed-up costs you a dependence on batch size.</b> The stable, well-scaled inputs that let you train faster come from statistics computed <em>across the batch</em> — so each example's output now depends on its batch-mates. With a healthy batch that noise is mild and even helps regularize. With a tiny batch (say 2–4 images, common when the model or images are large) the mean and variance are so noisy that training destabilizes. Whether to accept that coupling — or switch to a batch-independent normalizer like GroupNorm or LayerNorm — is the <b>design-review</b> decision when batch size is forced small.</div></div>
       <button class="gotit" type="button">Got the batchnorm math</button>
     </div>
   </section>
@@ -336,20 +341,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Compute batchnorm by hand and confirm PyTorch agrees. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_batchnorm.py</code>. Make a small batch, for example one channel with values <code>[2,4,6,8]</code>. Compute mean, variance, and <code>x_norm = (x - mean)/sqrt(var + 1e-5)</code> in NumPy. Print the normalized values and confirm the mean is near 0 and the spread near 1. Then run the same numbers through <code>torch.nn.BatchNorm1d</code> and compare. Run with <code>python3 m06_batchnorm.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py</code>. Make a small batch, for example one channel with values <code>[2,4,6,8]</code>. Compute mean, variance, and <code>x_norm = (x - mean)/sqrt(var + 1e-5)</code> in NumPy. Print the normalized values and confirm the mean is near 0 and the spread near 1. Then run the same numbers through <code>torch.nn.BatchNorm1d</code> and compare. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 4 artifact.
 
-Create experiments/foundations/m06_batchnorm.py that, with a comment on each step, shows batch normalization from scratch and against PyTorch:
+Create sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py that, with a comment on each step, shows batch normalization from scratch and against PyTorch:
 1. Makes a small batch for one channel, e.g. x = [2,4,6,8]; computes mean, variance, and x_norm = (x - mean)/sqrt(var + 1e-5) in NumPy; prints x_norm and asserts its mean is ~0 and its std is ~1.
 2. Runs the same values through torch.nn.BatchNorm1d(num_features=1) in train mode and prints its output, noting it matches the by-hand normalization when gamma=1, beta=0.
 3. Trains a tiny model on random data twice — once with a BatchNorm layer and once without — and prints the loss after a few steps to show batchnorm trains faster/more stably.
 Then run it and paste the by-hand vs torch values and the two loss numbers at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-04-log.md</code>: did your by-hand normalized mean come out near 0, and did the batchnorm model reach a lower loss faster?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-04-batch-normalization/log.md</code>: did your by-hand normalized mean come out near 0, and did the batchnorm model reach a lower loss faster?</div></div>
       <button class="gotit" type="button">Done — on to Day 5</button>
     </div>
   </section>
@@ -363,9 +368,9 @@ Then run it and paste the by-hand vs torch values and the two loss numbers at th
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-cnn-classifier.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A Small CNN Classifier</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-data-augmentation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Data Augmentation</span></a>
+  <a class="lnav prev" href="../day-03-cnn-classifier/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">A CNN Classifier</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-data-augmentation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Data Augmentation</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -480,9 +485,9 @@ var QS=[
  {q:'3. Why does batchnorm speed up and stabilize training?',
   opts:['it removes layers','each layer gets steady, well-scaled inputs instead of a moving target','it lowers the learning rate to zero','it stops gradients'],
   ans:1, fb:'Right. Steady inputs let you use a bigger learning rate and give a smoother loss curve.'},
- {q:'4. Why does batchnorm behave differently at test time?',
-  opts:['it is turned off','a single test image has no batch, so it uses a saved running mean and variance','it changes the image size','it adds more channels'],
-  ans:1, fb:'Right. At test time there is no meaningful batch, so it uses running averages saved during training for a consistent answer.'}
+ {q:'4. Your CNN hits high validation accuracy during training, but once deployed the same image gets different predictions depending on which other images are in its batch, and single-image requests do worst. Nothing errors. Where do you look first?',
+  opts:['The image files are corrupted at serving time','The model was never switched to eval mode, so batchnorm still uses the live batch statistics instead of the saved running averages — predictions then depend on batch-mates, and a batch of size 1 normalizes against itself; call model.eval() (and disable gradients) on the inference path','The learning rate at serving time is too high','The number of classes changed after deployment'],
+  ans:1, fb:'Right. In training mode batchnorm normalizes with the current batch mean and variance. If you never call eval(), that behavior carries into serving, so a prediction depends on whichever images share the batch, and a lone image normalizes against itself and collapses toward zero. Switch to eval mode (and no_grad) so it uses the running averages saved during training. It is not corrupted files, learning rate (no training at serving), or class count.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

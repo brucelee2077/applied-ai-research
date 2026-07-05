@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-profiling-step-time.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Profiling the Step Time</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-isoflops-experiment-design.html"><span class="lnav-dir">Next →</span><span class="lnav-t">IsoFlops Experiment Design</span></a>
+  <a class="lnav prev" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Profiling the Step Time</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m13-isoflops-scaling-law/day-01-isoflops-experiment-design/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M13 · Your Own IsoFlops Scaling Law</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Explains the "donut of doom"</strong> — the ring-shaped gap you may have seen in a trace, where the device is idle waiting for tiny ops. Padding shapes to hardware-friendly tile sizes (multiples of 128 on TPU) often closes exactly this gap.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Day 2's trace tells you the step is compute-bound in a general sense → today's MFU turns that into a percentage → the roofline model explains <em>why</em> that percentage isn't higher → retuning batch size/shapes closes the gap → Thursday's IsoFLOPs sweep starts from a config you know is efficient.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>MFU is a ratio, and a ratio with the wrong denominator still prints a clean-looking percentage — which is how a whole optimization effort can chase the wrong number.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dividing by the wrong peak.</b> MFU is achieved FLOP/s over the chip's peak FLOP/s, and the spec sheet lists a different peak for each precision — bf16 peak is roughly double fp32 peak. If you train in bf16 but divide by the fp32 peak, your MFU comes out about half the real value; divide by the bf16 peak when you actually ran fp32 and it comes out double. Nothing errors, the report just says "we're at 4% MFU, we have tons of headroom" (or "90%, we're maxed out") when the truth is the opposite, and the team optimizes in the wrong direction. A senior engineer catches this in <b>code review</b> by checking that the peak-FLOP/s constant matches the actual training <em>dtype</em>, and that achieved and peak are quoted at the same precision.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bigger batch buys MFU but spends memory and can dull learning.</b> On a memory-bound step, raising the batch size amortizes each weight loaded from HBM over more tokens, lifting arithmetic intensity toward the ridge point and pushing MFU up. The cost is real: the batch's activations must fit in HBM (you can hit OOM), and a very large batch can need learning-rate retuning and sometimes generalizes worse per step of training. So "just make MFU higher" is not free efficiency — how far to push batch size is a <b>design-review</b> decision that weighs hardware utilization against memory limits and training dynamics.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -320,29 +325,29 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): turn yesterday's trace into an MFU number, use the roofline model to diagnose the gap, retune batch size/shapes, and record the before/after.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>experiments/week10_jax/day03_roofline_tuning/mfu_report.py</code> that (a) computes theoretical FLOPs/step for the addition-transformer's current config, (b) times the actual <code>train_step</code> with <code>jax.block_until_ready</code>, (c) computes and prints MFU and arithmetic intensity, (d) computes the TPU's ridge point and prints a compute-bound/memory-bound verdict.</li>
-        <li><code>experiments/week10_jax/day03_roofline_tuning/batch_sweep_results.csv</code> with step time, MFU, and roofline verdict for at least 5 batch sizes (e.g. 8, 16, 32, 64, 128, 256), each measured by actually running the training step at that size — not estimated.</li>
-        <li><code>experiments/week10_jax/day03_roofline_tuning/reports/week10_day03_roofline_writeup.md</code>: baseline MFU (Tuesday's unoptimized config) vs. tuned MFU (best batch size/shape-aligned config found today), the roofline verdict explaining the gap, and the final batch size/model configuration going into Thursday's IsoFLOPs design.</li>
+        <li><code>sessions/m12-addition-transformer/day-11-hardware-optimization/experiment.py</code> that (a) computes theoretical FLOPs/step for the addition-transformer's current config, (b) times the actual <code>train_step</code> with <code>jax.block_until_ready</code>, (c) computes and prints MFU and arithmetic intensity, (d) computes the TPU's ridge point and prints a compute-bound/memory-bound verdict.</li>
+        <li><code>sessions/m12-addition-transformer/day-11-hardware-optimization/day03_roofline_tuning/batch_sweep_results.csv</code> with step time, MFU, and roofline verdict for at least 5 batch sizes (e.g. 8, 16, 32, 64, 128, 256), each measured by actually running the training step at that size — not estimated.</li>
+        <li><code>sessions/m12-addition-transformer/day-11-hardware-optimization/day03_roofline_tuning/reports/week10_day03_roofline_writeup.md</code>: baseline MFU (Tuesday's unoptimized config) vs. tuned MFU (best batch size/shape-aligned config found today), the roofline verdict explaining the gap, and the final batch size/model configuration going into Thursday's IsoFLOPs design.</li>
       </ul>
       <p>The script must print a non-null MFU percentage and a roofline verdict string ("compute-bound" or "memory-bound"); the CSV must have one row per tested batch size with <strong>measured</strong> step times; the writeup must state a concrete MFU delta (e.g. "24% → 41%") and name the specific fix (batch size change, shape padding fix, or host-overlap fix) that produced it.</p>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week10_jax/day03_roofline_tuning/mfu_report.py</code> and <code>batch_sweep_results.csv</code> with the bullets above, reusing the <code>train_step</code> and profiler setup from <code>experiments/week10_jax/profile_step.py</code> (Day 2).</p>
+      <p>Build <code>sessions/m12-addition-transformer/day-11-hardware-optimization/experiment.py</code> and <code>batch_sweep_results.csv</code> with the bullets above, reusing the <code>train_step</code> and profiler setup from <code>sessions/m12-addition-transformer/day-11-hardware-optimization/experiment.py</code> (Day 2).</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 10 Day 3 artifact.
 
-Create experiments/week10_jax/day03_roofline_tuning/ containing:
-1. mfu_report.py that reuses the addition-transformer's train_step (already @jax.jit, from experiments/week10_jax/profile_step.py):
+Create sessions/m12-addition-transformer/day-11-hardware-optimization/day03_roofline_tuning/ containing:
+1. mfu_report.py that reuses the addition-transformer's train_step (already @jax.jit, from sessions/m12-addition-transformer/day-11-hardware-optimization/experiment.py):
    a. Computes theoretical FLOPs/step as 6 * N * batch_size * seq_len for the current config.
    b. Times the actual jitted train_step with a warmup call plus jax.block_until_ready, excluding compile time.
    c. Computes and prints MFU (achieved FLOP/s / chip's bf16 peak FLOP/s) and arithmetic intensity (FLOPs / bytes moved from HBM for the dominant matmul).
    d. Computes the chip's ridge point (peak FLOP/s / peak memory bandwidth) and prints "compute-bound" if intensity > ridge point else "memory-bound".
 2. batch_sweep_results.csv with columns [batch_size, step_time_s, mfu, verdict], one row per actually-measured run at batch sizes 8, 16, 32, 64, 128, 256.
-3. reports/week10_day03_roofline_writeup.md: baseline MFU (Tuesday's unoptimized config) vs. tuned MFU (best batch size/shape found today), the roofline verdict explaining the gap, the specific fix applied, and the final config chosen for Thursday's IsoFLOPs design.
+3. sessions/m12-addition-transformer/day-11-hardware-optimization/reports/week10_day03_roofline_writeup.md: baseline MFU (Tuesday's unoptimized config) vs. tuned MFU (best batch size/shape found today), the roofline verdict explaining the gap, the specific fix applied, and the final config chosen for Thursday's IsoFLOPs design.
 Run everything end-to-end and confirm the script prints a real MFU percentage and verdict string.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-10/day-03-log.md</code>: which fix moved MFU the most — batch size, shape padding, or closing a host-overlap gap — and why that one, specifically, for <em>your</em> config?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-11-hardware-optimization/log.md</code>: which fix moved MFU the most — batch size, shape padding, or closing a host-overlap gap — and why that one, specifically, for <em>your</em> config?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -356,9 +361,9 @@ Run everything end-to-end and confirm the script prints a real MFU percentage an
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-profiling-step-time.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Profiling the Step Time</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-isoflops-experiment-design.html"><span class="lnav-dir">Next →</span><span class="lnav-t">IsoFlops Experiment Design</span></a>
+  <a class="lnav prev" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Profiling the Step Time</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m13-isoflops-scaling-law/day-01-isoflops-experiment-design/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M13 · Your Own IsoFlops Scaling Law</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -459,9 +464,9 @@ var QS=[
  {q:'3. Why does increasing batch size often raise MFU on a memory-bound step?',
   opts:['It reduces the total FLOPs needed','It lowers the chip\'s peak FLOP/s requirement','Each weight loaded from HBM gets reused across more tokens, raising arithmetic intensity toward the ridge point','It makes the step time measurement more accurate'],
   ans:2, fb:'Right. Bigger batches amortize each byte of weights loaded from HBM over more tokens of compute, raising arithmetic intensity — which can push a memory-bound step toward compute-bound and closer to peak MFU.'},
- {q:'4. Why must you call <code>jax.block_until_ready()</code> before recording the step time used in an MFU calculation?',
-  opts:['It is not necessary, timing works either way','Without it you time only how long it takes to dispatch the async operation, not how long the device actually took to finish it','It forces the model to recompile every step','It converts the result from bf16 to fp32'],
-  ans:1, fb:'Right. JAX dispatches ops asynchronously; without block_until_ready, your Python-side timer stops as soon as the op is queued, not when the device finishes — giving a step time (and MFU) that is wrong, exactly like the trap from Day 2.'}
+ {q:'4. You train in bf16 and report an MFU of about 4%. A teammate says the same step on the same chip should be near 8%. Both of you timed the step correctly with <code>block_until_ready()</code>. Where do you look first?',
+  opts:['Assume your teammate is wrong, since MFU can never differ between two correct measurements','Check which peak FLOP/s each of you divided by: bf16 peak is roughly 2x the fp32 peak, so dividing bf16-achieved throughput by the fp32 peak halves the reported MFU','Rerun with a larger model, because MFU only stabilizes at scale','Switch to fp32 training so the two numbers agree'],
+  ans:1, fb:'Right. A clean 2x disagreement in MFU between two correctly-timed runs is the fingerprint of a wrong denominator. MFU = achieved FLOP/s / peak FLOP/s, and the spec-sheet peak differs by precision (bf16 peak is about double fp32). If you ran bf16 but divided by the fp32 peak, your MFU is halved. Match the peak constant to the training dtype. Switching to fp32 just to make the numbers agree would change the workload instead of fixing the calculation.'},
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

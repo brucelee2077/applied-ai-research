@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-memory-economics-synthesis.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Economics Synthesis</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-16/day-01-decoding-innovations.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Decoding Innovations</span></a>
+  <a class="lnav prev" href="../day-05-memory-economics-synthesis/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Economics Synthesis</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m17b-long-context-decoding/day-01-decoding-innovations/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M17b · Long-Context Decoding</span></a>
 </nav>
 
 
@@ -292,6 +292,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>No retraining needed</strong> — like all PTQ, this is a one-time conversion at load time, not a training run.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> models scale past ~6.7B params → outlier features emerge in a few activation dimensions → naive int8 quantization crushes them → LLM.int8() detects and routes outliers to FP16, quantizes the rest to int8 → memory drops, accuracy barely moves → perplexity benchmarking (next) is how you verify that last claim instead of assuming it.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Perplexity is the number you use to <em>prove</em> quantization was safe — which makes a quietly broken benchmark the most dangerous bug on this day, because it lies with a clean-looking result.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): an apples-to-oranges perplexity comparison.</b> Perplexity is only comparable when the FP16 and INT8 runs use the <em>identical</em> tokenizer, the same eval text, the same context window and stride, and the same reduction (per-token mean over the same token count). It is easy to change one of these between runs — a different tokenizer version, a different sliding-window stride, or averaging over a different number of tokens — and the script still prints two finite perplexities and a tidy delta. No crash. You then conclude "int8 costs only 0.3 PPL" when the real gap is hidden (or invented) by the mismatch. In <b>code review</b> a senior engineer runs FP16 and INT8 through the <em>same</em> eval function on the same tokenized data, sanity-checks that FP16 reproduces a known reference perplexity, and treats an int8 PPL <em>below</em> FP16 as a red flag that the harness — not the model — changed.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: PTQ is cheap and fast, but you gave up the chance for the model to adapt.</b> Post-training quantization is a one-time conversion at load — no retraining, no gradients, minutes not GPU-days — which is exactly why it is the default. What you pay is robustness: the model never saw the quantization noise during training, so at aggressive bit-widths its accuracy can degrade in ways quantization-aware training would have absorbed. In a <b>design review</b> the choice is PTQ's speed and simplicity versus QAT's cost: reach for PTQ first, and only pay for QAT if the measured perplexity/accuracy gap at your target bit-width is unacceptable.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -324,7 +329,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Today's task (from the curriculum) has two parts — a Saturday half and a Sunday half.</p>
       <h4>Saturday half — memory footprint</h4>
-      <p><code>experiments/week15_ptq/quantize_and_measure.py</code>: a script that (a) loads a 7B-parameter Hugging Face causal LM in FP16, (b) reloads it in INT8 via <code>load_in_8bit=True</code> (bitsandbytes), (c) measures the actual GPU memory footprint for both (via <code>torch.cuda.memory_allocated()</code> or summed <code>numel() * element_size()</code>), and (d) writes <code>experiments/week15_ptq/results/memory_footprint.json</code> with keys <code>fp16_bytes</code>, <code>int8_bytes</code>, <code>reduction_pct</code>.</p>
+      <p><code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/experiment.py</code>: a script that (a) loads a 7B-parameter Hugging Face causal LM in FP16, (b) reloads it in INT8 via <code>load_in_8bit=True</code> (bitsandbytes), (c) measures the actual GPU memory footprint for both (via <code>torch.cuda.memory_allocated()</code> or summed <code>numel() * element_size()</code>), and (d) writes <code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/memory_footprint.json</code> with keys <code>fp16_bytes</code>, <code>int8_bytes</code>, <code>reduction_pct</code>.</p>
       <h4>Acceptance criteria — Saturday</h4>
       <ul>
         <li>Script runs end-to-end on a CUDA GPU without manual intervention.</li>
@@ -332,7 +337,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Both raw byte counts are logged, not just the percentage.</li>
       </ul>
       <h4>Sunday half — perplexity benchmark</h4>
-      <p><code>experiments/week15_ptq/perplexity_benchmark.py</code>: extends the Saturday script (or runs standalone against saved checkpoints) to compute perplexity for both FP16 and INT8 models on an identical fixed held-out text sample (e.g. a WikiText-2 slice, tokenized once and reused for both), writing <code>experiments/week15_ptq/results/perplexity_comparison.json</code> with keys <code>ppl_fp16</code>, <code>ppl_int8</code>, <code>pct_degradation</code>, plus a short markdown note <code>experiments/week15_ptq/results/degradation_curve.md</code> documenting the observed degradation and whether it grows with sequence length (the "mathematical degradation curve" the curriculum names explicitly).</p>
+      <p><code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/experiment.py</code>: extends the Saturday script (or runs standalone against saved checkpoints) to compute perplexity for both FP16 and INT8 models on an identical fixed held-out text sample (e.g. a WikiText-2 slice, tokenized once and reused for both), writing <code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/perplexity_comparison.json</code> with keys <code>ppl_fp16</code>, <code>ppl_int8</code>, <code>pct_degradation</code>, plus a short markdown note <code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/degradation_curve.md</code> documenting the observed degradation and whether it grows with sequence length (the "mathematical degradation curve" the curriculum names explicitly).</p>
       <h4>Acceptance criteria — Sunday</h4>
       <ul>
         <li>Both PPL values are finite and <code>ppl_int8 ≥ ppl_fp16</code> (int8 should never beat the FP16 baseline).</li>
@@ -340,27 +345,27 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>The markdown note states in one sentence whether the observed degradation is "acceptable" (single-digit % increase) or a red flag (multiples of baseline).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create both scripts above under <code>experiments/week15_ptq/</code> with the acceptance criteria listed.</p>
+      <p>Create both scripts above under <code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/</code> with the acceptance criteria listed.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 6 artifact.
 
-Saturday half — create experiments/week15_ptq/quantize_and_measure.py that:
+Saturday half — create sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/experiment.py that:
 1. Loads a 7B-parameter Hugging Face causal LM in FP16.
 2. Reloads the same model in INT8 via load_in_8bit=True (bitsandbytes).
 3. Measures actual GPU memory footprint for both, via torch.cuda.memory_allocated() or summed numel() * element_size().
-4. Writes experiments/week15_ptq/results/memory_footprint.json with keys fp16_bytes, int8_bytes, reduction_pct.
+4. Writes sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/memory_footprint.json with keys fp16_bytes, int8_bytes, reduction_pct.
 Acceptance: runs end-to-end on a CUDA GPU with no manual steps; reduction_pct lands between 40-55%; both raw byte counts are logged, not just the percentage.
 
-Sunday half — create experiments/week15_ptq/perplexity_benchmark.py that:
+Sunday half — create sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/experiment.py that:
 1. Extends the Saturday script (or runs standalone against saved checkpoints).
 2. Computes perplexity for both FP16 and INT8 models on an identical fixed held-out text sample (e.g. a WikiText-2 slice), tokenized once and reused for both.
-3. Writes experiments/week15_ptq/results/perplexity_comparison.json with keys ppl_fp16, ppl_int8, pct_degradation.
-4. Writes a short markdown note experiments/week15_ptq/results/degradation_curve.md documenting the observed degradation and whether it grows with sequence length.
+3. Writes sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/perplexity_comparison.json with keys ppl_fp16, ppl_int8, pct_degradation.
+4. Writes a short markdown note sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/results/degradation_curve.md documenting the observed degradation and whether it grows with sequence length.
 Acceptance: both PPL values are finite and ppl_int8 >= ppl_fp16; pct_degradation is computed and logged; the markdown note states in one sentence whether the degradation is "acceptable" (single-digit % increase) or a red flag (multiples of baseline).</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-06-log.md</code>: why must <code>ppl_int8</code> never come out lower than <code>ppl_fp16</code> — what would it mean if it did? (Hint: think about what perplexity measures and what quantization can and cannot add to a model.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/log.md</code>: why must <code>ppl_int8</code> never come out lower than <code>ppl_fp16</code> — what would it mean if it did? (Hint: think about what perplexity measures and what quantization can and cannot add to a model.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -374,9 +379,9 @@ Acceptance: both PPL values are finite and ppl_int8 >= ppl_fp16; pct_degradation
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-memory-economics-synthesis.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Economics Synthesis</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-16/day-01-decoding-innovations.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Decoding Innovations</span></a>
+  <a class="lnav prev" href="../day-05-memory-economics-synthesis/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Economics Synthesis</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m17b-long-context-decoding/day-01-decoding-innovations/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M17b · Long-Context Decoding</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -475,9 +480,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What is Post-Training Quantization (PTQ), and how does it differ from Quantization-Aware Training (QAT)?',
-  opts:['PTQ retrains the model from scratch at lower precision; QAT does not','PTQ converts an already-trained model\'s weights to lower precision with no retraining or gradient updates; QAT injects quantization noise during training so the model learns to compensate for it','PTQ and QAT are the same technique with different names','PTQ only works on CPUs; QAT only works on GPUs'],
-  ans:1, fb:'Right. PTQ is a one-time numeric conversion after training finishes — cheap but riskier since the model never adapted to the noise. QAT bakes quantization into training itself — more expensive but more robust.'},
+ {q:'1. Your benchmark prints FP16 perplexity 5.5 and INT8 perplexity 5.4 on "the same" WikiText eval, so INT8 looks slightly better than FP16. The quantization code has no errors. What is the most likely explanation, and where do you look first?',
+  opts:['INT8 genuinely improved the model, so ship it — lower perplexity is always a real win','Suspect the harness, not the model: the two runs probably were not apples-to-apples (different tokenizer version, context stride, or token count in the mean), because quantization only removes information and cannot make the model more confident on held-out text than the original FP16 weights','Conclude 8-bit is the optimal precision for this model and stop testing','Assume the eval text was too easy and switch to a harder dataset'],
+  ans:1, fb:'Quantization can only discard information, so a correctly measured INT8 perplexity should be equal to or slightly higher than FP16 — never lower on the same held-out text. An INT8 PPL below FP16 is the classic signature of a broken benchmark: a mismatched tokenizer, a different context window/stride, or averaging over a different number of tokens between the two runs. The fix is to run both models through the identical eval function on identically tokenized data and confirm FP16 reproduces a known reference number. Treating the 5.4 as a real improvement is exactly the trap.'},
  {q:'2. Why does naive int8 quantization (map min/max range onto 256 buckets, one scale for the whole row) break down on transformers larger than about 6.7B parameters?',
   opts:['int8 arithmetic is not supported on GPUs that size','Larger models develop emergent outlier features — a small number of activation dimensions with much larger magnitude — that stretch the scale factor so far that ordinary values collapse into a few buckets','The model runs out of memory before quantization can happen','Larger models have more layers than int8 can represent'],
   ans:1, fb:'Right. The emergent outlier features are the specific failure mechanism: a handful of feature dimensions get huge values as scale increases, and a single shared scale factor sized for those outliers destroys the resolution for everything else.'},

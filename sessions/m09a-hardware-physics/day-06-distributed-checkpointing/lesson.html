@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-memory-footprint.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Footprint</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-03/day-01-transformer-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transformer Arithmetic (C≈6ND)</span></a>
+  <a class="lnav prev" href="../day-05-memory-footprint/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Footprint</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m9b/day-01-float-formats.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M9b · Mixed-Precision &amp; fp8 Training</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Remat only pays off when the wrapped region's <strong>inputs are cheap</strong> relative to its <strong>internal activations</strong>. A whole transformer block is a great target: its input is one activation tensor, but internally it computes attention scores, softmax outputs, MLP hidden states — many large tensors. Wrapping a tiny function (like a single <code>add</code>) is pure overhead: you save almost nothing and still pay the recompute cost.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Rule of thumb:</b> checkpoint expensive, activation-heavy blocks (transformer layers). Don't checkpoint cheap elementwise ops — there's nothing big to save, only recompute cost to pay.</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Day 5 measured peak memory → activations dominate it in deep models → <code>jax.checkpoint</code> lets you trade FLOPs for memory → bigger batches or bigger models fit in the same hardware budget.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Remat changes only where compute happens, never the answer — which is exactly why a badly placed <code>jax.checkpoint</code> hides as "training just got slower for no reason."</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): checkpointing cheap functions, so you pay recompute for almost no memory saved.</b> <code>jax.checkpoint</code> is transparent to autodiff, so wrapping the wrong thing never changes the gradients or raises an error — the model still trains correctly. But if you wrap a cheap function (a single <code>add</code>, an activation, a thin layer) whose inputs are as big as its internals, you save almost no activation memory yet still re-run its forward math in the backward pass. Step time goes up and peak memory barely moves, with nothing to catch in a stack trace. In <b>code review</b>, a senior engineer checks that <code>jax.checkpoint</code> wraps expensive, activation-heavy regions (a whole transformer block), not tiny elementwise ops.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: less peak memory vs. extra FLOPs (and wall-clock time).</b> Remat frees activation memory so you can fit a bigger batch or a bigger model on the same hardware — but the freed activations are recomputed in the backward pass, so you deliberately spend real extra compute and a slower step. In a <b>design review</b>, this is the choice you make when memory is the binding constraint: you accept a slower step to make the job fit at all, rather than shrinking the model or batch.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -320,8 +325,8 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>This weekend's task (from the curriculum) has two deliverables — one for the distributed deploy, one for checkpointing.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>experiments/week02_jax/distributed_deploy.md</code> — deployment notes: the instance type and device count you actually used (e.g. a specific cloud GPU instance with N GPUs) and the sharding spec you deployed the Week 2 ViT with, OR — if you don't have cloud access this weekend — a concrete, specific plan for exactly what you would provision and how you'd shard, written so someone else could execute it.</li>
-        <li><code>experiments/week02_jax/vit_remat.py</code> — apply <code>jax.checkpoint</code> to the ViT's transformer blocks (one line, as in the walkthrough).</li>
+        <li><code>sessions/m09a-hardware-physics/day-06-distributed-checkpointing/distributed_deploy.md</code> — deployment notes: the instance type and device count you actually used (e.g. a specific cloud GPU instance with N GPUs) and the sharding spec you deployed the Week 2 ViT with, OR — if you don't have cloud access this weekend — a concrete, specific plan for exactly what you would provision and how you'd shard, written so someone else could execute it.</li>
+        <li><code>sessions/m09a-hardware-physics/day-06-distributed-checkpointing/experiment.py</code> — apply <code>jax.checkpoint</code> to the ViT's transformer blocks (one line, as in the walkthrough).</li>
         <li>The script must report the <strong>peak-memory difference with vs. without remat</strong> — a measured number if you can profile it, or a clearly-labeled estimated proxy (e.g. counting/summing activation tensor sizes) if you can't.</li>
         <li>Confirm <code>jax.grad</code> still produces correct gradients on the remat'd model (compare against the non-remat version on a small input).</li>
       </ul>
@@ -332,7 +337,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Weekend Lab artifacts.
 
-Create experiments/week02_jax/vit_remat.py that:
+Create sessions/m09a-hardware-physics/day-06-distributed-checkpointing/experiment.py that:
 1. Reuses this week's sharded ViT transformer block function block(params, x) (attention + MLP).
 2. Defines block_ckpt = jax.checkpoint(block) — a one-line change.
 3. Builds a forward(params_stack, x) that scans block_ckpt over a stack of layers with jax.lax.scan.
@@ -340,11 +345,11 @@ Create experiments/week02_jax/vit_remat.py that:
 5. Reports the peak-memory difference with vs. without remat — use a real profiler if available (e.g. jax.profiler or device_memory stats), otherwise print a clearly-labeled estimated proxy (sum of stored activation tensor sizes per layer, with vs. without checkpointing).
 Add a brief comment on each step explaining what remat is doing, then run it to confirm it works.
 
-Also create experiments/week02_jax/distributed_deploy.md documenting:
+Also create sessions/m09a-hardware-physics/day-06-distributed-checkpointing/distributed_deploy.md documenting:
 - The instance type and device count actually used to deploy this week's sharded ViT on real multi-GPU/multi-host hardware, and the sharding spec used.
 - If cloud access wasn't available this weekend, write a specific, executable plan instead (exact instance type, device count, sharding spec) rather than generic advice.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-02/day-06-log.md</code>: which part of the ViT block has the biggest internal activations, and why does checkpointing that block (rather than a single matmul) actually pay off?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-06-distributed-checkpointing/log.md</code>: which part of the ViT block has the biggest internal activations, and why does checkpointing that block (rather than a single matmul) actually pay off?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Also create experiments/week02_jax/distributed_deploy.md documenting:
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-memory-footprint.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Footprint</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-03/day-01-transformer-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transformer Arithmetic (C≈6ND)</span></a>
+  <a class="lnav prev" href="../day-05-memory-footprint/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Memory Footprint</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../week-m9b/day-01-float-formats.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M9b · Mixed-Precision &amp; fp8 Training</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -457,9 +462,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What does <code>jax.checkpoint</code> (remat) trade?',
-  opts:['Less accuracy for more speed','Extra compute time (recomputing in the backward pass) for less peak memory (fewer stored activations)','Less code for more memory use','Nothing — it is purely free'],
-  ans:1, fb:'Right. Checkpointing throws away internal activations and recomputes them during backward — you pay extra FLOPs to save memory.'},
+ {q:'1. You wrap several functions with <code>jax.checkpoint</code> to cut memory. The model still trains to the same accuracy, but each step got noticeably slower and peak memory barely dropped. Where do you look first, and why?',
+  opts:['The gradients must be wrong — remat changes the math, so re-derive the backward pass','Check what you wrapped: <code>jax.checkpoint</code> only helps when a region\'s internal activations are large relative to its inputs; wrapping cheap functions pays recompute for almost no memory saved','Lower the batch size — remat only works at batch size 1','Remove <code>jax.grad</code>, since it conflicts with <code>jax.checkpoint</code>'],
+  ans:1, fb:'Right. Remat is transparent to autodiff, so accuracy is unchanged — that is the clue it is a placement problem, not a correctness bug. If you wrap cheap functions whose inputs are about as big as their internals, you re-run their forward math in the backward pass but free almost no activation memory, so step time rises and peak memory stays flat. The fix is to checkpoint expensive, activation-heavy regions (a whole transformer block), not tiny ops. Re-deriving gradients or dropping <code>jax.grad</code> would be chasing a bug that is not there.'},
  {q:'2. What is the practical multi-device task for this weekend?',
   opts:['Keep using the 4 simulated local devices from Day 4','Provision a real multi-GPU/multi-host setup and deploy the sharded ViT on actual hardware','Switch the ViT to run on CPU only','Rewrite the ViT without any sharding'],
   ans:1, fb:'Right. Saturday\'s job is to move off Day 4\'s simulated devices and actually deploy on real multi-GPU/multi-host hardware (or write a concrete plan if you lack cloud access).'},

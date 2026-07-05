@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-thunderkittens-architecture.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-cuda-tk-setup-implementation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; TK Implementation</span></a>
+  <a class="lnav prev" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; Implementation</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Theory meets the merge request</strong> — real inference engines like llama.cpp have to decide whether to adopt a faster kernel at all, weighing portability, maintenance burden, and measured speedup against integration risk (see the produce section).</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> attention is memory-bound (Section 1) → tiling + online softmax fixes it exactly once (FlashAttention) → loop order and hardware-specific asynchrony squeeze out more (FA-2, FA-3) → ThunderKittens generalizes the fix into reusable, hardware-aligned primitives → you benchmark to see the argument proven in wall-clock numbers.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A benchmark is only evidence if it times the steady state — the way it quietly lies is by measuring the very first call.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): timing the cold / first call.</b> The first time you invoke a kernel, the measured time includes things that never happen again: lazy CUDA context creation, JIT compilation, cuDNN/autotuner shape selection, and cold caches. Your timer runs fine and prints a number — it is just measuring startup, not the kernel. This makes a genuinely faster kernel look slower (or gives wildly high variance), and you ship the wrong conclusion with no error to hint at it. A senior engineer checks in <b>code review</b> that the harness does <em>warmup</em> iterations first, uses <code>torch.cuda.synchronize()</code> (or an equivalent device barrier) around the timed region so async launches are actually finished, and reports the median of many steady-state runs — not one cold call.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fusing the whole op into one kernel buys HBM traffic but costs flexibility.</b> FlashAttention wins by fusing QK^T → softmax → ×V so the N×N scores never touch HBM — that is the entire IO-awareness gain. The cost: the intermediate score matrix no longer exists to inspect, log, or reuse, the fused kernel is specialized to specific shapes/dtypes and much harder to write and maintain, and adopting it in a real engine adds portability and integration risk. In a <b>design review</b> you weigh the measured speedup against maintenance burden and how often the op's shape actually matches what the fused kernel was tuned for.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -320,19 +325,19 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): build a small reproducible benchmark suite comparing a from-scratch attention kernel against a naive unfused implementation and a vendor/library baseline — directly measuring the memory-traffic story behind the FlashAttention argument, scoped down to run without a CUDA/ThunderKittens toolchain (JAX Pallas stands in as the hardware-aligned kernel).</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>bench_attention.py</code> runs end-to-end with <code>python3 experiments/week14_jax/day5_comparative_benchmarking/bench_attention.py</code> and exits 0.</li>
+        <li><code>bench_attention.py</code> runs end-to-end with <code>python3 sessions/m15b-native-kernels/day-05-comparative-benchmarking/experiment.py</code> and exits 0.</li>
         <li>It implements (1) naive unfused attention (materializes the full N×N score matrix), (2) a tiled/Pallas fused attention kernel with online softmax, (3) the built-in library attention as the vendor baseline.</li>
         <li>Runs each across at least 3 sequence lengths (e.g. 512, 2048, 8192) and prints, for each of the 3 implementations × 3 lengths, a wall-clock time and an estimated bytes-moved figure (9 rows minimum).</li>
         <li>The naive implementation's estimated bytes-moved must scale visibly closer to O(N²) than the fused/library implementations' O(N) scaling — the checkable numeric signature of IO-awareness.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week14_jax/day5_comparative_benchmarking/bench_attention.py</code>, <code>results.md</code>, and <code>notes_issue_7276.md</code> with the criteria above.</p>
+      <p>Create <code>sessions/m15b-native-kernels/day-05-comparative-benchmarking/experiment.py</code>, <code>results.md</code>, and <code>notes_issue_7276.md</code> with the criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Day 5 artifact.
 
-Path: experiments/week14_jax/day5_comparative_benchmarking/
+Path: sessions/m15b-native-kernels/day-05-comparative-benchmarking/day5_comparative_benchmarking/
 
 Create bench_attention.py that implements:
 1. Naive unfused attention (materializes the full N×N scores matrix S = QK^T in HBM, then softmax, then the ×V matmul as separate steps).
@@ -344,7 +349,7 @@ Create results.md with the results table and a 3-5 sentence write-up connecting 
 
 Create notes_issue_7276.md: a 10-15 line summary of the llama.cpp GitHub issue #7276 discussion's key engineering trade-offs (portability, maintenance cost vs. measured speedup) for adopting a faster attention kernel.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-14/day-05-log.md</code>: at N=128, would you expect the fused kernel to look faster than naive? Why or why not? (Hint: at small N, the whole problem fits in SRAM/cache regardless of implementation — the O(N²) vs O(N) gap only opens up once N is large. Always sweep sequence length and look at the trend, not a single data point.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15b-native-kernels/day-05-comparative-benchmarking/log.md</code>: at N=128, would you expect the fused kernel to look faster than naive? Why or why not? (Hint: at small N, the whole problem fits in SRAM/cache regardless of implementation — the O(N²) vs O(N) gap only opens up once N is large. Always sweep sequence length and look at the trend, not a single data point.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Create notes_issue_7276.md: a 10-15 line summary of the llama.cpp GitHub issue #
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-thunderkittens-architecture.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-cuda-tk-setup-implementation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; TK Implementation</span></a>
+  <a class="lnav prev" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-cuda-tk-setup-implementation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">CUDA/TK Setup &amp; Implementation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -457,9 +462,9 @@ var QS=[
  {q:'2. What two techniques does FlashAttention combine to avoid ever materializing the full N×N matrix in HBM?',
   opts:['Quantization and pruning','Tiling (load Q/K/V blocks into SRAM) and online softmax (rescale a running max/sum as new blocks arrive)','Batching and gradient checkpointing','Weight sharing and low-rank approximation'],
   ans:1, fb:'Right. Tiling keeps blocks of Q, K, V in fast on-chip SRAM so all three steps (QK^T, softmax, ×V) happen without round-tripping to HBM; online softmax lets softmax be computed exactly without ever seeing a full row at once, by rescaling a running max and sum as each new block arrives.'},
- {q:'3. What is ThunderKittens\' core design philosophy, and what did the paper find when TK-generated kernels were benchmarked against strong hand-written baselines?',
-  opts:['Present a general abstraction and optimize it later; TK loses to every hand-written baseline','"Silicon constraints as the API" — mirror what the hardware actually does; TK roughly ties mature baselines (GEMM, attention-inference) but wins big (8-14x) on less-mature ops (SSMs, linear attention)','Hide all hardware details behind a Python-only interface; TK is slower everywhere but easier to write','Replace CUDA entirely with a new instruction set; results were not benchmarked'],
-  ans:1, fb:'Right. ThunderKittens builds its abstractions (16x16 tiles, warp-level primitives) to mirror the GPU\'s actual memory/compute hierarchy instead of presenting a general model to optimize later. The gap it opens over hand-written code tracks how much hand-tuning effort already went into the baseline: it roughly ties CuBLAS/FlashAttention-3 on mature ops, but wins by a wide margin (8x on SSMs, 14x on linear attention) on ops nobody had time to hand-tune yet.'},
+ {q:'3. Your benchmark reports the fused FlashAttention-style kernel as <em>slower</em> than naive attention, and the times swing wildly from run to run — yet everyone agrees the fused kernel should win, and the outputs match. Where do you look first, and why?',
+  opts:['Conclude FlashAttention is a myth and keep the naive kernel','Check the timing harness for a cold-start bug: no warmup runs, or missing torch.cuda.synchronize() around the timed region, so you are measuring JIT compile / autotune / context init / async launch latency instead of the kernel','Increase the sequence length until the fused kernel finally wins','Rewrite the fused kernel, since a correct-but-slow result means the algorithm is wrong'],
+  ans:1, fb:'Right. Correct output plus high variance and a "faster kernel looks slower" result is the fingerprint of measuring the cold path. The first call folds in JIT compilation, autotuner shape selection, and lazy CUDA context creation, and without a device sync you time the launch, not the work. Add warmup iterations, synchronize around the timed region, and report the median of steady-state runs before doubting the algorithm.'},
  {q:'4. In today\'s benchmark, what is the checkable numeric signature that proves the IO-awareness argument?',
   opts:['The fused/library kernels are always faster in wall-clock time, at every sequence length tested','The naive implementation\'s estimated HBM bytes-moved scales visibly closer to O(N²), while the fused/library implementations\' scales closer to O(N), as sequence length grows','The naive kernel uses more GPU memory bandwidth on paper but is actually faster in practice','All three implementations produce different numerical outputs, proving the fused kernel is a new algorithm'],
   ans:1, fb:'Right. The point isn\'t just "fused is faster" — it\'s that the memory-traffic estimates scale differently: naive attention\'s bytes-moved grows close to O(N²) because it repeatedly round-trips the full N×N matrix through HBM, while the tiled/fused and vendor-library kernels scale close to O(N) because they never materialize that matrix. That scaling gap, not a single timing number, is the direct numeric evidence for IO-awareness.'}

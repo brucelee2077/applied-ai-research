@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-images-as-patches.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Images as Patches</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-transformer-for-vision.html"><span class="lnav-dir">Next →</span><span class="lnav-t">A Transformer for Vision</span></a>
+  <a class="lnav prev" href="../day-01-images-as-patches/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Images as Patches</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-transformer-for-vision/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transformer for Vision</span></a>
 </nav>
 
   <header class="hero">
@@ -301,6 +301,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The class token starts as noise.</strong> It carries no image information at the start. Attention is what fills it, over the transformer blocks you run tomorrow.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Why this matters:</b> after these three steps the image is a clean <code>(65, 128)</code> sequence — same shape a text transformer expects. Tomorrow you push it through the exact transformer block from M5a, and attention starts mixing patches together.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The three steps all produce the right shape, so the one that can break your model without changing any shape is the position embedding.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): position embeddings that carry no position.</b> Attention treats the sequence as an unordered bag, so the position table is the <em>only</em> thing telling the model where each patch sat. If that table is initialized to all zeros and accidentally frozen (<code>requires_grad=False</code>), or every row is initialized identically, the add <code>seq + pos</code> still runs and the shape stays <code>(65, 128)</code> — but every token gets the same (or no) position signal. The model trains, the loss drops, nothing errors; it has simply become order-blind and cannot tell a top-left patch from a corner one, so it plateaus below what it should reach. A senior engineer catches this in <b>code review</b> by confirming <code>pos_emb</code> is a learnable parameter with distinct per-row values, not a constant or a frozen tensor.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: learned position embeddings lock in one input size.</b> A learned table has exactly <code>num_patches + 1</code> rows, so it only works for the image size and patch count it was trained on. You gain a flexible, data-tuned notion of position; you pay by making the model brittle to a different resolution — feed a bigger image and you have no row for the extra patches. Whether to use a learned table or an interpolatable/relative scheme is the <b>design-review</b> decision when you expect varying input sizes.</div></div>
       <button class="gotit" type="button">Got the embedding steps</button>
     </div>
   </section>
@@ -332,21 +337,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the three steps by watching the shape grow from <code>(64, 48)</code> to <code>(65, 128)</code>. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05b_patch_embed.py</code>. Start from a fake <code>(64, 48)</code> patch array. Build a small PyTorch <code>nn.Module</code> called <code>PatchEmbed</code> with: an <code>nn.Linear(48, 128)</code> projection, a learnable <code>cls_token</code> parameter of shape <code>(1, 128)</code>, and a learnable <code>pos_emb</code> parameter of shape <code>(65, 128)</code>. In <code>forward</code>, project the patches, prepend the class token, then add the position table. Print the shape after each step and assert the final shape is <code>(65, 128)</code>. Run with <code>python3 m05b_patch_embed.py</code>.</p>
+      <p>Create <code>sessions/m05b-vision-transformer/day-02-patch-embeddings/experiment.py</code>. Start from a fake <code>(64, 48)</code> patch array. Build a small PyTorch <code>nn.Module</code> called <code>PatchEmbed</code> with: an <code>nn.Linear(48, 128)</code> projection, a learnable <code>cls_token</code> parameter of shape <code>(1, 128)</code>, and a learnable <code>pos_emb</code> parameter of shape <code>(65, 128)</code>. In <code>forward</code>, project the patches, prepend the class token, then add the position table. Print the shape after each step and assert the final shape is <code>(65, 128)</code>. Run with <code>python3 m05b_patch_embed.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5b Day 2 artifact.
 
-Create experiments/foundations/m05b_patch_embed.py that, with a comment on each step, builds patch embeddings for a ViT:
+Create sessions/m05b-vision-transformer/day-02-patch-embeddings/experiment.py that, with a comment on each step, builds patch embeddings for a ViT:
 1. Starts from a fake patch tensor of shape (64, 48) with torch.
 2. Defines a PatchEmbed nn.Module with: nn.Linear(48, 128) for projection, a learnable cls_token nn.Parameter of shape (1, 128), and a learnable pos_emb nn.Parameter of shape (num_patches + 1, 128) = (65, 128).
 3. In forward: project patches to (64, 128), prepend the cls_token to get (65, 128), then add pos_emb elementwise. Print the shape after each step.
 4. Asserts the final output shape is exactly (65, 128), and asserts the pos_emb has 65 rows (num_patches + 1), not 64, to catch the off-by-one bug.
 Then run it and paste the printed shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f7/day-02-log.md</code>: what shape did the sequence have right after prepending the class token, and why does the position table need 65 rows and not 64?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05b-vision-transformer/day-02-patch-embeddings/log.md</code>: what shape did the sequence have right after prepending the class token, and why does the position table need 65 rows and not 64?</div></div>
       <button class="gotit" type="button">Done — on to Day 3</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Then run it and paste the printed shapes at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-images-as-patches.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Images as Patches</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-transformer-for-vision.html"><span class="lnav-dir">Next →</span><span class="lnav-t">A Transformer for Vision</span></a>
+  <a class="lnav prev" href="../day-01-images-as-patches/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Images as Patches</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-transformer-for-vision/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Transformer for Vision</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -472,9 +477,9 @@ var QS=[
  {q:'2. Why add a learnable class token to the front of the sequence?',
   opts:['To make the image larger','It is a summary slot whose final state the model reads to classify the image','It replaces the position embeddings','It speeds up the linear layer'],
   ans:1, fb:'Right. The class token belongs to no patch. Attention fills it with a summary of every patch, and its final state is what the classifier reads at the end.'},
- {q:'3. Why do you add position embeddings?',
-  opts:['To make training slower','Because attention treats the sequence as an unordered bag, so each token needs its place stamped on','To change the number of tokens','To remove the class token'],
-  ans:1, fb:'Right. Attention does not know a patch\'s place in the grid, so a learned position table tells each token where it sat.'},
+ {q:'3. Your ViT trains cleanly — loss drops, no errors — but accuracy plateaus low, and you notice shuffling the patch order barely changes the prediction. Where do you look first?',
+  opts:['The class token is too small','The position embeddings: if pos_emb was frozen at zeros or every row is identical, the model is order-blind and cannot use where each patch sat','The learning rate needs to be higher','The image has too many color channels'],
+  ans:1, fb:'Right. Attention sees the sequence as an unordered bag, so the position table is the only thing encoding order. If it is a frozen zero tensor or all rows are identical, seq + pos still runs and the shape stays (65, 128), but the model gets no position signal — so patch order stops mattering and accuracy plateaus. Confirm pos_emb is a learnable parameter with distinct per-row values.'},
  {q:'4. You have 64 patches. How many rows must the position table have, and why?',
   opts:['64 — one per patch','65 — one per patch plus one for the class token','128 — the embedding dimension','1 — a shared row for all'],
   ans:1, fb:'Right. It needs num_patches + 1 = 65 rows. The +1 is the class token\'s own seat. Sizing it to 64 is a classic off-by-one bug.'}

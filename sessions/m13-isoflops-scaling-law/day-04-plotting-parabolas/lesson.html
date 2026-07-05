@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-10/day-06-execution-data-aggregation.html" title="Execution &amp; Data Aggregation"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-deriving-scaling-law.html" title="Deriving the Scaling Law"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
+  <a class="lnav prev" href="../day-03-execution-data-aggregation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-deriving-scaling-law/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
 </nav>
 
 
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Week 10's training matrix → group by fixed compute C → per-slice loss-vs-log(N) is genuinely U-shaped → fit a parabola per slice → read off the vertex → (C, N*, D*, L_min) table → Tuesday's power-law fit across all budgets.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common mistake:</b> pooling every run together and fitting one giant parabola against log(N) regardless of compute budget. That throws away the whole IsoFLOP structure — you'd just see that bigger overall runs (more N <em>and</em> more D at once) tend to have lower loss, a mostly-monotonic trend, not the intended U-shaped valley. Always <code>groupby</code> the fixed budget first, one parabola per group.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The fit always returns three numbers and a vertex, so it never crashes even when the vertex is nonsense — that gap between "ran fine" and "answered correctly" is exactly what a staff engineer guards.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the vertex sits outside your sampled range.</b> <code>curve_fit</code> happily returns <code>logN* = -b/(2a)</code> even when that minimum lies past your smallest or largest sampled <code>N</code>. The formula just extrapolates the parabola beyond the data, so you get a clean-looking <code>N*</code> that was never bracketed by a real run. Your compute-optimal frontier then bends toward a point you have zero evidence for, and nothing errors. In <b>code review</b>, a senior engineer checks that every reported <code>logN*</code> falls <em>inside</em> <code>[min(logN), max(logN)]</code> for its slice — a vertex outside the sampled window is flagged and re-sampled, not trusted.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a rigid parabola vs. a flexible fit.</b> A 3-parameter parabola is stable — it fits reliably from just six noisy points and gives a closed-form vertex. But it assumes loss is truly quadratic in <code>log(N)</code>, which only holds locally near the bottom of the bowl. If your slice is asymmetric or the true curve is flatter on one side, the parabola pulls the vertex off the real minimum. In a <b>design review</b> you decide: keep the parabola for its stability with sparse data, or spend more runs near the minimum (or use a richer curve) to buy accuracy you can only afford with a denser sweep.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -329,21 +334,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>This CSV is exactly the file Tuesday's session loads as its starting input — confirm the column names and format are stable before ending the session.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week11_jax/day01_isoflop_parabola_fit.py</code> that groups by (rounded) target FLOP budget, fits <code>a·log10(N)² + b·log10(N) + c</code> per group, computes the vertex, and saves the results table and figure under <code>experiments/week11_jax/reports/</code>.</p>
+      <p>Create <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/experiment.py</code> that groups by (rounded) target FLOP budget, fits <code>a·log10(N)² + b·log10(N) + c</code> per group, computes the vertex, and saves the results table and figure under <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 11 Day 1 artifact.
 
-Create experiments/week11_jax/day01_isoflop_parabola_fit.py that:
+Create sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/experiment.py that:
 1. Loads the Week 10 aggregated (N, D, C, L) dataset, groups rows into IsoFLOP slices by (rounded) target FLOP budget C, and for each slice fits a*log10(N)^2 + b*log10(N) + c via scipy.optimize.curve_fit.
 2. For each slice, checks the sign of the fitted a: if a <= 0, flags that budget explicitly in console output and excludes it from the results table (do not silently include it).
 3. For each valid slice, computes logN_star = -b/(2a), N_star = 10**logN_star, L_min = parabola(logN_star, a, b, c), and D_star = C / (6 * N_star).
-4. Saves experiments/week11_jax/reports/isoflop_minima.csv with one row per valid FLOP budget, columns [C, N_star, D_star, L_min, a, b, c].
-5. Saves experiments/week11_jax/reports/isoflop_parabolas.png: a Matplotlib/Seaborn small-multiples figure, one subplot per FLOP budget, showing the raw scatter of loss vs. log10(N) with the fitted parabola overlaid and the vertex (N_star, L_min) marked.
+4. Saves sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/isoflop_minima.csv with one row per valid FLOP budget, columns [C, N_star, D_star, L_min, a, b, c].
+5. Saves sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/reports/isoflop_parabolas.png: a Matplotlib/Seaborn small-multiples figure, one subplot per FLOP budget, showing the raw scatter of loss vs. log10(N) with the fitted parabola overlaid and the vertex (N_star, L_min) marked.
 Add a brief comment on each step explaining the IsoFLOP method, then run it to confirm it works end-to-end on the real data.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-11/day-01-log.md</code>: for your smallest FLOP budget, did the fitted <code>a</code> come out positive? If not, what does that tell you about how many distinct <code>N</code> values you sampled at that budget?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m13-isoflops-scaling-law/day-04-plotting-parabolas/log.md</code>: for your smallest FLOP budget, did the fitted <code>a</code> come out positive? If not, what does that tell you about how many distinct <code>N</code> values you sampled at that budget?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Add a brief comment on each step explaining the IsoFLOP method, then run it to c
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-10/day-06-execution-data-aggregation.html" title="Execution &amp; Data Aggregation"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-deriving-scaling-law.html" title="Deriving the Scaling Law"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
+  <a class="lnav prev" href="../day-03-execution-data-aggregation/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Execution &amp; Data Aggregation</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-deriving-scaling-law/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Deriving the Scaling Law</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -462,9 +467,9 @@ var QS=[
  {q:'3. After <code>popt = [a, b, c]</code> comes back from <code>curve_fit</code>, how do you find the compute-optimal N*?',
   opts:['N* = popt[2] (the intercept c)','Take logN_star = -b/(2a), the vertex where the derivative is zero, then N_star = 10**logN_star','N* is just the largest N in your samples','N* = a + b + c'],
   ans:1, fb:'Right. The vertex of a·x²+b·x+c sits where its derivative 2a·x+b equals zero, i.e. x* = -b/(2a). Exponentiating logN_star with 10** converts back out of log-space to get N* in actual parameter count.'},
- {q:'4. A fitted slice comes back with <code>a &lt;= 0</code>. What should you do?',
-  opts:['Trust the vertex anyway — it\'s still the minimum','Flag that slice explicitly and exclude its vertex from the results table, since a non-positive a means no real convex minimum was captured','Multiply a by -1 and continue','Increase the FLOP budget for that slice'],
-  ans:1, fb:'Right. a > 0 means a smiling U — a genuine minimum. If a is zero or negative, the sampled N values for that slice didn\'t actually bracket a minimum, so its vertex isn\'t trustworthy and should be flagged rather than silently included.'}
+ {q:'4. Your pipeline runs clean: every slice fits with <code>a &gt; 0</code> and prints an <code>N*</code>. But one slice reports a compute-optimal <code>N*</code> that is <em>larger</em> than the biggest model you ever trained in that slice. Nothing errored. Where do you look first, and why?',
+  opts:['Nowhere — a &gt; 0 already proved the fit is valid, so trust the N*','Check whether logN* = -b/(2a) fell OUTSIDE [min(logN), max(logN)] for that slice; if so the fit extrapolated the vertex past your data, so N* was never bracketed by a real run and must be re-sampled, not trusted','Re-run curve_fit with a higher iteration limit until N* lands inside the range','Switch that slice from log10(N) back to raw N so the vertex moves inward'],
+  ans:1, fb:'Right. a &gt; 0 only confirms the parabola smiles — it does not confirm the minimum sits inside your sampled window. curve_fit will happily extrapolate the vertex beyond your largest (or smallest) sampled N, giving a clean-looking N* backed by zero data. The first check is always whether logN* lies inside [min(logN), max(logN)] for that slice; a vertex outside the sampled range is flagged and re-sampled, never silently folded into the frontier. Raising the iteration limit or switching axes does not add the missing data point.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

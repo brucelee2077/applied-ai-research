@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-tpu-architecture.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">TPU Architecture</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-multi-device.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav prev" href="../day-02-tpu-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">TPU Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Multi-Device Execution</span></a>
 </nav>
 
 
@@ -305,6 +305,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>So the goal is to move less</strong> — good sharding layouts pick collectives that minimize how much data crosses the interconnect, and overlap communication with computation where possible.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> models too big for one chip → shard across devices → devices hold only pieces → collectives recombine them → collective traffic dominates at scale → communication, not math, sets the speed limit.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Sharding is easy to get numerically wrong in a way that still produces a plausible-looking loss curve, and it is easy to shard along the axis that costs the most traffic.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a missing (or wrong) collective, so replicas silently disagree.</b> If each device holds a shard and you forget the AllReduce on gradients — or use AllGather where you needed a summing reduce — every device keeps updating its own copy with only its local information. Nothing crashes: shapes still match, the step runs, and the loss even goes down for a while. But the replicas drift apart and the effective batch is wrong, so the model trains to a worse point than you think. In <b>code review</b>, a senior engineer checks that every quantity which must be identical across devices (gradients, batch-norm stats, the final summed result) actually passes through a reduce collective, not just a gather.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fit a bigger model vs. pay interconnect traffic.</b> Sharding lets you hold a model that no single chip could store, which is the only way to train the largest models at all. The cost is that recombining shards means collectives, and collective traffic grows with model size and device count until the wires — not the math units — set your speed. In a <b>design review</b>, choosing the sharding layout is choosing which axis to split so the collectives you trigger move the fewest bytes across the interconnect.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -345,13 +350,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Print each device's array <strong>before and after</strong> every collective.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week02/collectives_sim.py</code> with the functions and print statements above.</p>
+      <p>Create <code>sessions/m09a-hardware-physics/day-03-sharding/experiment.py</code> with the functions and print statements above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Day 3 artifact.
 
-Create experiments/week02/collectives_sim.py that simulates 3 collectives across 4 simulated devices using plain numpy (no real hardware):
+Create sessions/m09a-hardware-physics/day-03-sharding/experiment.py that simulates 3 collectives across 4 simulated devices using plain numpy (no real hardware):
 1. Represent 4 devices as a list of 4 numpy arrays, each of length 4. Device i holds a shard with value (i+1) in slot i and zeros elsewhere.
 2. all_gather(shards): return a list where every device holds the full stacked array of all shards.
 3. reduce_scatter(shards): sum the shards element-wise, then return a list where each device i holds only slice i of the sum.
@@ -359,7 +364,7 @@ Create experiments/week02/collectives_sim.py that simulates 3 collectives across
 5. Print each device's array BEFORE and AFTER every collective so the effect is visible.
 Add a brief comment on each function explaining the collective, then run it to confirm the output matches.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-02/day-03-log.md</code>: why does <code>AllReduce</code> move roughly twice the data of a single <code>AllGather</code>? (Hint: it is two collectives in a row.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-03-sharding/log.md</code>: why does <code>AllReduce</code> move roughly twice the data of a single <code>AllGather</code>? (Hint: it is two collectives in a row.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -373,9 +378,9 @@ Add a brief comment on each function explaining the collective, then run it to c
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-tpu-architecture.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">TPU Architecture</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-multi-device.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav prev" href="../day-02-tpu-architecture/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">TPU Architecture</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Multi-Device Execution</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

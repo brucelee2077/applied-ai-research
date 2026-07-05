@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-multi-device.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-distributed-checkpointing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
+  <a class="lnav prev" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-distributed-checkpointing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
 </nav>
 
 
@@ -296,6 +296,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The escape hatch: gradient checkpointing.</strong> Instead of saving every activation, you save a few "checkpoints" and <em>recompute</em> the rest during the backward pass. You trade <strong>more compute</strong> for <strong>less activation memory</strong>.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> parameters need a value (weights) → training needs a slope per value (gradients) → Adam needs two running averages per value (8N, the 2x) → the forward pass must remember its outputs for backprop (activations, batch-dependent) → total memory = <code>16N + activations</code>.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Memory math is where a "why did this run out of memory?" question gets answered before you launch, and the classic mistake is counting only the weights.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): budgeting for weights alone and forgetting the 4x.</b> A beginner sizes the job by parameters times bytes — 1B params in fp32 = 4 GB — and picks hardware around that. But training also stores gradients (another 4N) and Adam's two buffers (8N), so the real static cost is <code>16N</code>, four times the weights, before a single activation. This is not a code bug that throws early: your notebook may run on a tiny batch, look fine, then blow up only at the real batch size or later in training when activations pile on top. In <b>code review</b>, a senior engineer checks that the memory estimate includes gradients, optimizer state (Adam = 2x weights), and activations — not just the parameter count — and that it uses the actual training dtype.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast, stable convergence vs. 2x the weight memory.</b> Adam keeps a per-weight momentum <code>m</code> and variance <code>v</code>, which is why it trains reliably with little tuning — but those two buffers cost <code>8N</code>, the whole 2x optimizer-state term. Plain SGD keeps none (0) and momentum-SGD keeps one (4N), so they free memory you could spend on a bigger model or batch. In a <b>design review</b>, choosing the optimizer is partly a memory decision: you weigh Adam's convergence quality against the parameters or batch size that its extra state forces you to give up.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -335,13 +340,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Print each term in GB and a total. Confirm that for <code>N = 1e9</code>, fp32, the static part (weights + grads + Adam) is <code>16 GB</code>.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week02/memory_calc.py</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m09a-hardware-physics/day-05-memory-footprint/experiment.py</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Day 5 artifact.
 
-Create experiments/week02/memory_calc.py that:
+Create sessions/m09a-hardware-physics/day-05-memory-footprint/experiment.py that:
 1. Takes inputs: params (N), bytes_per_param (e.g. 4 for fp32, 2 for bf16), and batch, seq, layers.
 2. Computes weights = bytes_per_param * N, gradients = bytes_per_param * N, and Adam optimizer state = 2 * bytes_per_param * N (the m and v moments — the 2x multiplier).
 3. Estimates activations as a per-token coefficient * batch * seq * layers (state the coefficient you chose in a comment).
@@ -349,7 +354,7 @@ Create experiments/week02/memory_calc.py that:
 5. Includes a sanity check: assert the static subtotal for N=1e9, fp32 equals 16 GB.
 Add a brief comment on each term explaining what it is, then run it on a 1B-param fp32 example to confirm the 16 GB static figure.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-02/day-05-log.md</code>: for your calculator, at what <code>batch</code> does the activations term overtake the <code>16N</code> static cost? What would gradient checkpointing change?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-05-memory-footprint/log.md</code>: for your calculator, at what <code>batch</code> does the activations term overtake the <code>16N</code> static cost? What would gradient checkpointing change?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -363,9 +368,9 @@ Add a brief comment on each term explaining what it is, then run it on a 1B-para
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-multi-device.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-distributed-checkpointing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
+  <a class="lnav prev" href="../day-04-multi-device/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Multi-Device Execution</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-distributed-checkpointing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed Deploy &amp; Checkpointing</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

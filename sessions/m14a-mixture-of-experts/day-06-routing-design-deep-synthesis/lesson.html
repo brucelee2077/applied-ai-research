@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-moe-vs-dense-benchmarks.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE vs. Dense Benchmarks</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-08/day-01-comprehensive-profiling.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comprehensive Profiling</span></a>
+  <a class="lnav prev" href="../day-05-moe-vs-dense-benchmarks/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE vs. Dense Benchmarks</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m14b-capstone-moe/day-01-moe-architecture-upgrade/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M14b · Capstone Close-Out: MoE Upgrade + Report</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Load imbalance is real</strong> — routing isn't perfectly uniform, so capacity buffers and a load-balancing loss are both required in practice, not optional extras.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> dense FFN forces every token through every parameter → cost scales with total size → MoE splits the FFN into experts + a router → routing creates a ragged per-expert workload → <code>ragged_dot</code> executes that ragged workload efficiently → total knowledge capacity grows while per-token active compute stays roughly flat.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Routing turns a clean matmul into a sort-then-multiply pipeline. That extra bookkeeping is where a quiet correctness bug hides, and the primitive that makes it fast is also what you trade for.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): <code>group_sizes</code> out of sync with the sorted tokens.</b> <code>ragged_dot</code> trusts you: it multiplies the first <code>group_sizes[0]</code> rows by expert 0's weights, the next <code>group_sizes[1]</code> rows by expert 1's, and so on. If the token sort and the <code>group_sizes</code> vector disagree — an off-by-one boundary, a stale count from a previous step, or tokens not actually contiguous by expert — the op still runs with valid shapes and returns a full-size result. It just multiplies some tokens by the <em>wrong</em> expert's weights. No error, no shape mismatch; the model simply learns from scrambled routing and quietly underperforms. In <b>code review</b> a senior engineer checks that <code>sum(group_sizes)</code> equals the token count and asserts the sort order and the group boundaries are produced together from the same routing decision, not computed twice.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: <code>ragged_dot</code> saves memory but adds a data-dependent sort.</b> The one-hot-mask alternative is simple and shape-static, but it builds a dense <code>(N, T, D)</code> tensor that is mostly zeros — wasting memory and FLOPs on experts a token never visits. <code>ragged_dot</code> avoids that waste by working on contiguous per-expert groups, but it needs the tokens sorted into those groups first, which is a data-dependent gather/scatter that itself costs time and can be awkward to fuse. In a <b>design review</b> the choice is masking's simplicity and predictable shapes versus <code>ragged_dot</code>'s memory and compute savings at the price of a sort step and more bookkeeping.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -328,7 +333,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Tests pass covering: correct <code>expert_idx</code> shape/dtype, <code>group_sizes</code> summing to total token count, and dropped-token count increasing as capacity_factor decreases.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week07_jax/moe_routing.py</code> plus <code>experiments/week07_jax/test_moe_routing.py</code> with the criteria above. State clearly whether you implemented top-1 or top-2 routing.</p>
+      <p>Create <code>sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/experiment.py</code> plus <code>sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/experiment.py</code> with the criteria above. State clearly whether you implemented top-1 or top-2 routing.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -336,7 +341,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Implement a toy top-1 (or top-2, your choice, but state which) MoE routing algorithm in JAX/Python that accepts a batch of token embeddings and distributes them across 8 simulated experts.
 
-File path: experiments/week07_jax/moe_routing.py (implementation) plus experiments/week07_jax/test_moe_routing.py (tests) under the repo's experiments convention.
+File path: sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/experiment.py (implementation) plus sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/experiment.py (tests) under the repo's experiments convention.
 
 Acceptance criteria ("done" looks like):
 (a) a route_tokens(tokens, router_weights, num_experts=8) function that returns expert_idx, gate_value, and group_sizes (compute logits -> softmax -> argmax -> bincount).
@@ -344,12 +349,12 @@ Acceptance criteria ("done" looks like):
 (c) a capacity-factor check that reports dropped-token count for at least 2 different capacity_factor values (e.g. 1.0 vs 1.5) on a deliberately imbalanced synthetic batch.
 (d) the load-balancing auxiliary loss L_aux = alpha * N * sum(f_i * P_i) computed and printed for both a balanced and an imbalanced routing distribution, with imbalanced > balanced.
 (e) all outputs printed with shapes at every step.
-(f) tests pass (pytest experiments/week07_jax/test_moe_routing.py) covering at least: correct expert_idx shape/dtype, group_sizes summing to total token count, and dropped-token count increasing as capacity_factor decreases.</pre>
+(f) tests pass (pytest sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/experiment.py) covering at least: correct expert_idx shape/dtype, group_sizes summing to total token count, and dropped-token count increasing as capacity_factor decreases.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common misconception to avoid:</b> MoE does <strong>not</strong> shrink total memory footprint. A Switch/GShard-style model still needs enough device memory to hold <strong>all</strong> experts resident, since any token could route to any of them — even though only a slice is actively multiplied per token. The savings are in compute (FLOPs) per token, not "the model got smaller."</div></div>
       <h4>Artifact 2 (tomorrow, Sunday) · the synthesis essay</h4>
-      <p>Write <code>experiments/week07_jax/moe_inference_economics_essay.md</code>: a 1,500-word (1,400–1,600, check with <code>wc -w</code>) theoretical essay on why frontier labs moved from dense to MoE architectures specifically for <strong>inference economics</strong>. Do this one yourself, no skill trigger. Must explicitly address: (a) total vs. active parameters per token, grounded in Switch Transformer's top-1 routing; (b) GShard's top-2 routing and expert-parallel sharding as what made training 600B+ param MoE models tractable; (c) Pope et al.'s framing of inference cost as bounded by arithmetic intensity / memory bandwidth, and how MoE's sparse activation interacts with that; (d) at least one honest failure mode or cost (all-to-all communication overhead, load imbalance forcing capacity buffers, or larger total HBM footprint).</p>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running today's code, write one line in <code>sessions/week-07/day-06-log.md</code>: why does raising <code>capacity_factor</code> reduce dropped tokens but increase wasted buffer space on well-balanced experts?</div></div>
+      <p>Write <code>sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/moe_inference_economics_essay.md</code>: a 1,500-word (1,400–1,600, check with <code>wc -w</code>) theoretical essay on why frontier labs moved from dense to MoE architectures specifically for <strong>inference economics</strong>. Do this one yourself, no skill trigger. Must explicitly address: (a) total vs. active parameters per token, grounded in Switch Transformer's top-1 routing; (b) GShard's top-2 routing and expert-parallel sharding as what made training 600B+ param MoE models tractable; (c) Pope et al.'s framing of inference cost as bounded by arithmetic intensity / memory bandwidth, and how MoE's sparse activation interacts with that; (d) at least one honest failure mode or cost (all-to-all communication overhead, load imbalance forcing capacity buffers, or larger total HBM footprint).</p>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running today's code, write one line in <code>sessions/m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/log.md</code>: why does raising <code>capacity_factor</code> reduce dropped tokens but increase wasted buffer space on well-balanced experts?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -363,9 +368,9 @@ Acceptance criteria ("done" looks like):
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-moe-vs-dense-benchmarks.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE vs. Dense Benchmarks</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-08/day-01-comprehensive-profiling.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Comprehensive Profiling</span></a>
+  <a class="lnav prev" href="../day-05-moe-vs-dense-benchmarks/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE vs. Dense Benchmarks</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m14b-capstone-moe/day-01-moe-architecture-upgrade/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M14b · Capstone Close-Out: MoE Upgrade + Report</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -463,9 +468,9 @@ var QS=[
  {q:'1. In Switch Transformer\'s top-1 routing, if expert capacity is set with <code>capacity_factor = 1.0</code> and routing across 8 experts is NOT perfectly uniform for a batch, what happens to the excess tokens sent to an over-subscribed expert?',
   opts:['They are dropped — skipped by that expert\'s FFN and passed through via the residual connection','They are automatically re-routed to the second-highest-probability expert','The batch is rejected and reprocessed with a larger capacity factor','They are queued and processed in the next training step'],
   ans:0, fb:'Right. Switch Transformer explicitly drops overflow tokens (skips the FFN, passes the token through the residual stream) rather than re-routing or queuing them — the direct cost of setting capacity_factor too low.'},
- {q:'2. Why does <code>jax.lax.ragged_dot</code> exist instead of just using a dense one-hot mask + matmul to dispatch tokens to experts?',
-  opts:['One-hot dispatch is mathematically incorrect and produces wrong gradients','One-hot dispatch wastes compute and memory because most of the masked tensor is zero-padding, while ragged_dot operates only on the real per-expert token groups','ragged_dot is required because JAX cannot compile any function containing argmax','One-hot masks only work for top-1 routing, not top-2'],
-  ans:1, fb:'Right. One-hot dispatch is correct but wasteful (dense zero-padded tensors); ragged_dot achieves the same routed computation using contiguous, correctly-sized groups defined by group_sizes, avoiding the padding overhead.'},
+ {q:'2. You switch an MoE layer from one-hot-mask dispatch to <code>jax.lax.ragged_dot</code>. Shapes are valid, it compiles, and training runs with no error — but eval quality is clearly worse than the masked version, and it never recovers. Where do you look first, and why?',
+  opts:['The router\'s W_router weights are too small; scale them up until quality returns','The alignment between the sorted-token order and <code>group_sizes</code>: ragged_dot blindly multiplies the first group_sizes[0] rows by expert 0, the next by expert 1, and so on, so a stale or off-by-one group_sizes (or tokens not truly contiguous by expert) silently multiplies tokens by the wrong expert\'s weights with no shape error','The capacity_factor must have changed; raise it to 2.0 to stop token drops','ragged_dot produces wrong gradients by design, so revert to one-hot masking permanently'],
+  ans:1, fb:'Right. ragged_dot trusts group_sizes to define where each expert\'s rows begin and end; it does not verify that the token sort matches. If the sort order and group_sizes disagree — a stale count, an off-by-one boundary, or non-contiguous groups — the op still returns a full-size, correctly-shaped result while multiplying some tokens by the wrong expert. No crash, just scrambled routing and quietly worse quality. You check that sum(group_sizes) equals the token count and that the sort order and group boundaries come from the same routing decision. Router-weight scale, capacity_factor, and "wrong gradients by design" all miss the actual bug: an accounting mismatch between the sort and the group sizes.'},
  {q:'3. Switch Transformer\'s auxiliary load-balancing loss is <code>L_aux = alpha * N * sum(f_i * P_i)</code>. What does this loss achieve, and what happens without it?',
   opts:['It guarantees zero dropped tokens under any capacity factor','It speeds up the router\'s softmax computation','It discourages router collapse onto a small subset of experts by penalizing uneven distributions of both dispatched-token fraction (f_i) and router-probability mass (P_i), so without it training tends to concentrate traffic on a few "rich-get-richer" experts','It replaces the need for a capacity factor entirely'],
   ans:2, fb:'Right. The loss is minimized when f_i and P_i are both uniform (1/N each); without it, a positive feedback loop (better-trained experts get more traffic, get even better) causes most experts to go underused.'},

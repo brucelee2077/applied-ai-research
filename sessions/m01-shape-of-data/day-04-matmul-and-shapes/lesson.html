@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-broadcasting-dtypes.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-logs-and-exponents.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+  <a class="lnav prev" href="../day-03-broadcasting-dtypes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
 </nav>
 
   <header class="hero">
@@ -277,6 +277,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p>A <span class="term" data-tip="A dense (fully-connected / linear) layer: it maps inputs to outputs by y = xW + b, a matmul plus a bias.">dense layer</span> is literally <code>y = x @ W + b</code>. Attention is matmuls too: scores <code>= Q @ Kᵀ</code>, then output <code>= scores @ V</code>. Matmul is where almost all the <span class="term" data-tip="Floating-point operations — a count of the multiply/add work a computation does. Roughly 2·m·k·n for an (m,k)@(k,n) matmul.">FLOPs</span> go, which is exactly why the compute formula <code>C ≈ 6ND</code> (that you'll meet in the scaling-law modules) is really a matmul count — and why GPUs and TPUs are, at heart, giant matmul machines.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> a layer is a matmul → matmul dominates the FLOPs → chips are built to do matmuls fast → the whole scaling story becomes "how many matmuls can you afford." And the most common runtime crash in ML is a matmul with mismatched inner dims.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A mismatched matmul crashes loudly, which is easy to fix. The dangerous matmul bug is the one where the shapes happen to line up but the math is wrong — no crash, no error, just quietly wrong numbers.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a legal matmul that computes the wrong thing (a bug that doesn't announce itself).</b> Two traps. First, writing <code>*</code> when you meant <code>@</code>: with a bias vector <code>(features,)</code> and an activation <code>(batch, features)</code>, <code>*</code> does not error — it broadcasts an element-wise multiply and returns the right-shaped array full of wrong numbers. Second, matmul on a <strong>square</strong> weight, or feeding the un-transposed operand: <code>A @ B</code> and a wrongly-oriented version can both have legal inner dims, so both run, but only one is the layer you meant. A senior engineer catches this in <b>code review</b> by checking that <code>@</code> (not <code>*</code>) is used for layers and by tracing one <code>result[i, j]</code> against "row <code>i</code> of A dotted with column <code>j</code> of B" — if that dot product isn't the quantity you wanted, the orientation is wrong even though the shape is fine.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batching more matmul work vs. memory and latency.</b> Because matmul is where almost all the FLOPs go, chips run it fastest when you hand them big matrices at once — larger batches and wider layers keep the hardware busy and cost less per number. What you pay: bigger matmuls need more memory for their inputs and outputs, and a single huge matmul finishes later than a small one, so interactive latency suffers. In a <b>design review</b> this is the batch-size decision — trade throughput (fill the matmul units) against memory budget and response time.</div></div>
       <button class="gotit" type="button">Got the rule</button>
     </div>
   </section>
@@ -286,8 +291,8 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">From one dot product to a neural-net layer — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>Here is matmul built one step at a time. First, <strong>play with the live tool</strong> below — set the shapes and click a result cell to see the exact dot product that fills it. Then <strong>scroll down slowly</strong> through the static build underneath, where each piece fades in with a short note. By the bottom you'll read any matmul shape and see the layer hiding inside it.</p>
-      <div class="build-embed"><iframe src="../viz/matmul.html" title="Interactive matrix multiply" loading="lazy"></iframe>
-      <div class="cap">↑ interactive — drag the m, k, n sliders and click a cell of C. <a href="../viz/matmul.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
+      <div class="build-embed"><iframe src="../../viz/matmul.html" title="Interactive matrix multiply" loading="lazy"></iframe>
+      <div class="cap">↑ interactive — drag the m, k, n sliders and click a cell of C. <a href="../../viz/matmul.html" target="_blank" rel="noopener">open full screen ↗</a></div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -310,21 +315,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Multiply a few matrices and build a layer yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m04_matmul.py</code>. Multiply a <code>(2,3)</code> by a <code>(3,2)</code> with <code>@</code> and print the result's shape; try a mismatched <code>(2,3) @ (2,3)</code> in a <code>try/except</code> and print the error; build a dense layer <code>x @ W + b</code> with <code>x</code> shape <code>(1,3)</code> and <code>W</code> shape <code>(3,4)</code>; and show that <code>@</code> and <code>*</code> give different results. Run it with <code>python3 m04_matmul.py</code>.</p>
+      <p>Create <code>sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py</code>. Multiply a <code>(2,3)</code> by a <code>(3,2)</code> with <code>@</code> and print the result's shape; try a mismatched <code>(2,3) @ (2,3)</code> in a <code>try/except</code> and print the error; build a dense layer <code>x @ W + b</code> with <code>x</code> shape <code>(1,3)</code> and <code>W</code> shape <code>(3,4)</code>; and show that <code>@</code> and <code>*</code> give different results. Run it with <code>python3 sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 1 Day 4 artifact.
 
-Create experiments/foundations/m04_matmul.py that, with a comment on each step:
+Create sessions/m01-shape-of-data/day-04-matmul-and-shapes/experiment.py that, with a comment on each step:
 1. Makes A (2,3) and B (3,2); prints (A @ B).shape (expect (2,2)) and the result, noting the inner 3 matched and vanished.
 2. Wraps A @ np.ones((2,3)) in try/except and prints the shape-mismatch error (inner 3 vs 2).
 3. Builds a dense layer: x (1,3), W (3,4), b (4,); prints (x @ W + b) and its shape (1,4), with a comment 'this is a neural-net layer'.
 4. Shows @ vs *: print A @ B (matmul) and A * A (element-wise) to make the difference obvious.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f1/day-04-log.md</code>: in your own words, why must the inner dimensions match?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-04-matmul-and-shapes/log.md</code>: in your own words, why must the inner dimensions match?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -338,9 +343,9 @@ Then run it and paste the output at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-broadcasting-dtypes.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-logs-and-exponents.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
+  <a class="lnav prev" href="../day-03-broadcasting-dtypes/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Broadcasting &amp; dtypes</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-logs-and-exponents/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Logs &amp; Exponents</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -458,9 +463,9 @@ var QS=[
  {q:'3. A dense (linear) layer computes:',
   opts:['y = x * W (element-wise)','y = x @ W + b (a matmul plus a bias)','y = x + W','y = W only'],
   ans:1, fb:'Right. y = x @ W + b — a matmul that maps inputs to outputs, plus a broadcast bias.'},
- {q:'4. In NumPy, how do <code>@</code> and <code>*</code> differ?',
-  opts:['They are the same','@ is matmul (rows × columns); * is element-wise','@ only works on 1-D arrays','* is matmul; @ is element-wise'],
-  ans:1, fb:'Right. @ does matrix multiplication; * multiplies element by element. Mixing them up is a classic bug.'}
+ {q:'4. A teammate\'s layer runs with no error and the output has the shape they expected, but the model never learns — loss barely moves. You look at the layer and see <code>y = x * W + b</code> where <code>x</code> is <code>(batch, features)</code> and <code>W</code> is also <code>(batch, features)</code>. Where do you look first, and why?',
+  opts:['The learning rate — a stuck loss is always an optimizer problem','The <code>*</code>: it does an element-wise multiply (broadcasting), not the matmul a layer needs, so the shape looks right but every output is the wrong quantity','The dtype — element-wise vs matmul is only a precision issue','Nothing is wrong; <code>*</code> and <code>@</code> are interchangeable when shapes match'],
+  ans:1, fb:'Right. <code>*</code> multiplies element by element and broadcasts, so <code>x * W</code> can produce a plausibly-shaped array without ever mixing features the way <code>x @ W</code> does. A real dense layer is <code>y = x @ W + b</code>. The shape check passes, so the bug is silent — you catch it by confirming the operator is <code>@</code>, not <code>*</code>, before blaming the optimizer.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

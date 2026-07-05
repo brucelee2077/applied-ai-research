@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-mathematical-discovery-funsearch.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-evolutionary-prompts-evoprompt.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
+  <a class="lnav prev" href="../day-07-mathematical-discovery-funsearch/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-evolutionary-prompts-evoprompt/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
 </nav>
 
 
@@ -296,6 +296,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Self-improvement.</strong> The symbolic half teaches the neural half the one creative move the symbolic half can never invent. Together they solved 25 of 30 recent IMO geometry problems, near a gold medalist.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> no human data → generate random diagrams → engine finds true theorems → traceback isolates the needed aux point → (problem → aux) pairs train the Transformer → the trained Transformer feeds good guesses back into the solving loop.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The symbolic engine guarantees no false <em>proof</em> can ever slip out — but nothing guarantees the <em>training labels</em> that teach the neural half are correct.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): traceback mislabeling poisons the training data.</b> The proofs stay sound — a wrong guess just wastes a step, it can never produce a false theorem. The quiet danger is one layer back, in data generation. Traceback is supposed to prune each proof to only the points it actually used, so any used point not in the givens becomes the "needed auxiliary construction" label. If that pruning is loose — it keeps a point the proof did not really depend on — you label a non-auxiliary point as a needed construction. The pipeline runs fine and every proof is still valid, but the Transformer now trains on wrong (problem → aux) pairs and slowly learns to propose useless constructions. You see it only as a mysteriously weaker guesser, never as an error. A senior engineer catches this in <b>code review</b> by testing the traceback on proofs with a known minimal dependency set and confirming the pruned set matches exactly — no extra points kept, none dropped.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: neuro-symbolic soundness vs. a pure neural prover's flexibility.</b> Routing every deduction and the final check through the symbolic engine buys an absolute guarantee — no false proof is possible — but it confines the system to a domain the symbolic engine can express and verify (here, a fixed set of geometry rules), and the whole thing stalls the moment a needed move is one the engine cannot represent. A pure neural prover would generalize to far more kinds of problems, but it can emit confident, wrong "proofs." In a <b>design review</b> this is the core decision: pay in generality to make unsound output structurally impossible, or pay in trust to gain reach.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -335,13 +340,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>pytest test_alphageometry_loop.py</code> passes: closure determinism, engine-alone fails on the aux-requiring theorem, loop succeeds with aux, traceback prunes ≥1 unused premise.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week20_alphageometry/alphageometry_loop_sim.py</code> (plus <code>README.md</code> and <code>test_alphageometry_loop.py</code>) with the bullets above.</p>
+      <p>Create <code>sessions/m26-adrs/day-08-formal-theorem-proving-alphageometry/experiment.py</code> (plus <code>README.md</code> and <code>test_alphageometry_loop.py</code>) with the bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 20 Day 2 artifact.
 
-Create experiments/week20_alphageometry/alphageometry_loop_sim.py (plus README.md and test_alphageometry_loop.py in the same folder) that simulates the AlphaGeometry neuro-symbolic loop on a toy geometry domain (no GPU, no real solver):
+Create sessions/m26-adrs/day-08-formal-theorem-proving-alphageometry/experiment.py (plus README.md and test_alphageometry_loop.py in the same folder) that simulates the AlphaGeometry neuro-symbolic loop on a toy geometry domain (no GPU, no real solver):
 1. A tiny rule-based deduction engine over a handful of angle/parallel/midpoint rules that runs to deductive closure (fixed point). It must be deterministic: same premises -> identical fact set. Print the fact count.
 2. A stub auxiliary-construction proposer (a hardcoded/heuristic list) standing in for the Transformer.
 3. The outer loop that alternates engine-run and aux-proposal until the goal is derived or a budget runs out.
@@ -357,7 +362,7 @@ Acceptance:
 Run everything to confirm it works.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to internalize:</b> if you FORGET the traceback/pruning step and train on the full unpruned proof, you feed the model many irrelevant premises and never isolate which added point was the necessary auxiliary construction. The model learns noise, and the whole "no human demonstrations" trick collapses. Traceback is what turns raw theorems into clean (problem → aux) labels.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-20/day-02-log.md</code>: in your loop, which part is allowed to be "creative but sometimes wrong," and which part must be "boring but always correct" — and why that split makes the final proofs trustworthy.</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m26-adrs/day-08-formal-theorem-proving-alphageometry/log.md</code>: in your loop, which part is allowed to be "creative but sometimes wrong," and which part must be "boring but always correct" — and why that split makes the final proofs trustworthy.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -371,9 +376,9 @@ Run everything to confirm it works.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-mathematical-discovery-funsearch.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-evolutionary-prompts-evoprompt.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
+  <a class="lnav prev" href="../day-07-mathematical-discovery-funsearch/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-evolutionary-prompts-evoprompt/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -502,9 +507,9 @@ var QS=[
  {q:'2. Why did DeepMind use synthetic data instead of human-written proofs to train the language model?',
   opts:['Human proofs were too long to fit in the context window','There is almost no large corpus of formal, machine-checkable geometry proofs to learn from','Synthetic data is cheaper to store than human data','Human proofs contained too many errors to be trusted'],
   ans:1, fb:'Formal geometry proofs are scarce, so they generated ~100M proofs by exploring random diagrams with the symbolic engine.'},
- {q:'3. What does the "traceback" (dependency pruning) step accomplish during data generation?',
-  opts:['It reverses the proof so the model reads it backward','It keeps only the premises actually used, and any used point not in the original givens becomes a labeled auxiliary construction','It deletes theorems that are too easy to prove','It checks the proof for numerical rounding errors'],
-  ans:1, fb:'Pruning to the minimal proof exposes which added points were necessary — those are the aux-construction labels the LM learns.'},
+ {q:'3. Your AlphaGeometry-style pipeline runs cleanly and every generated proof is valid, but over time the trained Transformer proposes more and more useless auxiliary constructions and the solver gets weaker. The symbolic engine never emitted a false proof. Where do you look first, and why?',
+  opts:['The symbolic engine must have a soundness bug, so re-verify its deduction rules','The traceback (dependency pruning): if it keeps points the proof did not actually depend on, those get mislabeled as "needed auxiliary constructions," poisoning the (problem -> aux) training pairs — verify the pruned dependency set matches the true minimal set exactly','The Transformer\'s context window is too small, so shrink the diagrams','Nothing is wrong — valid proofs guarantee a strong guesser'],
+  ans:1, fb:'Right. Soundness is safe: a wrong guess only wastes a step, so no false proof can escape — that is not the failure here. The damage is one layer back in data generation. Traceback creates the labels by pruning each proof to the points it actually used; if it keeps an extra, unused point, that point is falsely labeled a needed construction, and the model trains on wrong (problem -> aux) pairs. The symptom is a quietly weaker guesser, never an error. First move: test traceback against proofs with a known minimal dependency set and confirm an exact match.'},
  {q:'4. The symbolic engine reaches its "deductive closure" but the goal is still unproven. What does this indicate?',
   opts:['The theorem is false','The Transformer made a bad prediction','A proof likely requires an auxiliary construction the engine cannot invent on its own','The engine hit a numerical precision limit in Gaussian elimination'],
   ans:2, fb:'Closure means no more facts follow from the current points; needing more implies a new construction must be introduced by the language model.'}

@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-minibatch-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Mini-Batch Loop</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-pytorch-version.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
+  <a class="lnav prev" href="../day-03-minibatch-loop/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-pytorch-version/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
 </nav>
 
   <header class="hero">
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why labs care</h4>
       <p>The loss curve is the primary dashboard for every training run, from this MLP to a giant LLM — engineers stare at it for days. And overfitting never goes away; it just changes shape. Dropout, weight decay, and early stopping are the everyday tools that keep big models honest.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The habit:</b> always watch validation loss, not just training loss. The moment the two diverge is the moment your model stops learning the task and starts memorizing the answers.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Dropout has one on/off switch you must flip at the right time, and one knob that trades stability for capacity.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dropout left on at test time.</b> This is a bug that doesn't announce itself. Dropout should run <em>only</em> during training; at test time every neuron must be used. If you forget to switch it off, the model keeps randomly zeroing neurons while you evaluate — so its answers become random and its test accuracy is quietly lower and jittery from run to run, with no error. The matching trap is the scaling: if you drop neurons but forget to divide the survivors by <code>(1 - p)</code>, the average signal into the next layer shrinks, so train and test behave differently even when the switch is right. A senior engineer in <b>code review</b> checks that evaluation flips dropout off (in a framework, <code>model.eval()</code>) and that the <code>(1 - p)</code> scaling is present.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: dropout rate — less overfitting vs. slower learning.</b> A higher <code>p</code> (say 0.5) forces more robustness and fights overfitting harder, but it throws away more signal each step, so training is noisier and slower to converge. A lower <code>p</code> (say 0.1) trains fast but regularizes weakly. In a <b>design review</b> you tune <code>p</code> to the size of the train-vs-validation gap: reach for more dropout only when that gap is actually growing, not by default.</div></div>
       <button class="gotit" type="button">Got curves and dropout</button>
     </div>
   </section>
@@ -298,7 +303,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Feel the descent, then read the curve — scroll, don't click</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>First, play with gradient descent itself — drag the controls and watch a ball roll downhill toward the lowest loss. That downhill roll is what every training step is doing.</p>
-      <div class="build-embed"><iframe src="../viz/gradient-descent.html" title="interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
       <p>Now here is the loss-curve story and dropout, built one step at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
@@ -322,21 +327,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Train on MNIST, plot the two loss curves, and see dropout shrink the gap — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05_training_dropout.py</code>. Train the 784→128→10 MLP on MNIST with your Day-3 loop. Record training loss and validation loss each epoch and plot both curves (save the figure). Then add dropout with <code>p = 0.2</code> on the hidden layer, retrain, and compare the train-vs-validation gap before and after. Run with <code>python3 m05_training_dropout.py</code>.</p>
+      <p>Create <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py</code>. Train the 784→128→10 MLP on MNIST with your Day-3 loop. Record training loss and validation loss each epoch and plot both curves (save the figure). Then add dropout with <code>p = 0.2</code> on the hidden layer, retrain, and compare the train-vs-validation gap before and after. Run with <code>python3 sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 4 artifact.
 
-Create experiments/foundations/m05_training_dropout.py that, with a comment on each step, trains the 2-layer MLP on MNIST and studies the loss curve (NumPy, reuse the Day 2-3 code):
+Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py that, with a comment on each step, trains the 2-layer MLP on MNIST and studies the loss curve (NumPy, reuse the Day 2-3 code):
 1. Trains for several epochs, recording BOTH training loss and validation loss (on a held-out split) each epoch.
 2. Plots the two loss curves on one figure and saves it; prints where the validation loss stops improving (the overfitting turn).
 3. Adds dropout with p=0.2 on the hidden activations during training only (mask + scale by 1/(1-p)); turns it off at eval time.
 4. Retrains and prints the train-vs-validation gap with and without dropout, showing the gap shrinks with dropout.
 Then run it and paste the two gaps at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-04-log.md</code>: at which epoch did validation loss stop improving, and how much did dropout shrink the train-vs-validation gap?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md</code>: at which epoch did validation loss stop improving, and how much did dropout shrink the train-vs-validation gap?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -350,9 +355,9 @@ Then run it and paste the two gaps at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-minibatch-loop.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Mini-Batch Loop</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-pytorch-version.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
+  <a class="lnav prev" href="../day-03-minibatch-loop/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-pytorch-version/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Same Model in PyTorch</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -464,9 +469,9 @@ var QS=[
  {q:'3. What does dropout do during training?',
   opts:['adds more neurons','randomly switches off a fraction of neurons each step','removes the loss function','makes the batch bigger'],
   ans:1, fb:'Right. It zeros a random subset of neurons each step, so the network cannot over-rely on any single one.'},
- {q:'4. At test time, dropout is:',
-  opts:['turned on with a higher rate','turned off — all neurons are used','applied twice','the same as training'],
-  ans:1, fb:'Right. Dropout runs only during training; at test time every neuron is used, and the /(1-p) scaling keeps signals matched.'}
+ {q:'4. Training looks healthy, but your test accuracy is lower than expected and changes by a percent or two every time you re-run evaluation on the same fixed test set. Where do you look first?',
+  opts:['collect a bigger test set','check that dropout is switched off at test time (e.g. model.eval()) — if it stays on, neurons are still randomly zeroed during evaluation, so answers vary run to run and accuracy drops','increase the dropout rate p','train for more epochs'],
+  ans:1, fb:'Right. Evaluation on a fixed test set should be deterministic. Randomness between runs is the fingerprint of dropout (or another train-only randomness) still active at test time. Switch it off for evaluation so every neuron is used, and make sure the /(1-p) scaling kept the training-time signal matched. Nothing errors, which is why this one bites so many beginners.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

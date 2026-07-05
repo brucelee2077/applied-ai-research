@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-memory-wall.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Memory Wall</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-serving-llama3-tpus.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Serving LLaMA 3 on TPUs</span></a>
+  <a class="lnav prev" href="../day-02-memory-wall/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Memory Wall</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-serving-llama3-tpus/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Serving LLaMA 3 on TPUs</span></a>
 </nav>
 
 
@@ -289,6 +289,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Pope et al. (2022)</strong> show that at realistic batch sizes and context lengths, the KV cache can <em>exceed</em> the model's own weight size — which is why MQA (Shazeer, 2019) and GQA (Ainslie et al., 2023) redesign attention itself to shrink it.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> decode reloads all weights every step (Tuesday's memory wall) → batching amortizes that fixed cost across <code>B</code> sequences (cheap throughput, up to the ridge point <code>B*</code>) → but each of those <code>B</code> sequences needs its own growing KV cache → cache competes with weights for the same HBM → MQA/GQA shrink the cache so you can push <code>B</code> further.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Batching turns one dial (batch size <code>B</code>) that quietly pulls two levers in opposite directions — throughput up, per-user latency down. The two things below are what a staff engineer watches for once batching goes into a real serving loop.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a continuous-batching stall from one slow request.</b> Production servers use <span class="term" data-tip="A serving loop that adds new requests to and removes finished ones from the running batch every step, instead of waiting for a whole fixed batch to finish.">continuous batching</span> — new requests join the running batch every step, finished ones leave. Because every sequence in the batch must step together, the batch can only advance as fast as its slowest member. Nothing errors: if one request is generating a very long answer, or a large new prompt arrives and its <em>prefill</em> is scheduled into the same step, every other user's decode freezes for that step. Your average tokens/sec still looks healthy while the <span class="term" data-tip="The 95th/99th percentile of latency — the slow tail that a small fraction of users actually feel.">tail latency</span> (p95/p99) quietly blows past the target. In <b>code review</b>, a senior engineer asks whether prefill and decode share the same batch step, and whether the scheduler chunks or separates long prefills so one request cannot stall the whole batch.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batch size trades per-user latency for total throughput.</b> Raising <code>B</code> toward the ridge point <code>B*</code> amortizes the weight load over more tokens, so total tokens/sec (and cost-per-token) improves — but every user now waits for a bigger batch to assemble and to step forward together, so each user's time-to-first-token and time-per-token get worse, and the bigger <code>B</code> also enlarges the KV cache that competes for HBM. In a <b>design review</b> this is the central dial: an interactive chat product caps <code>B</code> (and reserves KV headroom) to protect latency, while an offline bulk-generation job pushes <code>B</code> up to <code>B*</code> to minimize cost. Same model, opposite settings.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -328,20 +333,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Print a summary table: batch size, step time, tokens/sec throughput, KV cache size, and whether memory- or compute-bound.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week06_jax/day3_batching_economics.py</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m16a-inference-economics/day-03-batching-economics/experiment.py</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 6 Day 3 artifact.
 
-Create experiments/week06_jax/day3_batching_economics.py that:
+Create sessions/m16a-inference-economics/day-03-batching-economics/experiment.py that:
 1. Implements step_time(batch_size, params, bytes_per_param, hbm_bandwidth, peak_flops) returning max(t_load, t_compute), where t_load = weight_bytes/hbm_bandwidth (weight_bytes = params*bytes_per_param) and t_compute = 2*params*batch_size/peak_flops. Also implement kv_cache_bytes(n_layers, n_kv_heads, head_dim, batch, seq_len, bytes_per_param) = 2*n_layers*n_kv_heads*head_dim*batch*seq_len*bytes_per_param.
 2. Sweeps batch size 1,2,4,...,1024 for a 7B bf16 model (bytes_per_param=2, hbm_bandwidth=1.2e12, peak_flops=200e12) and plots step time vs. batch size, with a vertical line at the computed crossover B* = weight_bytes*peak_flops/(hbm_bandwidth*2*params), showing the flat memory-bound region then the linear compute-bound region.
 3. Produces a second plot (or printed table) of KV cache size vs. batch size for MHA (n_kv_heads=48), GQA (n_kv_heads=8 and 4), and MQA (n_kv_heads=1) on PaLM-540B's config (118 layers, head_dim=256, seq_len=2048, bytes_per_param=2), marking where the KV cache crosses the model's own weight size (540e9*2 bytes).
 4. Prints a summary table: batch size, step time, tokens/sec throughput, KV cache size, and whether memory- or compute-bound.
 Add a brief comment on each step explaining the roofline logic, then run it to confirm the plots and printed B* match the closed-form formulas.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-06/day-03-log.md</code>: for a GQA/MQA model like Llama-2-70B, why would plugging in the query-head count instead of <code>num_key_value_heads</code> into the KV cache formula overestimate the cache size — and by how much?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-03-batching-economics/log.md</code>: for a GQA/MQA model like Llama-2-70B, why would plugging in the query-head count instead of <code>num_key_value_heads</code> into the KV cache formula overestimate the cache size — and by how much?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -355,9 +360,9 @@ Add a brief comment on each step explaining the roofline logic, then run it to c
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-memory-wall.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Memory Wall</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-serving-llama3-tpus.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Serving LLaMA 3 on TPUs</span></a>
+  <a class="lnav prev" href="../day-02-memory-wall/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Memory Wall</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-serving-llama3-tpus/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Serving LLaMA 3 on TPUs</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

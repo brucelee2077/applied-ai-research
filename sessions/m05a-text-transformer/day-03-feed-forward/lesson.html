@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-layer-norm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-full-block.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Decoder Block</span></a>
+  <a class="lnav prev" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-full-block/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Block</span></a>
 </nav>
 
   <header class="hero">
@@ -298,6 +298,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>Why it matters — the muscle of the transformer</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the FFN holds most of a transformer's weights — often two thirds of them. Attention decides who talks to whom; the FFN is where the model actually stores and applies most of what it has learned. In real models the activation is often GELU or SwiGLU instead of ReLU, but the widen-filter-narrow shape is the same.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The FFN is the model's memory, and its power comes entirely from one small nonlinear step in the middle — and from how wide you make that middle.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the activation goes missing and the FFN collapses to one linear layer.</b> The whole point of <code>ReLU(x · W1) · W2</code> is the ReLU in the middle. If you drop it (or leave a placeholder that just passes numbers through), you get <code>(x · W1) · W2</code>, which is mathematically the same as multiplying by one single matrix. Nothing crashes — the shapes are identical and the code runs — but two layers are now doing the work of one, so the model quietly loses most of its capacity and plateaus at a worse loss you cannot explain from the numbers. A senior engineer in <b>code review</b> confirms a real nonlinearity sits <em>between</em> the two linear layers, because two stacked linears with nothing between them are secretly just one.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: d_ff width buys capacity but dominates the compute and memory bill.</b> The middle size <code>d_ff</code> (usually <code>4 × d_model</code>) is where most of the model's parameters and matmul FLOPs live. Making it wider gives the model more room to store and combine features, but it grows the parameter count and the per-token compute faster than almost any other knob. In a <b>design review</b> the FFN width is the main lever for trading model quality against training cost and inference latency — which is also why sparse mixture-of-experts replaces one wide FFN with many, activating only a few per token.</div></div>
       <button class="gotit" type="button">Got how the FFN works</button>
     </div>
   </section>
@@ -329,21 +334,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the feed-forward layer to yourself with a tiny experiment. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05a_ffn.py</code>. Write <code>feed_forward(x, W1, b1, W2, b2)</code> that does <code>hidden = maximum(0, x @ W1 + b1)</code> then <code>hidden @ W2 + b2</code>. Use <code>d_model = 4</code> and <code>d_ff = 16</code>. Feed in a tiny sequence of shape <code>(3, 4)</code> and print the shape at every step to confirm it goes 4 → 16 → 4. Run with <code>python3 m05a_ffn.py</code>.</p>
+      <p>Create <code>sessions/m05a-text-transformer/day-03-feed-forward/experiment.py</code>. Write <code>feed_forward(x, W1, b1, W2, b2)</code> that does <code>hidden = maximum(0, x @ W1 + b1)</code> then <code>hidden @ W2 + b2</code>. Use <code>d_model = 4</code> and <code>d_ff = 16</code>. Feed in a tiny sequence of shape <code>(3, 4)</code> and print the shape at every step to confirm it goes 4 → 16 → 4. Run with <code>python3 m05a_ffn.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5a Day 3 artifact.
 
-Create experiments/foundations/m05a_ffn.py that, with a comment on each step, shows the position-wise feed-forward layer widens then narrows:
+Create sessions/m05a-text-transformer/day-03-feed-forward/experiment.py that, with a comment on each step, shows the position-wise feed-forward layer widens then narrows:
 1. Defines feed_forward(x, W1, b1, W2, b2) = (maximum(0, x @ W1 + b1)) @ W2 + b2.
 2. Uses d_model=4, d_ff=16, and a sequence x of shape (3, 4); prints the shape after expand (should be (3,16)), after ReLU, and after compress (back to (3,4)).
 3. Confirms every token is processed with the SAME W1, W2 (position-wise) by checking that permuting the tokens permutes the output the same way.
 4. Prints how many parameters the FFN has (W1, b1, W2, b2 counts).
 Then run it and paste the shapes and the parameter count at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f6/day-03-log.md</code>: what were the three shapes (4 → ? → 4), and how many parameters did the FFN have?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-03-feed-forward/log.md</code>: what were the three shapes (4 → ? → 4), and how many parameters did the FFN have?</div></div>
       <button class="gotit" type="button">Done — on to Day 4</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Then run it and paste the shapes and the parameter count at the bottom as a comm
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-layer-norm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-full-block.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Decoder Block</span></a>
+  <a class="lnav prev" href="../day-02-layer-norm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Layer Normalization</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-full-block/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Full Block</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -469,9 +474,9 @@ var QS=[
  {q:'3. Why does the FFN widen then narrow?',
   opts:['to save memory','the wider middle gives more room to combine features before packing back to the original size','to delete tokens','to add positions'],
   ans:1, fb:'Right. The wide hidden size (usually 4× d_model) is scratch space; the output is compressed back to d_model so it fits the block.'},
- {q:'4. Where do most of a transformer\'s weights live?',
-  opts:['in the attention scores','in the feed-forward layers','in the softmax','in the positional encoding'],
-  ans:1, fb:'Right. The FFN often holds around two thirds of the parameters — it is where most learned knowledge is stored.'}
+ {q:'4. Your FFN code runs fine and shapes all match, but the model trains to a clearly worse loss than expected and adding more FFN layers barely helps. Where do you look first?',
+  opts:['the batch size, since a small batch always caps the loss','whether a real nonlinearity (ReLU/GELU) actually sits between the two linear layers — without it, W1 then W2 collapses into a single linear map and the FFN loses most of its power','the random seed','the file encoding of the dataset'],
+  ans:1, fb:'Right. The FFN needs a nonlinearity between its two linear layers. If it is missing or is a no-op, (x·W1)·W2 is mathematically just one matrix multiply, so two layers do the work of one and capacity quietly disappears — with no error and matching shapes. That is exactly the silent bug a code review catches by checking the activation is really there between the linears.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

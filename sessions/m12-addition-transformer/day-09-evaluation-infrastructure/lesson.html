@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-09/day-06-training-loop-baseline-training.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline Training</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-profiling-step-time.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
+  <a class="lnav prev" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Speed is a real constraint</strong> — AR decoding is sequential (one token at a time), unlike the fully parallel teacher-forced forward pass, so you must know its wall-clock cost before deciding how often to run it during training.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> teacher-forced loss hides error compounding → AR exact-match reveals it → pytest + parametrize turns that into one reliable, repeatable number per digit length → pytest-benchmark confirms you can afford to collect it often enough to fit a scaling law.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole point of this eval is to measure what deployment will actually do — and the way it goes wrong is by measuring something that looks like that but isn't.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a "decode loop" that peeks at the true answer.</b> It is easy to write an evaluation that <em>looks</em> autoregressive but, at each step, slices the next token out of the true target array instead of the model's own previous prediction. It runs, it reports high accuracy, and there is no error — but it is just teacher forcing wearing a costume. The error cascade that appears in real generation is completely hidden, so you ship a model that scores 99% in eval and fails on long sums in production. A senior engineer catches this in <b>code review</b> with one test: corrupt the target array to garbage and re-run the decode; a genuinely autoregressive loop produces the exact same generated digits, because it never reads the targets. If the output changes, the loop is peeking.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: honest AR eval is slow eval.</b> Teacher-forced loss is one parallel forward pass and is cheap to compute every step. True autoregressive exact-match must decode one token at a time — sequential, and far slower — but it is the only number that matches deployment. You cannot afford to run full AR eval after every training step, so the <b>design-review</b> decision is the cadence: how often (every N steps, or only on a subset of checkpoints and digit-length buckets) to pay for the honest metric versus lean on the cheap proxy in between. <code>pytest-benchmark</code> exists to make that cost a measured number, not a guess.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -327,13 +332,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>At least one retained teacher-forced-loss test, kept explicitly as a contrast baseline — not as the pass/fail gate.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week10_jax/test_addition_eval.py</code> with the five bullets above, plus a <code>pytest-benchmark</code> test for <code>autoregressive_decode</code>.</p>
+      <p>Build <code>sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py</code> with the five bullets above, plus a <code>pytest-benchmark</code> test for <code>autoregressive_decode</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 10 Day 1 artifact.
 
-Create experiments/week10_jax/test_addition_eval.py that:
+Create sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py that:
 1. Has a fixture that loads/builds a trained addition-transformer checkpoint and exposes params + apply_fn.
 2. Has a make_eval_batch(num_digits, n) fixture/helper returning tokenized prompts ("123+456=") and true target digit sequences ("579"), stratified across digit-length buckets [1, 2, 4, 8, 12, 16, 20].
 3. Implements a pure-JAX autoregressive_decode(state, prompts, max_new_tokens) that, at each step, takes argmax of the logits at the last position, appends that PREDICTED token (never the ground-truth token) to the running sequence, and feeds the extended sequence back in. JIT-compile it with a static max sequence length.
@@ -341,10 +346,10 @@ Create experiments/week10_jax/test_addition_eval.py that:
 5. Keeps a separate test_teacher_forced_loss test as a sanity-check baseline, explicitly not the pass/fail gate — used only to report the gap between teacher-forced loss and AR accuracy.
 6. Adds a test_generation_speed test using the pytest-benchmark `benchmark` fixture to time autoregressive_decode on a fixed batch.
 7. Adds an explicit unit test that corrupts the ground-truth targets array before decoding and asserts the generated output is unaffected — proving the decode loop never reads targets after the prompt.
-Run pytest experiments/week10_jax/test_addition_eval.py -v and pytest ... --benchmark-only --benchmark-json=experiments/week10_jax/reports/eval_bench.json to confirm it works, then write the metric contract ("strict digit-by-digit AR exact-match accuracy, stratified by digit length") into experiments/week10_jax/reports/week10_eval_notes.md.</pre>
+Run pytest sessions/m12-addition-transformer/day-09-evaluation-infrastructure/experiment.py -v and pytest ... --benchmark-only --benchmark-json=sessions/m12-addition-transformer/day-09-evaluation-infrastructure/reports/eval_bench.json to confirm it works, then write the metric contract ("strict digit-by-digit AR exact-match accuracy, stratified by digit length") into sessions/m12-addition-transformer/day-09-evaluation-infrastructure/reports/week10_eval_notes.md.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha to watch for:</b> a decode loop that <em>looks</em> autoregressive but secretly still slices into the ground-truth answer array for each new step. If your "AR accuracy" comes out nearly identical to what teacher-forced loss implied, that's the tell — verify by corrupting the targets array before decoding and confirming the output doesn't change.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-10/day-01-log.md</code>: on your longest digit bucket, how much lower is AR exact-match accuracy than teacher-forced loss would suggest — and what does that gap tell you about carry generalization?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-09-evaluation-infrastructure/log.md</code>: on your longest digit bucket, how much lower is AR exact-match accuracy than teacher-forced loss would suggest — and what does that gap tell you about carry generalization?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -358,9 +363,9 @@ Run pytest experiments/week10_jax/test_addition_eval.py -v and pytest ... --benc
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-09/day-06-training-loop-baseline-training.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline Training</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-profiling-step-time.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
+  <a class="lnav prev" href="../day-08-training-loop-baseline-training/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Training Loop &amp; Baseline</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-10-profiling-step-time/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Profiling the Step Time</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -460,9 +465,9 @@ var QS=[
  {q:'2. In pytest, what is the purpose of <code>@pytest.mark.parametrize</code> in the addition-accuracy test script?',
   opts:['It benchmarks the wall-clock speed of a function automatically','It runs the same test function repeatedly with different input values (e.g. different digit lengths) without duplicating code','It marks a test as expected to fail','It replaces the need for fixtures'],
   ans:1, fb:'Right. parametrize lets one test body run once per parameter set — here, once per digit-length bucket — producing a separate reported result for each.'},
- {q:'3. What does "strict digit-by-digit exact-match accuracy" require for a generated answer to count as correct?',
-  opts:['At least half the digits must match the true sum','The per-token teacher-forced loss must be below a threshold','Every digit in the generated sequence must match the true sum exactly, including getting the total length right','Only the final (units) digit needs to be correct'],
-  ans:2, fb:'Right. Exact-match is an all-or-nothing criterion per example — a single wrong or missing/extra digit anywhere fails that example, which is what makes it a strict, deployment-realistic metric.'},
+ {q:'3. Your AR eval reports 99% exact-match, but the same checkpoint fails visibly on long sums when you type them in by hand. The eval code has no errors. What single test do you run first to find the bug?',
+  opts:['Retrain the model, since a wrong eval always means the weights are bad','Corrupt the true target array to garbage and re-run the decode: if the generated digits change, the loop is secretly reading the targets (teacher forcing in disguise) instead of feeding back its own predictions','Lower the exact-match threshold so more answers count as correct','Run the eval on more examples until the number drops on its own'],
+  ans:1, fb:'Right. A 99% eval that collapses on hand-typed long sums is the fingerprint of a decode loop that peeks at the true answer. The definitive test: replace the targets with garbage and decode again. A genuinely autoregressive loop reads only its own growing output, so it must produce the exact same digits either way; if the output changes, the loop was slicing the next token from the true array and hiding the error cascade. Retraining or loosening the threshold both accept the wrong number instead of fixing how it is measured.'},
  {q:'4. What is the <code>benchmark</code> fixture from pytest-benchmark actually used for in today\'s task?',
   opts:['To measure how accurate the model\'s arithmetic is','To time and calibrate how fast the evaluation/generation code itself runs, so you know if full autoregressive eval is cheap enough to run frequently during training','To automatically fix bugs in the decode loop','To replace assert statements in correctness tests'],
   ans:1, fb:'Right. pytest-benchmark measures wall-clock performance (min/mean/stddev over repeated calibrated runs) of a callable — here it answers an engineering question (eval cost), not a correctness question.'}

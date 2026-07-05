@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-moe-fundamentals.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Fundamentals</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-load-balancing-problem.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Load Balancing Problem</span></a>
+  <a class="lnav prev" href="../day-01-moe-fundamentals/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Fundamentals</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-load-balancing-problem/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Load Balancing Problem</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Production consequence</strong> — Mixtral, DeepSeek-MoE, and Switch-C are all trained on token counts far exceeding what a same-active-size dense model would use, precisely because of this steeper data exponent.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> sparse routing (Day 1) → most expert parameters see only a fraction of tokens → per-parameter training signal is diluted → fitted data exponent effectively steepens → compute-optimal D/N_active ratio rises above the dense ~20-tokens/param rule.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>MoE scaling has one number that everyone mixes up (which "N" goes into the formula) and one temptation that always looks free (just add more experts). Both fail quietly — the run trains fine and only the final quality tells you something was off.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): sizing the token budget from total parameters.</b> If you plan <code>D</code> with the dense ~20-tokens-per-parameter rule but use <code>N_total</code> (all experts) instead of <code>N_active</code> (routed experts), the arithmetic tells you to train on far more tokens than a same-FLOP dense model — which sounds right, so nobody questions it. But the two mistakes can also point the other way: teams reuse a dense token budget for a much larger total-parameter MoE and quietly <em>undertrain</em> it. Either way there is no crash and loss still falls — the sparse capacity just never earns its keep, and the model underperforms a dense baseline at the same active size. In <b>code review</b> a senior engineer checks exactly which parameter count feeds the token-budget calculation, and confirms <code>C ≈ 6 × N_active × D</code> uses active, not total, parameters.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: cheap total parameters bought with expensive data.</b> Adding experts (raising <code>N_total</code>) barely moves per-token FLOPs, so it looks almost free — that is why MoE is called "outrageously large." What you pay is on the data side: because each expert sees only its slice of tokens, the compute-optimal <code>D/N_active</code> ratio is higher than dense, so more experts only pay off if you also scale <code>D</code> up to feed them. In a <b>design review</b> the choice is capacity-per-FLOP versus the data (and data-collection) budget needed to train that capacity to adequacy.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -320,7 +325,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's artifact: a small reproducible JAX experiment that empirically tests the qualitative claim — MoE's compute-optimal token/parameter ratio grows faster than a dense model's as compute budget increases — on a toy scale where full training runs are cheap.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>experiments/week07_jax/moe_scaling_deviation/run_experiment.py</code> trains a small dense transformer and a small top-k routed MoE transformer (matched active-FLOPs budget per step) at 3–4 increasing compute budgets, and fits a two-term power law <code>L ≈ E + B/D^beta</code> separately for dense and MoE runs.</li>
+        <li><code>sessions/m14a-mixture-of-experts/day-02-moe-scaling-deviations/experiment.py</code> trains a small dense transformer and a small top-k routed MoE transformer (matched active-FLOPs budget per step) at 3–4 increasing compute budgets, and fits a two-term power law <code>L ≈ E + B/D^beta</code> separately for dense and MoE runs.</li>
         <li><code>results.csv</code> (or <code>results.json</code>) records final loss per <code>(model_type, N_active, D)</code> triple — at least 2 model types × 3 budgets = 6+ rows.</li>
         <li><code>plot_beta_comparison.png</code> shows a loss-vs-tokens log-log plot for dense vs. MoE, with the fitted beta exponents annotated on the plot — two distinct fitted lines.</li>
         <li><code>writeup.md</code> states the measured <code>beta_dense</code> vs. <code>beta_moe</code>, whether the direction matches Krajewski et al./Feinberg's qualitative claim, and one caveat about how far a toy-scale run can be trusted to reproduce a trillion-parameter-regime finding. A negative or null result is an acceptable, honest outcome — say so if the toy scale is too small to show the effect.</li>
@@ -328,20 +333,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha:</b> never conflate total parameters with active parameters when plugging a number into <code>C ≈ 6ND</code> or comparing an MoE model's size to a dense model's "fairly." A 47B-total-parameter MoE model might have only ~13B active parameters per token — comparing its total count against a 13B dense model's token requirements produces a wildly wrong compute-optimal estimate. Always ask "active or total?" first.</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week07_jax/moe_scaling_deviation/</code> with the four files above using Flax/JAX and a hand-rolled top-k MoE FFN layer.</p>
+      <p>Build <code>sessions/m14a-mixture-of-experts/day-02-moe-scaling-deviations/moe_scaling_deviation/</code> with the four files above using Flax/JAX and a hand-rolled top-k MoE FFN layer.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 7 Day 2 artifact.
 
-Create experiments/week07_jax/moe_scaling_deviation/ containing:
+Create sessions/m14a-mixture-of-experts/day-02-moe-scaling-deviations/moe_scaling_deviation/ containing:
 1. run_experiment.py — trains a small dense transformer and a small top-k routed MoE transformer (same active-FLOPs budget per step, using Flax/JAX with a hand-rolled or flaxformer-style MoE FFN layer) at 3-4 increasing compute budgets (varying steps x active-param count). Fit a two-term power law L ≈ E + B/D^beta separately for the dense runs and the MoE runs.
 2. results.csv — final losses per (model_type, N_active, D) triple, at least 2 model types x 3 compute budgets = 6+ rows.
 3. plot_beta_comparison.png — loss-vs-tokens log-log plot for dense vs MoE with fitted beta exponents annotated, two distinct fitted lines.
 4. writeup.md — 1-2 paragraphs stating the measured beta_dense vs beta_moe, whether the direction matches Krajewski et al./Feinberg's qualitative claim (MoE benefiting more per additional token in the undertrained-token regime), and one caveat about trusting a toy-scale run to reproduce a trillion-parameter-regime finding. A negative/null result is acceptable and must be stated honestly if the toy scale is too small.
 Must run end-to-end on CPU/single-GPU in under ~20 minutes total. Never conflate total parameters with active parameters anywhere in the compute accounting.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-07/day-02-log.md</code>: what was your measured <code>beta_moe</code> vs. <code>beta_dense</code>, and did the direction match the paper's claim?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14a-mixture-of-experts/day-02-moe-scaling-deviations/log.md</code>: what was your measured <code>beta_moe</code> vs. <code>beta_dense</code>, and did the direction match the paper's claim?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -355,9 +360,9 @@ Must run end-to-end on CPU/single-GPU in under ~20 minutes total. Never conflate
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-moe-fundamentals.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Fundamentals</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-load-balancing-problem.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Load Balancing Problem</span></a>
+  <a class="lnav prev" href="../day-01-moe-fundamentals/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Fundamentals</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-load-balancing-problem/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Load Balancing Problem</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -456,9 +461,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. In the compute approximation C ≈ 6ND for a dense transformer, what does "N" represent for an MoE model if you want the approximation to stay accurate?',
-  opts:['Total parameters across all experts','Active parameters used per token (i.e., only the experts actually routed to)','The number of distinct experts in the layer','The router\'s parameter count only'],
-  ans:1, fb:'Right. Only active/routed experts consume FLOPs on a given token, so N in the 6ND approximation must be active parameters, not total parameters — conflating the two is exactly the mistake that hides why MoE needs a different scaling treatment.'},
+ {q:'1. Your MoE (64 experts, top-1, ~400M params each; N_active ≈ 400M, N_total ≈ 25.6B) trains cleanly with falling loss, but its final eval quality lags a dense model of the same active size. Nothing errors. Where do you look first, and why?',
+  opts:['The router softmax temperature — a wrong temperature is the only thing that can hurt final quality','The token budget: check whether D was sized against N_active or accidentally against N_total, since a wrong choice either undertrains the sparse capacity or misallocates compute for MoE\'s steeper data exponent','The GPU count — too few devices always lowers final accuracy','The learning-rate warmup steps — MoE just needs a longer warmup than dense'],
+  ans:1, fb:'Right. The first suspect is the token budget and which parameter count set it. MoE is more data-hungry than a same-active-size dense model, so reusing a dense token/parameter ratio (or sizing D from the wrong N) leaves the sparse capacity undertrained — loss still falls, but the model underperforms its dense-active twin with no error to catch. Router temperature, device count, and warmup can matter, but none of them explain a clean run that simply undertrains its experts; you check the D-vs-N_active accounting first.'},
  {q:'2. According to Chinchilla-style dense scaling laws, at a fixed compute budget C, how should optimal parameters (N) and optimal training tokens (D) scale?',
   opts:['N should scale much faster than D','D should scale much faster than N','Both N and D should scale at roughly the same rate (~C^0.5 each)','N should stay fixed regardless of C'],
   ans:2, fb:'Right. Hoffmann et al. (Chinchilla) found a roughly balanced allocation, both scaling close to the square root of compute, giving the well-known ~20 tokens-per-parameter rule of thumb for dense models.'},

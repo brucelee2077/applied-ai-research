@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-rooflines.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-sharding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sharding Fundamentals</span></a>
+  <a class="lnav prev" href="../day-01-rooflines/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-sharding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sharding Fundamentals</span></a>
 </nav>
 
 
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Fewer moving parts.</strong> A GPU's flexible SMs must be scheduled and fed with general instructions; the MXU's fixed dataflow avoids much of that overhead for its one job.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> AI training is mostly big matmuls → build a chip whose core (the MXU / systolic array) does exactly that op → keep it fed with HBM and bf16 → get high, efficient throughput on the workloads that matter.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A TPU is fast only when the workload is the shape it was built for; feed it the wrong shape and it stays quietly slow with no error at all.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): tiny matmuls that leave the MXU mostly empty.</b> The MXU is a fixed grid — say 128&times;128 cells. If your matrix dimensions are much smaller than the grid (a small batch, a narrow layer, or a per-example loop), the extra cells sit idle but the pass still takes the same number of beats to drain. The code runs and gives correct answers, but you get a small fraction of peak throughput and no warning. In <b>code review</b>, a senior engineer checks that matmul dimensions (especially batch and the contracted dimension) are large multiples of the MXU tile size, and flags per-example or tiny-batch loops that starve the grid.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fixed-function speed vs. flexibility.</b> A GPU's general SMs run almost any code; the MXU only does one op — matrix multiply — extremely well. You gain near-peak efficiency and lower overhead on the matmul-heavy work that dominates transformer training, and you give up the freedom to run irregular, branchy, or non-matmul kernels efficiently. In a <b>design review</b>, this is the choice between a specialized accelerator that wins on your main workload and a general one that never falls off a cliff on the odd operation.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -331,21 +336,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Run it once in <code>fp32</code> and once in <code>bf16</code>; print both times and note which is faster.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week02/tpu_vs_gpu.py</code> (the timing) and a short markdown note next to it with the comparison above.</p>
+      <p>Create <code>sessions/m09a-hardware-physics/day-02-tpu-architecture/experiment.py</code> (the timing) and a short markdown note next to it with the comparison above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 2 Day 2 artifact.
 
-Create experiments/week02/tpu_vs_gpu.py that:
+Create sessions/m09a-hardware-physics/day-02-tpu-architecture/experiment.py that:
 1. Builds two random 1024x1024 matrices with jax.random and computes C = A @ B.
 2. Times the matmul properly: warm up once, then time several runs using (A @ B).block_until_ready() so lazy dispatch does not hide the real work.
 3. Repeats the timing with A and B cast to bfloat16 and prints both the fp32 and bf16 times plus the speedup.
 4. Prints device info (jax.devices()) so it is clear whether it ran on CPU/GPU/TPU.
-Then create experiments/week02/tpu_vs_gpu.md: a short note comparing the MXU (systolic array, purpose-built for matmul) to a GPU SM (general, flexible), and one line each on when each wins.
+Then create sessions/m09a-hardware-physics/day-02-tpu-architecture/tpu_vs_gpu.md: a short note comparing the MXU (systolic array, purpose-built for matmul) to a GPU SM (general, flexible), and one line each on when each wins.
 Add brief comments explaining the systolic-array idea, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-02/day-02-log.md</code>: why did bf16 change the time the way it did — and how does that connect to the MXU and HBM being fed with fewer bytes?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-02-tpu-architecture/log.md</code>: why did bf16 change the time the way it did — and how does that connect to the MXU and HBM being fed with fewer bytes?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -359,9 +364,9 @@ Add brief comments explaining the systolic-array idea, then run it to confirm it
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-rooflines.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-sharding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sharding Fundamentals</span></a>
+  <a class="lnav prev" href="../day-01-rooflines/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Rooflines &amp; Arithmetic Intensity</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-sharding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Sharding Fundamentals</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -459,9 +464,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. What is the <code>MXU</code> at the heart of a TPU?',
-  opts:['A cache that stores model weights','A systolic array: a grid of multiply-accumulate cells that does a big matmul as data flows through','A general-purpose CPU core','A tool for compressing numbers to bf16'],
-  ans:1, fb:'Right. The MXU is a systolic array of multiply-accumulate cells. Data streams through the grid, partial sums build up, and one pass computes a big matmul.'},
+ {q:'1. Your training step gives correct results on the TPU but reports only a small fraction of the chip\'s peak matmul throughput. You are running one example at a time (batch size 1) through narrow layers. Where do you look first, and why?',
+  opts:['Switch to fp32 — bf16 is the reason throughput is low','The matmul dimensions are far smaller than the MXU grid, so most cells sit idle each pass; batch the work so dimensions are large multiples of the tile size','Assume the TPU is broken and file a hardware ticket','Add more layers — a deeper model always uses the MXU better'],
+  ans:1, fb:'Right. The MXU is a fixed grid (for example 128x128). A batch-1 pass through narrow layers fills only a few cells while the rest idle, yet the pass still takes the full number of beats — correct answer, tiny throughput, no error. The fix is to make the matmul dimensions (batch and the contracted dimension) large multiples of the tile size so the grid stays full. Switching to fp32 would make it slower, not faster, and the hardware is fine — the workload shape is the problem.'},
  {q:'2. How does an MXU differ from a GPU <code>SM</code>?',
   opts:['The MXU is slower but uses less power','The MXU is purpose-built for matmul; SMs are general-purpose, flexible cores that run many kinds of math','They are the same thing with different names','SMs can only do matmul; the MXU does everything'],
   ans:1, fb:'Right. The MXU is a fixed dataflow built for one job (matmul). GPU SMs are flexible general cores — great for varied work, more overhead for one repeated op.'},

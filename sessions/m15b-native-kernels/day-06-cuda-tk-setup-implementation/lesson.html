@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-comparative-benchmarking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Comparative Benchmarking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-15/day-01-quantization-theory-int8.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Theory (int8)</span></a>
+  <a class="lnav prev" href="../day-05-comparative-benchmarking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Comparative Benchmarking</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m16a-inference-economics/day-01-inference-mechanics/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M16a · Inference Economics &amp; Language-Assist</span></a>
 </nav>
 
 
@@ -305,6 +305,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>g++-11 + C++20</strong> — TK "runs on concepts," a C++20 feature it uses to type-check tiles at compile time. A pre-C++20 compiler cannot compile the tile types at all.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> pin CUDA 12.8 + g++-11 → TK's C++20 tile types compile → write attention as 16×16 tile ops (<code>mma_AB</code>, <code>exp</code>, <code>sum</code>) → the block template overlaps TMA loads with compute → fast <em>and</em> correct, verified against PyTorch.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The whole kernel hinges on the state tile S being clean at the right moment, and on knowing what linear attention gives up for its O(n) cost.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to <code>zero(S)</code>, so the state carries over.</b> The state tile S is accumulated with <code>mma_AB(S, kᵀ, v, S)</code>. If you skip the <code>zero(S)</code> at the start of a sequence — or reuse the same S buffer across batch items or across kernel launches without resetting it — S still holds leftover <code>kᵀv</code> from a previous sequence. The kernel runs, produces full-shaped output, and it looks reasonable, but every token has silently attended to tokens from an unrelated sequence. There is no crash; only a careful diff against the PyTorch reference exposes it. A senior engineer checks in <b>code review</b> that S is zeroed exactly once per sequence, before the first accumulation, and verifies with a two-sequence test that swapping the order of sequences does not change either result.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: linear attention buys O(n) cost by giving up exact softmax recall.</b> Compressing all past tokens into a fixed d×d state S is what makes cost grow linearly and long contexts affordable. The price is that S is a lossy summary — it cannot represent an arbitrary token-to-token attention pattern the way the full n×n softmax matrix can, so tasks that need precise lookup of a specific earlier token (exact copying, retrieval) can lose quality. In a <b>design review</b> you decide whether the workload tolerates a summarized history, or whether the exact-but-quadratic softmax attention is worth its cost.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -345,14 +350,14 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>The README records exact CUDA/g++/GPU versions, the run command, and the final diff + timing numbers.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create the four files under <code>experiments/w14-thunderkittens/</code>: <code>linear_attn_tk.cu</code> (register/shared tiles, <code>mma_AB</code> to update state S, produce/consume load loop), a <code>Makefile</code> (<code>nvcc -std=c++20 -arch=sm_90a</code>), <code>verify_linear_attn.py</code> (PyTorch reference + diff), and a <code>README.md</code> setup log.</p>
+      <p>Create the four files under <code>sessions/m15b-native-kernels/day-06-cuda-tk-setup-implementation/</code>: <code>linear_attn_tk.cu</code> (register/shared tiles, <code>mma_AB</code> to update state S, produce/consume load loop), a <code>Makefile</code> (<code>nvcc -std=c++20 -arch=sm_90a</code>), <code>verify_linear_attn.py</code> (PyTorch reference + diff), and a <code>README.md</code> setup log.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Day 6 artifact:
 a custom linear-attention CUDA kernel in the ThunderKittens DSL, verified against PyTorch.
 
-Create these files under experiments/w14-thunderkittens/:
+Create these files under sessions/m15b-native-kernels/day-06-cuda-tk-setup-implementation/:
 1. linear_attn_tk.cu — the TK kernel. Use a register tile for q,k,v (16x16 base tiles) and
    carry a state tile S (64x64). ZERO S first, then per token: mma_AB(S, k_transpose, v, S)
    to accumulate k^T v, then mma_AB(out, q, S, out) to read the state. Structure the block
@@ -369,7 +374,7 @@ kernels/gemm/bf16_h100 example (make && make run). Then build mine and run the v
 Remember: zero(S) at the top of the loop, and -arch=sm_90a for Hopper (not sm_80).</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The #1 silent bug:</b> forgetting to <code>zero(S)</code> before the recurrence loop. Register and shared tiles are <em>not</em> auto-zeroed — they hold leftover bits. Skip it and the kernel still compiles and runs, but S starts with garbage: max abs diff jumps to <em>tens or hundreds</em> instead of ~1e-4. The fix is one line. Second most common: wrong arch flag (<code>sm_80</code> for Ampere when TK targets Hopper <code>sm_90a</code>).</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After it passes, write one line in <code>experiments/w14-thunderkittens/README.md</code>: why does correctness (matching PyTorch) matter more than the speedup number? (Hint: a fast wrong kernel is worthless.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After it passes, write one line in <code>sessions/m15b-native-kernels/day-06-cuda-tk-setup-implementation/README.md</code>: why does correctness (matching PyTorch) matter more than the speedup number? (Hint: a fast wrong kernel is worthless.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -383,9 +388,9 @@ Remember: zero(S) at the top of the loop, and -arch=sm_90a for Hopper (not sm_80
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-comparative-benchmarking.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Comparative Benchmarking</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-15/day-01-quantization-theory-int8.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Quantization Theory (int8)</span></a>
+  <a class="lnav prev" href="../day-05-comparative-benchmarking/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Comparative Benchmarking</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../../m16a-inference-economics/day-01-inference-mechanics/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">M16a · Inference Economics &amp; Language-Assist</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -546,9 +551,9 @@ var QS=[
  {q:'3. Why does TK strictly require g++-11 (or newer) and C++20?',
   opts:['Older compilers produce slower machine code','TK relies on C++20 concepts to type-check its tile abstractions at compile time','CUDA 12.8 refuses to install without g++-11','C++20 is needed to link against PyTorch'],
   ans:1, fb:'TK "runs on concepts" — a C++20 feature — so a pre-C++20 compiler fails to compile the tile types.'},
- {q:'4. In the practical task, what proves your TK kernel is actually correct?',
-  opts:['It compiles without errors','It runs faster than the PyTorch baseline','Its output matches the PyTorch reference within a small tolerance (e.g. max abs diff < 1e-2)','nvidia-smi shows high GPU utilization'],
-  ans:2, fb:'Correctness is defined by numerical agreement with the trusted baseline. Compiling and being fast are necessary but not sufficient.'}
+ {q:'4. Your TK linear-attention kernel compiles and runs. Verified alone on one sequence it matches PyTorch — but when you process a batch of sequences in a loop reusing the same state buffer, the <em>first</em> sequence is correct and later ones drift from the reference, and the error depends on batch order. Where do you look first, and why?',
+  opts:['Increase the tolerance until it passes, since bf16 is just imprecise','Check that the state tile S is zeroed before each sequence: a reused, un-reset S carries leftover kᵀv from the previous sequence, so later tokens silently attend to unrelated history — no crash, order-dependent drift','Assume PyTorch is wrong and trust the kernel','Add more warps so the state updates finish faster'],
+  ans:1, fb:'Right. "First one correct, later ones drift, error depends on order" is the fingerprint of stale state. S accumulates kᵀv, so if it is not zeroed per sequence it mixes in a prior sequence\'s tokens. The output stays full-shaped and plausible, so only a diff catches it. Zero S once before the first accumulation of each sequence and confirm with an order-swap test before touching the tolerance.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-custom-tokenizer-design.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Custom Tokenizer Design</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-static-shape-engineering.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Static Shape Engineering</span></a>
+  <a class="lnav prev" href="../day-04-custom-tokenizer-design/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Custom Tokenizer Design</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-static-shape-engineering/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Static Shape Engineering</span></a>
 </nav>
 
 
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Splitting must happen at the pair level</strong> — grouping by the distinct <code>(a, b)</code> pair before splitting, not by row, is what prevents the same pair from landing in both train and held-out sets.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> a 13-symbol tokenizer (Day 2) needs training text → that text must be exact and abundant → a vectorized NumPy generator produces it at scale with zero labeling error → a pair-level split keeps evaluation honest for every day that follows.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Synthetic data feels safe because the labels are exact — but the split you draw on top of it is where a quiet, self-flattering bug lives.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): train/held-out leakage from a row-level split.</b> You generate millions of rows, then split them randomly into train and held-out. Nothing errors, and held-out accuracy looks great — maybe suspiciously great. The problem: with only <code>(10^max_digits)^2</code> distinct <code>(a, b)</code> pairs, the same pair appears in many rows, and a row-level split drops copies of it into <em>both</em> sets. The model can memorize those pairs and score high on held-out data it effectively already saw, so your accuracy is partly measuring memorization, not generalization. A senior engineer catches this in <b>code review</b> by requiring the split to be done at the <em>unique (a, b) pair</em> level, and by checking that the train and held-out pair sets have zero intersection.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: cheap infinite data vs. a hard uniqueness ceiling.</b> A vectorized generator gives you effectively unlimited, perfectly-labeled rows for free — but the number of <em>distinct</em> problems is capped at <code>(10^max_digits)^2</code>. Generate far more rows than that and you are just repeating pairs, which inflates memorization risk and wastes compute on duplicates. The <b>design-review</b> call is choosing <code>max_digits</code> and dataset size together: enough digits that the unique-pair space is much larger than what the model sees, so held-out really tests unseen problems.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -330,24 +335,24 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>verify_and_benchmark.py</code> generates at least 1,000,000 and 10,000,000 rows, printing wall-clock time and rows/sec for each, and times a naive per-row Python-loop baseline for comparison (the vectorized version must be at least an order of magnitude faster).</li>
         <li>The same script asserts every <code>text</code> string round-trips — reparse the digits, recompute the sum, compare to the <code>sum</code> column — for a random sample of at least 10,000 rows, with a 100% pass rate.</li>
         <li>It reports <code>n_unique / n_total</code> distinct <code>(a, b)</code> pairs and warns if duplication exceeds a threshold given <code>max_digits</code> (recall Section 4: the ceiling is <code>(10^max_digits)^2</code> pairs).</li>
-        <li><code>train_holdout_split.py</code> splits at the distinct-<code>(a, b)</code>-pair level — not the row level — into train/held-out sets, saving both as <code>.parquet</code> under <code>experiments/week09_jax/day3_synthetic_data_gen/data/</code>, with zero shared pairs between the two files.</li>
-        <li>A <code>README.md</code> (or <code>reports/week09_day3_synthetic_data.md</code>) states the throughput numbers achieved, the uniqueness ceiling for the chosen <code>max_digits</code>, and the train/held-out split sizes.</li>
+        <li><code>train_holdout_split.py</code> splits at the distinct-<code>(a, b)</code>-pair level — not the row level — into train/held-out sets, saving both as <code>.parquet</code> under <code>sessions/m12-addition-transformer/day-05-synthetic-data-generation/day3_synthetic_data_gen/data/</code>, with zero shared pairs between the two files.</li>
+        <li>A <code>README.md</code> (or <code>sessions/m12-addition-transformer/day-05-synthetic-data-generation/reports/week09_day3_synthetic_data.md</code>) states the throughput numbers achieved, the uniqueness ceiling for the chosen <code>max_digits</code>, and the train/held-out split sizes.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create the three scripts above under <code>experiments/week09_jax/day3_synthetic_data_gen/</code>: <code>generate_addition_data.py</code>, <code>verify_and_benchmark.py</code>, <code>train_holdout_split.py</code>.</p>
+      <p>Create the three scripts above under <code>sessions/m12-addition-transformer/day-05-synthetic-data-generation/day3_synthetic_data_gen/</code>: <code>generate_addition_data.py</code>, <code>verify_and_benchmark.py</code>, <code>train_holdout_split.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 9 Day 3 artifact.
 
-Create experiments/week09_jax/day3_synthetic_data_gen/ containing:
+Create sessions/m12-addition-transformer/day-05-synthetic-data-generation/day3_synthetic_data_gen/ containing:
 1. generate_addition_data.py — a module exposing generate_batch(n, max_digits, seed) -> pd.DataFrame (columns a, b, sum, text), built with vectorized numpy.random.Generator calls (no per-example Python-loop random calls in the hot path).
 2. verify_and_benchmark.py — a script that: (a) generates at least 1,000,000 and 10,000,000 rows and prints wall-clock time and rows/sec for each, also timing a naive per-row Python-loop baseline for comparison; (b) asserts every text string round-trips (reparse digits, recompute sum, compare to the sum column) for a random sample of at least 10,000 rows; (c) reports n_unique / n_total and warns if duplication exceeds a threshold given max_digits.
-3. train_holdout_split.py — splits at the distinct-(a,b)-pair level into train/held-out sets, saving both as .parquet under experiments/week09_jax/day3_synthetic_data_gen/data/, with zero shared pairs between the two files.
+3. train_holdout_split.py — splits at the distinct-(a,b)-pair level into train/held-out sets, saving both as .parquet under sessions/m12-addition-transformer/day-05-synthetic-data-generation/day3_synthetic_data_gen/data/, with zero shared pairs between the two files.
 4. A README.md stating the throughput numbers achieved, the uniqueness ceiling for the chosen max_digits, and the train/held-out split sizes.
 Run verify_and_benchmark.py to confirm it exits 0 with 100% round-trip pass rate and zero pair leakage.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-09/day-03-log.md</code>: which <code>max_digits</code> did you choose, and how many distinct <code>(a, b)</code> pairs does that give you? (Hint: this ceiling is what Friday's model-sizing work will reference.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-05-synthetic-data-generation/log.md</code>: which <code>max_digits</code> did you choose, and how many distinct <code>(a, b)</code> pairs does that give you? (Hint: this ceiling is what Friday's model-sizing work will reference.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -361,9 +366,9 @@ Run verify_and_benchmark.py to confirm it exits 0 with 100% round-trip pass rate
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-custom-tokenizer-design.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Custom Tokenizer Design</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-static-shape-engineering.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Static Shape Engineering</span></a>
+  <a class="lnav prev" href="../day-04-custom-tokenizer-design/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Custom Tokenizer Design</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-static-shape-engineering/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Static Shape Engineering</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -468,9 +473,9 @@ var QS=[
  {q:'3. With 3-digit operands (0-999), what is the ceiling on distinct (a, b) pairs?',
   opts:['999','1,000','1,000,000','Unlimited — random numbers never repeat'],
   ans:2, fb:'Right. There are 1,000 possible values for a and 1,000 for b, so (10^3)^2 = 1,000,000 distinct ordered pairs — no more can exist no matter how many rows you generate.'},
- {q:'4. Why must the train/held-out split happen at the (a, b) pair level, not the row level?',
-  opts:['It runs faster that way','Parquet files require it','Splitting by row can leave the same (a, b) pair in both sets, letting the model memorize instead of learn, which inflates held-out accuracy','It has no effect either way'],
-  ans:2, fb:'Right. If a pair is duplicated across rows and the split is done row-by-row, the same pair can end up in both train and held-out, so the held-out score partly measures memorization, not generalization.'}
+ {q:'4. Your model reports 99% held-out accuracy on 3-digit addition, but a colleague testing on freshly generated random pairs sees only 70%. Training was clean and the labels are exact. Where do you look first?',
+  opts:['Trust the 99% — held-out accuracy is always the more reliable number','Check how the split was made: with only 1,000,000 distinct (a,b) pairs, a row-level random split can put the same pair in both train and held-out, so the 99% is partly memorization and the 70% on truly unseen pairs is the honest number','Assume your colleague used the wrong model checkpoint','Retrain with a bigger model, since 70% means it is too small'],
+  ans:1, fb:'Right. A big gap between your held-out score and fresh-pair accuracy is the fingerprint of train/held-out leakage. Because there are only (10^3)^2 = 1,000,000 distinct pairs, a row-level split easily lands copies of the same pair in both sets, so held-out overlaps with training and inflates the score. Re-split at the unique (a,b) pair level and confirm the sets do not intersect. The 70% on genuinely unseen pairs is the real generalization number; blaming the checkpoint or model size skips the actual cause.'},
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

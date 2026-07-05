@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-loss.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Functions</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-training-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Training Loop</span></a>
+  <a class="lnav prev" href="../day-04-loss/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Functions</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-training-loop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Training Loop</span></a>
 </nav>
 
   <header class="hero">
@@ -275,6 +275,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <h4>Why a frontier lab cares</h4>
       <p>Backprop is how <strong>every</strong> neural network learns. It's the reverse of the forward pass and costs about the same (so a training step ≈ 2–3× a forward pass — the "6" in the <code>C ≈ 6ND</code> compute formula). Modern frameworks compute it automatically (<span class="term" data-tip="Automatic differentiation: the framework computes gradients for you, e.g. jax.grad. You will meet it in the JAX modules.">autodiff</span>, e.g. <code>jax.grad</code>) — but knowing it's just "chain rule, backward" demystifies the whole thing.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> loss → gradient (slope for each weight) → step downhill (w − lr·grad) → backprop computes all gradients in one backward sweep → repeat = training. Tomorrow we assemble it into the training loop.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Backprop multiplies many local slopes together, and that single fact is the source of both a quiet training failure and a real memory choice.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): vanishing gradients.</b> The chain rule multiplies one local slope per layer. If those slopes are each a little below <code>1</code> (which sigmoid activations produce), then in a deep network you multiply many small numbers together and the gradient that reaches the early layers shrinks toward <code>0</code>. Those early layers then barely change, no matter how long you train. Nothing crashes — the loss just stops improving and sits there. A senior engineer catches this in <b>code review</b> by logging the size (norm) of the gradients per layer: if the early-layer gradients are orders of magnitude smaller than the late-layer ones, the signal is dying on the way back. (This is exactly why ReLU and residual connections exist.)</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: store activations or recompute them.</b> Backprop reuses the values from the forward pass, so the fast way is to keep every layer's activations in memory — but for a big model that memory is huge. The alternative, <span class="term" data-tip="Gradient checkpointing: during the backward pass, re-run parts of the forward pass to regenerate activations instead of storing them, trading extra compute for less memory.">gradient checkpointing</span>, throws most activations away and re-runs part of the forward pass during backward to get them back. You save a lot of memory but pay extra compute (more FLOPs per step). Whether to checkpoint is a <b>design-review</b> decision that trades GPU memory against training speed.</div></div>
       <button class="gotit" type="button">Got backprop</button>
     </div>
   </section>
@@ -306,21 +311,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Roll a weight downhill yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03b_gradients.py</code>. For <code>f(w)=w²</code>, compute the numerical slope at <code>w=3</code> (expect ≈6). Then loop 10 times doing <code>w = w - 0.1*(2*w)</code>, printing <code>w</code> and <code>w**2</code> each step, and watch the loss fall toward 0. Run with <code>python3 m03b_gradients.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>. For <code>f(w)=w²</code>, compute the numerical slope at <code>w=3</code> (expect ≈6). Then loop 10 times doing <code>w = w - 0.1*(2*w)</code>, printing <code>w</code> and <code>w**2</code> each step, and watch the loss fall toward 0. Run with <code>python3 m03b_gradients.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 3 Day 2 artifact.
 
-Create experiments/foundations/m03b_gradients.py that, with a comment on each step:
+Create sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py that, with a comment on each step:
 1. Defines f(w)=w**2 (a simple loss bowl).
 2. Computes a numerical gradient at w=3 via (f(w+h)-f(w-h))/(2h) with h=1e-5; prints it (expect ~6.0) and notes the exact slope is 2w.
 3. Runs gradient descent: w=3.0; for 10 steps do grad=2*w; w = w - 0.1*grad; print round(w,3), round(w**2,3).
 4. Confirms w marches toward 0 and the loss w**2 falls toward 0.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f3/day-02-log.md</code>: what would happen to the descent if the learning rate were 1.0 instead of 0.1?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-05-gradients-backprop/log.md</code>: what would happen to the descent if the learning rate were 1.0 instead of 0.1?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -334,9 +339,9 @@ Then run it and paste the output at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-loss.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Functions</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-training-loop.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Training Loop</span></a>
+  <a class="lnav prev" href="../day-04-loss/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Functions</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-training-loop/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The Training Loop</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -453,9 +458,9 @@ var QS=[
  {q:'3. Backpropagation is based on which calculus rule?',
   opts:['the product rule','the chain rule','the quotient rule','the power rule'],
   ans:1, fb:'Right. The chain rule multiplies local slopes along the path; backprop applies it backward from the loss.'},
- {q:'4. Backprop runs in which direction through the network?',
-  opts:['forward (inputs → loss)','backward (loss → inputs)','sideways','it does not move'],
-  ans:1, fb:'Right. It starts at the loss and works backward to the inputs, computing every weight\'s gradient in one sweep.'}
+ {q:'4. You train a deep network with sigmoid activations. It runs with no error, but the loss barely moves and the early layers\' weights hardly change while the last layers do learn. You log the gradient size at each layer and see the early-layer gradients are tiny. What is happening, and why?',
+  opts:['The learning rate is exactly zero, which is the only way weights stop changing','Vanishing gradients: the chain rule multiplies many small (<1) local slopes together, so the gradient shrinks toward 0 by the time it reaches the early layers, and they barely update','The batch size is too large, which always freezes the early layers','Early layers are supposed to never change, so this is normal'],
+  ans:1, fb:'Right. Backprop multiplies one local slope per layer. Sigmoid slopes are less than 1, so a product of many of them collapses toward 0 for the early layers — vanishing gradients. Training stalls with no crash. You look at per-layer gradient norms, which is exactly why ReLU and residual connections were introduced.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

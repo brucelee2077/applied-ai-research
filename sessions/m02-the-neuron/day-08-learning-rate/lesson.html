@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-optimizers.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Optimizers</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-train-val-test.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Train / Val / Test</span></a>
+  <a class="lnav prev" href="../day-07-optimizers/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Optimizers (SGD, Momentum, Adam)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-train-val-test/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Train / Val / Test &amp; Overfitting</span></a>
 </nav>
 
   <header class="hero">
@@ -290,6 +290,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><b><span class="term" data-tip="Slowly lowering the learning rate as training goes on, so the model can settle gently into a good minimum.">Decay</span>:</b> slowly lower the rate as training goes on. Big steps early cover ground fast; small steps late let the model settle gently into the valley.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Why a frontier lab cares:</b> a good learning rate (and its warmup + decay schedule) is one of the highest-value knobs in a huge training run. A rate slightly too high can waste millions of dollars of compute by diverging; too low wastes it by crawling. This is a core part of the craft you will see in the scaling and JAX modules.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A learning rate that blows up is easy to spot. The dangerous case is the one where nothing looks wrong.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a rate high enough to hurt, but not high enough to explode.</b> A too-big rate that sends the loss to <code>NaN</code> is loud — you notice at once. The quiet failure is a rate that is a bit too high: the loss still drops fast and looks healthy, but it settles at a <em>worse</em> value than a smaller rate would have reached, because the big steps keep bouncing around the bottom of the valley instead of settling into it. Nothing errors, the curve looks fine, and you ship a model that is silently weaker than it could be. A senior engineer catches this in <b>code review</b> (or in the run logs) by comparing final loss across a few learning rates, not by trusting that "loss went down, so the rate was fine."</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fast steps vs. stable steps.</b> A larger learning rate covers ground quickly and saves compute, but risks bouncing or diverging. A smaller rate is stable and lands in a better final spot, but crawls and burns hours of expensive GPU time. This is exactly why schedules exist — <b>warmup</b> to ease a fragile fresh model in, then <b>decay</b> to settle gently at the end. Where to set the peak rate and how to shape the schedule is a <b>design-review</b> decision that trades training speed against final quality and stability.</div></div>
       <button class="gotit" type="button">Got the three cases</button>
     </div>
   </section>
@@ -299,7 +304,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Slide the learning rate, then watch the three cases build</span><span class="sec-tick">✓</span></div>
     <div class="sec-body">
       <p>First, the live version. Drag the <strong>learning-rate slider</strong> and press <strong>Step</strong> or <strong>Run</strong>. Push it high to make the ball fly apart, low to make it crawl, and find the value where it slides in smoothly. Then <strong>scroll</strong> through the static build underneath.</p>
-      <div class="build-embed"><iframe src="../viz/gradient-descent.html" title="interactive learning rate" loading="lazy"></iframe><div class="cap">interactive — drag the learning-rate slider. <a href="../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive learning rate" loading="lazy"></iframe><div class="cap">interactive — drag the learning-rate slider. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -322,14 +327,14 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. See the three cases with your own eyes — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m03e_learning_rate.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code> from <code>w=1.0</code>. Run the same 8-step loop three times with <code>lr = 0.005</code>, <code>0.1</code>, and <code>0.6</code>: <code>grad=2*(w*x-y)*x</code>; <code>w = w - lr*grad</code>; print step, w, loss. Confirm 0.005 crawls, 0.1 reaches <code>w ≈ 3</code>, and 0.6 blows up. Run with <code>python3 m03e_learning_rate.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-08-learning-rate/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code> from <code>w=1.0</code>. Run the same 8-step loop three times with <code>lr = 0.005</code>, <code>0.1</code>, and <code>0.6</code>: <code>grad=2*(w*x-y)*x</code>; <code>w = w - lr*grad</code>; print step, w, loss. Confirm 0.005 crawls, 0.1 reaches <code>w ≈ 3</code>, and 0.6 blows up. Run with <code>python3 m03e_learning_rate.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2-3 Day 5 artifact.
 
-Create experiments/foundations/m03e_learning_rate.py that, with a comment on each step:
+Create sessions/m02-the-neuron/day-08-learning-rate/experiment.py that, with a comment on each step:
 1. Sets a tiny model pred = w*x, with x=2.0, target y=6.0 (ideal w=3).
 2. Defines a run(lr, steps) function: w=1.0; for each step do grad=2*(w*x-y)*x; w = w - lr*grad; print step, round(w,4), round((w*x-y)**2,4).
 3. Calls run(0.005, 8), run(0.1, 8), and run(0.6, 8).
@@ -337,7 +342,7 @@ Create experiments/foundations/m03e_learning_rate.py that, with a comment on eac
 5. Adds a comment: the loss shrinks only while |1 - lr*curvature| < 1; here the curvature is 8, so lr must stay below 0.25.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f3/day-05-log.md</code>: at what learning rate does this toy problem tip from converging to diverging, and why?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-08-learning-rate/log.md</code>: at what learning rate does this toy problem tip from converging to diverging, and why?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -346,15 +351,15 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <span class="em">🎚️</span>
     <h3>Day 5 done — you can read a loss curve</h3>
     <p>You know the one knob that makes or breaks a run: too big explodes, too small crawls, just right slides down smoothly. And you know what warmup and decay do.<br>Next: how do you know the model actually learned, and did not just memorize? Day 6 splits the data into <b>train / val / test</b> and shows you overfitting.</p>
-    <a class="cta" href="day-06-train-val-test.html">Next: Train / Val / Test →</a>
+    <a class="cta" href="../day-09-train-val-test/lesson.html">Next: Train / Val / Test →</a>
   </div>
 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-optimizers.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Optimizers</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-train-val-test.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Train / Val / Test</span></a>
+  <a class="lnav prev" href="../day-07-optimizers/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Optimizers (SGD, Momentum, Adam)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-09-train-val-test/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Train / Val / Test &amp; Overfitting</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -474,9 +479,9 @@ var QS=[
  {q:'3. The loss drops but only a tiny bit each step, over thousands of steps. What is the likely cause?',
   opts:['the learning rate is too small — it crawls','the learning rate is too big','the model has too many weights','the loss function is wrong'],
   ans:0, fb:'Right. A too-small learning rate moves the right way but very slowly, wasting time and compute.'},
- {q:'4. What does a warmup schedule do?',
-  opts:['starts the learning rate tiny and raises it over the first steps','turns the model off between epochs','doubles the batch size','removes the gradient'],
-  ans:0, fb:'Right. Warmup starts small and ramps up, so a fragile fresh model does not blow up before it stabilizes. Decay then lowers the rate later so it settles gently.'}
+ {q:'4. Your training runs cleanly with no error and the loss drops fast, but the final loss is a bit worse than a teammate got on the same setup. Their only difference is a smaller learning rate. What most likely happened, and why is it easy to miss?',
+  opts:['Your learning rate was slightly too high, so the steps kept bouncing around the bottom instead of settling in — the loss still went down and never errored, so nothing flagged it','A smaller learning rate always overfits, which is the only explanation','Your model had fewer parameters, which is the only thing that sets the final loss','A worse final loss with no error means the data was corrupted'],
+  ans:0, fb:'Right. A rate that is a little too high does not diverge — the loss still falls and looks healthy — but the big steps overshoot the minimum and settle at a worse value. It is easy to miss because nothing crashes. You compare final loss across a few rates rather than trusting that "loss went down."'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

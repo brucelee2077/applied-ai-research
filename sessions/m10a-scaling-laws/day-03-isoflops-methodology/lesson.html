@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-chinchilla-correction.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Chinchilla Correction</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-power-law-derivation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Power Law Derivation</span></a>
+  <a class="lnav prev" href="../day-02-chinchilla-correction/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Chinchilla Correction</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-power-law-derivation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Power Law Derivation</span></a>
 </nav>
 
 
@@ -297,6 +297,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The dip:</strong> the size where added capacity and available tokens are in balance. Lowest loss lives here.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> fix budget <code>C</code> → <code>N·D</code> is pinned by <code>6·N·D</code> → sweep sizes, each gives a loss → the losses form a valley → fit a parabola, take its vertex → that is the compute-optimal size → repeat across budgets → the (compute, optimal-size) points fall on a line → that line is the scaling law.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The IsoFlops recipe is simple, which is exactly why it's easy to run wrong and still get a number. A staff engineer knows the number that lies, and what the method costs.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): fitting a parabola to a sweep that never bracketed the minimum.</b> If loss is still falling at your largest trained size, there is no valley in your data — but <code>polyfit</code>/<code>curve_fit</code> happily returns a vertex anyway, <em>extrapolated</em> past everything you measured. You report a compute-optimal <code>N</code> you never actually trained, and nothing errors. A senior engineer checks that the loss curve visibly turns back up <em>inside</em> the sampled range before trusting the vertex.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: robust sweep vs. cheap parametric fit.</b> IsoFlops (fix <code>C</code>, sweep <code>N</code>) is assumption-light and hard to fool — it just needs a bracketed minimum per budget — but it's expensive, since most of the models you train at each budget are deliberately suboptimal. Fitting one parametric surface <code>L(N,D)</code> to all runs at once is far cheaper per datapoint, but it bakes in a functional form that can be wrong. How many budgets × sizes to sweep, versus trusting a fitted surface, is a <b>design-review</b> call about the accuracy vs. cost of the scaling study itself.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -337,13 +342,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The classic mistake:</b> fitting the parabola over a size range that does not actually bracket the minimum. If all your sizes fall on the underfitting (left) arm, the vertex <code>x* = −b/(2a)</code> lands <em>outside</em> your data — an extrapolation, not a measurement. Confirm the loss curve goes <b>down then back up</b> before trusting <code>curve_fit</code>; if the minimum is pinned at an endpoint, widen your size range. A related trap: forgetting to fit in log-space (use <code>log10(N)</code> as x).</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>frontier-lab/week5/wed_isoflops/isoflops_loop.ipynb</code> (plus a short <code>writeup.md</code> alongside it) covering the five bullets above.</p>
+      <p>Create <code>sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/isoflops_loop.ipynb</code> (plus a short <code>writeup.md</code> alongside it) covering the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 5 Day 3 artifact.
 
-Create frontier-lab/week5/wed_isoflops/isoflops_loop.ipynb (plus a short writeup.md alongside it) that:
+Create sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/isoflops_loop.ipynb (plus a short writeup.md alongside it) that:
 1. Fixes at least 3 distinct FLOP budgets C (e.g. 1e18, 1e19, 1e20).
 2. For each budget, defines >=4 model sizes N and derives D = C/(6*N). Print a table of N, D per budget and assert abs(6*N*D - C)/C < 1e-6 for every row.
 3. Records a final loss per run: train a tiny synthetic/char-level model, OR use clearly-labeled simulated losses shaped as a U (underfit on the left, undertrained on the right) with mild noise.
@@ -351,7 +356,7 @@ Create frontier-lab/week5/wed_isoflops/isoflops_loop.ipynb (plus a short writeup
 5. Plots each per-budget loss-vs-size scatter (matplotlib), then a final log-log plot of compute C vs N_opt with a fitted trend line; print the slope and compare in one line to Chinchilla's ~20 tokens/param.
 Every step should print shapes/intermediate values, and the notebook must run top-to-bottom with no errors.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>frontier-lab/week5/wed_isoflops/writeup.md</code>: for one of your budgets, does the fitted vertex land <em>inside</em> your trained size range? If not, what did you change to bracket the minimum?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/writeup.md</code>: for one of your budgets, does the fitted vertex land <em>inside</em> your trained size range? If not, what did you change to bracket the minimum?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -365,9 +370,9 @@ Every step should print shapes/intermediate values, and the notebook must run to
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-chinchilla-correction.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Chinchilla Correction</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-power-law-derivation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Power Law Derivation</span></a>
+  <a class="lnav prev" href="../day-02-chinchilla-correction/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Chinchilla Correction</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-power-law-derivation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Power Law Derivation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -443,7 +448,7 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
    diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
    is the short explanation beside it. Engine below is fixed across all lessons. */
 var BUILD=[
- {viz:'<div class="build-embed"><iframe src="../viz/scaling-laws.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/scaling-laws.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+ {viz:'<div class="build-embed"><iframe src="../../viz/scaling-laws.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/scaling-laws.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
   note:'<b>Play with the real thing first.</b> This is a live IsoFlops explorer: drag the controls to change the budget and watch the loss parabola and its minimum move. Get a feel for the valley — then scroll down and we\'ll rebuild it piece by piece.'},
  {viz:'<div class="dgram col">'+
     '<span class="node hot" style="padding:.45rem 2.4rem">🔒&nbsp; C = 1e19 FLOPs&nbsp; (locked)</span>'+

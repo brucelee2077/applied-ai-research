@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../week-14/day-06-cuda-tk-setup-implementation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">CUDA/TK Setup &amp; TK Implementation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-incoherent-processing-quip.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+  <a class="lnav prev" href="../../week-m16b/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M16b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
 </nav>
 
 
@@ -292,6 +292,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>The trade is bookkeeping</strong> — you pay a little extra work finding outlier columns at runtime and keeping a thin FP16 side-path, in exchange for roughly halving memory.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> INT8 has only 256 buckets → the scale is set by the absmax → a systematic outlier feature stretches the scale → ordinary features get crushed → accuracy collapses → route outliers to FP16 so the INT8 grid resolves the rest cleanly.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>int8 quantization never throws an error — the model still loads, still runs, still returns numbers. That is exactly why the two things below are so easy to miss.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): calibrating the outlier threshold on the wrong data.</b> Outlier features live in the <em>activations</em>, and which columns blow up depends on the input text. If you pick your outlier threshold (or your fixed set of "known outlier" columns) using one calibration set — say, clean English prose — then serve traffic in another domain like code or a second language, new columns cross the threshold and quietly re-enter the INT8 path. There is no crash: the absmax scale inflates for those blocks, ordinary features get crushed, and quality drops only on the shifted inputs. In <b>code review</b> a senior engineer asks "what data was the threshold calibrated on, and does it match production traffic?" and checks that outliers are detected <em>per input at runtime</em>, not frozen once at load.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: mixed precision saves memory but forks the hot path.</b> Routing the ~0.1% outlier columns to FP16 is what buys you full accuracy at half the memory — but it means every matmul now runs two kernels (an INT8 one and a small FP16 one) plus a step that finds and gathers the outlier columns at runtime. That extra branching and the scatter/gather can eat into the speed-up on short sequences, and it makes the kernel harder to fuse. In a <b>design review</b> the question is whether the memory win is worth a slower, more complex inference path — for a model that already fits in memory, plain FP16 or a simpler weight-only scheme may serve faster.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -331,13 +336,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><em>Stretch (optional):</em> load a real HF model via <code>bitsandbytes load_in_8bit=True</code> and print which columns it flags as outliers, confirming they cluster in a few fixed dimensions.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week15-quantization/outlier_features_int8.py</code> plus a <code>results.md</code> writeup in the same folder, covering the five bullets above.</p>
+      <p>Create <code>sessions/m17a-quantization/day-01-quantization-theory-int8/experiment.py</code> plus a <code>results.md</code> writeup in the same folder, covering the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 15 Day 1 artifact.
 
-Create experiments/week15-quantization/outlier_features_int8.py (plus a results.md writeup in the same folder) that empirically demonstrates outlier features and the LLM.int8() mixed-precision fix:
+Create sessions/m17a-quantization/day-01-quantization-theory-int8/experiment.py (plus a results.md writeup in the same folder) that empirically demonstrates outlier features and the LLM.int8() mixed-precision fix:
 1. absmax_quantize(x): returns (int8_codes, scale, dequantized). A unit test asserts round-trip max-abs-error < 0.02 on a clean random vector.
 2. Outlier-injection demo: add one value of ~70 to an otherwise-normal vector; assert the small-feature max-abs-error grows by at least 10x versus the clean case, and print both side by side.
 3. llm_int8_matmul(x, W, threshold=6.0): detect outlier columns (|x| > threshold), run the FP16 side-path plus the INT8 path, sum the partials. Assert its relative error vs a full FP16 matmul is < 0.01, while plain int8 matmul relative error is > 0.05 on the same inputs.
@@ -345,7 +350,7 @@ Create experiments/week15-quantization/outlier_features_int8.py (plus a results.
 5. Optional stretch: load a real HF model via bitsandbytes load_in_8bit=True and print which columns bitsandbytes flags as outliers, confirming they cluster in a few fixed dimensions.
 Every claim in results.md must be backed by printed output from the script (exit code 0). Add a brief comment on each step.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-15/day-01-log.md</code>: why is the outlier problem an <em>activation</em> problem, not a weight problem — and what breaks if you set the threshold to 20.0 instead of 6.0?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17a-quantization/day-01-quantization-theory-int8/log.md</code>: why is the outlier problem an <em>activation</em> problem, not a weight problem — and what breaks if you set the threshold to 20.0 instead of 6.0?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -359,9 +364,9 @@ Every claim in results.md must be backed by printed output from the script (exit
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../week-14/day-06-cuda-tk-setup-implementation.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">CUDA/TK Setup &amp; TK Implementation</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-incoherent-processing-quip.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
+  <a class="lnav prev" href="../../week-m16b/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M16b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-incoherent-processing-quip/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Incoherent Processing (QuiP)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -440,7 +445,7 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
    diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
    is the short explanation beside it. Engine below is fixed across all lessons. */
 var BUILD=[
- {viz:'<div class="build-embed"><iframe src="../viz/quantization.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/quantization.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+ {viz:'<div class="build-embed"><iframe src="../../viz/quantization.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/quantization.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
   note:'<b>Play with it first.</b> This is a live quantization sandbox. Drag the controls to change the values and the outlier size, and watch the INT8 grid and the error meter respond. Get a feel for how one big value ruins everything — then scroll on and we\'ll build up why, one diagram at a time.'},
  {viz:'<div class="dgram col">'+
     '<span><span class="node">t1</span> <span class="node">0.4</span> <span class="node">1.1</span> <span class="node">0.7</span> <span class="node">0.3</span> <span class="node">0.9</span> <span class="node">0.5</span> <span class="node">1.2</span> <span class="node">0.6</span></span>'+

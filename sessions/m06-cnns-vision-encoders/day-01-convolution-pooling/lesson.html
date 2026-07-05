@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav prev" href="../../m05b-vision-transformer/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M5b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-output-dim-arithmetic/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Dimension Arithmetic</span></a>
 </nav>
 
   <header class="hero">
@@ -298,6 +298,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Finds patterns anywhere:</strong> a filter that spots an edge on the left also spots it on the right — one learned pattern, used across the whole image.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> stack many such filters and layers, and the network builds up from tiny edges to shapes to whole objects. Pooling between layers keeps the maps small so this stays fast. Every image model you have heard of starts from exactly this idea.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The "slide, multiply, add" rule is simple, but two things about it bite quietly: whether the filter is flipped, and what pooling throws away.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): it is cross-correlation, not textbook convolution.</b> The rule above lays the filter on the patch and multiplies straight across — it never flips the filter. True mathematical convolution flips the filter first (top-to-bottom and left-to-right). Deep-learning libraries all use the no-flip version but still call it "convolution". If you copy a filter straight from a signal-processing textbook (say an edge or blur kernel), it runs fine and gives an image — just mirrored from what you expected, so your detected edges point the wrong way and nothing crashes. A senior engineer, in <b>code review</b>, checks that any hand-derived kernel is either symmetric or pre-flipped before trusting the direction of its output.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: pooling buys speed and shift-robustness by throwing away location.</b> Max pooling keeps only the strongest value in each block, so the map gets smaller (faster) and small shifts of the object stop mattering. What you pay is exact position: after several pooling layers the network knows a "plus shape" is present but not precisely where. For whole-image classification that is a good deal; for a task that needs pixel-accurate location, that lost detail is the <b>design-review</b> question — you may pool less, or use learnable strided convolutions instead.</div></div>
       <button class="gotit" type="button">Got how one value is computed</button>
     </div>
   </section>
@@ -329,21 +334,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the slide-and-add to yourself on a tiny grid. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m06_conv_by_hand.py</code>. Make a small 5×5 image and a 3×3 filter as NumPy arrays. Write two loops that slide the filter over the image, and at each stop compute the multiply-and-add sum. Print the feature map. Then do a 2×2 max pooling on that map (keep the biggest value in each 2×2 block) and print the smaller map. Run with <code>python3 m06_conv_by_hand.py</code>.</p>
+      <p>Create <code>sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py</code>. Make a small 5×5 image and a 3×3 filter as NumPy arrays. Write two loops that slide the filter over the image, and at each stop compute the multiply-and-add sum. Print the feature map. Then do a 2×2 max pooling on that map (keep the biggest value in each 2×2 block) and print the smaller map. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 6 Day 1 artifact.
 
-Create experiments/foundations/m06_conv_by_hand.py that, with a comment on each step, shows a convolution and pooling from scratch in NumPy:
+Create sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py that, with a comment on each step, shows a convolution and pooling from scratch in NumPy:
 1. Builds a small 5x5 image and a 3x3 filter (for example an edge or plus detector).
 2. Slides the filter over the image with two nested loops, stride 1, no padding; at each position it multiplies the overlapping cells and sums them into one output value; prints the resulting 3x3 feature map.
 3. Runs a 2x2 max pooling over the feature map (keep the largest value in each 2x2 block) and prints the smaller map.
 4. Prints the shapes at every step (image, filter, feature map, pooled map).
 Then run it and paste the feature map and pooled map at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f8/day-01-log.md</code>: what did the feature map's biggest number tell you, and how much smaller did pooling make the map?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/log.md</code>: what did the feature map's biggest number tell you, and how much smaller did pooling make the map?</div></div>
       <button class="gotit" type="button">Done — on to Day 2</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Then run it and paste the feature map and pooled map at the bottom as a comment.
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../index.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Map</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-02-output-dim-arithmetic.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Size Arithmetic</span></a>
+  <a class="lnav prev" href="../../m05b-vision-transformer/review.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M5b · Review Gate</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-02-output-dim-arithmetic/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Output-Dimension Arithmetic</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -478,9 +483,9 @@ var QS=[
  {q:'3. "Weight sharing" means:',
   opts:['each spot learns its own weights','the same filter weights are reused at every position','the weights are random','the weights never change'],
   ans:1, fb:'Right. One small set of weights is reused everywhere, so a pattern learned once is found across the whole image.'},
- {q:'4. What does max pooling do to a feature map?',
-  opts:['makes it bigger','keeps the largest value in each small block, shrinking the map','adds all the numbers','turns it into an image'],
-  ans:1, fb:'Right. Each block (like 2×2) becomes one number — its biggest value — so the map gets smaller but keeps the strong matches.'}
+ {q:'4. You copy a directional edge-detector kernel from a signal-processing textbook into your conv layer. The code runs and produces an edge map, but the edges consistently point the opposite way from what the textbook figure shows. Where do you look first?',
+  opts:['The learning rate is too high, so the filter drifted','The layer does cross-correlation (no filter flip), while the textbook assumes true convolution (filter flipped first) — so a hand-derived asymmetric kernel comes out mirrored; flip it or use a symmetric one','The image was loaded in the wrong color format','Pooling reversed the output'],
+  ans:1, fb:'Right. Deep-learning "convolution" is really cross-correlation: it never flips the filter. Textbook convolution flips it top-to-bottom and left-to-right first. For an asymmetric hand-derived kernel that difference mirrors the result, so it runs cleanly but points the wrong way. Pre-flip the kernel or use a symmetric one. It is not the learning rate (this filter is fixed, not learned) and not pooling (which shrinks the map, it does not reverse direction).'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

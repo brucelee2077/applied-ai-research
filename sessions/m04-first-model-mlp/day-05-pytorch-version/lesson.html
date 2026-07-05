@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-04-training-loss-dropout.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Reading the Loss Curve</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-why-pytorch.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Why PyTorch Mirrors NumPy</span></a>
+  <a class="lnav prev" href="../day-04-training-loss-dropout/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Curve &amp; Dropout</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-why-pytorch/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Why PyTorch Mirrors NumPy</span></a>
 </nav>
 
   <header class="hero">
@@ -305,6 +305,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <tr><td style="padding:.4rem .6rem;border:1px solid var(--border)"><code>W -= lr*dW</code> (Day 3)</td><td style="padding:.4rem .6rem;border:1px solid var(--border)"><code>optimizer.step()</code></td></tr>
       </table>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The point:</b> the framework did not invent new ideas. It automated the exact three things you built by hand — that is why you learned them first.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>PyTorch's convenience hides a piece of state you now have to manage yourself: gradients that quietly add up unless you clear them.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting <code>optimizer.zero_grad()</code>.</b> This is a bug that doesn't announce itself. PyTorch <em>adds</em> each new <code>.backward()</code> onto whatever gradient is already stored. In your hand-written NumPy code the gradient was fresh every batch, so this never came up — but in PyTorch, if you skip <code>zero_grad()</code>, batch 2's gradient piles on top of batch 1's, batch 3 on top of that, and the update steps grow far too large. No error prints; the loss just explodes to <code>NaN</code> or refuses to fall. The same class of bug is forgetting <code>model.eval()</code> before evaluation, which leaves dropout on and quietly lowers test accuracy. A senior engineer in <b>code review</b> checks that every training step starts with <code>zero_grad()</code> and that evaluation switches to <code>model.eval()</code>.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: framework convenience vs. hidden state.</b> <code>loss.backward()</code> and <code>optimizer.step()</code> save you from ever hand-wiring a gradient again, which is a huge win. What you pay is that the framework now holds state you cannot see — accumulated <code>.grad</code> buffers, train-vs-eval mode, the autograd graph. In a <b>design review</b> the framework is the obvious choice for anything real, but the team treats "manage the hidden state correctly" (<code>zero_grad</code>, <code>eval</code>, <code>no_grad</code>) as a required checklist, not an afterthought.</div></div>
       <button class="gotit" type="button">Got the PyTorch loop</button>
     </div>
   </section>
@@ -336,21 +341,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Rebuild your MLP in PyTorch and match your NumPy accuracy — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05_pytorch_mlp.py</code>. Define the 784→128→10 MLP as an <code>nn.Module</code>, use <code>nn.CrossEntropyLoss</code> and <code>torch.optim.SGD</code>, and write the training loop with the four calls (<code>zero_grad</code>, <code>backward</code>, <code>step</code>, plus the forward). Train on MNIST and print test accuracy — aim to match the ~95%+ you got with NumPy. Run with <code>python3 m05_pytorch_mlp.py</code>.</p>
+      <p>Create <code>sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py</code>. Define the 784→128→10 MLP as an <code>nn.Module</code>, use <code>nn.CrossEntropyLoss</code> and <code>torch.optim.SGD</code>, and write the training loop with the four calls (<code>zero_grad</code>, <code>backward</code>, <code>step</code>, plus the forward). Train on MNIST and print test accuracy — aim to match the ~95%+ you got with NumPy. Run with <code>python3 sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5 Day 5 artifact.
 
-Create experiments/foundations/m05_pytorch_mlp.py that, with a comment on each step, rebuilds the exact 2-layer MLP in PyTorch:
+Create sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py that, with a comment on each step, rebuilds the exact 2-layer MLP in PyTorch:
 1. Defines an nn.Module: fc1 = nn.Linear(784,128) + torch.relu, fc2 = nn.Linear(128,10); forward returns logits (no softmax).
 2. Uses nn.CrossEntropyLoss (it includes softmax) and torch.optim.SGD (or Adam) on model.parameters().
 3. Loads MNIST, builds a DataLoader, and runs the training loop with optimizer.zero_grad(); loss = criterion(model(x), y); loss.backward(); optimizer.step().
 4. Prints test accuracy each epoch and confirms it reaches ~95%+, matching the NumPy version.
 Add a short comment mapping each PyTorch line to the NumPy line it replaces. Then run it and paste the final accuracy at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f5/day-05-log.md</code>: how many lines shorter was the PyTorch version, and did its accuracy match your NumPy MLP?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-05-pytorch-version/log.md</code>: how many lines shorter was the PyTorch version, and did its accuracy match your NumPy MLP?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -364,9 +369,9 @@ Add a short comment mapping each PyTorch line to the NumPy line it replaces. The
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-04-training-loss-dropout.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Reading the Loss Curve</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-06-why-pytorch.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Why PyTorch Mirrors NumPy</span></a>
+  <a class="lnav prev" href="../day-04-training-loss-dropout/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Loss Curve &amp; Dropout</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-06-why-pytorch/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Why PyTorch Mirrors NumPy</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -485,9 +490,9 @@ var QS=[
  {q:'2. nn.Linear(784, 128) corresponds to which NumPy pieces?',
   opts:['the loss function','a weight matrix W and bias b for one layer','the optimizer','the softmax'],
   ans:1, fb:'Right. One nn.Linear holds a layer\'s W and b, created and stored for you.'},
- {q:'3. Why call optimizer.zero_grad() before loss.backward()?',
-  opts:['to speed up the GPU','because PyTorch adds new gradients onto the old ones, so you must clear them','to change the learning rate','to add dropout'],
-  ans:1, fb:'Right. Gradients accumulate in PyTorch; without zero_grad(), one batch\'s gradient piles onto the last and the update is wrong.'},
+ {q:'3. You port your working NumPy loop to PyTorch. It runs with no error, but after a few batches the loss shoots up to NaN or refuses to fall. Where do you look first?',
+  opts:['switch the optimizer from SGD to Adam','check that each training step calls optimizer.zero_grad() before loss.backward() — PyTorch adds gradients onto the old ones, so without clearing them the steps grow batch over batch','lower the number of hidden units','add more training data'],
+  ans:1, fb:'Right. Gradients accumulate in PyTorch. Skip zero_grad() and batch 2 piles onto batch 1, batch 3 onto that, so the update steps blow up and the loss diverges to NaN — with no error message. Clear the gradients at the top of every step. (The sibling of this bug is forgetting model.eval() at evaluation time.)'},
  {q:'4. Why is there no softmax in the PyTorch forward() method?',
   opts:['softmax is not needed at all','nn.CrossEntropyLoss includes softmax and is more numerically stable','PyTorch cannot do softmax','it is applied by the optimizer'],
   ans:1, fb:'Right. nn.CrossEntropyLoss folds softmax inside, which is more numerically stable than doing them separately.'}

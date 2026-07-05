@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-thunderkittens-architecture.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav prev" href="../day-02-tensor-memory-acceleration/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ThunderKittens Architecture</span></a>
 </nav>
 
 
@@ -288,6 +288,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Composable with the register file</strong> — the fixed per-SM register budget (65,536 32-bit registers on an H100) gets split unevenly on purpose, giving the warps that actually do FLOPs far more room.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Pallas taught the tiling/blocking mental model in JAX → ThunderKittens applies the same mental model directly in CUDA → worker overlapping is the technique both frameworks exist to make accessible → it's the prerequisite for later kernels (quantized weights, long-context decoding) to hit near-peak hardware use instead of being memory-bound.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Overlapping producers and consumers is the whole speedup — and the barriers that keep them from stepping on each other are the one thing you cannot get wrong quietly.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a missing or misordered barrier — the classic data race.</b> Producers and consumers run at the same time and coordinate only through <code>arrive</code>/<code>wait</code> signals. Drop a <code>wait</code>, or let a producer refill a buffer slot before the consumer signals it is done reading, and a consumer computes on a tile that is half-written (or already overwritten by the next tile). Nothing crashes — the kernel finishes and returns a full result. The output is just quietly wrong, and because it depends on which warp happened to win the race, it flakes: passes on one run, fails on the next. A senior engineer checks in <b>code review</b> that every buffer read is fenced by a matching <code>wait</code>, and that a slot is never reused until the consumer's <code>arrive</code> confirms it finished the previous tile.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: static warp specialization buys overlap but hard-wires roles and the register split.</b> Deciding once that a warp is a producer or a consumer (and splitting registers <code>40</code> vs <code>232</code>) is what lets the load hide behind compute and pushes the matmul toward ~86% of peak. You pay in rigidity: the producer/consumer ratio and register budget are baked into the kernel, so a workload with a different load-to-compute balance can leave one group idle, and you carry the full complexity of the LCF template even for simple ops. In a <b>design review</b> the question is whether the op is imbalanced enough (memory-bound vs compute-bound) to justify a fixed split, or whether a plain kernel would use the SM's registers more evenly.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -327,26 +332,26 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><code>results.md</code> exists with a table of at least 3 rows (ratio, sequential time, overlapped time, speedup).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week14_thunderkittens/overlap_sim.py</code>, <code>annotate_lcf_template.md</code>, and <code>results.md</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m15b-native-kernels/day-03-worker-overlapping/experiment.py</code>, <code>annotate_lcf_template.md</code>, and <code>results.md</code> with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 14 Day 3 artifact.
 
-Create experiments/week14_thunderkittens/overlap_sim.py that:
+Create sessions/m15b-native-kernels/day-03-worker-overlapping/experiment.py that:
 1. Simulates N tiles with configurable load_time and compute_time per tile.
 2. Implements sequential mode: total_time = N * (load_time + compute_time).
 3. Implements a pipelined/overlapped mode with a producer/consumer queue (threading + a bounded queue.Queue, or a simulated-clock event loop): total_time ≈ load_time + N * max(load_time, compute_time).
 4. Prints, for at least 3 load:compute ratios (e.g. 0.5x, 1x, 2x), both total times and the speedup ratio.
 5. Confirms the balanced case (load_time == compute_time) gives a speedup between 1.5x and 2.0x.
 
-Also create experiments/week14_thunderkittens/annotate_lcf_template.md: the actual TK matmul template code from the ThunderKittens GitHub README, annotated line-by-line mapping each call (tma::load_async, warpgroup::mma_AB, arrive, decrease_registers/increase_registers) to the walkthrough steps from today's lesson — at least 15 inline annotations.
+Also create sessions/m15b-native-kernels/day-03-worker-overlapping/annotate_lcf_template.md: the actual TK matmul template code from the ThunderKittens GitHub README, annotated line-by-line mapping each call (tma::load_async, warpgroup::mma_AB, arrive, decrease_registers/increase_registers) to the walkthrough steps from today's lesson — at least 15 inline annotations.
 
-Also create experiments/week14_thunderkittens/results.md: a table showing simulated speedup vs. the load_time:compute_time ratio (at least 3 rows), demonstrating that overlap gains are largest when load and compute times are close.
+Also create sessions/m15b-native-kernels/day-03-worker-overlapping/results.md: a table showing simulated speedup vs. the load_time:compute_time ratio (at least 3 rows), demonstrating that overlap gains are largest when load and compute times are close.
 
 Add a brief comment on each step explaining the load/compute overlap, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-14/day-03-log.md</code>: why can't overlap alone fix a kernel where <code>load_time</code> is much larger than <code>compute_time</code>? (Hint: the steady-state throughput is bounded below by <code>max(load_time, compute_time)</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m15b-native-kernels/day-03-worker-overlapping/log.md</code>: why can't overlap alone fix a kernel where <code>load_time</code> is much larger than <code>compute_time</code>? (Hint: the steady-state throughput is bounded below by <code>max(load_time, compute_time)</code>.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Add a brief comment on each step explaining the load/compute overlap, then run i
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-tensor-memory-acceleration.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-thunderkittens-architecture.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ThunderKittens Architecture</span></a>
+  <a class="lnav prev" href="../day-02-tensor-memory-acceleration/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Tensor Memory Acceleration</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-thunderkittens-architecture/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">ThunderKittens Architecture</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -466,9 +471,9 @@ var QS=[
  {q:'2. Why does TK shrink producer warps to <code>decrease_registers&lt;40&gt;()</code> and give consumer warps <code>increase_registers&lt;232&gt;()</code>?',
   opts:['NVIDIA hardware requires all warps in a block to have the same register count, so this balances them','Producers only compute memory addresses and issue async copies, so they need very few registers; consumers do the actual math and benefit from more registers per thread to hold bigger accumulator tiles','It reduces the total number of thread blocks needed per SM','It is required for TMA loads to function at all'],
   ans:1, fb:'Right. Registers are a fixed, shared per-SM budget; since producer warps do minimal computation, reallocating their unused registers to consumer warps lets consumers hold larger accumulators and avoid register-spill slowdowns.'},
- {q:'3. According to the paper\'s abstract, roughly how much does ThunderKittens outperform the strongest prior baseline on linear attention kernels?',
-  opts:['About 1.5x','About 3x','About 14x','About 40x'],
-  ans:2, fb:'Right. The abstract states TK outperforms the strongest baselines by 14x on linear attention (and 8x on state space models, 10-40% on attention backward).'},
+ {q:'3. You add warp specialization (producers load, consumers compute) to speed up a working matmul. It gets faster and the output looks right on your first run — but a correctness test now fails about one run in ten, and passes when you re-run it. The math did not change. Where do you look first, and why?',
+  opts:['Roll back to the slow version permanently, since overlap is inherently unsafe','Check the producer/consumer barriers: an intermittent, no-crash wrong result is the signature of a missing or misordered arrive/wait, so a consumer is reading a slot before the producer finished writing it (or a producer is refilling a slot still being read)','Assume the test itself is flaky and delete it','Add more consumer warps so the compute finishes before the load can go wrong'],
+  ans:1, fb:'Right. Producers and consumers run concurrently and coordinate only through arrive/wait signals. A result that is wrong only sometimes, and re-run-dependent, is a textbook data race: the outcome depends on which warp won. Fix the synchronization — fence every buffer read with its matching wait, and never reuse a slot until the consumer signals it is done — before blaming the test or the algorithm.'},
  {q:'4. What does the grid-level "persistent kernel" pattern (e.g., launching exactly 132 blocks on an H100) primarily avoid?',
   opts:['The cost of shared-memory bank conflicts','The overhead of repeatedly launching and tearing down thousands of short-lived thread blocks','The need for tensor cores','The need for barriers between producer and consumer warps'],
   ans:1, fb:'Right. A persistent kernel launches one block per SM (132 on H100) that loops internally over work items, paying the block launch/teardown cost once instead of once per output tile.'}

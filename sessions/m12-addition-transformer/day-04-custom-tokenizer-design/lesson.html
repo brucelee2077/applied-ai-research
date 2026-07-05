@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-infrastructure-setup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Infrastructure Setup</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-synthetic-data-generation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Synthetic Data Generation</span></a>
+  <a class="lnav prev" href="../day-03-infrastructure-setup/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Infrastructure Setup</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-synthetic-data-generation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Synthetic Data Generation</span></a>
 </nav>
 
 
@@ -300,6 +300,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>No padding yet</strong> — padding is Thursday's job (a 14th, padding, symbol added on top of this contract). Adding it today would break the "exactly 13" invariant this file is graded on.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> the data's true alphabet is 13 symbols (Monday's setup) → today's <code>VOCAB</code>/<code>stoi</code>/<code>itos</code> hand-encode exactly that alphabet → Wednesday's data generator and Friday's architecture sizing both import this file directly, so the contract never drifts.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A tokenizer is small enough to feel foolproof, which is exactly why the two ways it breaks are the ways that never announce themselves.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the &lt;unk&gt; fallback that swallows bad input.</b> The tempting "safe" version of encode is <code>stoi.get(ch, unk_id)</code> — it never crashes. But if the data generator ever emits a stray character (a stray minus sign, a comma, a broken row), every one of those characters silently becomes the same fallback ID, and the model trains on quietly corrupted examples. Accuracy just comes out lower than it should with no error to trace. A senior engineer catches this in <b>code review</b> by insisting on direct <code>stoi[ch]</code> indexing (which raises <code>KeyError</code> on the first bad character) and by testing that <code>decode(encode(s)) == s</code> holds for every valid string — so a data bug fails loudly at the tokenizer instead of hiding in the loss.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a hand-fit 13-symbol vocab vs. a general tokenizer.</b> The tiny fixed vocabulary spends almost no parameters on embeddings (13 &times; d_model) and fails loud on anything unexpected, which is perfect for a closed task like addition. What you give up is generality: this tokenizer cannot represent a single character outside the 13, so the moment the task grows (subtraction, new symbols) you must edit <code>VOCAB</code> and re-derive everything downstream. Whether to hand-fit the vocabulary to today's task or absorb the cost of a general tokenizer is a <b>design-review</b> decision about how much the input alphabet is expected to change.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -333,30 +338,30 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): hand-write the closed-vocabulary tokenizer for the Addition Transformer capstone, with tests proving it round-trips and fails loudly on bad input.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>python -m pytest experiments/week09_jax/tokenizer/tests/</code> exits 0, all tests pass, output captured in the README or a <code>results/</code> subfolder.</li>
+        <li><code>python -m pytest sessions/m12-addition-transformer/day-04-custom-tokenizer-design/tokenizer/tests/</code> exits 0, all tests pass, output captured in the README or a <code>results/</code> subfolder.</li>
         <li><code>tokenizer.py</code> has exactly 13 vocabulary entries — no <code>&lt;unk&gt;</code>, no padding token added yet (padding is Thursday's job).</li>
         <li>Manually confirmed: <code>encode("*")</code> (or any out-of-vocab call) raises <code>KeyError</code> rather than returning a fallback ID.</li>
         <li><code>vocab_size</code> is importable as a single named constant, ready for Friday's architecture-sizing script to consume without modification.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week09_jax/tokenizer/src/tokenizer.py</code> (with <code>VOCAB</code>, <code>stoi</code>, <code>itos</code>, <code>encode</code>, <code>decode</code>, <code>vocab_size</code>) and <code>experiments/week09_jax/tokenizer/tests/test_tokenizer.py</code> with the acceptance criteria above.</p>
+      <p>Create <code>sessions/m12-addition-transformer/day-04-custom-tokenizer-design/experiment.py</code> (with <code>VOCAB</code>, <code>stoi</code>, <code>itos</code>, <code>encode</code>, <code>decode</code>, <code>vocab_size</code>) and <code>sessions/m12-addition-transformer/day-04-custom-tokenizer-design/experiment.py</code> with the acceptance criteria above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 9 Day 2 artifact.
 
-Create experiments/week09_jax/tokenizer/ containing:
+Create sessions/m12-addition-transformer/day-04-custom-tokenizer-design/tokenizer/ containing:
 1. src/tokenizer.py — the VOCAB, stoi, itos, encode, decode, and a vocab_size constant (must equal 13), packaged so Wednesday's data-generation script and Friday's model-sizing script can import it directly.
 2. tests/test_tokenizer.py — pytest covering: (a) round-trip decode(encode(s)) == s on a batch of at least 20 randomly generated valid addition strings, (b) vocab_size == 13 exactly, (c) encode raises on every character not in {0-9, ' ', '+', '='} (test at least 4 distinct invalid characters: a letter, a decimal point, a newline, and *), (d) stoi and itos are exact inverses for all 13 entries.
 3. README.md — one-paragraph statement of the vocabulary design decision and the embedding-parameter-cost comparison table from demo (3).
 
 Acceptance criteria:
-- python -m pytest experiments/week09_jax/tokenizer/tests/ exits 0, all tests pass, output captured in the README or a results/ subfolder.
+- python -m pytest sessions/m12-addition-transformer/day-04-custom-tokenizer-design/tokenizer/tests/ exits 0, all tests pass, output captured in the README or a results/ subfolder.
 - tokenizer.py has exactly 13 vocabulary entries — no &lt;unk&gt;, no padding token added yet (padding is Thursday's job).
 - Manually confirmed: encode("*") (or any out-of-vocab call) raises KeyError rather than returning a fallback ID.
 - vocab_size is importable as a single named constant, ready for Friday's architecture-sizing script to consume without modification.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-09/day-02-log.md</code>: why does <code>encode</code> use <code>stoi[ch]</code> instead of <code>stoi.get(ch, unk_id)</code>? (Hint: think about what a silent fallback would hide.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m12-addition-transformer/day-04-custom-tokenizer-design/log.md</code>: why does <code>encode</code> use <code>stoi[ch]</code> instead of <code>stoi.get(ch, unk_id)</code>? (Hint: think about what a silent fallback would hide.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -370,9 +375,9 @@ Acceptance criteria:
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-infrastructure-setup.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Infrastructure Setup</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-synthetic-data-generation.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Synthetic Data Generation</span></a>
+  <a class="lnav prev" href="../day-03-infrastructure-setup/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Infrastructure Setup</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-05-synthetic-data-generation/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Synthetic Data Generation</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -465,9 +470,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. Why does today\'s tokenizer use exactly 13 vocabulary entries instead of the 30,000+ a BPE tokenizer would learn?',
-  opts:['13 is a Python convention for small vocabularies','The data\'s true alphabet — digits 0-9, space, +, = — has exactly 13 symbols, so a bigger vocabulary would only waste embedding capacity','BPE tokenizers cannot be used with JAX','13 is the smallest vocabulary JAX allows'],
-  ans:1, fb:'Right. Because the Addition Transformer only ever sees these 13 characters, a 13-entry vocabulary is the exact fit — no unused embedding rows, no wasted parameters.'},
+ {q:'1. Training finishes cleanly with no errors, but held-out accuracy is a few points lower than the same setup gave last week. You recently changed <code>encode</code> from <code>stoi[ch]</code> to <code>stoi.get(ch, unk_id)</code> to "make it robust." Where do you look first?',
+  opts:['Increase the learning rate, since lower accuracy always means undertraining','Check the raw data for stray characters: with a get(..., unk_id) fallback, any bad character silently maps to the unk ID instead of raising, so corrupted rows train quietly and drag accuracy down','Add more layers, because the model has clearly become too small','Assume the metric changed and ignore the drop'],
+  ans:1, fb:'Right. Swapping direct indexing for a get(..., unk_id) fallback removes the loud failure that used to catch bad input. Now a stray character (a stray minus, a comma, a broken row) becomes the same fallback ID instead of a KeyError, so corrupted examples slip into training and quietly lower accuracy. First check the data for characters outside the 13 and restore stoi[ch] direct indexing. Bumping learning rate or depth treats a symptom while the real cause is that a data bug stopped failing loudly.'},
  {q:'2. What should <code>encode("*")</code> do, given <code>*</code> is not one of the 13 vocabulary symbols?',
   opts:['Return the ID for a special &lt;unk&gt; token','Silently skip the character and return a shorter list','Raise a KeyError, because stoi[ch] is a direct dict lookup with no fallback','Round it to the nearest valid symbol'],
   ans:2, fb:'Right. encode uses stoi[ch] (not stoi.get(ch, fallback)), so any character outside the 13 raises KeyError immediately instead of hiding the problem.'},

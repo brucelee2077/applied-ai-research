@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-03-evolutionary-prompts-evoprompt.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-agentic-scaffolding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Agentic Scaffolding</span></a>
+  <a class="lnav prev" href="../day-09-evolutionary-prompts-evoprompt/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-11-agentic-scaffolding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Agentic Scaffolding</span></a>
 </nav>
 
 
@@ -293,6 +293,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Correctness never regresses</strong> — because CodeGen emits a runtime-checked fallback, a rule that doesn't apply just leaves the original code untouched; speed varies, correctness doesn't.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> naive per-program LLM optimization (Day 3's evolutionary-search cousin) → measured yield is too low to run online (~5.7%) → split into offline discovery+bridge (pay once) and online deployment (free forever) → RuleFlow.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>"Correctness never regresses" is only true when two things hold — EquivCheck actually caught every case where the rewrite differs, and the precondition guards exactly those cases. When either slips, the fallback protects nothing.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a rewrite that only looks equivalent under-samples the cases where it differs.</b> EquivCheck compares the original and candidate on <em>random</em> test dataframes. If those random frames never contain the input that makes the two diverge, the rewrite passes as "equivalent," gets lifted into a rule, and the precondition RuleGen synthesizes guards the wrong thing. The paper's real example: rewriting Pandas <code>.min()</code> as NumPy <code>np.min(...)</code> — Pandas skips missing values (NaN), NumPy does not. On random data with no NaNs they match; the precondition only checks that the column exists, not that it has no NaN; so in production the rule fires on a column with a missing value and silently returns a different, wrong number. No crash, no fallback triggered — the runtime check preserves correctness only when the precondition captures the unsafe case. A senior engineer catches this in <b>code review</b> by asking, of every rule, "under what inputs do original and rewrite differ, and does the precondition actually exclude those?" — and by making EquivCheck sample the edge cases (NaN, empty, duplicates, mixed dtypes), not just moderate random frames.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: pay-once offline discovery vs. staleness of the rule library.</b> Splitting into expensive offline discovery (SnippetGen + RuleGen) and free online deployment (CodeGen, zero LLM calls) is what makes RuleFlow fast enough to run on every notebook — the whole design buys cheap, deterministic deployment. But you pay for it in freshness: the rule library only knows the patterns discovered in the last offline run, so new APIs, new idioms, and library version changes are invisible until you re-run discovery, and a rule validated against an old Pandas version can quietly become unsafe after an upgrade. In a <b>design review</b> this is the explicit decision — how often to re-run offline discovery and re-validate rules against the current library, trading compute for the library staying correct and current.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -326,7 +331,7 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task (from the curriculum): "Study how a hybrid 3-stage LLM approach decoupled discovery from deployment to become the state-of-the-art Pandas optimization framework." This is a <strong>study/analysis day</strong>, not a build day — there's no new code to write, only the framework and repo to study and explain in your own words.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li>File exists at <code>experiments/week20_data_engineering_automation/ruleflow_study_notes.md</code>.</li>
+        <li>File exists at <code>sessions/m26-adrs/day-10-data-engineering-automation-ruleflow/ruleflow_study_notes.md</code>.</li>
         <li>Contains a diagram or written trace (you can reuse today's 25-step walkthrough) of SnippetGen → RuleGen → CodeGen, correctly labeling which stages call an LLM (SnippetGen, RuleGen) and which does not (CodeGen).</li>
         <li>Contains at least one worked rewrite rule, copied or paraphrased from the RuleFlow GitHub repo or paper, written in LHS/RHS/precondition DSL form.</li>
         <li>Contains a short (3–5 sentence) answer to: "why does separating discovery from deployment fix the yield problem of per-program LLM optimization?" — must cite the specific numbers (5.7% raw yield, 87.13% notebook hit rate of reused rules).</li>
@@ -334,20 +339,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>References the <a href="https://pandas.pydata.org/docs/" target="_blank" rel="noopener">Pandas docs</a> for at least one specific API detail used in an example (e.g. <code>.pop()</code> vs <code>.drop()</code>, or <code>.min()</code>'s NaN-skipping behavior).</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Read the <a href="https://arxiv.org/abs/2602.09051" target="_blank" rel="noopener">RuleFlow paper</a> and the <a href="https://github.com/ADAPT-uiuc/RuleFlow" target="_blank" rel="noopener">RuleFlow GitHub repo</a>, then draft <code>experiments/week20_data_engineering_automation/ruleflow_study_notes.md</code> against the five bullets above.</p>
+      <p>Read the <a href="https://arxiv.org/abs/2602.09051" target="_blank" rel="noopener">RuleFlow paper</a> and the <a href="https://github.com/ADAPT-uiuc/RuleFlow" target="_blank" rel="noopener">RuleFlow GitHub repo</a>, then draft <code>sessions/m26-adrs/day-10-data-engineering-automation-ruleflow/ruleflow_study_notes.md</code> against the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-paper-course</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-paper-course to build my Week 20 Day 4 artifact on the RuleFlow paper (arXiv 2602.09051, repo github.com/ADAPT-uiuc/RuleFlow).
 
-Create experiments/week20_data_engineering_automation/ruleflow_study_notes.md that:
+Create sessions/m26-adrs/day-10-data-engineering-automation-ruleflow/ruleflow_study_notes.md that:
 1. Traces the 3-stage pipeline SnippetGen -> RuleGen -> CodeGen, clearly labeling which stages call an LLM (SnippetGen, RuleGen) and which does not (CodeGen, a deterministic compiler pass).
 2. Includes at least one worked rewrite rule in LHS/RHS/precondition DSL form (e.g. the drop-to-pop rule), copied or paraphrased from the paper or repo.
 3. Answers in 3-5 sentences: why does separating discovery from deployment fix the yield problem of per-program LLM optimization? Must cite the paper's numbers: ~5.7% raw yield of the naive per-program approach, and 87.13% notebook hit rate of the reused rule library on held-out test notebooks.
 4. Adds one paragraph connecting this discovery/bridge/deployment split to the FunSearch/AlphaEvolve pattern from earlier in Phase 5 (offline LLM search against an evaluator, artifact survives, cheap deployment) as a bridge to why TLA+ formal verification is the natural next step.
 5. Cites the Pandas docs (pandas.pydata.org/docs) for at least one specific API detail used in an example, such as .pop() vs .drop(), or .min()'s NaN-skipping behavior vs np.min().</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After writing it, write one line in <code>sessions/week-20/day-04-log.md</code>: why did the <code>.min()</code> → <code>np.min(...).values</code> rule pass <code>EquivCheck</code> during discovery, yet still silently return wrong answers on real data with missing values?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After writing it, write one line in <code>sessions/m26-adrs/day-10-data-engineering-automation-ruleflow/log.md</code>: why did the <code>.min()</code> → <code>np.min(...).values</code> rule pass <code>EquivCheck</code> during discovery, yet still silently return wrong answers on real data with missing values?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -361,9 +366,9 @@ Create experiments/week20_data_engineering_automation/ruleflow_study_notes.md th
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-03-evolutionary-prompts-evoprompt.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-05-agentic-scaffolding.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Agentic Scaffolding</span></a>
+  <a class="lnav prev" href="../day-09-evolutionary-prompts-evoprompt/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Evolutionary Prompts (EvoPrompt)</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-11-agentic-scaffolding/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Agentic Scaffolding</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

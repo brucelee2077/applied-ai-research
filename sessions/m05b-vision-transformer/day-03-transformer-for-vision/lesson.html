@@ -197,9 +197,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-patch-embeddings.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Patch Embeddings</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-vit-classifier.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The ViT Classifier</span></a>
+  <a class="lnav prev" href="../day-02-patch-embeddings/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Patch Embeddings</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-vit-classifier/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The ViT Classifier</span></a>
 </nav>
 
   <header class="hero">
@@ -301,6 +301,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>More blocks is not always better.</strong> On small data, a deep stack overfits fast. ViTs are hungry — you will see why on Day 4.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Why this matters:</b> the text transformer and the vision transformer share this exact block. The only difference between them is the input: word tokens versus patch tokens. Tomorrow you read out the class token and turn all this mixing into an actual prediction.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Because the block returns the same shape it was given, the nastiest bug is one that keeps the shape but mixes along the wrong axis.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): attention mixing along the wrong axis.</b> PyTorch's <code>nn.MultiheadAttention</code> defaults to <code>batch_first=False</code> — it expects <code>(seq, batch, dim)</code>. If you feed it your patch sequence as <code>(batch, seq, dim)</code> = <code>(1, 65, 128)</code> and forget to set <code>batch_first=True</code>, it treats dimension 0 (your batch of 1) as the sequence. Attention then mixes over the wrong axis, but the output shape is still <code>(1, 65, 128)</code>, so no assertion fails and training still runs. With batch size 1 the patches never actually attend to each other — the model quietly ignores cross-patch information and underperforms with no error to trace. A senior engineer catches this in <b>code review</b> by checking the <code>batch_first</code> setting against the tensor layout, or by feeding two known-different sequences in a batch and confirming each one's output does not depend on the other.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: every block re-pays the O(sequence²) attention cost.</b> Attention lets every patch read every other patch, which costs on the order of <code>tokens²</code> per block. Stacking N blocks makes representations richer but multiplies that cost by N, and halving the patch size (4&times; more tokens) makes each block roughly 16&times; more expensive. Choosing how deep the stack goes and how many tokens you feed it is the <b>design-review</b> decision that trades accuracy for compute and memory.</div></div>
       <button class="gotit" type="button">Got how the block works</button>
     </div>
   </section>
@@ -332,21 +337,21 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
     <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the block works on patches unchanged, and that shape holds through the stack. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/foundations/m05b_vit_block.py</code>. Build a small PyTorch <code>EncoderBlock</code> (LayerNorm → <code>nn.MultiheadAttention</code> → residual → LayerNorm → MLP → residual). Make a fake <code>(1, 65, 128)</code> patch sequence. Stack 4 blocks, run the sequence through, and print the shape after each block. Assert the output shape is still <code>(1, 65, 128)</code>. Run with <code>python3 m05b_vit_block.py</code>.</p>
+      <p>Create <code>sessions/m05b-vision-transformer/day-03-transformer-for-vision/experiment.py</code>. Build a small PyTorch <code>EncoderBlock</code> (LayerNorm → <code>nn.MultiheadAttention</code> → residual → LayerNorm → MLP → residual). Make a fake <code>(1, 65, 128)</code> patch sequence. Stack 4 blocks, run the sequence through, and print the shape after each block. Assert the output shape is still <code>(1, 65, 128)</code>. Run with <code>python3 m05b_vit_block.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 5b Day 3 artifact.
 
-Create experiments/foundations/m05b_vit_block.py that, with a comment on each step, shows the same transformer block works on image patches:
+Create sessions/m05b-vision-transformer/day-03-transformer-for-vision/experiment.py that, with a comment on each step, shows the same transformer block works on image patches:
 1. Defines an EncoderBlock nn.Module: x = x + attention(LayerNorm(x)) using nn.MultiheadAttention, then x = x + mlp(LayerNorm(x)) with a 2-layer MLP. This is the SAME block used for text — no vision-specific code.
 2. Makes a fake patch sequence of shape (1, 65, 128) (batch 1, 65 tokens = 64 patches + class token, embed dim 128).
 3. Stacks 4 EncoderBlocks, runs the sequence through, and prints the shape after each block.
 4. Asserts the output shape is still exactly (1, 65, 128), proving attention mixes information but never resizes the sequence.
 Then run it and paste the printed shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-f7/day-03-log.md</code>: what shape came out after 4 blocks, and in one sentence, why is it the same block used for text?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05b-vision-transformer/day-03-transformer-for-vision/log.md</code>: what shape came out after 4 blocks, and in one sentence, why is it the same block used for text?</div></div>
       <button class="gotit" type="button">Done — on to Day 4</button>
     </div>
   </section>
@@ -360,9 +365,9 @@ Then run it and paste the printed shapes at the bottom as a comment.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-patch-embeddings.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Patch Embeddings</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-vit-classifier.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The ViT Classifier</span></a>
+  <a class="lnav prev" href="../day-02-patch-embeddings/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Patch Embeddings</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-vit-classifier/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The ViT Classifier</span></a>
 </nav>
 
 <footer>Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -473,9 +478,9 @@ var QS=[
  {q:'2. What does attention do when it runs on patches?',
   opts:['It shrinks the image','It lets every patch look at every other patch and blend in useful information','It sorts the patches by brightness','It removes the class token'],
   ans:1, fb:'Right. Attention mixes information across regions — the sky patch can read the bird patch, and the class token gathers from all of them.'},
- {q:'3. What is the shape of the sequence after passing through several blocks?',
-  opts:['It shrinks each block','It stays (65, 128) — attention mixes but never resizes','It grows to (128, 128)','It becomes a single vector'],
-  ans:1, fb:'Right. The token count and embedding size are fixed through every block. Only the content each token holds gets richer.'},
+ {q:'3. You wrap nn.MultiheadAttention in your block, feed a (1, 65, 128) patch sequence, and it runs with no error and returns (1, 65, 128) — but the model barely learns and patches seem to ignore each other. Where do you look first?',
+  opts:['The embedding dimension is too large','Check batch_first: nn.MultiheadAttention defaults to (seq, batch, dim), so passing (batch, seq, dim) makes it attend over the wrong axis without changing the output shape','Add more color channels to the patches','The class token should be removed'],
+  ans:1, fb:'Right. nn.MultiheadAttention defaults to batch_first=False and expects (seq, batch, dim). Feeding (1, 65, 128) makes it treat the batch of 1 as the sequence, so it mixes over the wrong axis — the shape stays (1, 65, 128) and nothing errors, but with batch 1 the 65 patches never actually attend to each other. Set batch_first=True or transpose the tensor to match.'},
  {q:'4. Why does the residual add (x + attention(...)) work at all?',
   opts:['Because attention returns the same shape as its input','Because the shapes are always different','Because it deletes the input','Because the class token is removed'],
   ans:0, fb:'Right. The block returns exactly x\'s shape, so x + block-output lines up. This is why the size must be held fixed the whole way through.'}

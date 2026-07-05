@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-05-reward-hacking-threat.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reward Hacking Threat</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-20/day-01-mathematical-discovery-funsearch.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
+  <a class="lnav prev" href="../day-05-reward-hacking-threat/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reward Hacking Threat</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-mathematical-discovery-funsearch/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
 </nav>
 
 
@@ -299,6 +299,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Next week's TLA+ complements this gap</strong> — for a judiciously bounded state space, a model checker can prove "no reachable state violates this invariant," a categorically stronger guarantee than sampling. You need both: pytest-benchmark answers "is this candidate fast and correct on everything I tested," TLA+ answers "is this candidate provably safe for every state it could ever reach."</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> LLM only sees a scalar score → the score becomes the entire specification of "good" → any untested input is an unenforced rule → an evolutionary search finds unenforced rules → hidden hold-out workloads close that gap for what you can sample, and TLA+ (next week) closes it for what you can prove.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A hold-out only protects you if it is genuinely independent of what the search can see — and it is surprisingly easy to build one that quietly isn't.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): train/eval leakage — the hold-out is not actually held out.</b> The whole point of the hidden suite is to be independent of the visible one. But if you generate both from the same function with the same random seed, or the hidden arrays overlap the visible ones, or a case appears in both, then a candidate that overfits the visible workload <em>also</em> passes hidden — because hidden is really the same data wearing a different label. The gap you thought you closed is still open, and every score looks trustworthy right up until production. Nothing errors. A senior engineer catches this in <b>code review</b> by checking that the hidden suite is generated independently (different seed, different distribution axis) and that visible and hidden case sets provably do not intersect — the hold-out must vary the axis the visible suite didn't, not just re-roll the same one.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: sampled testing (fast, incomplete) vs. proof (complete, expensive).</b> pytest-benchmark can only ever run the finite cases you thought to write — it is cheap and runs every iteration, but it answers "correct on everything I tested," never "correct on every possible input." A model checker like TLA+ proves "no reachable state violates this invariant" for a bounded state space — a categorically stronger guarantee, but far more effort to set up and only tractable for judiciously bounded specs. In a <b>design review</b> you decide which parts of the system get sampled hold-out testing and which few load-bearing invariants are worth the cost of a proof.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -332,33 +337,33 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>Today's task: build a fortified, two-tier pytest evaluation sandbox for a sorting algorithm, with hidden hold-out workloads, and prove on your own machine that the hidden suite catches an overfit candidate the visible suite misses.</p>
       <h4>Acceptance criteria</h4>
       <ul>
-        <li><code>pytest experiments/week19_adrs/sandbox/test_correctness_visible.py -v</code> exits 0 for the correct candidate.</li>
-        <li><code>pytest experiments/week19_adrs/sandbox/test_correctness_hidden.py -v</code> exits non-zero for the deliberately flawed candidate, and exits 0 for the correct candidate — the hidden suite catches what the visible suite misses.</li>
+        <li><code>pytest sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py -v</code> exits 0 for the correct candidate.</li>
+        <li><code>pytest sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py -v</code> exits non-zero for the deliberately flawed candidate, and exits 0 for the correct candidate — the hidden suite catches what the visible suite misses.</li>
         <li><code>pytest ... test_speed_benchmark.py --benchmark-json=results.json</code> runs successfully and <code>results.json</code> contains a <code>mean</code> stat for each candidate.</li>
         <li><code>run_eval.py</code>, pointed at the flawed candidate, reports <code>correctness_hidden: False</code> even though <code>correctness_visible</code> may be <code>True</code> — reproducing the overfitting gap from demo ③.</li>
         <li><code>RESULTS.md</code> states in plain language which candidate would be wrongly selected as "best" using only the visible suite, and why the hidden suite prevents that.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Build out <code>experiments/week19_adrs/sandbox/</code> with <code>reference_sort.py</code>, <code>candidates/</code> (at least one correct, one deliberately flawed), <code>test_correctness_visible.py</code>, <code>test_correctness_hidden.py</code>, <code>test_speed_benchmark.py</code>, <code>run_eval.py</code>, and a top-level <code>RESULTS.md</code>.</p>
+      <p>Build out <code>sessions/m26-adrs/day-06-evaluation-engineering-holdout/sandbox/</code> with <code>reference_sort.py</code>, <code>candidates/</code> (at least one correct, one deliberately flawed), <code>test_correctness_visible.py</code>, <code>test_correctness_hidden.py</code>, <code>test_speed_benchmark.py</code>, <code>run_eval.py</code>, and a top-level <code>RESULTS.md</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 19 Day 6 artifact.
 
-Build a fortified, two-tier pytest evaluation sandbox for a sorting algorithm, with hidden hold-out workloads, under experiments/week19_adrs/:
+Build a fortified, two-tier pytest evaluation sandbox for a sorting algorithm, with hidden hold-out workloads, under sessions/m26-adrs/day-06-evaluation-engineering-holdout/:
 
-1. experiments/week19_adrs/sandbox/reference_sort.py — baseline that wraps Python's built-in sorted() as the correctness oracle.
-2. experiments/week19_adrs/sandbox/candidates/ — at least 2 candidate sort implementations: one correct and reasonable (e.g. a clean quicksort or mergesort), one deliberately flawed the way a reward-hacking LLM might write it (e.g. only sorts a prefix, or mutates and returns the input).
-3. experiments/week19_adrs/sandbox/test_correctness_visible.py — pytest with parametrized "normal" cases (random arrays, a few sizes/ranges) that would be quoted back to an LLM in its feedback prompt.
-4. experiments/week19_adrs/sandbox/test_correctness_hidden.py — pytest, kept logically separate with a "DO NOT SHOW TO MODEL" header, covering: empty list, single element, all-duplicates, already-sorted, reverse-sorted, one large-scale stress case, and at least one adversarial/type-edge case.
-5. experiments/week19_adrs/sandbox/test_speed_benchmark.py — pytest-benchmark timing test producing --benchmark-json=results.json with mean/stddev per candidate.
-6. experiments/week19_adrs/sandbox/run_eval.py — a driver that runs both correctness suites and the benchmark for a given candidate path, returning {correctness_visible, correctness_hidden, speed_mean_s, rejected_reason}.
-7. experiments/week19_adrs/RESULTS.md — a short writeup: table of each candidate's visible-vs-hidden pass/fail and timing, one sentence per candidate on why it passed or failed, and one sentence connecting the visible/hidden gap to reward hacking / overfitting.
+1. sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py — baseline that wraps Python's built-in sorted() as the correctness oracle.
+2. sessions/m26-adrs/day-06-evaluation-engineering-holdout/sandbox/candidates/ — at least 2 candidate sort implementations: one correct and reasonable (e.g. a clean quicksort or mergesort), one deliberately flawed the way a reward-hacking LLM might write it (e.g. only sorts a prefix, or mutates and returns the input).
+3. sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py — pytest with parametrized "normal" cases (random arrays, a few sizes/ranges) that would be quoted back to an LLM in its feedback prompt.
+4. sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py — pytest, kept logically separate with a "DO NOT SHOW TO MODEL" header, covering: empty list, single element, all-duplicates, already-sorted, reverse-sorted, one large-scale stress case, and at least one adversarial/type-edge case.
+5. sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py — pytest-benchmark timing test producing --benchmark-json=results.json with mean/stddev per candidate.
+6. sessions/m26-adrs/day-06-evaluation-engineering-holdout/experiment.py — a driver that runs both correctness suites and the benchmark for a given candidate path, returning {correctness_visible, correctness_hidden, speed_mean_s, rejected_reason}.
+7. sessions/m26-adrs/day-06-evaluation-engineering-holdout/RESULTS.md — a short writeup: table of each candidate's visible-vs-hidden pass/fail and timing, one sentence per candidate on why it passed or failed, and one sentence connecting the visible/hidden gap to reward hacking / overfitting.
 
 Make sure hidden-suite failures never leak the literal failing input back into any feedback string — only a coarse pass/fail category. Run every acceptance-criteria command and confirm the outputs match.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> "hidden" is a property of what information ever reaches the LLM's context, not where the file lives. If your driver's error messages print the exact failing hidden array, you've silently converted your hold-out set into a second visible set the moment the next generation's prompt quotes it. Return only a coarse category ("failed hidden correctness check," maybe "large-N timeout") — never the literal input or expected output.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-19/day-06-log.md</code>: which candidate would a naive evaluator (checking only "no crash" and "same length") have wrongly crowned the winner, and what specific hidden test caught it?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m26-adrs/day-06-evaluation-engineering-holdout/log.md</code>: which candidate would a naive evaluator (checking only "no crash" and "same length") have wrongly crowned the winner, and what specific hidden test caught it?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -372,9 +377,9 @@ Make sure hidden-suite failures never leak the literal failing input back into a
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-05-reward-hacking-threat.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reward Hacking Threat</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../week-20/day-01-mathematical-discovery-funsearch.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
+  <a class="lnav prev" href="../day-05-reward-hacking-threat/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Reward Hacking Threat</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-07-mathematical-discovery-funsearch/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Mathematical Discovery (FunSearch)</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -468,9 +473,9 @@ else if(!RM && 'IntersectionObserver' in window){
 
 /* QUIZ */
 var QS=[
- {q:'1. In the ADRS generate-evaluate-select loop, what is the specific role of <code>pytest-benchmark</code>, as distinct from plain <code>pytest</code>?',
-  opts:['It discovers and runs test_* functions and reports pass/fail','It statically analyzes candidate source code for banned imports before execution','It repeatedly times a function call, controls for warm-up/noise, and reports statistics used as the fitness score','It formally proves an invariant holds across all reachable states'],
-  ans:2, fb:'Right. pytest is the correctness gate (pass/fail via assertions); pytest-benchmark is the fitness function that produces the calibrated timing statistic the evolutionary loop\'s selection step ranks candidates by.'},
+ {q:'1. You built a hidden hold-out suite, and your champion passes 100% of BOTH the visible and the hidden suite with a great benchmark score — yet it fails on genuinely new production inputs. Nothing errored. Where do you look first, and why?',
+  opts:['pytest-benchmark mis-timed the runs, so re-run the benchmark on a quieter machine','Check how the hidden suite was generated: if it shares the visible suite\'s random seed or distribution (or its cases overlap the visible ones), it is not really held out — a candidate that overfit visible also passes hidden, so the hold-out silently stopped protecting you','The sandbox timeout is too short, so the good candidates were killed early','Nothing is wrong — passing a hidden suite guarantees the solution generalizes'],
+  ans:1, fb:'Right. A hold-out only works if it is independent of what the search can see. If visible and hidden are drawn from the same generator/seed or overlap, then overfitting to visible also passes hidden — hidden is just the same data with a different label (train/eval leakage). The tell is passing BOTH suites yet failing in production. The first move is to verify the hidden suite is generated independently and varies an axis the visible suite didn\'t (reverse-sorted, all-duplicates), and that the two case sets do not intersect. The benchmark and the sandbox aren\'t the issue — the hold-out\'s independence is.'},
  {q:'2. Why must the hidden hold-out suite include <em>distributional</em> shifts (reverse-sorted, many-duplicate, nearly-sorted arrays), not just larger arrays of the same visible distribution?',
   opts:['Larger arrays always take longer to test, which slows down the evaluation loop','pytest-benchmark cannot time arrays above a fixed size','An LLM candidate can overfit to the algorithmic shape of the visible workload, not just its size — distributional edge cases catch algorithm-specific worst cases that size alone would miss','TLA+ requires distributional diversity in its state space definition'],
   ans:2, fb:'Right. Overfitting can happen along any axis the LLM can detect — size, value range, or structural shape. Hidden tests must vary the axis the visible suite didn\'t, specifically to catch algorithm-specific worst cases like a reverse-sorted array breaking naive quicksort.'},

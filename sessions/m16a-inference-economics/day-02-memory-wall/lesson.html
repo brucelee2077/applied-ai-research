@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-inference-mechanics.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Inference Mechanics</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-batching-economics.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav prev" href="../day-01-inference-mechanics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Inference Mechanics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batching Economics</span></a>
 </nav>
 
 
@@ -298,6 +298,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha most people miss:</b> at batch 1 the <em>weights</em> dominate, but decode also reads the entire <b>KV cache</b> for the sequence — and that read is memory-bound too. KV bytes scale with batch <code>B</code> and context length while weight bytes stay fixed. So at large batch / long context the KV cache becomes the <em>new</em> wall. The clean "1 FLOP/byte → weights dominate" proof holds only in the <b>small-batch, short-context</b> regime — state that assumption out loud. (This is exactly why Pope et al. push MQA.)</div></div>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> two memories → weights must cross the slow bandwidth link → one token reuses each weight only once → intensity ≈ 1 ≪ ridge → time = bytes/bandwidth → every inference optimization is a move to raise intensity or shrink the bytes.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The memory wall means the bottleneck you can see (FLOPs) is usually not the one that sets your speed (bytes). That mismatch is where the quiet mistakes hide.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): estimating decode throughput from the chip's peak FLOPs.</b> A tempting bug is to size expected tokens/sec (or how many GPUs you need) from the accelerator's advertised TFLOP/s number. Nothing errors — you get a clean, confident estimate — but decode at batch 1 is memory-bound, so the real ceiling is <code>weight_bytes ÷ HBM_bandwidth</code>, which can be 100&times; lower than the FLOP-based guess. You then under-provision hardware and miss your latency target with no bug to find. In <b>code review</b>, a senior engineer checks that any decode throughput or capacity estimate divides by <em>memory bandwidth</em>, not peak FLOPs, whenever arithmetic intensity is below the ridge point.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: shrinking the bytes usually costs precision or complexity.</b> Since decode time is proportional to bytes read, the strongest levers all reduce bytes — but each has a bill. Quantizing weights to int8 halves the bytes and roughly doubles throughput, but gives up numeric precision and can hurt quality on outlier-heavy layers. MQA/GQA shrink the KV cache but slightly reduce model capacity. In a <b>design review</b> the decision is not "should we go faster" but "how much accuracy or model quality are we willing to trade for that bandwidth relief" — and that answer depends on the product's quality bar.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -337,13 +342,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>A <code>results.md</code> states the one-sentence claim and shows the two time bars side by side: <strong>7.0 ms memory</strong> vs <strong>0.045 ms compute</strong> for 7B bf16.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>experiments/week6-tue-memory-wall/memory_wall_proof.py</code> plus <code>results.md</code> in the same folder, following the five bullets above. Remember to state the small-batch / short-context assumption (the KV cache caveat) in <code>results.md</code>.</p>
+      <p>Create <code>sessions/m16a-inference-economics/day-02-memory-wall/experiment.py</code> plus <code>results.md</code> in the same folder, following the five bullets above. Remember to state the small-batch / short-context assumption (the KV cache caveat) in <code>results.md</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 6 Day 2 artifact.
 
-Create experiments/week6-tue-memory-wall/memory_wall_proof.py (pure Python/NumPy, no ML deps) plus results.md in the same folder. The script must prove single-token decode is memory-bound.
+Create sessions/m16a-inference-economics/day-02-memory-wall/experiment.py (pure Python/NumPy, no ML deps) plus results.md in the same folder. The script must prove single-token decode is memory-bound.
 
 1. In comments/markdown, derive arithmetic intensity for a decode matmul:
    FLOPs = 2*d_out*d_in*B, bytes = bytes_per_param*d_out*d_in,
@@ -370,7 +375,7 @@ at large batch / long context).
 Then run it and confirm exit code 0.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Prove the RIGHT number.</b> At batch 1 the weights dominate, but a full proof also accounts for the <b>KV cache</b> read (also memory-bound, and it grows with batch and context). State the small-batch, short-context assumption explicitly — otherwise you'll wrongly conclude batching is a free lunch.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-06/day-02-log.md</code>: for a 7B bf16 model on 2 TB/s HBM, why does the token rate stay ~143 tok/s no matter how fast the chip's multipliers are?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-02-memory-wall/log.md</code>: for a 7B bf16 model on 2 TB/s HBM, why does the token rate stay ~143 tok/s no matter how fast the chip's multipliers are?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -384,9 +389,9 @@ Then run it and confirm exit code 0.</pre>
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-inference-mechanics.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Inference Mechanics</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-batching-economics.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batching Economics</span></a>
+  <a class="lnav prev" href="../day-01-inference-mechanics/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">Inference Mechanics</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-batching-economics/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Batching Economics</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -466,7 +471,7 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
    diagram primitives, raw <svg>, or a .build-embed iframe to a sessions/viz page); `note`
    is the short explanation beside it. Engine below is fixed across all lessons. */
 var BUILD=[
- {viz:'<div class="build-embed"><iframe src="../viz/roofline.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../viz/roofline.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
+ {viz:'<div class="build-embed"><iframe src="../../viz/roofline.html" title="Interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/roofline.html" target="_blank" rel="noopener">open full screen &#8599;</a></div></div>',
   note:'<b>Play with this first.</b> This is the roofline chart, live. Drag the arithmetic-intensity control and watch the dot move: on the sloped part you are memory-bound, on the flat part you are compute-bound, and the corner is the ridge point. Get a feel for it, then scroll and we\'ll build every piece from scratch below.'},
  {viz:'<div class="dgram"><span class="node v" style="padding:.6rem 1rem">HBM<br><span style="font-weight:400;font-size:.72rem">80 GB · all weights</span></span><span class="arrow">— bandwidth 2 TB/s →</span><span class="node" style="padding:.6rem 1rem">SRAM<br><span style="font-weight:400;font-size:.72rem">~20 MB · next to ALUs</span></span></div>',
   note:'<b>Two tiers of memory.</b> The big pool (HBM) holds every weight. The tiny scratchpad (SRAM) sits next to the arithmetic units. Nothing gets multiplied until it crosses that one arrow — the memory bandwidth link.'},

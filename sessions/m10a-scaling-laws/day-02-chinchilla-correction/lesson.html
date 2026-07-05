@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-01-kaplan-paradigm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Kaplan Paradigm</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-isoflops-methodology.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The IsoFLOPs Methodology</span></a>
+  <a class="lnav prev" href="../day-01-kaplan-paradigm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Kaplan Paradigm</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-isoflops-methodology/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">IsoFlops Methodology</span></a>
 </nav>
 
 
@@ -287,6 +287,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Convergent evidence</strong> — three methods, three different assumptions, same conclusion is much stronger evidence than one fit, which is exactly why the field trusted the correction.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> fixed compute budget <code>C</code> (Week 5 Day 1) → compute identity <code>C ≈ 6ND</code> forces a trade-off between <code>N</code> and <code>D</code> → a biased fitting procedure (Kaplan) can silently distort that trade-off → a more careful, triple-checked fit (Chinchilla) corrects it and reshapes how every lab since has trained models.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Chinchilla is a lesson in how a fit can be confidently wrong, and in what "compute-optimal" does and doesn't buy you.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a biased fitting procedure that never errors.</b> Kaplan's fixed schedule length across model sizes stopped small models before their loss floor. There is no crash and the power laws look clean — but the exponents come out systematically tilted toward "bigger model." An entire generation of models (Gopher, GPT-3-era) was sized on that quietly-wrong fit. A senior engineer distrusts a scaling result until it's reproduced by an <em>independent</em> method (Chinchilla used three).</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: compute-optimal for training vs. cheap to serve.</b> Chinchilla-optimal (a smaller model on more tokens) matches Kaplan-era quality at equal <em>training</em> compute and is far cheaper to serve, since inference cost scales with <code>N</code>. But it needs more data <code>D</code> (pressing on the data wall) and longer wall-clock. Labs often deliberately train <em>past</em> Chinchilla-optimal — a smaller model on even more tokens (e.g. LLaMA) — because lifetime inference savings outweigh the extra training cost. That's a <b>design-review</b> decision about where the model will spend its life.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -327,13 +332,13 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li>Produce one plot: loss vs. <code>N</code> at several fixed <code>C</code> (IsoFLOP curves), minima marked, saved as a PNG in the same directory.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Write <code>experiments/week05_jax/day2_chinchilla_correction/chinchilla_isoflop.py</code> (plus a <code>plot.png</code> in the same directory) with the five bullets above.</p>
+      <p>Write <code>sessions/m10a-scaling-laws/day-02-chinchilla-correction/experiment.py</code> (plus a <code>plot.png</code> in the same directory) with the five bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 5 Day 2 artifact.
 
-Create experiments/week05_jax/day2_chinchilla_correction/chinchilla_isoflop.py (plus a plot.png in the same directory) that:
+Create sessions/m10a-scaling-laws/day-02-chinchilla-correction/experiment.py (plus a plot.png in the same directory) that:
 1. Implements the parametric loss surface L(N,D) = E + A/N^a + B/D^b using the paper's reported constants (E=1.69, A=406.4, B=410.7, a=0.34, b=0.28).
 2. For at least 6 compute budgets spanning 1e19 to 1e24 FLOPs, numerically solves (grid search or scipy.optimize, respecting C=6ND) for the loss-minimizing N*(C) and D*(C).
 3. Fits a log-log regression of N* vs C and D* vs C to recover empirical exponents, printing them, and prints a comparison line against Kaplan's reported 0.73/0.27.
@@ -343,7 +348,7 @@ Acceptance criteria: script runs end-to-end with python3 chinchilla_isoflop.py w
 Add a brief comment on each step explaining the math, then run it to confirm it works.</pre>
       </div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Gotcha:</b> don't treat "20 tokens per parameter" as a universal constant. It is the ratio that fell out of Chinchilla's fitted constants at the scales DeepMind tested (up to ~1e24 FLOPs, 16B params) — not a fixed law. The real invariant is the <strong>equal scaling exponents</strong> (both near 0.5). At different scales, tokenizers, or architectures, the fitted constants shift and the optimal ratio shifts with them. Later replication analyses (e.g. Epoch AI, 2024) found the paper's confidence intervals were wide; the qualitative conclusion about Kaplan's undertraining held up, but the exact "20x" number is scale-and-setup-specific, not gospel.</div></div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-05/day-02-log.md</code>: why did Meta (LLaMA) and Google (PaLM 2) sometimes train <em>past</em> the Chinchilla-optimal point on purpose? (Hint: training FLOPs vs. inference FLOPs.)</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m10a-scaling-laws/day-02-chinchilla-correction/log.md</code>: why did Meta (LLaMA) and Google (PaLM 2) sometimes train <em>past</em> the Chinchilla-optimal point on purpose? (Hint: training FLOPs vs. inference FLOPs.)</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -357,9 +362,9 @@ Add a brief comment on each step explaining the math, then run it to confirm it 
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-01-kaplan-paradigm.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Kaplan Paradigm</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-03-isoflops-methodology.html"><span class="lnav-dir">Next →</span><span class="lnav-t">The IsoFLOPs Methodology</span></a>
+  <a class="lnav prev" href="../day-01-kaplan-paradigm/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">The Kaplan Paradigm</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-03-isoflops-methodology/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">IsoFlops Methodology</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

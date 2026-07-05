@@ -198,9 +198,9 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 <main>
 
 <nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="day-02-moe-scaling-deviations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
+  <a class="lnav prev" href="../day-02-moe-scaling-deviations/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-distributed-moe-routing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
 </nav>
 
 
@@ -285,6 +285,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Production consequence</strong> — dropped tokens don't get an error; the model just skips that expert's transformation for them that layer (often via a residual/identity pass-through), silently degrading quality on whichever tokens got unlucky. Tuning <code>α</code> and <code>capacity_factor</code> together is a real trade-off: too little balancing pressure risks collapse, too much can slightly hurt the primary language-modeling loss, and too tight a capacity risks dropping a lot of tokens.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> random early imbalance → favored experts get more gradient signal → they get better → router favors them even more → collapse, unless the auxiliary loss's constant pressure toward uniform <code>f_i, P_i</code> counteracts it, and a hard per-expert capacity limit catches whatever imbalance survives training.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Load balancing is the whole reason this day exists, so the failure to name is the one it is meant to prevent — routing collapse — and the trade-off is how hard you push to prevent it.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): router collapse to a few experts.</b> If the balancing pressure is too weak (<code>α</code> too small, or the aux loss wired up wrong so its gradient never reaches the router), a handful of experts win almost all the tokens. The rest receive so few tokens that they get almost no gradient and stay near their initialization — effectively dead weight. Nothing crashes: the training loss still goes down because the few live experts carry the batch, so the run looks healthy. But you paid the memory for <code>N</code> experts and are getting the effective capacity of a few. In <b>code review</b> a senior engineer refuses to trust loss alone and asks for a per-expert token-count histogram (or the value of <code>loss_aux</code> itself): if it sits well above the <code>α</code> floor, or a few experts hold most of the mass, the router has collapsed.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: balancing pressure (<code>α</code>) versus the primary loss.</b> The auxiliary loss is added to the language-modeling loss, so it competes with it. Turn <code>α</code> up and you force even routing and avoid collapse — but you spend gradient budget on balancing instead of prediction, which can slightly raise the primary loss. Turn it down and the model optimizes prediction harder but risks collapse. The same tension shows up in <code>capacity_factor</code>: bigger buffers drop fewer tokens but waste compute and memory. In a <b>design review</b>, tuning <code>α</code> and <code>capacity_factor</code> together is the explicit decision between balanced-but-slightly-constrained training and cheaper-but-collapse-prone training.</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
   </section>
@@ -326,20 +331,20 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </ul>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>The gotcha:</b> don't confuse the two mechanisms. The auxiliary loss is a <em>training-time</em> incentive that shapes the router's weights over many steps — it can't guarantee any single batch is perfectly balanced. Expert capacity is an <em>inference/forward-pass-time</em> hard limit that drops tokens no matter how well-trained the router is, whenever a batch happens to be locally uneven. A well-trained router (low loss_aux) still needs a capacity buffer greater than 1.0x to avoid meaningful drop rates in practice.</div></div>
       <h4>Option A · write it yourself</h4>
-      <p>Build <code>experiments/week07_jax/moe_load_balancing.py</code> (plus a short <code>README.md</code> or docstring writeup in the same directory) with the four bullets above, using JAX/NumPy.</p>
+      <p>Build <code>sessions/m14a-mixture-of-experts/day-03-load-balancing-problem/experiment.py</code> (plus a short <code>README.md</code> or docstring writeup in the same directory) with the four bullets above, using JAX/NumPy.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Week 7 Day 3 artifact.
 
-Create experiments/week07_jax/moe_load_balancing.py (plus a short README.md or docstring writeup in the same directory) that:
+Create sessions/m14a-mixture-of-experts/day-03-load-balancing-problem/experiment.py (plus a short README.md or docstring writeup in the same directory) that:
 1. Simulates a batch of T=2048 synthetic tokens and N=8 experts with router logits deliberately skewed so 2 experts get ~3x the average softmax weight, reproducing routing collapse.
 2. Implements expert_capacity = (T/N) * capacity_factor and a dispatch loop that drops tokens once an expert's running counter hits capacity, tracking dropped_token_count and drop_rate for capacity_factor in {1.0, 1.25, 1.5, 2.0}, printing the real drop_rate for each.
 3. Implements the Switch Transformer auxiliary loss loss_aux = alpha * N * sum_i(f_i * P_i) as a JAX function on per-token router softmax outputs. Verify numerically that perfectly uniform routing gives loss_aux = alpha (the constant-minimum property from the paper), and that the skewed/collapsed distribution gives a strictly higher loss_aux.
 4. Runs a toy gradient-descent loop (a few hundred steps, plain JAX autodiff) on only the router's logits, using loss_aux as the sole objective, and plots how f_i and P_i converge toward 1/N over steps, saved as load_balance_convergence.png.
-Must run end-to-end with `python experiments/week07_jax/moe_load_balancing.py` with no errors. Print, for each capacity_factor, the resulting drop_rate as a real number, and print loss_aux for both the uniform and skewed cases. End with a short plain-language summary of what the capacity-factor-vs-drop-rate trade-off and the loss convergence demonstrate, tying back to the Switch Transformer and GShard papers' claims.</pre>
+Must run end-to-end with `python sessions/m14a-mixture-of-experts/day-03-load-balancing-problem/experiment.py` with no errors. Print, for each capacity_factor, the resulting drop_rate as a real number, and print loss_aux for both the uniform and skewed cases. End with a short plain-language summary of what the capacity-factor-vs-drop-rate trade-off and the loss convergence demonstrate, tying back to the Switch Transformer and GShard papers' claims.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/week-07/day-03-log.md</code>: at which <code>capacity_factor</code> did your <code>drop_rate</code> first fall below 1%, and does that match what the load-balancing loss convergence plot would predict?</div></div>
+      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m14a-mixture-of-experts/day-03-load-balancing-problem/log.md</code>: at which <code>capacity_factor</code> did your <code>drop_rate</code> first fall below 1%, and does that match what the load-balancing loss convergence plot would predict?</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
   </section>
@@ -353,9 +358,9 @@ Must run end-to-end with `python experiments/week07_jax/moe_load_balancing.py` w
 </main>
 
 <nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="day-02-moe-scaling-deviations.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="day-04-distributed-moe-routing.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
+  <a class="lnav prev" href="../day-02-moe-scaling-deviations/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">MoE Scaling Deviations</span></a>
+  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
+  <a class="lnav next" href="../day-04-distributed-moe-routing/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Distributed MoE Routing</span></a>
 </nav>
 
 <footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
