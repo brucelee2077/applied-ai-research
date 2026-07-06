@@ -18,8 +18,11 @@ use different "Why it matters" headers.
 ## Decision
 
 **Scope for this pass:** deepen the 19 existing M01–M04 lessons now. Propagating the pattern
-to M05–M29 is deferred — tracked as a watchlist note, not scheduled (mirrors how the
-2026-07-04 Staff-lens retrofit was sequenced: principle first, curriculum-wide sweep later).
+to M05–M29 is deferred — tracked as a watchlist note, not scheduled. (Note: the 2026-07-04
+Staff-lens retrofit was in fact swept curriculum-wide the same day it was decided — see
+`ROADMAP.md` lines ~553–560 — so this narrower M01–M04-only scope is a deliberate choice for
+this pass, per the user's explicit answer during brainstorming, not a repeat of how Staff-lens
+happened to play out.)
 
 **Content specificity:** name real systems by title — a specific model, paper, or product
 with a verifiable number — rather than staying abstract. Facts were checked against primary
@@ -30,10 +33,12 @@ config…") rather than presented as a verbatim paper citation.
 
 **Structural placement — two touchpoints per lesson, no new sections:**
 1. **Earlier hook** — a new short callout appended to the end of section 1 ("是什么 What is
-   it"), reusing the existing `.callout.c-info` style with a new 🏭 icon (matches the
-   Production/real-world emoji convention). One or two sentences naming the same system used
-   in section 4, as a teaser. No new `.sec` element — the progress-bar JS counts `.sec`
-   elements, so this must live inside the existing section 1 body.
+   it"), reusing the existing `.callout.c-info` style with a new 🏭 icon (already used
+   elsewhere in the curriculum for factory/production-line imagery; reused here for
+   "real production system" callouts — a new but consistent pairing, not an existing
+   Layer-2-markdown convention). One or two sentences naming the same system used in section
+   4, as a teaser. No new `.sec` element — the progress-bar JS counts `.sec` elements, so
+   this must live inside the existing section 1 body.
 2. **Deepened section 4** — the existing `<h4>Why a frontier lab cares</h4>` paragraph is
    rewritten to *open* with the named system + verified number, keep the existing abstract
    mechanism explanation after it, and leave the "Remember this chain" callout as-is (it's
@@ -94,10 +99,26 @@ Anchor rule in `TEACHING_PRINCIPLES.md` — same pattern as the existing Staff L
 ### 4. The 19 lesson files themselves
 Each of the 19 `lesson.html` files listed in the fact table gets:
 - One new `.callout.c-info` (🏭 icon) appended at the end of section 1.
-- Section 4's `<h4>Why a frontier lab cares</h4>` paragraph rewritten per the fact table.
+- Section 4's frontier-relevance paragraph rewritten per the fact table.
 No other section is touched. No new `.sec` elements. `lesson-before.html`, `compare.html`,
 `experiment.py`, `log.md` in `day-03-broadcasting-dtypes/` are the user's own in-progress
 files and are left untouched.
+
+**Structural exceptions found while auditing the 19 targets** (confirmed by grep, not
+assumed):
+- 17 of 19 use `<h4>Why a frontier lab cares</h4>` — rewrite that paragraph directly.
+- **M02 D8 (learning-rate) and M02 D9 (train-val-test)** don't have an `<h4>` at all — the
+  phrase is the bold lead-in inside the existing `<div class="callout c-info">…<b>Why a
+  frontier lab cares:</b> …</div>` block. Retarget that inline lead-in instead of looking for
+  an `<h4>`.
+- **M02 D7 (optimizers) and M02 D9 (train-val-test)** each have a *second*, shorter echo of
+  the same phrase inside a section-5 BUILD-step `note:` JS string (the final scroll-reveal
+  step restates the section-4 takeaway in one line). When rewriting section 4 for these two,
+  also update that echoed note so it stays consistent with the new named-system claim — but
+  keep it a one-line callback, not a second full deepening.
+- General fallback for any further mismatch discovered mid-pass: if section 4's
+  frontier-relevance text isn't in `<h4>` form, retarget the equivalent prose block; don't
+  stop to ask, just keep the meaning and note the deviation in the commit.
 
 ## Scope
 
