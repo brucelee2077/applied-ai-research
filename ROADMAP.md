@@ -53,6 +53,8 @@ These are **self-paced modules, not calendar weeks.** A module is a themed miles
 
 **Staff-lens bar** *(added 2026-07-04)*: any lesson with a Mechanism/math section needs a named **failure-mode** callout and a named **trade-off** callout, plus at least one diagnostic-style quiz question — see the Staff Lens rule in `.claude/skills/frontier-session-coach/TEACHING_PRINCIPLES.md`. Model: `attention-lab-course/modules/04-the-math.html`.
 
+**Industry-anchor bar** *(added 2026-07-06)*: the "why a frontier lab cares" passage in section 4 must name one real, verifiable system (not "a frontier lab" in the abstract), with a matching teaser callout in section 1 — see the Industry Anchor rule in `.claude/skills/frontier-session-coach/TEACHING_PRINCIPLES.md`.
+
 **Legend**
 
 | Marker | Meaning |

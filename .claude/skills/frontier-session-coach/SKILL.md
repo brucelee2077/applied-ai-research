@@ -109,7 +109,8 @@ Engine hooks the inline JS depends on (copy from reference page, do not rename):
 4. **机制/为什么 Mechanism & why** — the precise rule + the reason it matters for frontier
    labs. Define every term (compiler, XLA, etc.) on first use. End with a one-line causal chain.
    Include a named failure-mode callout and a named trade-off callout — see Staff Lens in
-   `TEACHING_PRINCIPLES.md`.
+   `TEACHING_PRINCIPLES.md`. The frontier-relevance passage must name a real system — see
+   Industry Anchor in `TEACHING_PRINCIPLES.md`.
 5. **Build it up (scroll-reveal visual)** — `data-sec="build"`. NOT a click-through code
    stepper (the user dislikes clicking "Next" through 20 text steps — see the
    `lesson-walkthrough-scroll-reveal` memory). Instead: a data-driven `var BUILD=[{viz, note}, …]`

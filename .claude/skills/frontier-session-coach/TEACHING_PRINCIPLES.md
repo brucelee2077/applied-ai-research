@@ -62,6 +62,25 @@ named failure mode is what makes the mechanism stick. Two requirements:
    metric looks off — where do you look first, and why?" Recall questions are fine for the
    other three; at least one must force the reader to reason like they're debugging.
 
+## Industry Anchor
+*(applies to every lesson's "Frontier-lab relevance" layer — section 4's "why a frontier lab
+cares" content, and its teaser in section 1)*
+
+"A frontier lab" and "a 7-billion-parameter model" are not concrete enough. Name a real,
+verifiable system:
+
+1. **Section 4's frontier-relevance paragraph must open by naming one real system** — a
+   specific model, paper, or product — with a specific number attached (a parameter count, a
+   token count, a precision format, a paper's finding). Not "modern frameworks" or "a frontier
+   lab"; say "DeepSeek-V3" or "Meta's Llama 3" or "Kaplan et al.'s 2020 scaling-law paper."
+2. **Section 1 gets a matching one-to-two-sentence teaser callout** — same named system, same
+   fact, compressed — appended at the end of section 1's body (reuse the existing
+   `.callout.c-info` style, icon 🏭), so the reader meets the real-world hook before the
+   mechanism, not only after it. This does not add a new `.sec` element.
+3. **Facts must be well-established or paper-verified.** If you can't independently confirm a
+   number against a primary source, hedge the language ("Meta has reported…", "per its
+   published config…") rather than presenting it as a verbatim citation.
+
 ## Language rule
 - **Write in English.** The user is comfortable reading English and prefers it.
 - Use Chinese only when it genuinely aids comprehension of a specific nuance — which is rare.

@@ -20,11 +20,14 @@ disabled `<span>`; last day: next points back to `../index.html`.
 
 ## Sections (the teaching arc)
 1. **是什么 What is it** — Ground Zero Rule: what/why/how-it-relates + prerequisites. Mandatory.
+   Ends with a short named-system teaser callout — see Industry Anchor in
+   `TEACHING_PRINCIPLES.md`.
 2. **直觉 Intuition** — one analogy before code; say where it breaks.
 3. **动手玩 Playground** — interactive demo; learn by clicking. Gate until interacted.
 4. **机制/为什么 Mechanism & why** — the rule + frontier relevance + causal chain. Include a
    named failure-mode callout and a named trade-off callout — see Staff Lens in
-   `TEACHING_PRINCIPLES.md`.
+   `TEACHING_PRINCIPLES.md`. The frontier-relevance passage must name a real system — see
+   Industry Anchor in `TEACHING_PRINCIPLES.md`.
 5. **逐行看 Worked example** — click-through of the real code.
 6. **自测 Quiz** — 4 clickable MCQs with instant feedback. Mandatory. Gate until answered.
    At least one question must be diagnostic-style, not recall — see Staff Lens in
