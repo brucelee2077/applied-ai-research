@@ -69,3 +69,35 @@ experiments/kv-cache-sim/EXPERIMENT_LOG.md
 Tell me whether this counts as a Frontier Lab learning artifact.
 Be warm but strict.
 ```
+
+
+## Audit visuals before rollout
+
+```text
+Use /frontier-visual-auditor.
+
+Review the playgrounds/visuals in these lessons:
+[paths]
+
+For each lesson, classify the visual as:
+- Visual mechanism
+- Interactive calculator
+- Terminal walkthrough
+- Static explanation
+- Missing visual
+
+Score each from 1–5.
+Identify P0 upgrades before batch rollout.
+Do not modify files yet.
+```
+
+## Upgrade top two visuals
+
+```text
+Use /frontier-d3-visual-lab.
+
+Based on the visual audit, upgrade only the top two P0 visuals.
+Preserve navigation, localStorage progress, quiz mechanics, playground behavior, and file paths.
+Add "What you should notice", "Common misconception", and "Where this visual simplifies reality".
+Do not refactor unrelated lessons.
+```

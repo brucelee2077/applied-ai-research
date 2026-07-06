@@ -3,20 +3,20 @@
 ## 1. Unzip
 
 ```bash
-unzip frontier_lab_claude_skills_v2.zip
+unzip frontier_lab_claude_skills_v2.1.zip
 ```
 
 ## 2. From your repo root, create a branch
 
 ```bash
-git checkout -b refactor/coach-skills-v2
+git checkout -b refactor/coach-skills-v2.1
 ```
 
 ## 3. Replace current skill pack
 
 ```bash
 rm -rf frontier_lab_claude_skills
-cp -R frontier_lab_claude_skills_v2 frontier_lab_claude_skills
+cp -R frontier_lab_claude_skills_v2.1 frontier_lab_claude_skills
 ```
 
 ## 4. Install as project-local Claude Code skills
@@ -33,7 +33,7 @@ cp -R frontier_lab_claude_skills/skills/* .claude/skills/
 find .claude/skills -maxdepth 2 -name SKILL.md | sort
 ```
 
-Expected: 11 skills.
+Expected: 12 skills.
 
 ## 6. Start Claude Code
 

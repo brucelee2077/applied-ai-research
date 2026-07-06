@@ -1,78 +1,79 @@
-# What Changed in v2
+# What Changed in v2.1
 
 ## Diagnosis
 
-The original skill pack was good for creating new artifacts:
+v2 solved the first important problem:
 
-- new courseware
-- new paper notes
-- new D3 pages
-- new experiments
-- weekly portfolio packaging
+> The sessions felt too dry and math-heavy.
 
-But the current `sessions/` repo needs a different job:
+It added:
 
-> safely upgrade existing lesson HTML files without breaking navigation, localStorage progress, quiz behavior, playground behavior, or repo structure.
+- Coach Layer
+- Math Ladder
+- bilingual support
+- artifact review
+- curriculum refactor workflow
 
-## v2 changes
+But the pilot revealed a second problem:
 
-### 1. Added curriculum refactor orchestration
+> Many playgrounds are still simulated terminal walkthroughs, not strong visual learning tools.
 
-New skill:
+They are useful, but not always enough to create the “I can see it now” moment.
 
-- `frontier-curriculum-refactor`
+## v2.1 changes
 
-It exists to plan and run a safe pilot, not randomly rewrite the whole repo.
+### 1. Added `frontier-visual-auditor`
 
-### 2. Added coach voice upgrade
+This skill reviews existing lesson visuals and scores whether they are good enough for concept understanding.
 
-New skill:
+It classifies each lesson as:
 
-- `frontier-lesson-humanizer`
+- Visual mechanism
+- Interactive calculator
+- Terminal walkthrough
+- Static explanation
+- Missing visual
 
-It adds:
+### 2. Strengthened `frontier-d3-visual-lab`
 
-- warm opening hook
-- intuition-first teaching
-- everyday analogy
-- systems analogy
-- where analogy breaks
-- Staff / Research Engineer Lens
-- interview-ready explanation
-- stronger Produce artifact
+The skill now requires every visualization to answer one learning question and include:
 
-### 3. Added math clarity layer
+- what you should notice
+- misconception note
+- where the visual lies / simplifies reality
+- controls only when they teach something
 
-New skill:
+It explicitly warns that terminal-style playgrounds are not enough for abstract math and systems concepts.
 
-- `frontier-math-unfogger`
+### 3. Strengthened `frontier-curriculum-refactor`
 
-It turns formula-heavy material into:
+Rollout should now include a visual audit before batch edits.
 
-- problem
-- intuition
-- symbols
-- tiny-number example
-- formula
-- sanity check
-- common mistake
-- code connection
-- frontier relevance
+Each batch should identify:
 
-### 4. Added artifact reviewer
+- which lessons already have acceptable visuals
+- which need interactive calculators
+- which need D3/SVG mechanism visuals
+- which should remain text/code focused
 
-New skill:
+### 4. Strengthened `frontier-lesson-humanizer`
 
-- `frontier-artifact-reviewer`
+When a lesson has a terminal-only playground, the humanizer should flag whether it needs a visual upgrade instead of silently accepting it.
 
-It reviews outputs using:
+## Recommended next workflow
 
-- correctness
-- depth of understanding
-- artifact quality
-- frontier-lab relevance
-- next improvement
+```text
+/frontier-visual-auditor
+→ /frontier-d3-visual-lab for the top 1–2 hard concepts
+→ /frontier-curriculum-refactor for batch rollout
+```
 
-### 5. Reformatted and strengthened existing skills
+## Definition of a good visualization
 
-The original skill files had the right intent, but they were too compressed and too generation-oriented. v2 keeps them focused while making them more reliable for Claude Code.
+A good visualization should help the learner answer:
+
+1. What is moving, growing, routing, shrinking, or transforming?
+2. Which variable controls it?
+3. What should I notice?
+4. What misconception does this prevent?
+5. What frontier-lab decision does this affect?

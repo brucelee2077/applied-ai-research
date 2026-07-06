@@ -1,4 +1,4 @@
-# Frontier Lab Claude Skills Pack v2
+# Frontier Lab Claude Skills Pack v2.1
 
 This is a drop-in replacement / upgrade for `frontier_lab_claude_skills`.
 
@@ -55,12 +55,13 @@ Use this order:
 5. `/frontier-artifact-reviewer` or `/frontier-review-quiz`  
    Review produced artifacts and decide whether the session counts.
 
-## New skills in v2
+## New skills in v2 / v2.1
 
 - `frontier-curriculum-refactor`
 - `frontier-lesson-humanizer`
 - `frontier-math-unfogger`
 - `frontier-artifact-reviewer`
+- `frontier-visual-auditor`  ← new in v2.1
 
 ## Updated skills from v1
 
@@ -81,3 +82,16 @@ Every learning day should create evidence:
 ```text
 Read → Understand → Explain → Implement → Measure → Write → Reflect
 ```
+
+
+## v2.1 visual upgrade
+
+v2.1 adds a stronger visualization bar for the next curriculum-wide refactor.
+
+A lesson playground should usually be one of:
+
+1. **Visual mechanism** — shows flow, shape, matrix, curve, timeline, routing, or scaling.
+2. **Interactive calculator** — sliders / toggles change parameters and outputs.
+3. **Terminal walkthrough** — acceptable only as a fallback or for implementation-heavy lessons.
+
+For abstract math and systems concepts, terminal-only playgrounds are usually not enough.

@@ -144,7 +144,23 @@ Example:
 
 > KV cache reduces autoregressive decoding cost by reusing previously computed key/value tensors, trading compute savings for growing memory pressure as sequence length and batch size increase.
 
-### 11. Produce
+
+### 12. Visual / playground check
+
+If the lesson has a playground, inspect whether it is:
+
+- a real visual mechanism
+- an interactive calculator
+- a terminal walkthrough
+- static explanation only
+
+For hard math or systems concepts, flag terminal-only playgrounds as candidates for visual upgrade.
+
+Do not automatically add complex D3 unless requested. Instead, add a short recommendation:
+
+> Visual upgrade recommended: <one-sentence reason and proposed visual>.
+
+### 12. Produce
 
 End with a concrete artifact.
 

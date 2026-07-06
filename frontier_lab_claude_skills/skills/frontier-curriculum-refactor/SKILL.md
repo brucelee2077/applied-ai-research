@@ -28,7 +28,7 @@ Do not rewrite the whole curriculum in one pass.
 Use:
 
 ```text
-Inspect → Plan → Pilot → Audit → Report → Roll out
+Inspect → Visual Audit → Plan → Pilot → Audit → Report → Roll out
 ```
 
 This is curriculum migration, not vibes-based mass editing.
@@ -72,6 +72,31 @@ Why these:
 - transformer arithmetic: FLOPs and training cost
 - KV cache: inference systems
 - power-law derivation: scaling laws and abstract math
+
+
+## Visual audit before rollout
+
+Before a batch rollout, run a visual audit.
+
+Use `frontier-visual-auditor` to classify each lesson as:
+
+- Visual mechanism
+- Interactive calculator
+- Terminal walkthrough
+- Static explanation
+- Missing visual
+
+For each batch, identify:
+
+1. P0 visual upgrades: hard concept, current visual score below 4
+2. P1 upgrades: useful but not blocking
+3. Lessons where terminal walkthrough is acceptable
+4. Lessons where no visualization is needed
+
+Do not blindly convert every playground to D3.
+Choose visuals based on the learning question.
+
+For hard math or systems lessons, terminal-only playgrounds are usually not enough.
 
 ## Required refactor artifacts
 

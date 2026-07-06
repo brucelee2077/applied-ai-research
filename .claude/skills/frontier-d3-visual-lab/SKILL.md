@@ -82,6 +82,73 @@ Always write or infer:
 - gradient all-reduce
 - idle time from stragglers
 
+
+## Visualization quality bar
+
+For abstract math and systems lessons, a terminal-style playground is usually not enough.
+
+A strong visual should show at least one of:
+
+- shape: curve, line, distribution, surface
+- flow: tokens, gradients, requests, data
+- growth: memory, compute, latency, cost
+- routing: tokens to experts, requests to workers
+- bottleneck: bandwidth, queueing, stragglers
+- transformation: raw scale to log scale, fp16 to int8, sequence to cache
+
+If the current playground only prints staged terminal output, either:
+
+1. upgrade it to a real visual mechanism, or
+2. add an interactive calculator with sliders, or
+3. explicitly document why terminal walkthrough is the right choice.
+
+## Required visual card
+
+Every new or upgraded visual must include:
+
+```html
+<p><strong>What you should notice:</strong> ...</p>
+<p><strong>Common misconception:</strong> ...</p>
+<p><strong>Where this visual simplifies reality:</strong> ...</p>
+```
+
+## Pilot lesson upgrade patterns
+
+### Logs and exponents
+
+Preferred visual:
+- left: normal scale curve
+- right: log-log straight line
+- exponent slider
+- display slope = exponent
+
+### Transformer arithmetic
+
+Preferred visual:
+- N slider
+- D slider
+- forward FLOPs bar
+- backward FLOPs bar
+- total FLOPs
+- effective FLOP/s assumption clearly labeled
+
+### KV cache
+
+Preferred visual:
+- no-cache recomputation triangle
+- cache append-only timeline
+- seq_len slider
+- batch slider
+- cache GB estimate
+
+### Power-law derivation
+
+Preferred visual:
+- left panel: IsoFLOP parabolas with vertices
+- right panel: extracted vertices on log-log axes
+- fitted regression line
+- displayed slope
+
 ## Required page or lesson sections
 
 Every visual should include:

@@ -19,13 +19,14 @@ Pilot files:
 
 Tasks:
 1. Inspect sessions/, _lesson_gen.py, and lesson_audit.py.
-2. Create sessions/COACH_STYLE_GUIDE.md.
-3. Create sessions/enhance_lesson_checklist.md.
-4. Update lesson_audit.py so Chinese is not treated as degraded.
-5. Apply the Coach Layer to only the four pilot lessons.
-6. Preserve navigation, localStorage progress, quiz mechanics, playground mechanics, file paths, and self-contained behavior.
-7. Create sessions/coach_layer_pilot_report.md.
-8. Run available checks and summarize results.
+2. Use /frontier-visual-auditor to assess the four pilot lesson playgrounds before editing.
+3. Create sessions/COACH_STYLE_GUIDE.md.
+4. Create sessions/enhance_lesson_checklist.md.
+5. Update lesson_audit.py so Chinese is not treated as degraded.
+6. Apply the Coach Layer to only the four pilot lessons.
+7. Preserve navigation, localStorage progress, quiz mechanics, playground mechanics, file paths, and self-contained behavior.
+8. Create sessions/coach_layer_pilot_report.md.
+9. Run available checks and summarize results.
 
 Do not refactor unrelated lessons.
 Do not reduce technical depth.

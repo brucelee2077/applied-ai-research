@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
+<title>Frontier Lab · The Capability Spiral</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===========================================================================
+   Hub — same sidebar/Appearance-switcher shell + palette as every lesson
+   (see m01-shape-of-data/day-03-broadcasting-dtypes/lesson.html), restyled
+   for a browse-many-modules landing page instead of a single lesson.
+   =========================================================================== */
+:root{
+  --accent:#8091FF; --accent-d:#6B7BF0; --accent-soft:#1B2340; --on-soft:#EDF1F7;
+  --ok:#5BC98A; --ok-ink:#8FE3AE; --ok-soft:#12271C; --ok-line:#1E7E4C;
+  --radius:16px; --r-sm:8px; --r-md:12px; --r-full:9999px;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.28);
+  --display:'Bricolage Grotesque',Georgia,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;
+}
+html[data-theme="dim"]{--bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;}
+html[data-theme="dark"]{--bg:#10151D; --bg2:#0A0E15; --panel:#18202B; --panel2:#202A36; --panel3:#28323F;
+  --ink:#E9EEF5; --ink2:#B8C2D1; --muted:#8B97A8; --line:#28313F; --line2:#35414F;}
+html[data-theme="midnight"]{--bg:#090C12; --bg2:#05070B; --panel:#10151D; --panel2:#161D28; --panel3:#1E2732;
+  --ink:#E6ECF4; --ink2:#AEB9C8; --muted:#828FA1; --line:#212A37; --line2:#2C3644;}
+html[data-theme="light"]{
+  --bg:#FAF7F2; --bg2:#F1EBE0; --panel:#FFFFFF; --panel2:#FBF7F0; --panel3:#F3EDE3;
+  --ink:#2C2A28; --ink2:#55504A; --muted:#6E675F; --line:#E5DFD6; --line2:#D8D0C4;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-soft:#E4F2F7; --on-soft:#1F6280;
+  --ok:#2D8B55; --ok-ink:#1A5C38; --ok-soft:#E8F5EE; --ok-line:#2D8B55;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--ink);background:var(--bg);line-height:1.6;font-size:16.5px;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(ellipse 110% 55% at 82% -8%,rgba(128,145,255,.10),transparent 60%),
+    radial-gradient(ellipse 90% 50% at 6% 108%,rgba(255,155,92,.06),transparent 60%);
+  background-attachment:fixed;min-height:100vh}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:var(--r-full)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+.layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
+#sidebar{position:sticky;top:0;height:100vh;width:288px;flex:0 0 288px;
+  display:flex;flex-direction:column;
+  padding:22px 0 0;border-right:1px solid var(--line);background:var(--panel)}
+.sidebar-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;padding:0 16px}
+.brand{padding:6px 8px 14px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand-title{font-family:var(--display);font-weight:800;font-size:1.2rem;letter-spacing:-.02em;color:var(--ink)}
+.brand-dot{color:var(--accent)}
+.brand-sub{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.nav-count{margin-top:10px;font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--ink2)}
+.nav-count b{color:var(--accent)}
+.theme-row{padding:10px 8px 0}
+.theme-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.theme-btn{flex:1;font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn.active{background:var(--accent);color:#fff}
+.nav-group{margin-top:6px}
+.nav-group-label{display:block;font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:4px 8px;margin-top:14px}
+.cap-filters{display:flex;flex-direction:column;gap:2px}
+.cap-chip{display:flex;align-items:center;gap:.5rem;padding:6px 9px;border-radius:9px;border:1px solid transparent;
+  background:none;color:var(--ink2);font-family:var(--body);font-size:.78rem;font-weight:600;cursor:pointer;
+  text-align:left;width:100%;transition:.15s}
+.cap-chip:hover{background:var(--panel2);color:var(--ink)}
+.cap-chip.active{background:var(--panel3);border-color:var(--line2);color:var(--ink)}
+.cap-chip .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.cap-chip .cnt{margin-left:auto;font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.clear-filter{display:none;margin:6px 8px 0;font-family:var(--mono);font-size:.7rem;color:var(--accent);background:none;border:0;cursor:pointer;padding:0}
+.clear-filter.show{display:inline-block}
+.phase-jump{display:flex;flex-direction:column;gap:1px}
+.nav-link{display:flex;align-items:center;gap:.5rem;padding:7px 10px;margin:1px 0;border-radius:9px;color:var(--ink2);
+  font-size:.82rem;border-left:2px solid transparent}
+.nav-link:hover{background:var(--panel2);text-decoration:none;color:var(--ink)}
+.nav-link .nl-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);flex:0 0 auto}
+.side-nav{flex:0 0 auto;padding:12px 16px 16px;border-top:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;gap:6px}
+.side-nav a{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);color:var(--ink);transition:.15s}
+.side-nav a:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-1px)}
+.side-nav .d{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.side-nav .t{font-size:.82rem;font-weight:600}
+
+#content{flex:1 1 auto;min-width:0;padding:44px clamp(20px,5vw,60px) 80px;max-width:960px}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.hero h1{font-family:var(--display);font-size:2.3rem;font-weight:800;line-height:1.1;margin-bottom:.7rem;color:var(--ink)}
+.hero-sub{color:var(--ink2);font-size:1.02rem;max-width:660px;margin-bottom:1.2rem}
+.hero-sub b{color:var(--ink)}
+.stats-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.2rem}
+.stat-chip{display:flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.8rem;font-weight:600;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--r-full);padding:.35rem .85rem;white-space:nowrap;color:var(--ink2)}
+.stat-chip .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-built{background:var(--accent)}.dot-done{background:var(--ok)}.dot-total{background:var(--line2)}
+.cta{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.95rem;font-weight:700;
+  color:#fff;background:var(--accent);border:none;border-radius:var(--r-md);padding:.7rem 1.4rem;
+  text-decoration:none;transition:background .15s,transform .1s;cursor:pointer}
+.cta:hover{background:var(--accent-d);transform:translateY(-1px);text-decoration:none}
+
+.modules{display:flex;flex-direction:column;gap:.85rem;margin-top:1.6rem}
+.phase-hdr{font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:1.6rem 0 .2rem;padding-top:.6rem;border-top:1px solid var(--line)}
+.phase-hdr:first-child{margin-top:0;border-top:none;padding-top:0}
+.mod{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-sm)}
+.mod-head{display:flex;align-items:center;gap:.8rem;padding:.9rem 1.1rem;cursor:pointer;user-select:none;background:var(--panel2)}
+.mod-head:hover{background:var(--panel3)}
+.mod-n{font-family:var(--mono);font-size:.82rem;font-weight:700;color:var(--muted);min-width:2.4rem;flex-shrink:0}
+.mod-cap{font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;padding:.22rem .5rem;border-radius:var(--r-sm);white-space:nowrap;flex-shrink:0}
+.mod-title{font-family:var(--display);font-size:1rem;font-weight:700;flex:1;min-width:0;color:var(--ink)}
+.mod-title .star{color:var(--accent);font-size:.85rem}
+.mod-status{font-family:var(--mono);font-size:.7rem;font-weight:600;padding:.2rem .55rem;border-radius:var(--r-full);white-space:nowrap;flex-shrink:0}
+.mod-status.built{background:var(--ok-soft);color:var(--ok-ink)}
+.mod-status.partial{background:var(--accent-soft);color:var(--on-soft)}
+.mod-status.planned{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.mod-chevron{color:var(--muted);font-size:.8rem;transition:transform .25s var(--ease);flex-shrink:0}
+.mod.open .mod-chevron{transform:rotate(180deg)}
+.mod-body{display:none;padding:.5rem 1.15rem 1.05rem}
+.mod.open .mod-body{display:block}
+.mod-goal{font-size:.86rem;color:var(--ink2);margin:.5rem 0 .3rem}
+.pills{display:flex;gap:.5rem;flex-wrap:wrap}
+.pill{display:flex;flex-direction:column;gap:.15rem;min-width:130px;max-width:180px;flex:1;
+  border-radius:var(--r-sm);padding:.5rem .65rem;font-size:.78rem;line-height:1.3;text-decoration:none;transition:transform .1s,box-shadow .15s}
+.pill .pl{font-family:var(--mono);font-size:.63rem;font-weight:600;letter-spacing:.04em;opacity:.75}
+.pill .pt{font-weight:500;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--ink)}
+.pill.none{background:var(--panel2);border:1.5px solid var(--line);color:var(--muted);cursor:default}
+.pill.none .pl{opacity:.5}.pill.none .pt{color:var(--muted)}
+.pill.ready{background:var(--accent-soft);border:1.5px solid var(--accent);color:var(--on-soft);cursor:pointer}
+.pill.ready:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.pill.started{background:var(--accent-soft);border:1.5px solid var(--accent);color:var(--on-soft);cursor:pointer}
+.pill.started:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.pill.started .pl::before{content:"● "}
+.pill.complete{background:var(--ok-soft);border:1.5px solid var(--ok);color:var(--ok-ink);cursor:pointer}
+.pill.complete:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.pill.complete .pl::after{content:" ✓"}
+.planned-note{font-size:.83rem;color:var(--muted);background:var(--panel2);border:1px dashed var(--line);border-radius:var(--r-md);padding:.7rem .9rem}
+
+footer{margin:3rem 0 0;padding:1.5rem 0 0;border-top:1px solid var(--line);font-size:.74rem;color:var(--muted);line-height:1.6}
+footer a{color:var(--accent)}
+
+#nav-toggle{display:none}
+#scrim{display:none}
+@media(max-width:900px){
+  .layout{display:block}
+  #sidebar{position:fixed;z-index:70;top:0;left:0;transform:translateX(-100%);transition:transform .22s var(--ease);
+    box-shadow:var(--shadow);width:290px;height:100vh}
+  #sidebar.open{transform:translateX(0)}
+  #nav-toggle{display:inline-flex;align-items:center;gap:.4rem;position:fixed;top:12px;right:12px;z-index:65;
+    background:var(--accent);color:#fff;border:none;padding:9px 15px;border-radius:10px;font-weight:700;font-family:var(--body);font-size:.85rem;cursor:pointer;box-shadow:var(--shadow)}
+  #scrim.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:69}
+  #content{padding:60px 18px 70px;max-width:100%}
+  .hero h1{font-size:1.8rem}
+  .pill{min-width:calc(50% - .25rem);max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false">☰ Menu</button>
+<div id="scrim" aria-hidden="true"></div>
+
+<div class="layout">
+
+  <aside id="sidebar" aria-label="hub navigation">
+    <div class="sidebar-scroll">
+      <div class="brand">
+        <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
+        <div class="brand-sub">The Capability Spiral</div>
+        <div class="nav-count" id="count"><b>0</b>/0 lessons complete</div>
+      </div>
+
+      <div class="theme-row" role="group" aria-label="appearance mode">
+        <span class="nav-group-label" style="padding:0;margin-top:0">Appearance</span>
+        <div class="theme-btns">
+          <button class="theme-btn" data-theme-set="light" type="button">Light</button>
+          <button class="theme-btn" data-theme-set="dim" type="button">Dim</button>
+          <button class="theme-btn" data-theme-set="dark" type="button">Dark</button>
+          <button class="theme-btn" data-theme-set="midnight" type="button">Midnight</button>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <span class="nav-group-label">Filter by capability</span>
+        <div class="cap-filters" id="capFilters"></div>
+        <button class="clear-filter" id="clearFilter" type="button">✕ clear filter</button>
+      </div>
+
+      <div class="nav-group">
+        <span class="nav-group-label">Jump to phase</span>
+        <nav class="phase-jump" id="phaseJump"></nav>
+      </div>
+    </div>
+
+    <div class="side-nav">
+      <a href="../ROADMAP.md"><span class="d">📄 Reference</span><span class="t">Full roadmap &amp; build status</span></a>
+    </div>
+  </aside>
+
+  <main id="content">
+    <header class="hero">
+      <span class="eyebrow">Your Learning Map · 29 Modules · 10 Phases</span>
+      <h1>The Capability Spiral</h1>
+      <p class="hero-sub">One integrated path from <b>zero</b> to a frontier-lab portfolio. Foundations, the full frontier curriculum, and 20 design case studies (+2 frameworks) are woven into <b>29 modules (44 build-units)</b> across 10 phases and 8 capabilities. See the <a href="../ROADMAP.md">full roadmap</a>.</p>
+      <div class="stats-row" id="stats-row"></div>
+      <a class="cta" id="cta" href="#">Loading…</a>
+    </header>
+
+    <div class="modules" id="modules"></div>
+
+    <footer>
+      Frontier Lab · Capability Spiral Hub — modules are self-paced milestones, not calendar weeks. Progress is read live from your browser's localStorage (the same data each lesson writes). Foundations (M1–M7) are new; frontier modules (M8–M29) reuse the existing daily lessons. <br>Full plan &amp; build status: <a href="../ROADMAP.md">ROADMAP.md</a>.
+    </footer>
+  </main>
+
+</div>
+
+<script>
+// ── capability palette ──
+var CAPS = {
+  Represent:'#1F6280', Train:'#5E5191', Scale:'#9A3012', Serve:'#9A7208',
+  Optimize:'#237046', Generate:'#8B3A62', Automate:'#2A7B9B', Communicate:'#6B4E8B'
+};
+
+// ── MODULES: v3 spiral — 29 anchors / 44 build-modules / 10 phases ──
+// lesson = [label, title, page (null=not built), qid (null)]
+// planned modules carry a `note` (source) and no lessons yet.
+var MODULES = [
+ {n:1, phase:'Phase 0 · Foundations', cap:'Represent', title:'Numbers, Arrays & the Shape of Data', goal:'Get fluent in arrays and how to read a shape — the skill every later lesson leans on.', lessons:[
+   ['L1','Arrays & the Shape of Data','m01-shape-of-data/day-01-arrays/lesson.html','wf1-d01-arrays'],
+   ['L2','Indexing & Slicing','m01-shape-of-data/day-02-indexing-slicing/lesson.html','wf1-d02-indexing'],
+   ['L3','Broadcasting & dtypes','m01-shape-of-data/day-03-broadcasting-dtypes/lesson.html','wf1-d03-broadcasting'],
+   ['L4','Matmul & Shapes','m01-shape-of-data/day-04-matmul-and-shapes/lesson.html','wf1-d04-matmul'],
+   ['L5','Logs & Exponents','m01-shape-of-data/day-05-logs-and-exponents/lesson.html','wf1-d05-logs'],
+   ['L6','Random Seeds & PRNG','m01-shape-of-data/day-06-random-seeds/lesson.html','wf1-d06-seeds'],
+   ['✓','Review Gate','m01-shape-of-data/review.html','wf1-review']]},
+ {n:2, phase:'Phase 0 · Foundations', cap:'Train', title:'The Neuron & How It Learns', goal:'Build a neuron and a layer, then learn how it measures error and updates its weights — one continuous story.', lessons:[
+   ['L1','A Single Neuron','m02-the-neuron/day-01-single-neuron/lesson.html','wf2-d01-neuron'],
+   ['L2','Activation Functions','m02-the-neuron/day-02-activations/lesson.html','wf2-d02-activations'],
+   ['L3','Layers & the Forward Pass','m02-the-neuron/day-03-layers-forward-pass/lesson.html','wf2-d03-forward'],
+   ['L4','Loss Functions','m02-the-neuron/day-04-loss/lesson.html','wf3-d01-loss'],
+   ['L5','Gradients & Backpropagation','m02-the-neuron/day-05-gradients-backprop/lesson.html','wf3-d02-backprop'],
+   ['L6','The Training Loop','m02-the-neuron/day-06-training-loop/lesson.html','wf3-d03-training-loop'],
+   ['L7','Optimizers (SGD, Momentum, Adam)','m02-the-neuron/day-07-optimizers/lesson.html','wf3-d04-optimizers'],
+   ['L8','Learning-Rate Intuition','m02-the-neuron/day-08-learning-rate/lesson.html','wf3-d05-lr'],
+   ['L9','Train / Val / Test & Overfitting','m02-the-neuron/day-09-train-val-test/lesson.html','wf3-d06-split'],
+   ['✓','Review Gate','m02-the-neuron/review.html','wf3-review']]},
+ {n:3, phase:'Phase 0 · Foundations', cap:'Represent', title:'Attention as a Pure Idea', goal:'Embeddings and self-attention as concepts — the input to every transformer.', lessons:[
+   ['L1','Words to Numbers (Embeddings)','m03-attention/day-01-embeddings/lesson.html','wf4-d01-embeddings'],
+   ['L2','Query, Key, Value','m03-attention/day-02-qkv/lesson.html','wf4-d02-qkv'],
+   ['L3','Attention Scores & Softmax','m03-attention/day-03-attention-scores/lesson.html','wf4-d03-attention-scores'],
+   ['L4','Multi-Head Attention','m03-attention/day-04-multihead/lesson.html','wf4-d04-multihead'],
+   ['L5','Positional Encoding & RoPE','m03-attention/day-05-positional/lesson.html','wf4-d05-position'],
+   ['✓','Review Gate','m03-attention/review.html','wf4-review']]},
+ {n:4, phase:'Phase 0 · Foundations', cap:'Train', title:'First Model: MLP → PyTorch', goal:'Train an MLP on MNIST from scratch, then rebuild it in PyTorch.', lessons:[
+   ['L1','MLP on MNIST (from scratch)','m04-first-model-mlp/day-01-mlp-mnist/lesson.html','wf5-d01-mlp-mnist'],
+   ['L2','The Backward Pass, Wired by Hand','m04-first-model-mlp/day-02-backward-pass/lesson.html','wf5-d02-backward'],
+   ['L3','Mini-Batch Loop & Overfit-One-Batch','m04-first-model-mlp/day-03-minibatch-loop/lesson.html','wf5-d03-minibatch'],
+   ['L4','Loss Curve & Dropout','m04-first-model-mlp/day-04-training-loss-dropout/lesson.html','wf5-d04-training'],
+   ['L5','The Same Model in PyTorch','m04-first-model-mlp/day-05-pytorch-version/lesson.html','wf5-d05-pytorch'],
+   ['L6','Why PyTorch Mirrors NumPy','m04-first-model-mlp/day-06-why-pytorch/lesson.html','wf5-d06-mirror'],
+   ['✓','Review Gate','m04-first-model-mlp/review.html','wf5-review']]},
+ {n:'5a', phase:'Phase 0 · Foundations', cap:'Represent', title:'The Full Text Transformer', goal:'Assemble a complete decoder-only transformer that generates text, one sublayer at a time.', lessons:[
+   ['L1','Residual Connections','m05a-text-transformer/day-01-residual-connections/lesson.html','wf6-d01-residual'],
+   ['L2','Layer Normalization','m05a-text-transformer/day-02-layer-norm/lesson.html','wf6-d02-layernorm'],
+   ['L3','The Feed-Forward Sublayer','m05a-text-transformer/day-03-feed-forward/lesson.html','wf6-d03-ffn'],
+   ['L4','The Full Block','m05a-text-transformer/day-04-full-block/lesson.html','wf6-d04-block'],
+   ['L5','Causal Masking','m05a-text-transformer/day-05-causal-masking/lesson.html','wf6-d05-causal'],
+   ['L6','Encoder vs Decoder','m05a-text-transformer/day-06-encoder-vs-decoder/lesson.html','wf6-d06-encdec'],
+   ['L7','Text Generation & Sampling','m05a-text-transformer/day-07-text-generation/lesson.html','wf6-d07-generate'],
+   ['L8','The Full Transformer','m05a-text-transformer/day-08-full-transformer/lesson.html','wf6-d08-assemble'],
+   ['✓','Review Gate','m05a-text-transformer/review.html','wf6-review']]},
+ {n:'5b', phase:'Phase 0 · Foundations', cap:'Represent', title:'The Vision Transformer (ViT)', goal:'Reuse the transformer block for images: patches → embeddings → classifier.', lessons:[
+   ['L1','Images as Patches','m05b-vision-transformer/day-01-images-as-patches/lesson.html','wf7-d01-patches'],
+   ['L2','Patch Embeddings','m05b-vision-transformer/day-02-patch-embeddings/lesson.html','wf7-d02-patchembed'],
+   ['L3','Transformer for Vision','m05b-vision-transformer/day-03-transformer-for-vision/lesson.html','wf7-d03-vitblock'],
+   ['L4','The ViT Classifier','m05b-vision-transformer/day-04-vit-classifier/lesson.html','wf7-d04-classifier'],
+   ['✓','Review Gate','m05b-vision-transformer/review.html','wf7-review']]},
+ {n:6, phase:'Phase 0 · Foundations', cap:'Represent', title:'CNNs & Vision Encoders ⭐', goal:'How images become embeddings — so the visual design studies are real builds.', lessons:[
+   ['L1','Convolution & Pooling','m06-cnns-vision-encoders/day-01-convolution-pooling/lesson.html','wf8-d01-conv'],
+   ['L2','Output-Dimension Arithmetic','m06-cnns-vision-encoders/day-02-output-dim-arithmetic/lesson.html','wf8-d02-dims'],
+   ['L3','A CNN Classifier','m06-cnns-vision-encoders/day-03-cnn-classifier/lesson.html','wf8-d03-cnn'],
+   ['L4','Batch Normalization','m06-cnns-vision-encoders/day-04-batch-normalization/lesson.html','wf8-d04-batchnorm'],
+   ['L5','Data Augmentation','m06-cnns-vision-encoders/day-05-data-augmentation/lesson.html','wf8-d05-augment'],
+   ['L6','Transfer Learning & Embeddings','m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/lesson.html','wf8-d06-transfer'],
+   ['L7','Object Detection (Intuition)','m06-cnns-vision-encoders/day-07-object-detection-intuition/lesson.html','wf8-d07-detection'],
+   ['L8','CLIP: Contrastive Image-Text','m06-cnns-vision-encoders/day-08-clip-contrastive/lesson.html','wf8-d08-clip'],
+   ['✓','Review Gate','m06-cnns-vision-encoders/review.html','wf8-review']]},
+ {n:7, phase:'Phase 0 · Foundations', cap:'Train', title:'Thinking in JAX', goal:'Rebuild the MLP in JAX/Flax: immutability, PRNG, vmap, jit (+ autodiff internals).', lessons:[
+   ['L1','JAX Immutability','m07-thinking-in-jax/day-01-jax-immutability/lesson.html','w01-d01-jax'],
+   ['L2','Randomness: Explicit Keys','m07-thinking-in-jax/day-02-prng-keys/lesson.html','w01-d02-prng'],
+   ['L3','vmap: Vectorization','m07-thinking-in-jax/day-03-vmap/lesson.html','w01-d03-vmap'],
+   ['L4','jit: Compilation','m07-thinking-in-jax/day-04-jit/lesson.html','w01-d04-jit'],
+   ['L5','Flax & Optax','m07-thinking-in-jax/day-05-flax-optax/lesson.html','w01-d05-flax'],
+   ['L6','ViT Capstone (bridge)','m07-thinking-in-jax/day-06-vit-capstone/lesson.html','w01-d06-vit'],
+   ['D','+ authored: MLP capstone & autodiff internals',null,null]]},
+ {n:8, phase:'Phase 1 · Hardware & Scaling', cap:'Represent', title:'Transformer Math + Search 🎨', goal:'Derive C≈6ND and KV math (+ FlashAttention concept); then build embedding search.', lessons:[
+   ['L1','Transformer Arithmetic (C≈6ND)','m08-transformer-math/day-01-transformer-arithmetic/lesson.html','w03-d01-arith'],
+   ['L2','Q, K, V Matrix Anatomy','m08-transformer-math/day-02-qkv-matrices/lesson.html','w03-d02-qkv'],
+   ['L3','The KV Cache','m08-transformer-math/day-03-kv-cache/lesson.html','w03-d03-kv'],
+   ['L4','Production Code Review','m08-transformer-math/day-04-production-code/lesson.html','w03-d04-prodcode'],
+   ['L5','Advanced Pretraining Logic','m08-transformer-math/day-05-pretraining-logic/lesson.html','w03-d05-pretrain'],
+   ['L6','Scaling Exercises & Rehearsal','m08-transformer-math/day-06-scaling-exercises-rehearsal/lesson.html','w03-d06-scalingex'],
+   ['D','+ FlashAttention concept · design: visual-search / youtube / street-view',null,null]]},
+ {n:'9a', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Hardware Physics: One Device', goal:'Rooflines, arithmetic intensity, memory footprint, activation recomputation.', lessons:[
+   ['L1','Rooflines & Arithmetic Intensity','m09a-hardware-physics/day-01-rooflines/lesson.html','w02-d01-roofline'],
+   ['L2','TPU Architecture','m09a-hardware-physics/day-02-tpu-architecture/lesson.html','w02-d02-tpu'],
+   ['L3','Sharding Fundamentals','m09a-hardware-physics/day-03-sharding/lesson.html','w02-d03-sharding'],
+   ['L4','Multi-Device Execution','m09a-hardware-physics/day-04-multi-device/lesson.html','w02-d04-multidevice'],
+   ['L5','Memory Footprint','m09a-hardware-physics/day-05-memory-footprint/lesson.html','w02-d05-memory'],
+   ['L6','Distributed Deploy & Checkpointing','m09a-hardware-physics/day-06-distributed-checkpointing/lesson.html','w02-d06-checkpoint']]},
+ {n:'9b', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Mixed-Precision & fp8 Training ⭐', goal:'bf16/fp16 numerics, master weights, loss scaling, fp8 (E4M3/E5M2).', lessons:[
+   ['L1','Float Formats (fp32/fp16/bf16)','week-m9b/day-01-float-formats.html','m9b-d01-formats'],
+   ['L2','Loss Scaling','week-m9b/day-02-loss-scaling.html','m9b-d02-lossscale'],
+   ['L3','The Mixed-Precision Recipe','week-m9b/day-03-mixed-precision-recipe.html','m9b-d03-recipe'],
+   ['L4','fp8 Training','week-m9b/day-04-fp8.html','m9b-d04-fp8'],
+   ['✓','Review Gate','week-m9b/review.html','m9b-review']]},
+ {n:'9c', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Sharding & Parallelism', goal:'DP/FSDP/ZeRO, tensor/sequence/pipeline parallel, composed mesh, distillation.', lessons:[
+   ['L1','Data Parallelism & FSDP','m09c-sharding-parallelism/day-01-data-parallel-fsdp/lesson.html','w04-d01-fsdp'],
+   ['L2','Tensor Parallelism','m09c-sharding-parallelism/day-02-tensor-parallel/lesson.html','w04-d02-tp'],
+   ['L3','Pipeline Parallelism','m09c-sharding-parallelism/day-03-pipeline-parallel/lesson.html','w04-d03-pp'],
+   ['L4','Training LLaMA 3 on TPUs','m09c-sharding-parallelism/day-04-llama3-tpu/lesson.html','w04-d04-llama3'],
+   ['L5','Distillation','m09c-sharding-parallelism/day-05-distillation/lesson.html','w04-d05-distill'],
+   ['L6','Parallelism Sync & Consolidation','m09c-sharding-parallelism/day-06-pytorch-sync-consolidation/lesson.html','w04-d06-sync']]},
+ {n:'9d', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'First Real Multi-Device Run 🔴', goal:'One capped real sharded run vs the calculator, with dry-run + billing alerts.', lessons:[
+   ['L1','Your First Real Sharded Run','week-m9d/day-01-real-run.html','m9d-d01-run'],
+   ['L2','The Cost & Quota Gate','week-m9d/day-02-cost-gate.html','m9d-d02-cost'],
+   ['✓','Review Gate','week-m9d/review.html','m9d-review']]},
+ {n:'9e', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Distributed Orchestration & Fault Tolerance ⭐', goal:'Bit-exact resume, preemption/elastic recovery, straggler mitigation, goodput.', lessons:[
+   ['L1','Multi-Host Bring-Up','week-m9e/day-01-multi-host-bringup.html','m9e-d01-bringup'],
+   ['L2','Sharded Checkpointing','week-m9e/day-02-checkpointing.html','m9e-d02-checkpoint'],
+   ['L3','Bit-Exact Resume','week-m9e/day-03-bit-exact-resume.html','m9e-d03-resume'],
+   ['L4','Preemption & Recovery','week-m9e/day-04-preemption-recovery.html','m9e-d04-preempt'],
+   ['L5','Goodput & MFU','week-m9e/day-05-goodput.html','m9e-d05-goodput'],
+   ['✓','Review Gate','week-m9e/review.html','m9e-review']]},
+ {n:'10a', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Scaling Laws + Budget Simulator', goal:'Kaplan → Chinchilla, IsoFlops, power laws (+ data curation); budget→optimal-model.', lessons:[
+   ['L1','The Kaplan Paradigm','m10a-scaling-laws/day-01-kaplan-paradigm/lesson.html','w05-d01-kaplan'],
+   ['L2','The Chinchilla Correction','m10a-scaling-laws/day-02-chinchilla-correction/lesson.html','w05-d02-chinchilla'],
+   ['L3','IsoFlops Methodology','m10a-scaling-laws/day-03-isoflops-methodology/lesson.html','w05-d03-isoflops'],
+   ['L4','Power Law Derivation','m10a-scaling-laws/day-04-power-law-derivation/lesson.html','w05-d04-powerlaw'],
+   ['L5','The Data Wall','m10a-scaling-laws/day-05-data-wall/lesson.html','w05-d05-datawall'],
+   ['L6','Scaling Simulator & Viz','m10a-scaling-laws/day-06-scaling-simulator-visualization/lesson.html','w05-d06-simviz'],
+   ['D','+ data curation & mixtures',null,null]]},
+ {n:'10b', phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Training Stability & Optimization Dynamics ⭐', goal:'Loss spikes, z-loss/QK-norm, LR schedules (WSD), muP + depth-scaled init.', lessons:[
+   ['L1','Loss Spikes & Recovery','week-m10b/day-01-loss-spikes.html','m10b-d01-spikes'],
+   ['L2','Stabilizers (z-loss, QK-norm, clipping)','week-m10b/day-02-stabilizers.html','m10b-d02-stabilizers'],
+   ['L3','Learning-Rate Schedules','week-m10b/day-03-lr-schedules.html','m10b-d03-schedules'],
+   ['L4','muP & Depth-Scaled Init','week-m10b/day-04-mup.html','m10b-d04-mup'],
+   ['L5','Stability Synthesis','week-m10b/day-05-stability-synthesis.html','m10b-d05-synthesis'],
+   ['✓','Review Gate','week-m10b/review.html','m10b-review']]},
+ {n:11, phase:'Phase 1 · Hardware & Scaling', cap:'Scale', title:'Experimental Method & Statistics ⭐', goal:'Ablations, seeds, error bars, significance — makes every downstream result trustworthy.', lessons:[
+   ['L1','One-Variable Ablations','week-m11/day-01-one-variable-ablations.html','m11-d01-ablation'],
+   ['L2','Seed Variance','week-m11/day-02-seed-variance.html','m11-d02-seeds'],
+   ['L3','Error Bars & the Noise Band','week-m11/day-03-error-bars.html','m11-d03-errorbars'],
+   ['L4','Probability & Statistics Primer','week-m11/day-04-probability-primer.html','m11-d04-prob'],
+   ['L5','Research Discipline','week-m11/day-05-research-discipline.html','m11-d05-discipline'],
+   ['✓','Review Gate','week-m11/review.html','m11-review']]},
+ {n:12, phase:'Phase 2 · Capstone', cap:'Train', title:'Addition Transformer — Build 🔴', goal:'Build a ~10M-param transformer from scratch on synthetic addition.', lessons:[
+   ['L1','Comprehensive Profiling','m12-addition-transformer/day-01-comprehensive-profiling/lesson.html','w08-d01-profiling'],
+   ['L2','Systems Review','m12-addition-transformer/day-02-systems-review/lesson.html','w08-d02-sysreview'],
+   ['L3','Infrastructure Setup','m12-addition-transformer/day-03-infrastructure-setup/lesson.html','w09-d01-infra'],
+   ['L4','Custom Tokenizer Design','m12-addition-transformer/day-04-custom-tokenizer-design/lesson.html','w09-d02-tokenizer'],
+   ['L5','Synthetic Data Generation','m12-addition-transformer/day-05-synthetic-data-generation/lesson.html','w09-d03-syndata'],
+   ['L6','Static Shape Engineering','m12-addition-transformer/day-06-static-shape-engineering/lesson.html','w09-d04-staticshape'],
+   ['L7','Architecture Sizing','m12-addition-transformer/day-07-architecture-sizing/lesson.html','w09-d05-archsize'],
+   ['L8','Training Loop & Baseline','m12-addition-transformer/day-08-training-loop-baseline-training/lesson.html','w09-d06-trainbaseline'],
+   ['L9','Evaluation Infrastructure','m12-addition-transformer/day-09-evaluation-infrastructure/lesson.html','w10-d01-evalinfra'],
+   ['L10','Profiling the Step Time','m12-addition-transformer/day-10-profiling-step-time/lesson.html','w10-d02-stepprofile'],
+   ['L11','Hardware Optimization','m12-addition-transformer/day-11-hardware-optimization/lesson.html','w10-d03-hwopt']]},
+ {n:13, phase:'Phase 2 · Capstone', cap:'Scale', title:'Your Own IsoFlops Scaling Law 🔴', goal:'Run your own shrunk IsoFlops sweep and fit a power law.', lessons:[
+   ['L1','IsoFlops Experiment Design','m13-isoflops-scaling-law/day-01-isoflops-experiment-design/lesson.html','w10-d04-isoflopsdesign'],
+   ['L2','Automation Scripting','m13-isoflops-scaling-law/day-02-automation-scripting/lesson.html','w10-d05-automation'],
+   ['L3','Execution & Data Aggregation','m13-isoflops-scaling-law/day-03-execution-data-aggregation/lesson.html','w10-d06-execagg'],
+   ['L4','Plotting the Parabolas','m13-isoflops-scaling-law/day-04-plotting-parabolas/lesson.html','w11-d01-parabolas'],
+   ['L5','Deriving the Scaling Law','m13-isoflops-scaling-law/day-05-deriving-scaling-law/lesson.html','w11-d02-derivelaw'],
+   ['L6','Scientific Documentation','m13-isoflops-scaling-law/day-06-scientific-documentation/lesson.html','w11-d03-scidocs']]},
+ {n:'14a', phase:'Phase 3 · MoE & Kernels', cap:'Scale', title:'Mixture of Experts', goal:'Top-k gating, aux load-balancing, your reusable toy router.', lessons:[
+   ['L1','MoE Fundamentals','m14a-mixture-of-experts/day-01-moe-fundamentals/lesson.html','w07-d01-moefund'],
+   ['L2','MoE Scaling Deviations','m14a-mixture-of-experts/day-02-moe-scaling-deviations/lesson.html','w07-d02-moescale'],
+   ['L3','The Load Balancing Problem','m14a-mixture-of-experts/day-03-load-balancing-problem/lesson.html','w07-d03-moeload'],
+   ['L4','Distributed MoE Routing','m14a-mixture-of-experts/day-04-distributed-moe-routing/lesson.html','w07-d04-moeroute'],
+   ['L5','MoE vs. Dense Benchmarks','m14a-mixture-of-experts/day-05-moe-vs-dense-benchmarks/lesson.html','w07-d05-moevsdense'],
+   ['L6','Routing Design & Synthesis','m14a-mixture-of-experts/day-06-routing-design-deep-synthesis/lesson.html','w07-d06-routesynth']]},
+ {n:'14b', phase:'Phase 3 · MoE & Kernels', cap:'Optimize', title:'Capstone Close-Out: MoE Upgrade + Report', goal:'Upgrade the dense capstone to MoE, derive scaling-law-vs-dense, ship a report.', lessons:[
+   ['L1','MoE Architecture Upgrade','m14b-capstone-moe/day-01-moe-architecture-upgrade/lesson.html','w11-d04-moeupgrade'],
+   ['L2','MoE Baseline Training','m14b-capstone-moe/day-02-moe-baseline-training/lesson.html','w11-d05-moebaseline'],
+   ['L3','MoE IsoFlops & Law Derivation','m14b-capstone-moe/day-03-moe-isoflops-matrix-law-derivation/lesson.html','w11-d06-moeisolaw'],
+   ['L4','Report Finalization','m14b-capstone-moe/day-04-report-finalization/lesson.html','w12-d01-reportfinal'],
+   ['L5','Repository Cleansing','m14b-capstone-moe/day-05-repository-cleansing/lesson.html','w12-d02-repocleanse'],
+   ['L6','Consolidation & Publishing','m14b-capstone-moe/day-06-consolidation-publishing/lesson.html','w12-d03-consolidate']]},
+ {n:'15a', phase:'Phase 3 · MoE & Kernels', cap:'Optimize', title:'Custom Kernels I: Pallas & FlashAttention', goal:'What-is-a-kernel → Pallas matmul → FlashAttention tiling → fused MoE kernel.', lessons:[
+   ['L1','The Pallas Abstraction','m15a-custom-kernels-pallas/day-01-pallas-abstraction/lesson.html','w13-d01-pallas'],
+   ['L2','Basic Kernel Construction','m15a-custom-kernels-pallas/day-02-basic-kernel-construction/lesson.html','w13-d02-basickernel'],
+   ['L3','Hardware Conflicts','m15a-custom-kernels-pallas/day-03-hardware-conflicts/lesson.html','w13-d03-hwconflict'],
+   ['L4','FlashAttention Paradigm','m15a-custom-kernels-pallas/day-04-flashattention-paradigm/lesson.html','w13-d04-flashattn'],
+   ['L5','Hardware Evolution','m15a-custom-kernels-pallas/day-05-hardware-evolution/lesson.html','w13-d05-hwevo'],
+   ['L6','MoE Kernel Challenge','m15a-custom-kernels-pallas/day-06-moe-kernel-challenge-performance-proof/lesson.html','w13-d06-moekernel']]},
+ {n:'15b', phase:'Phase 3 · MoE & Kernels', cap:'Optimize', title:'Native Kernels: C++/CUDA + ThunderKittens 🔴', goal:'C++/CUDA on-ramp → ThunderKittens kernel verified against PyTorch.', lessons:[
+   ['L1','Modern Kernel DSLs (TK)','m15b-native-kernels/day-01-modern-kernel-dsls/lesson.html','w14-d01-tkintro'],
+   ['L2','Tensor Memory Acceleration','m15b-native-kernels/day-02-tensor-memory-acceleration/lesson.html','w14-d02-tma'],
+   ['L3','Worker Overlapping','m15b-native-kernels/day-03-worker-overlapping/lesson.html','w14-d03-overlap'],
+   ['L4','ThunderKittens Architecture','m15b-native-kernels/day-04-thunderkittens-architecture/lesson.html','w14-d04-tkarch'],
+   ['L5','Comparative Benchmarking','m15b-native-kernels/day-05-comparative-benchmarking/lesson.html','w14-d05-compbench'],
+   ['L6','CUDA/TK Setup & Implementation','m15b-native-kernels/day-06-cuda-tk-setup-implementation/lesson.html','w14-d06-tkimpl']]},
+ {n:'16a', phase:'Phase 4 · Serving & Efficiency', cap:'Serve', title:'Inference Economics & Language-Assist 🎨', goal:'Prefill/decode, bandwidth wall, batching, BPE; serve Smart Compose & Translate.', lessons:[
+   ['L1','Inference Mechanics','m16a-inference-economics/day-01-inference-mechanics/lesson.html','w06-d01-infermech'],
+   ['L2','The Memory Wall','m16a-inference-economics/day-02-memory-wall/lesson.html','w06-d02-memwall'],
+   ['L3','Batching Economics','m16a-inference-economics/day-03-batching-economics/lesson.html','w06-d03-batching'],
+   ['L4','Serving LLaMA 3 on TPUs','m16a-inference-economics/day-04-serving-llama3-tpus/lesson.html','w06-d04-serving'],
+   ['L5','Quantization Intro','m16a-inference-economics/day-05-quantization-intro/lesson.html','w06-d05-llmint8'],
+   ['L6','Inference Calculator & Roofline','m16a-inference-economics/day-06-inference-calculator-roofline/lesson.html','w06-d06-infercalc'],
+   ['D','+ BPE lesson · design: smart-compose / translate',null,null]]},
+ {n:'16b', phase:'Phase 4 · Serving & Efficiency', cap:'Serve', title:'Serving Systems in Practice ⭐', goal:'Deploy + instrument vLLM/SGLang: PagedAttention, continuous batching, prefix cache.', lessons:[
+   ['L1','Deploying a Real Engine','week-m16b/day-01-engines.html','m16b-d01-engines'],
+   ['L2','PagedAttention & Continuous Batching','week-m16b/day-02-paged-attention.html','m16b-d02-paged'],
+   ['L3','Prefix (Radix) Caching','week-m16b/day-03-prefix-caching.html','m16b-d03-prefix'],
+   ['L4','TTFT/ITL, Goodput & Routing','week-m16b/day-04-goodput-routing.html','m16b-d04-goodput'],
+   ['✓','Review Gate','week-m16b/review.html','m16b-review']]},
+ {n:'17a', phase:'Phase 4 · Serving & Efficiency', cap:'Optimize', title:'Quantization', goal:'int8, PTQ, FP8/AWQ/GPTQ + KV-quant; memory economics.', lessons:[
+   ['L1','Quantization Theory (int8)','m17a-quantization/day-01-quantization-theory-int8/lesson.html','w15-d01-int8theory'],
+   ['L2','Incoherent Processing (QuiP)','m17a-quantization/day-02-incoherent-processing-quip/lesson.html','w15-d02-quip'],
+   ['L3','Extreme Compression (QuiP#)','m17a-quantization/day-03-extreme-compression-quip-sharp/lesson.html','w15-d03-quipsharp'],
+   ['L4','Additive Quantization (QTIP)','m17a-quantization/day-04-additive-quantization-qtip/lesson.html','w15-d04-qtip'],
+   ['L5','Memory Economics Synthesis','m17a-quantization/day-05-memory-economics-synthesis/lesson.html','w15-d05-memecon'],
+   ['L6','PTQ & Perplexity Benchmark','m17a-quantization/day-06-ptq-implementation-perplexity-benchmarking/lesson.html','w15-d06-ptqperplex']]},
+ {n:'17b', phase:'Phase 4 · Serving & Efficiency', cap:'Optimize', title:'Long-Context Decoding', goal:'KV eviction (SnapKV), GQA/MQA, speculative decoding, ring attention.', lessons:[
+   ['L1','Decoding Innovations','m17b-long-context-decoding/day-01-decoding-innovations/lesson.html','w16-d01-decoding'],
+   ['L2','Cache Eviction (SnapKV)','m17b-long-context-decoding/day-02-cache-eviction-snapkv/lesson.html','w16-d02-snapkv'],
+   ['L3','GQA & MQA','m17b-long-context-decoding/day-03-gqa-mqa/lesson.html','w16-d03-gqamqa'],
+   ['L4','Speculative Decoding','m17b-long-context-decoding/day-04-speculative-decoding/lesson.html','w16-d04-specdecode'],
+   ['L5','Ring Attention','m17b-long-context-decoding/day-05-ring-attention/lesson.html','w16-d05-ringattn'],
+   ['L6','Systems Review Essay','m17b-long-context-decoding/day-06-systems-review-essay/lesson.html','w16-d06-hwlottery']]},
+ {n:'17c', phase:'Phase 4 · Serving & Efficiency', cap:'Optimize', title:'State-Space Models & Alternatives ⭐', goal:'Selective-scan (Mamba/S6), linear attention, hybrids, recurrence↔attention duality.', lessons:[
+   ['L1','Selective Scan (S6 / Mamba)','week-m17c/day-01-selective-scan.html','m17c-d01-s6'],
+   ['L2','Linear Attention, RWKV, RetNet','week-m17c/day-02-linear-attention.html','m17c-d02-linattn'],
+   ['L3','Hybrids (Jamba, Griffin)','week-m17c/day-03-hybrids.html','m17c-d03-hybrid'],
+   ['L4','Recurrence & Attention Duality','week-m17c/day-04-duality.html','m17c-d04-duality'],
+   ['✓','Review Gate','week-m17c/review.html','m17c-review']]},
+ {n:18, phase:'Phase 5 · Ranking & Graphs', cap:'Serve', title:'Ranking & Recommendation 🎨', goal:'Two-stage retrieve-then-rank across five recsys case studies.', lessons:[
+   ['L1','Two-Tower Retrieval','week-m18/day-01-two-tower.html','m18-d01-twotower'],
+   ['L2','Calibration & Ranking Metrics','week-m18/day-02-calibration-metrics.html','m18-d02-metrics'],
+   ['L3','Retrieval as Architecture','week-m18/day-03-retrieval-architecture.html','m18-d03-retrieval'],
+   ['L4','Video Recommendation 🎨','week-m18/day-04-video-rec.html','m18-d04-videorec'],
+   ['L5','Ad Click Prediction 🎨','week-m18/day-05-ad-click.html','m18-d05-adclick'],
+   ['L6','Event Recommendation 🎨','week-m18/day-06-event-rec.html','m18-d06-eventrec'],
+   ['L7','Similar Listings 🎨','week-m18/day-07-similar-listings.html','m18-d07-similar'],
+   ['L8','Personalized News Feed 🎨','week-m18/day-08-news-feed.html','m18-d08-newsfeed'],
+   ['✓','Review Gate','week-m18/review.html','m18-review']]},
+ {n:19, phase:'Phase 5 · Ranking & Graphs', cap:'Scale', title:'Graph Systems & Link Prediction 🎨', goal:'Message passing, GNNs, edge/link prediction (People-You-May-Know).', lessons:[
+   ['L1','Graphs & Message Passing','week-m19/day-01-graphs.html','m19-d01-graphs'],
+   ['L2','Graph Neural Networks','week-m19/day-02-gnns.html','m19-d02-gnns'],
+   ['L3','Link Prediction 🎨','week-m19/day-03-link-prediction.html','m19-d03-linkpred'],
+   ['L4','Negative Sampling for Graphs','week-m19/day-04-negative-sampling.html','m19-d04-negs'],
+   ['✓','Review Gate','week-m19/review.html','m19-review']]},
+ {n:20, phase:'Phase 6 · Post-Training & RL', cap:'Train', title:'RL Foundations ⭐', goal:'MDP, policy gradient, REINFORCE, advantage/GAE, actor-critic — the PPO prerequisite.', lessons:[
+   ['L1','The MDP','week-m20/day-01-mdp.html','m20-d01-mdp'],
+   ['L2','Policy Gradient / REINFORCE','week-m20/day-02-policy-gradient.html','m20-d02-pg'],
+   ['L3','Baselines & Variance Reduction','week-m20/day-03-baselines.html','m20-d03-baseline'],
+   ['L4','Advantage & GAE','week-m20/day-04-advantage-gae.html','m20-d04-gae'],
+   ['L5','Actor-Critic','week-m20/day-05-actor-critic.html','m20-d05-ac'],
+   ['L6','On- vs Off-Policy','week-m20/day-06-on-off-policy.html','m20-d06-onoff'],
+   ['✓','Review Gate','week-m20/review.html','m20-review']]},
+ {n:'21a', phase:'Phase 6 · Post-Training & RL', cap:'Train', title:'Core Post-Training: SFT/PEFT/RM/PPO/DPO', goal:'SFT, LoRA/QLoRA, reward models, PPO-for-LM, DPO, preference data.', lessons:[
+   ['L1','The Post-Training Pipeline','week-m21a/day-01-pipeline.html','m21a-d01-pipeline'],
+   ['L2','Supervised Fine-Tuning','week-m21a/day-02-sft.html','m21a-d02-sft'],
+   ['L3','PEFT: LoRA & QLoRA','week-m21a/day-03-lora-qlora.html','m21a-d03-lora'],
+   ['L4','Reward Models','week-m21a/day-04-reward-model.html','m21a-d04-rm'],
+   ['L5','RM Failure Modes','week-m21a/day-05-rm-failure-modes.html','m21a-d05-rmfail'],
+   ['L6','PPO for Language Models','week-m21a/day-06-ppo-for-llms.html','m21a-d06-ppo'],
+   ['L7','DPO','week-m21a/day-07-dpo.html','m21a-d07-dpo'],
+   ['L8','Preference & Instruction Data','week-m21a/day-08-data-engineering.html','m21a-d08-data'],
+   ['✓','Review Gate','week-m21a/review.html','m21a-review']]},
+ {n:'21b', phase:'Phase 6 · Post-Training & RL', cap:'Train', title:'Reasoning-RL & Verifiable Rewards ⭐', goal:'GRPO (core), RLVR, PRM vs ORM, long-CoT, STaR, RL→distill flywheel.', lessons:[
+   ['L1','GRPO (critic-free)','week-m21b/day-01-grpo.html','m21b-d01-grpo'],
+   ['L2','RLVR: Verifiable Rewards','week-m21b/day-02-rlvr.html','m21b-d02-rlvr'],
+   ['L3','PRM vs ORM','week-m21b/day-03-prm-vs-orm.html','m21b-d03-prm'],
+   ['L4','STaR, Rejection & Best-of-N','week-m21b/day-04-star-rejection.html','m21b-d04-star'],
+   ['L5','The RL→Distill Flywheel','week-m21b/day-05-rl-distill-flywheel.html','m21b-d05-flywheel'],
+   ['✓','Review Gate','week-m21b/review.html','m21b-review']]},
+ {n:'22a', phase:'Phase 7 · Generative', cap:'Generate', title:'Generative I: Autoencoders & GANs 🆕', goal:'AE → VAE (reparam + ELBO) → VQ-VAE (straight-through) → GAN (mode collapse).', lessons:[
+   ['L1','Autoencoders','week-m22a/day-01-autoencoders.html','m22a-d01-ae'],
+   ['L2','The VAE','week-m22a/day-02-vae.html','m22a-d02-vae'],
+   ['L3','VQ-VAE','week-m22a/day-03-vqvae.html','m22a-d03-vqvae'],
+   ['L4','GANs','week-m22a/day-04-gan.html','m22a-d04-gan'],
+   ['✓','Review Gate','week-m22a/review.html','m22a-review']]},
+ {n:'22b', phase:'Phase 7 · Generative', cap:'Generate', title:'Generative II: Diffusion 🆕', goal:'DDPM (forward/reverse), latent diffusion + classifier-free guidance.', lessons:[
+   ['L1','The Forward Process (Adding Noise)','week-m22b/day-01-forward-noising.html','m22b-d01-forward'],
+   ['L2','The Reverse Process (Denoising)','week-m22b/day-02-reverse-denoising.html','m22b-d02-reverse'],
+   ['L3','The Training Objective (ε-Prediction)','week-m22b/day-03-noise-prediction-loss.html','m22b-d03-loss'],
+   ['L4','Sampling: DDPM vs DDIM','week-m22b/day-04-sampling-schedules.html','m22b-d04-sampling'],
+   ['L5','Latent Diffusion & Text Control','week-m22b/day-05-latent-diffusion.html','m22b-d05-latent'],
+   ['✓','Review Gate','week-m22b/review.html','m22b-review']]},
+ {n:'22c', phase:'Phase 7 · Generative', cap:'Generate', title:'Generative III: Flow Matching ⭐🆕', goal:'Normalizing flows → flow matching / rectified flow → consistency models.', lessons:[
+   ['L1','Normalizing Flows','week-m22c/day-01-normalizing-flows.html','m22c-d01-flows'],
+   ['L2','Flow Matching','week-m22c/day-02-flow-matching.html','m22c-d02-fm'],
+   ['L3','Consistency Models','week-m22c/day-03-consistency-models.html','m22c-d03-consistency'],
+   ['✓','Review Gate','week-m22c/review.html','m22c-review']]},
+ {n:23, phase:'Phase 7 · Generative', cap:'Generate', title:'Image & Text Generation 🎨', goal:'Captioning, RAG, face-gen, text-to-image, headshots, text-to-video.', lessons:[
+   ['L1','Image Captioning 🎨','week-m23/day-01-image-captioning.html','m23-d01-caption'],
+   ['L2','RAG End-to-End 🎨','week-m23/day-02-rag.html','m23-d02-rag'],
+   ['L3','Realistic Face Generation 🎨','week-m23/day-03-face-generation.html','m23-d03-face'],
+   ['L4','High-Res Image Synthesis 🎨','week-m23/day-04-high-res.html','m23-d04-highres'],
+   ['L5','Text-to-Image 🎨','week-m23/day-05-text-to-image.html','m23-d05-t2i'],
+   ['L6','Personalized Headshots 🎨','week-m23/day-06-headshots.html','m23-d06-headshots'],
+   ['L7','Image-to-Video 🎨','week-m23/day-07-image-to-video.html','m23-d07-i2v'],
+   ['L8','Temporal Consistency','week-m23/day-08-temporal-consistency.html','m23-d08-temporal'],
+   ['L9','Serving & Safety Trade-offs','week-m23/day-09-serving-safety.html','m23-d09-serving'],
+   ['✓','Review Gate','week-m23/review.html','m23-review']]},
+ {n:24, phase:'Phase 8 · Eval, Interp & Safety', cap:'Automate', title:'Eval Science & LLM-as-a-Judge ⭐', goal:'Contamination, elicitation, saturation, model-graded eval biases + calibration.', lessons:[
+   ['L1','Contamination & Saturation','week-m24/day-01-contamination.html','m24-d01-contam'],
+   ['L2','Elicitation & Prompt Sensitivity','week-m24/day-02-elicitation.html','m24-d02-elicit'],
+   ['L3','LLM-as-a-Judge & Its Biases','week-m24/day-03-llm-as-judge.html','m24-d03-judge'],
+   ['L4','Held-Out-by-Construction','week-m24/day-04-held-out.html','m24-d04-heldout'],
+   ['✓','Review Gate','week-m24/review.html','m24-review']]},
+ {n:25, phase:'Phase 8 · Eval, Interp & Safety', cap:'Automate', title:'Interpretability Foundations ⭐', goal:'Linear probes, logit lens, activation patching; SAE/superposition awareness.', lessons:[
+   ['L1','Linear Probes','week-m25/day-01-linear-probes.html','m25-d01-probes'],
+   ['L2','The Logit Lens','week-m25/day-02-logit-lens.html','m25-d02-logitlens'],
+   ['L3','Activation Patching','week-m25/day-03-activation-patching.html','m25-d03-patching'],
+   ['L4','Superposition','week-m25/day-04-superposition.html','m25-d04-superpos'],
+   ['L5','Sparse Autoencoders','week-m25/day-05-saes.html','m25-d05-sae'],
+   ['L6','Circuits & Synthesis','week-m25/day-06-circuits.html','m25-d06-circuits'],
+   ['✓','Review Gate','week-m25/review.html','m25-review']]},
+ {n:26, phase:'Phase 8 · Eval, Interp & Safety', cap:'Automate', title:'AI-Driven Research (ADRS)', goal:'A fortified eval sandbox + an autonomous loop that optimizes your own kernel/router.', lessons:[
+   ['L1','The ADRS Paradigm','m26-adrs/day-01-adrs-paradigm/lesson.html','w19-d01-adrs-paradigm'],
+   ['L2','ADRS Architecture','m26-adrs/day-02-adrs-architecture/lesson.html','w19-d02-adrsarch'],
+   ['L3','Case Studies in Automation','m26-adrs/day-03-case-studies-automation/lesson.html','w19-d03-casestudies'],
+   ['L4','The Less-is-More Principle','m26-adrs/day-04-less-is-more-principle/lesson.html','w19-d04-lessismore'],
+   ['L5','The Reward Hacking Threat','m26-adrs/day-05-reward-hacking-threat/lesson.html','w19-d05-rewardhack'],
+   ['L6','Evaluation Engineering & Hold-out','m26-adrs/day-06-evaluation-engineering-holdout/lesson.html','w19-d06-evalholdout'],
+   ['L7','Mathematical Discovery (FunSearch)','m26-adrs/day-07-mathematical-discovery-funsearch/lesson.html','w20-d01-funsearch'],
+   ['L8','Formal Theorem Proving','m26-adrs/day-08-formal-theorem-proving-alphageometry/lesson.html','w20-d02-alphageom'],
+   ['L9','Evolutionary Prompts (EvoPrompt)','m26-adrs/day-09-evolutionary-prompts-evoprompt/lesson.html','w20-d03-evoprompt'],
+   ['L10','Data Eng Automation (RuleFlow)','m26-adrs/day-10-data-engineering-automation-ruleflow/lesson.html','w20-d04-ruleflow'],
+   ['L11','Agentic Scaffolding','m26-adrs/day-11-agentic-scaffolding/lesson.html','w20-d05-scaffold'],
+   ['L12','ADRS Implementation','m26-adrs/day-12-adrs-implementation-simulation-execution/lesson.html','w20-d06-adrsimpl']]},
+ {n:'27a', phase:'Phase 8 · Eval, Interp & Safety', cap:'Automate', title:'Assistant & Safety Systems 🎨', goal:'A ChatGPT-style chatbot and a harmful-content detector.', lessons:[
+   ['L1','Two Kinds of Safety','week-m27a/day-01-two-kinds-of-safety.html','m27a-d01-safety'],
+   ['L2','A ChatGPT-Style Chatbot 🎨','week-m27a/day-02-chatbot.html','m27a-d02-chatbot'],
+   ['L3','Harmful-Content Detection 🎨','week-m27a/day-03-harmful-content.html','m27a-d03-harmful'],
+   ['L4','Late vs Early Fusion','week-m27a/day-04-fusion.html','m27a-d04-fusion'],
+   ['L5','Safety Metrics & Thresholds','week-m27a/day-05-metrics.html','m27a-d05-metrics'],
+   ['L6','Drift Monitoring','week-m27a/day-06-drift.html','m27a-d06-drift'],
+   ['✓','Review Gate','week-m27a/review.html','m27a-review']]},
+ {n:'27b', phase:'Phase 8 · Eval, Interp & Safety', cap:'Automate', title:'Red-Teaming & Adversarial Robustness ⭐', goal:'Jailbreak families, prompt injection, automated attacks; RLAIF/CAI awareness.', lessons:[
+   ['L1','Jailbreak Families','week-m27b/day-01-jailbreak-families.html','m27b-d01-jailbreak'],
+   ['L2','Prompt Injection','week-m27b/day-02-prompt-injection.html','m27b-d02-injection'],
+   ['L3','Automated Attack Generation','week-m27b/day-03-automated-attacks.html','m27b-d03-auto'],
+   ['L4','Robustness Eval & Constitutional AI','week-m27b/day-04-robustness-eval.html','m27b-d04-robust'],
+   ['✓','Review Gate','week-m27b/review.html','m27b-review']]},
+ {n:28, phase:'Phase 9 · Ship', cap:'Communicate', title:'Formal Methods: TLA+ & Property Testing', goal:'TLA+ spec + refinement for the ADRS loop; Hypothesis property-based testing.', lessons:[
+   ['L1','What Is TLA+?','week-m28/day-01-what-is-tlaplus.html','m28-d01-tla'],
+   ['L2','States, Init & Next','week-m28/day-02-init-next.html','m28-d02-initnext'],
+   ['L3','Invariants & Model Checking (TLC)','week-m28/day-03-invariants-tlc.html','m28-d03-tlc'],
+   ['L4','Refinement: Spec to Code','week-m28/day-04-refinement.html','m28-d04-refine'],
+   ['L5','Property-Based Testing (Hypothesis)','week-m28/day-05-hypothesis.html','m28-d05-hypothesis'],
+   ['L6','When to Use Which','week-m28/day-06-synthesis.html','m28-d06-synth'],
+   ['✓','Review Gate','week-m28/review.html','m28-review']]},
+ {n:29, phase:'Phase 9 · Ship', cap:'Communicate', title:'Ship & Outreach', goal:'Screencasts, kernel report, portfolio, cold email, outreach, interview prep.', lessons:[
+   ['L1','Screencast Production (Code)','m29-ship-outreach/day-01-screencast-production-code/lesson.html','w23-d01-screencode'],
+   ['L2','Screencast Production (Math)','m29-ship-outreach/day-02-screencast-production-math/lesson.html','w23-d02-screenmath'],
+   ['L3','Kernel Systems Report','m29-ship-outreach/day-03-kernel-systems-report/lesson.html','w23-d03-kernelreport'],
+   ['L4','Portfolio Assembly','m29-ship-outreach/day-04-portfolio-assembly/lesson.html','w23-d04-portfolio'],
+   ['L5','Cold Email Engineering','m29-ship-outreach/day-05-cold-email-engineering/lesson.html','w24-d01-coldemail'],
+   ['L6','Leadership Outreach','m29-ship-outreach/day-06-targeted-leadership-outreach/lesson.html','w24-d02-leadershipoutreach'],
+   ['L7','Researcher Network Outreach','m29-ship-outreach/day-07-researcher-network-outreach/lesson.html','w24-d03-researchoutreach'],
+   ['L8','Interview Preparation','m29-ship-outreach/day-08-interview-preparation/lesson.html','w24-d04-interviewprep']]}
+];
+
+// ── progress helpers (read the same localStorage the lessons write) ──
+function pillStatus(lesson){
+  if(!lesson[2]) return 'none';
+  var qid = lesson[3]; if(!qid) return 'ready';
+  try{
+    var raw = localStorage.getItem('frontier-lesson:'+qid);
+    if(!raw) return 'ready';
+    var s = JSON.parse(raw);
+    if(s.done && s.done.produce) return 'complete';
+    if(s.done && Object.keys(s.done).length>0) return 'started';
+    return 'ready';
+  }catch(e){ return 'ready'; }
+}
+function modStats(m){
+  if(!m.lessons) return {built:0,total:0,done:0,planned:true};
+  var built=0,done=0;
+  m.lessons.forEach(function(l){ var st=pillStatus(l); if(l[2])built++; if(st==='complete')done++; });
+  return {built:built,total:m.lessons.length,done:done,planned:false};
+}
+function pickResume(){
+  for(var i=0;i<MODULES.length;i++){
+    var m = MODULES[i];
+    if(!m.lessons) continue;
+    var started=null, ready=null;
+    for(var j=0;j<m.lessons.length;j++){
+      var l = m.lessons[j];
+      if(!l[2]) continue;
+      var st = pillStatus(l);
+      if(st==='started' && !started) started=l;
+      if(st==='ready' && !ready) ready=l;
+    }
+    var pick = started || ready;
+    if(pick) return {m:m, l:pick};
+  }
+  return null;
+}
+
+var activeCaps = new Set();
+
+function applyFilter(){
+  var wrap = document.getElementById('modules');
+  var mods = Array.prototype.slice.call(wrap.querySelectorAll('.mod'));
+  mods.forEach(function(el){
+    el.style.display = (activeCaps.size===0 || activeCaps.has(el.getAttribute('data-cap'))) ? '' : 'none';
+  });
+  var children = Array.prototype.slice.call(wrap.children);
+  var curHdr=null, curVisible=false;
+  children.forEach(function(el){
+    if(el.classList.contains('phase-hdr')){
+      if(curHdr) curHdr.style.display = curVisible ? '' : 'none';
+      curHdr = el; curVisible = false;
+    } else if(el.classList.contains('mod')){
+      if(el.style.display !== 'none') curVisible = true;
+    }
+  });
+  if(curHdr) curHdr.style.display = curVisible ? '' : 'none';
+  document.getElementById('clearFilter').classList.toggle('show', activeCaps.size>0);
+}
+
+function renderCapFilters(){
+  var box = document.getElementById('capFilters');
+  var counts = {};
+  MODULES.forEach(function(m){ counts[m.cap] = (counts[m.cap]||0)+1; });
+  box.innerHTML = Object.keys(CAPS).map(function(c){
+    return '<button class="cap-chip" data-cap="'+c+'" type="button">'+
+      '<span class="dot" style="background:'+CAPS[c]+'"></span>'+
+      '<span>'+c+'</span><span class="cnt">'+(counts[c]||0)+'</span></button>';
+  }).join('');
+  Array.prototype.slice.call(box.querySelectorAll('.cap-chip')).forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var cap = btn.getAttribute('data-cap');
+      if(activeCaps.has(cap)){ activeCaps.delete(cap); btn.classList.remove('active'); }
+      else { activeCaps.add(cap); btn.classList.add('active'); }
+      applyFilter();
+    });
+  });
+  document.getElementById('clearFilter').addEventListener('click', function(){
+    activeCaps.clear();
+    Array.prototype.slice.call(box.querySelectorAll('.cap-chip.active')).forEach(function(b){ b.classList.remove('active'); });
+    applyFilter();
+  });
+}
+
+function renderPhaseJump(){
+  var box = document.getElementById('phaseJump');
+  var phases = [];
+  MODULES.forEach(function(m){ if(m.phase && phases.indexOf(m.phase)===-1) phases.push(m.phase); });
+  box.innerHTML = phases.map(function(p,i){
+    return '<a class="nav-link" href="#phase-'+i+'"><span class="nl-dot"></span>'+p.replace(/^Phase \d+ · /,'')+'</a>';
+  }).join('');
+  Array.prototype.slice.call(box.querySelectorAll('a')).forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      if(window.innerWidth <= 900) closeSidebar();
+    });
+  });
+}
+
+function render(){
+  renderCapFilters();
+
+  var totLessons=0, builtLessons=0, doneLessons=0;
+  MODULES.forEach(function(m){ var s=modStats(m); totLessons+=s.total; builtLessons+=s.built; doneLessons+=s.done; });
+  document.getElementById('count').innerHTML = '<b>'+doneLessons+'</b>/'+builtLessons+' lessons complete';
+  document.getElementById('stats-row').innerHTML = [
+    '<span class="stat-chip"><span class="dot dot-done"></span>'+doneLessons+' lessons complete</span>',
+    '<span class="stat-chip"><span class="dot dot-built"></span>'+builtLessons+' lessons ready to open</span>',
+    '<span class="stat-chip"><span class="dot dot-total"></span>29 anchors · 10 phases</span>'
+  ].join('');
+
+  var cta = document.getElementById('cta');
+  var resume = pickResume();
+  if(resume){
+    var verb = doneLessons>0 ? 'Continue' : 'Start';
+    cta.textContent = verb+': M'+resume.m.n+' · '+resume.l[1]+' →';
+    cta.href = resume.l[2];
+  } else {
+    cta.textContent = 'Start: M1 · Arrays & the Shape of Data →';
+    cta.href = 'm01-shape-of-data/day-01-arrays/lesson.html';
+  }
+
+  var wrap = document.getElementById('modules'); wrap.innerHTML='';
+  var curPhase=null, phaseIdx=-1;
+  MODULES.forEach(function(m){
+    if(m.phase && m.phase!==curPhase){
+      curPhase=m.phase; phaseIdx++;
+      var ph=document.createElement('div'); ph.className='phase-hdr'; ph.id='phase-'+phaseIdx; ph.textContent=m.phase;
+      wrap.appendChild(ph);
+    }
+    var s = modStats(m);
+    var color = CAPS[m.cap] || '#2A7B9B';
+    var statusCls = s.planned ? 'planned' : (s.built===0 ? 'planned' : (s.built<s.total ? 'partial' : 'built'));
+    var statusTxt = s.planned ? 'planned' : (s.built===0 ? 'planned' : (s.built<s.total ? s.built+'/'+s.total+' built' : 'built'));
+    var el = document.createElement('div');
+    el.className = 'mod' + (m.n===1 ? ' open' : '');
+    el.setAttribute('data-cap', m.cap);
+    var titleHtml = m.title.replace('⭐','<span class="star">★</span>');
+    var head = document.createElement('div'); head.className='mod-head';
+    head.innerHTML =
+      '<span class="mod-n">M'+m.n+'</span>'+
+      '<span class="mod-cap" style="background:'+color+'">'+m.cap+'</span>'+
+      '<span class="mod-title">'+titleHtml+'</span>'+
+      '<span class="mod-status '+statusCls+'">'+statusTxt+'</span>'+
+      '<span class="mod-chevron">▾</span>';
+    head.addEventListener('click', function(){ el.classList.toggle('open'); });
+    el.appendChild(head);
+    var body = document.createElement('div'); body.className='mod-body';
+    var goal = '<p class="mod-goal">'+m.goal+'</p>';
+    if(m.lessons){
+      var pills = m.lessons.map(function(l){
+        var st = pillStatus(l);
+        var tag = l[2] ? 'a' : 'span';
+        var href = l[2] ? ' href="'+l[2]+'"' : '';
+        return '<'+tag+' class="pill '+st+'"'+href+'><span class="pl" style="color:'+color+'">'+l[0]+'</span><span class="pt">'+l[1]+'</span></'+tag+'>';
+      }).join('');
+      body.innerHTML = goal + '<div class="pills">'+pills+'</div>';
+    } else {
+      body.innerHTML = goal + '<div class="planned-note">'+ (m.note||'Planned module.') +'</div>';
+    }
+    el.appendChild(body);
+    wrap.appendChild(el);
+  });
+
+  renderPhaseJump();
+  applyFilter();
+}
+render();
+
+// ── appearance switcher (same localStorage key as every lesson) ──
+var themeBtns = Array.prototype.slice.call(document.querySelectorAll('.theme-btn'));
+function setTheme(t){
+  try{ localStorage.setItem('frontier-theme', t); }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme-set')===t); });
+}
+themeBtns.forEach(function(b){ b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme-set')); }); });
+setTheme(document.documentElement.getAttribute('data-theme') || 'dim');
+
+// ── mobile sidebar toggle ──
+var sidebar = document.getElementById('sidebar'), toggle = document.getElementById('nav-toggle'), scrim = document.getElementById('scrim');
+function openSidebar(){ sidebar.classList.add('open'); scrim.classList.add('show'); toggle.setAttribute('aria-expanded','true'); }
+function closeSidebar(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); }
+if(toggle) toggle.addEventListener('click', function(){ sidebar.classList.contains('open')?closeSidebar():openSidebar(); });
+if(scrim) scrim.addEventListener('click', closeSidebar);
+</script>
+</body>
+</html>
