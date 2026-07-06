@@ -2,16 +2,9 @@
 
 _The house style for warm, rigorous, bilingual Frontier Lab lessons in `sessions/`._
 
-This guide governs how we upgrade an existing `lesson.html` into a **Coach Layer** lesson. It is
-a refactor guide, not a from-scratch template — the lesson structure (7 sections, quiz, playground,
-scroll-reveal build, produce artifact) already works. The Coach Layer makes it **warmer, more
-intuitive, bilingual, math-friendly, and artifact-driven** without deleting depth or breaking
-mechanics.
+This guide governs how we upgrade an existing `lesson.html` into a **Coach Layer** lesson. It is a refactor guide, not a from-scratch template — the lesson structure (7 sections, quiz, playground, scroll-reveal build, produce artifact) already works. The Coach Layer makes it **warmer, more intuitive, bilingual, math-friendly, and artifact-driven** without deleting depth or breaking mechanics.
 
-> **Golden rule:** the Coach Layer is **additive**. You insert small, consistent blocks into the
-> existing `.sec-body` of each section. You never remove a hard concept, never turn rigor into
-> motivational fluff, and never touch the interactive JavaScript (`DEMOS`, `BUILD`, `QS`), the
-> navigation links, or the localStorage progress machinery.
+> **Golden rule:** the Coach Layer is **additive**. You insert small, consistent blocks into the existing `.sec-body` of each section. You never remove a hard concept, never turn rigor into motivational fluff, and never touch the interactive JavaScript (`DEMOS`, `BUILD`, `QS`), the navigation links, or the localStorage progress machinery.
 
 ---
 
@@ -19,15 +12,10 @@ mechanics.
 
 Two readers share every lesson. Keep their material layered, never blended into mush.
 
-- **Reader A — first encounter.** May be an ML beginner; English may be a second language. Needs an
-  everyday analogy and plain words *before* any symbol. This reader is served by the hook, the
-  intuition, the analogy, and the Chinese scaffold.
-- **Reader B — Staff/Principal MLE interview prep.** Wants exact math, failure modes, trade-offs,
-  and an answer they could say out loud in an interview. This reader is served by the Math Ladder,
-  the Staff Lens, and the Interview-ready block.
+- **Reader A — first encounter.** May be an ML beginner; English may be a second language. Needs an everyday analogy and plain words *before* any symbol. This reader is served by the hook, the intuition, the analogy, and the Chinese scaffold.
+- **Reader B — Staff/Principal MLE interview prep.** Wants exact math, failure modes, trade-offs, and an answer they could say out loud in an interview. This reader is served by the Math Ladder, the Staff Lens, and the Interview-ready block.
 
-A good Coach Layer lesson lets Reader A climb up to Reader B's material one rung at a time. Nothing
-is dumbed down; the hard parts are simply reached by a warmer path.
+A good Coach Layer lesson lets Reader A climb up to Reader B's material one rung at a time. Nothing is dumbed down; the hard parts are simply reached by a warmer path.
 
 ---
 
@@ -37,8 +25,7 @@ Write like a brilliant friend who is rooting for the reader — not a professor,
 
 - Short sentences. One idea each. Active voice. Use "you".
 - Define every technical word the first time it appears, then use it freely.
-- Banned phrases: "As you can see", "Obviously", "Trivially", "Recall that", "This is just",
-  "It is left as an exercise". If a sentence would sound at home on an exam paper, rewrite it.
+- Banned phrases: "As you can see", "Obviously", "Trivially", "Recall that", "This is just", "It is left as an exercise". If a sentence would sound at home on an exam paper, rewrite it.
 - Name the hard part out loud. Confusion is a sign of seriousness, not failure.
 - After a hard idea, give a **victory lap**: tell the reader what they just unlocked.
 
@@ -46,12 +33,10 @@ Write like a brilliant friend who is rooting for the reader — not a professor,
 
 ## 3. The bilingual rule (light touch)
 
-Chinese is a **learning scaffold**, not the medium. The learner reads mostly in English and prefers
-it that way. Use Chinese **only** where it lowers the emotional and intuitive barrier:
+Chinese is a **learning scaffold**, not the medium. The learner reads mostly in English and prefers it that way. Use Chinese **only** where it lowers the emotional and intuitive barrier:
 
 - ✅ Use Chinese for: the one-line intuition, emotional orientation, and "why this is confusing".
-- ❌ Do **not** translate: technical terms, formulas, variable names, code, or the interview-ready
-  phrasing. Those stay in English because that is the language of the field and the interview.
+- ❌ Do **not** translate: technical terms, formulas, variable names, code, or the interview-ready phrasing. Those stay in English because that is the language of the field and the interview.
 
 **Pattern** (Chinese clause first, English technical point second, in the same block):
 
@@ -61,16 +46,13 @@ The technical point is that we cache each past token's Key and Value once, so ev
 step reads them instead of recomputing them — turning <code>O(n²)</code> work into <code>O(n)</code>.</p>
 ```
 
-Aim for **2–4 short Chinese touches per lesson**, concentrated in Section 1 (pain point) and
-Section 2 (intuition). More than that starts to overwhelm the English-first reader; fewer than that
-and the bilingual scaffold isn't really there. See the memory note `prefers-english-learning-content`.
+Aim for **2–4 short Chinese touches per lesson**, concentrated in Section 1 (pain point) and Section 2 (intuition). More than that starts to overwhelm the English-first reader; fewer than that and the bilingual scaffold isn't really there. See the memory note `prefers-english-learning-content`.
 
 ---
 
 ## 4. The 15 Coach Layer elements → where they live
 
-Every upgraded lesson should contain all 15. Most already exist in a strong lesson; the Coach Layer
-adds the ones that are missing and *labels* the ones that were implicit. Map:
+Every upgraded lesson should contain all 15. Most already exist in a strong lesson; the Coach Layer adds the ones that are missing and *labels* the ones that were implicit. Map:
 
 | # | Coach Layer element | Section | How it appears |
 |---|---------------------|---------|----------------|
@@ -90,17 +72,13 @@ adds the ones that are missing and *labels* the ones that were implicit. Map:
 | 14 | Acceptance criteria | §7 Produce | Explicit `<h4>Acceptance criteria</h4>` + list |
 | 15 | 5-minute research log | §7 Produce | **Research-log block** (`c-info`, bilingual) |
 
-If an element already exists and is good, **leave it** — do not duplicate it. The job is a complete
-set, not a longer file.
+If an element already exists and is good, **leave it** — do not duplicate it. The job is a complete set, not a longer file.
 
 ---
 
 ## 5. The reusable blocks (copy these)
 
-All blocks use only classes that already exist in **both** shells (`callout`, `c-info`, `c-warn`,
-`c-ok`, `code`, `<b>`, `<h4>`). They render correctly whether the lesson is on the old top-nav shell
-or the new sidebar shell. Insert each block **inside `.sec-body`, just before that section's
-`.gotit` button**.
+All blocks use only classes that already exist in **both** shells (`callout`, `c-info`, `c-warn`, `c-ok`, `code`, `<b>`, `<h4>`). They render correctly whether the lesson is on the old top-nav shell or the new sidebar shell. Insert each block **inside `.sec-body`, just before that section's `.gotit` button**.
 
 ### 5.1 Pain-point block (Section 1)
 
@@ -122,13 +100,11 @@ Four rungs, always in this order. Never show the full formula first; climb to it
 <br><b>4 · Sanity check:</b> &lt;one quick invariant or "does this make sense?" test&gt;</div></div>
 ```
 
-Rule 8-of-CLAUDE.md math: this block *is* the "words → formula (labeled) → worked example" ladder,
-plus a sanity check. Anchor the symbols back to the Section-2 analogy where you can.
+Rule 8-of-CLAUDE.md math: this block *is* the "words → formula (labeled) → worked example" ladder, plus a sanity check. Anchor the symbols back to the Section-2 analogy where you can.
 
 ### 5.3 Interview-ready block (Section 4)
 
-A crisp answer the reader could **say out loud** in 20–30 seconds. Lead with the headline, then the
-one caveat that signals depth.
+A crisp answer the reader could **say out loud** in 20–30 seconds. Lead with the headline, then the one caveat that signals depth.
 
 ```html
 <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b>
@@ -147,8 +123,7 @@ Turns the existing `log.md` nudge into a concrete 5-minute habit. Bilingual prom
 that surprised you; (3) one thing you're still unsure about.</div></div>
 ```
 
-Keep whatever `log.md` question the lesson already had — fold it into line (1) or leave it beside
-this block.
+Keep whatever `log.md` question the lesson already had — fold it into line (1) or leave it beside this block.
 
 ---
 
@@ -167,16 +142,9 @@ Two shells are live in `sessions/`. Know which one you are editing and match its
 | Theme switch | none | Light/Dim/Dark/Midnight |
 | Finale | `.fin` (block) | `.fin` (block) |
 
-**Shell-agnostic (identical in both, safe to rely on):** `data-sec` keys
-(`what,intuition,play,why,build,quiz,produce`), `.sec-body`, `.gotit` buttons, `.callout`
-(`c-info/c-warn/c-ok`), `.relate` cards, `.term[data-tip]` tooltips, the `var DEMOS/BUILD/QS`
-literals, and the localStorage progress script.
+**Shell-agnostic (identical in both, safe to rely on):** `data-sec` keys (`what,intuition,play,why,build,quiz,produce`), `.sec-body`, `.gotit` buttons, `.callout` (`c-info/c-warn/c-ok`), `.relate` cards, `.term[data-tip]` tooltips, the `var DEMOS/BUILD/QS` literals, and the localStorage progress script.
 
-**Migration compatibility:** `_shell_migrate.py` migrates the old shell → new shell and re-extracts
-each `.sec-body`, the hero, and the `DEMOS/BUILD/QS` literals **byte-for-byte** from the live
-`lesson.html`. So Coach Layer content added inside `.sec-body` (and the hero `.lead`/`.lede`)
-survives a later shell migration automatically. To stay compatible, **do not** alter a section's
-wrapper tag, its `id`, its `data-sec`, or the `<div class="sec-body"> … </div></section>` boundary.
+**Migration compatibility:** `_shell_migrate.py` migrates the old shell → new shell and re-extracts each `.sec-body`, the hero, and the `DEMOS/BUILD/QS` literals **byte-for-byte** from the live `lesson.html`. So Coach Layer content added inside `.sec-body` (and the hero `.lead`/`.lede`) survives a later shell migration automatically. To stay compatible, **do not** alter a section's wrapper tag, its `id`, its `data-sec`, or the `<div class="sec-body"> … </div></section>` boundary.
 
 ---
 
@@ -186,24 +154,21 @@ When editing an existing lesson you MUST preserve, unchanged:
 
 - File paths and file names (`lesson.html` stays `lesson.html`).
 - Every navigation `href` (prev / next / hub, top and bottom).
-- `data-quest-id` on `<body>` (it is the localStorage key `frontier-lesson:<id>` — changing it
-  wipes the learner's progress).
+- `data-quest-id` on `<body>` (it is the localStorage key `frontier-lesson:<id>` — changing it wipes the learner's progress).
 - The 7 sections, their `id`s, and their `data-sec` keys.
 - The 7 `.gotit` buttons and the progress / reset / checklist script.
 - Quiz mechanics: the `var QS = [...]` literal shape (`{q, opts, ans, fb}`), 4 questions.
 - Playground mechanics: the `var DEMOS = {...}` literal, 3 `data-demo` buttons.
 - Scroll-reveal build: the `var BUILD = [...]` literal.
 - Glossary tooltip script and every `.term[data-tip]`.
-- Self-contained / offline behavior: no new external assets, no new CDN links, no new fonts.
-  Chinese renders in the existing system font stack.
+- Self-contained / offline behavior: no new external assets, no new CDN links, no new fonts. Chinese renders in the existing system font stack.
 
 You MAY:
 
 - Add Coach Layer blocks inside `.sec-body` (before the `.gotit`).
 - Enrich the hero `.lead`/`.lede` and the `.goal` line for warmth (keep them extractable).
 - Add or rewrite `.term[data-tip]` glossary hovers for newly introduced words.
-- Fix **factual/label bugs inside the pilot file itself** (e.g. a finale banner that names the wrong
-  topic after a shell migration) — this is coherence, not scope creep.
+- Fix **factual/label bugs inside the pilot file itself** (e.g. a finale banner that names the wrong topic after a shell migration) — this is coherence, not scope creep.
 - Add `<h4>Acceptance criteria</h4>` to a Produce section that lacks one.
 
 You MUST NOT:
@@ -243,11 +208,9 @@ A Coach Layer upgrade is complete only when:
 - [ ] The lesson still opens and renders (verified headless via jsdom + `node --check` on its JS).
 - [ ] `lesson_audit.py` reports it **OK** with no hard failures (Chinese is not a defect).
 - [ ] All 15 Coach Layer elements are present (use `enhance_lesson_checklist.md`).
-- [ ] Navigation, `data-quest-id`, quiz, playground, build, and tooltips are byte-identical in
-      behavior.
+- [ ] Navigation, `data-quest-id`, quiz, playground, build, and tooltips are byte-identical in behavior.
 - [ ] The bilingual scaffold is present but light (2–4 Chinese touches, intuition/pain only).
 - [ ] Technical depth is equal to or greater than before — nothing was removed.
 - [ ] The learner can now *explain the concept more clearly* and is asked for a concrete artifact.
 
-See `enhance_lesson_checklist.md` for the per-lesson checklist and `coach_layer_pilot_report.md` for
-the pilot results and rollout order.
+See `enhance_lesson_checklist.md` for the per-lesson checklist and `coach_layer_pilot_report.md` for the pilot results and rollout order.

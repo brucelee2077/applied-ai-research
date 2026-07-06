@@ -18,6 +18,9 @@ import sys
 import glob
 import os
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _metadata_derive as md
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE_PATH = os.path.join(REPO, "sessions/m01-shape-of-data/day-03-broadcasting-dtypes/lesson.html")
 
@@ -104,7 +107,6 @@ def extract_old(path):
     d["title"] = req(r"<title>(.*?)</title>", c, path).group(1)
     d["quest_id"] = req(r'data-quest-id="([^"]*)"', c, path).group(1)
     d["brand_sub"] = req(r'<span class="nav-title">([^<]*)</span>', c, path).group(1)
-    d["eyebrow"] = req(r'<span class="eyebrow">(.*?)</span>', c, path).group(1)
 
     h1 = req(r"<h1>(.*?)</h1>", c, path).group(1)
     if "<br>" in h1:
@@ -167,6 +169,27 @@ def extract_old(path):
     d["build_literal"] = extract_js_literal(c, "var BUILD", "[", path)
     d["qs_literal"] = extract_js_literal(c, "var QS", "[", path)
 
+    # kicker / sidebar nav-group-label / finale — derived, not copied verbatim,
+    # from this lesson's own title + sessions/index.html's MODULES table (see
+    # _metadata_derive.py and coach_layer_pilot_report.md §11-12 for why the
+    # old naive "copy the eyebrow span" approach silently no-ops against the
+    # new-shell template, which uses class="kicker" and has no eyebrow at all).
+    modules = md.load_modules()
+    module_num = md.module_num_from_path(path)
+    meta = md.derive_metadata(d["title"], module_num, modules) if module_num else None
+    if meta is None:
+        raise ValueError(f"could not derive kicker/nav-label/finale for {path} "
+                          f"(title={d['title']!r}, module_num={module_num!r})")
+    d["kicker"] = meta["kicker"]
+    d["nav_group_label"] = meta["nav_group_label"]
+    d["finale_h3"] = meta["finale_h3"]
+    if d["next"]["disabled"]:
+        d["finale_p"] = (f"Nice work — you've completed <b>{d['h1_main']}</b>. That's the last "
+                          f"lesson in this run — check the curriculum map for what's next.")
+    else:
+        d["finale_p"] = (f"Nice work — you've completed <b>{d['h1_main']}</b>."
+                          f"<br>Next up: <b>{d['next']['text']}</b>.")
+
     return d
 
 
@@ -189,7 +212,7 @@ def render(d, template):
     out = sub1(r"<title>.*?</title>", f'<title>{d["title"]}</title>', out, flags=re.S)
     out = sub1(r'data-quest-id="[^"]*"', f'data-quest-id="{d["quest_id"]}"', out)
     out = sub1(r'<div class="brand-sub">[^<]*</div>', f'<div class="brand-sub">{d["brand_sub"]}</div>', out)
-    out = sub1(r'<span class="eyebrow">.*?</span>', f'<span class="eyebrow">{d["eyebrow"]}</span>', out, flags=re.S)
+    out = sub1(r'<span class="kicker">.*?</span>', f'<span class="kicker">{d["kicker"]}</span>', out, flags=re.S)
     out = sub1(
         r"<h1>.*?</h1>",
         f'<h1>{d["h1_main"]}<span class="sub">{d["h1_sub"]}</span></h1>',
@@ -238,6 +261,23 @@ def render(d, template):
         nav_link_html(d["next"], "next"), out,
     )
     out = sub1(r'<a class="lnav-hub" href="[^"]*">', f'<a class="lnav-hub" href="{d["hub_href"]}">', out)
+
+    # sidebar module-name label + finale banner — see extract_old()'s derivation comment
+    out = re.sub(
+        r'(<nav aria-label="Sections">\s*<div class="nav-group-label">).*?(</div>)',
+        lambda m: m.group(1) + d["nav_group_label"] + m.group(2),
+        out, count=1, flags=re.S,
+    )
+    out = re.sub(
+        r'(<div class="fin" id="fin".*?<h3>).*?(</h3>)',
+        lambda m: m.group(1) + d["finale_h3"] + m.group(2),
+        out, count=1, flags=re.S,
+    )
+    out = re.sub(
+        r'(<div class="fin" id="fin".*?<h3>.*?</h3>\s*<p>).*?(</p>)',
+        lambda m: m.group(1) + d["finale_p"] + m.group(2),
+        out, count=1, flags=re.S,
+    )
 
     out = replace_js_literal(out, "var DEMOS", "{", d["demos_literal"])
     out = replace_js_literal(out, "var BUILD", "[", d["build_literal"])
