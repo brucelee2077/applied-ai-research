@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-TARGET="${1:-$HOME/.claude/skills}"
+
+TARGET="${1:-.claude/skills}"
+
 mkdir -p "$TARGET"
-cp -R skills/* "$TARGET/"
-echo "Installed Frontier Lab skills to: $TARGET"
-echo "Start Claude Code and invoke skills with /frontier-session-coach, /frontier-concept-courseware, etc."
+cp -R skills/* "$TARGET"/
+
+echo "Installed Frontier Lab Claude Skills v2 into $TARGET"
+find "$TARGET" -maxdepth 2 -name SKILL.md | sort
