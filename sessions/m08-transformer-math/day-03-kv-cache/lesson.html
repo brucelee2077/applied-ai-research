@@ -269,6 +269,35 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   .relate{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+/* ── inline SVG visual lab (playground) — dependency-free, theme-aware ── */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-fit{stroke:#111827;stroke-width:2;fill:none}
+.vlab-fit.dash{stroke:#B0453A;stroke-dasharray:5 4}
+.vlab-pt{stroke:#1F2937;stroke-width:1.1}
+.vlab-parab{fill:none;stroke-width:2;opacity:.9;transition:opacity .2s,stroke-width .2s}
+.vlab-parab.lo{opacity:.22;stroke-width:1.4}
+.vlab-parab.hi{stroke-width:3.4;opacity:1}
+.vlab-vtx{transition:r .2s}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
 </style>
 </head>
 
@@ -380,7 +409,32 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s3" data-sec="play">
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Click through recompute vs. cache vs. cost</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
-      <p>A simulated terminal. We are decoding token by token. Watch how much K,V work each step does, then watch the memory cost grow. <strong>Click all three</strong> to finish.</p>
+      <p>Drag the sliders to watch the trade the KV cache actually makes: <strong>compute saved</strong> on the left, <strong>memory spent</strong> on the right. Then use the three buttons below for the step-by-step numbers — <strong>click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">KV cache: compute saved vs. memory spent</span>
+          <span class="vlab-readout">cache <b><span id="kv-gb">1.07 GB</span></b> · recompute saved <b><span id="kv-mult">≈1024×</span></b></span>
+        </div>
+        <div class="vlab-panels">
+          <figure class="vlab-fig"><figcaption>Left · no cache — recompute grows like a triangle (O(n²))</figcaption>
+            <svg class="vlab-svg" id="kv-left" viewBox="0 0 460 300" role="img" aria-label="Without a KV cache, per-step recomputation forms a triangle whose area grows quadratically with sequence length; with a cache the work is a flat line."></svg></figure>
+          <figure class="vlab-fig"><figcaption>Right · KV cache — memory grows like a linear stack (O(n))</figcaption>
+            <svg class="vlab-svg" id="kv-right" viewBox="0 0 460 300" role="img" aria-label="The KV cache is a stack of per-request memory blocks that grows linearly with sequence length and batch size, approaching the HBM budget."></svg></figure>
+        </div>
+        <div class="vlab-controls">
+          <label>seq_len
+            <input type="range" id="kv-seq" min="512" max="8192" step="256" value="2048" aria-label="Sequence length in tokens">
+            <span class="vlab-val" id="kv-seq-lbl">2048</span>
+          </label>
+          <label>batch
+            <input type="range" id="kv-batch" min="1" max="16" step="1" value="1" aria-label="Batch size — concurrent requests">
+            <span class="vlab-val" id="kv-batch-lbl">1</span>
+          </label>
+        </div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the KV cache flattens the recompute triangle into a thin line — enormous compute saved. But the memory stack on the right keeps growing with every token <em>and</em> every request: at <code>seq_len = 8192</code> it is already ~4.3 GB for a single request, and a full batch marches toward the HBM ceiling. <em>Compute saved, memory spent.</em></div></div>
+        <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Misconception:</b> the KV cache saves <em>recompute</em>, but it does <b>not</b> save memory — it <b>adds</b> it. Growing, linear memory is the price of skipping the recompute, and at long context that memory becomes the serving bottleneck.</div></div>
+        <p class="vlab-note"><b>How to read it:</b> drag <code>seq_len</code> to grow the triangle (quadratic) and the memory stack (linear); drag <code>batch</code> to add request blocks. GB uses the lesson formula <code>2·L·H·d·s·b·bytes</code> with the 7B config (L=32, H=32, d=128, fp16). <b>Simplified:</b> recompute is shown in schematic units (not calibrated FLOPs) and this ignores attention's own O(n²) FLOPs, GQA/MQA, and cache quantization.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="recompute" type="button">① no cache: recompute every step</button>
@@ -698,6 +752,62 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── playground visual: KV cache — compute saved vs memory spent (dependency-free SVG) ── -->
+<script>
+(function(){
+  "use strict";
+  var left=document.getElementById('kv-left'), right=document.getElementById('kv-right');
+  if(!left || !right) return;
+  var W=460,H=300,padL=44,padR=16,padT=18,padB=32,SMAX=8192,GBMAX=80;
+  var PERTOK=2*32*32*128*2; // bytes per token = 524288 : 2 (K&V) x 32 layers x 32 heads x 128 head_dim x 2 bytes (fp16)
+  function perReqGB(s){ return PERTOK*s/1e9; }
+  function sx(v){ return padL+(v/SMAX)*(W-padL-padR); }
+  function syL(v){ return (H-padB)-(v/SMAX)*((H-padB)-padT); }
+  function syG(v){ return (H-padB)-(v/GBMAX)*((H-padB)-padT); }
+  function axes(xlab,ylab){
+    return '<line class="vlab-axis" x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'"/>'
+      +'<line class="vlab-axis" x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(H-padB)+'"/>'
+      +'<text class="vlab-lbl" x="'+((padL+W-padR)/2)+'" y="'+(H-4)+'" text-anchor="middle">'+xlab+'</text>'
+      +'<text class="vlab-lbl" x="12" y="'+((padT+H-padB)/2)+'" text-anchor="middle" transform="rotate(-90 12 '+((padT+H-padB)/2)+')">'+ylab+'</text>';
+  }
+  function renderLeft(s){
+    var g=axes('decode step →','K,V recomputed / step');
+    g+='<line class="vlab-grid" stroke-dasharray="4 4" x1="'+sx(0).toFixed(1)+'" y1="'+syL(0).toFixed(1)+'" x2="'+sx(SMAX).toFixed(1)+'" y2="'+syL(SMAX).toFixed(1)+'"/>';
+    g+='<polygon points="'+sx(0).toFixed(1)+','+syL(0).toFixed(1)+' '+sx(s).toFixed(1)+','+syL(s).toFixed(1)+' '+sx(s).toFixed(1)+','+syL(0).toFixed(1)+'" fill="rgba(240,120,88,.35)" stroke="#C0392B" stroke-width="1.5"/>';
+    g+='<line x1="'+sx(0).toFixed(1)+'" y1="'+syL(160).toFixed(1)+'" x2="'+sx(SMAX).toFixed(1)+'" y2="'+syL(160).toFixed(1)+'" stroke="#059669" stroke-width="2.6"/>';
+    g+='<text class="vlab-lbl" x="'+(sx(SMAX)-4).toFixed(1)+'" y="'+(syL(160)-6).toFixed(1)+'" text-anchor="end" style="fill:#059669">with KV cache ≈ flat (O(n))</text>';
+    g+='<text class="vlab-lbl" x="'+sx(s*0.30).toFixed(1)+'" y="'+syL(s*0.72).toFixed(1)+'" style="fill:#B0453A">no cache: recompute ∝ n²</text>';
+    left.innerHTML=g;
+  }
+  function renderRight(s,b){
+    var perReq=perReqGB(s), GB=perReq*b, g=axes('','cache memory (GB)');
+    [0,20,40,60,80].forEach(function(v){ var y=syG(v);
+      g+='<line class="vlab-grid" x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'"/>'
+        +'<text class="vlab-lbl mut" x="'+(padL-5)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v+'</text>'; });
+    g+='<line class="vlab-fit dash" x1="'+padL+'" y1="'+syG(80).toFixed(1)+'" x2="'+(W-padR)+'" y2="'+syG(80).toFixed(1)+'"/>';
+    g+='<text class="vlab-lbl" x="'+(W-padR-4)+'" y="'+(syG(80)+13).toFixed(1)+'" text-anchor="end" style="fill:#B0453A">H100 HBM ≈ 80 GB</text>';
+    var cx=(padL+W-padR)/2, bw=104, x0=cx-bw/2, k;
+    for(k=0;k<b;k++){ var yTop=syG((k+1)*perReq), yBot=syG(k*perReq);
+      g+='<rect x="'+x0.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+bw+'" height="'+Math.max(1.2,yBot-yTop).toFixed(1)+'" fill="rgba(128,145,255,.8)" stroke="#2F3A4A" stroke-width="0.8"/>'; }
+    g+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(syG(GB)-6).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700">'+GB.toFixed(1)+' GB</text>';
+    g+='<text class="vlab-lbl mut" x="'+cx.toFixed(1)+'" y="'+(H-padB+12)+'" text-anchor="middle">'+b+' request'+(b>1?'s':'')+' × '+perReq.toFixed(2)+' GB</text>';
+    right.innerHTML=g;
+  }
+  var seq=document.getElementById('kv-seq'), bat=document.getElementById('kv-batch');
+  var seqL=document.getElementById('kv-seq-lbl'), batL=document.getElementById('kv-batch-lbl');
+  var gbOut=document.getElementById('kv-gb'), multOut=document.getElementById('kv-mult');
+  function update(){
+    var s=parseInt(seq.value,10), b=parseInt(bat.value,10);
+    renderLeft(s); renderRight(s,b);
+    seqL.textContent=s; batL.textContent=b;
+    gbOut.textContent=(perReqGB(s)*b).toFixed(2)+' GB';
+    multOut.textContent='≈'+Math.round(s/2)+'×';
+  }
+  seq.addEventListener('input',update); bat.addEventListener('input',update);
+  update();
 })();
 </script>
 
