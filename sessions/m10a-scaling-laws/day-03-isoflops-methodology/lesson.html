@@ -362,6 +362,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The Chinchilla paper (Hoffmann et al. 2022) did exactly this and found optimal <code>N</code> and <code>D</code> grow at roughly the same rate — about 20 training tokens per parameter. That is why a 70B "Chinchilla" model trained on ~1.4T tokens beat the larger 280B "Gopher" trained on fewer tokens. <span class="term" data-tip="A SciPy tool: you give it data points and a function shape, and it returns the numbers that fit best.">curve_fit</span> (from SciPy) is the tool that does the fitting: hand it your data points and a function shape, and it returns the coefficients that best match.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://vladfeinberg.com/assets/2025-04-24-princeton-talk.pdf" target="_blank" rel="noopener">Feinberg — scaling laws talk (PDF)</a> · <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener">Chinchilla paper (Hoffmann et al. 2022)</a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html" target="_blank" rel="noopener">scipy.optimize.curve_fit</a> · <a href="https://matplotlib.org/stable/" target="_blank" rel="noopener">Matplotlib</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 大家以为"拟合出一个 vertex"就等于"找到了最优" — people think getting a vertex out of <code>curve_fit</code> means they found the optimum. In plain terms: the fit always returns a number, even when your model sizes never actually bracketed the valley — so the danger isn't the algebra, it's trusting a minimum you never trained.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -377,6 +378,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>The best trip comes from a middle mix.</strong> If you tried every possible split and scored each packing choice, then plotted score against "average item size," the points would trace a valley with a clear best point in the middle. That valley is your IsoFlops parabola, and its bottom is the compute-optimal size.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: an airline bag has one obvious weight number, but real training FLOPs are only <em>approximated</em> by <code>C ≈ 6·N·D</code>. And unlike luggage, the loss valley can be shallow and noisy, so the "bottom" is a fitted estimate — not a sharp edge you can feel.</div></div>
+      <p><b>直觉 / Intuition:</b> 固定预算下，太大和太小都亏，最好的尺寸在"下弯又上弯"的谷底 — at fixed compute both extremes waste the budget, so the best size sits at the bottom of a valley. The technical point: because <code>D = C/6N</code>, loss vs. <code>log N</code> is a U, and the whole method is "find the bottom of that U."</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -412,6 +414,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>a, b, c = polyfit(log10(N), loss, 2)</code> &nbsp;→&nbsp; <code>x_star = -b/(2*a)</code> &nbsp;→&nbsp; <code>N_opt = 10**x_star</code><br><span style="font-size:.85rem;color:var(--text2)">Fit the quadratic, take the vertex, undo the log. That is the whole "read off the optimum" step.</span></div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — read the optimum off a parabola</b>
+      <br><b>1 · In words:</b> at a fixed budget, loss vs. model size makes a U; the lowest point is the compute-optimal size. A parabola is the simplest curve with exactly one bottom, so fit one and read its bottom.
+      <br><b>2 · The formula:</b> fit <code>loss ≈ a·x² + b·x + c</code> with <code>x = log₁₀(N)</code>; the vertex is at <code>x* = −b/(2a)</code>, then <code>N_opt = 10<sup>x*</sup></code>. Need <code>a &gt; 0</code> (opens upward). Here <code>x</code> = log model size, <code>a</code> = curvature, <code>b, c</code> = fit constants.
+      <br><b>3 · Tiny numbers:</b> suppose a fit gives <code>a = 0.5</code>, <code>b = −8</code>. Then <code>x* = −(−8)/(2·0.5) = 8</code>, so <code>N_opt = 10<sup>8</sup> = 100M</code> params — a size you may never have trained exactly.
+      <br><b>4 · Sanity check:</b> the vertex must land <em>inside</em> the sizes you swept (loss visibly goes down <em>then</em> up). If <code>x*</code> is past your largest <code>N</code>, or <code>a ≤ 0</code>, the "optimum" is an extrapolation — reject it and widen the sweep.</div></div>
+
       <h4>Why the valley exists</h4>
       <ul>
         <li><strong>Left arm (small N):</strong> the model runs out of capacity before it runs out of data. Extra tokens can't help — it <em>underfits</em>, so loss is high.</li>
@@ -424,6 +432,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The IsoFlops recipe is simple, which is exactly why it's easy to run wrong and still get a number. A staff engineer knows the number that lies, and what the method costs.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): fitting a parabola to a sweep that never bracketed the minimum.</b> If loss is still falling at your largest trained size, there is no valley in your data — but <code>polyfit</code>/<code>curve_fit</code> happily returns a vertex anyway, <em>extrapolated</em> past everything you measured. You report a compute-optimal <code>N</code> you never actually trained, and nothing errors. A senior engineer checks that the loss curve visibly turns back up <em>inside</em> the sampled range before trusting the vertex.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: robust sweep vs. cheap parametric fit.</b> IsoFlops (fix <code>C</code>, sweep <code>N</code>) is assumption-light and hard to fool — it just needs a bracketed minimum per budget — but it's expensive, since most of the models you train at each budget are deliberately suboptimal. Fitting one parametric surface <code>L(N,D)</code> to all runs at once is far cheaper per datapoint, but it bakes in a functional form that can be wrong. How many budgets × sizes to sweep, versus trusting a fitted surface, is a <b>design-review</b> call about the accuracy vs. cost of the scaling study itself.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "IsoFLOP: fix a compute budget, sweep model size with <code>D = C/6N</code>, and loss traces a U in <code>log N</code>. Fit a parabola and its vertex <code>x* = −b/(2a)</code> is the compute-optimal size; stack those vertices across budgets and the slope of the log–log line is the scaling exponent. The nuance is you must fit in log-space and confirm the minimum is <em>bracketed</em> — <code>curve_fit</code> will happily hand back a vertex extrapolated past sizes you never trained, and it won't error."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -478,7 +487,7 @@ Create sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/isofl
 5. Plots each per-budget loss-vs-size scatter (matplotlib), then a final log-log plot of compute C vs N_opt with a fitted trend line; print the slope and compare in one line to Chinchilla's ~20 tokens/param.
 Every step should print shapes/intermediate values, and the notebook must run top-to-bottom with no errors.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/writeup.md</code>: for one of your budgets, does the fitted vertex land <em>inside</em> your trained size range? If not, what did you change to bracket the minimum?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m10a-scaling-laws/day-03-isoflops-methodology/wed_isoflops/writeup.md</code>: (1) the one sentence you'd tell a teammate about what the parabola's vertex means; (2) for one of your budgets, does the fitted vertex land <em>inside</em> your trained size range — if not, what did you change to bracket it; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

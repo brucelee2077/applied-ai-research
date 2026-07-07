@@ -349,6 +349,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>What is reproducibility?</h4>
       <p><span class="term" data-tip="The ability to run the same code and get exactly the same result every time. Others can rerun your experiment and confirm it.">Reproducibility</span> means your program gives the same result every time you run it. It matters for two reasons. First, <strong>debugging</strong>: if a bug only shows up sometimes, you cannot fix it — but a fixed seed makes it show up every time. Second, <strong>science</strong>: other people can rerun your code and check that your result was real, not luck. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "随机"这个词让人以为它不可控，其实 seed 让它 100% 可复现 — the word "random" makes people think it's uncontrollable, when a seed makes it perfectly repeatable. In plain terms: people either forget to seed (and can't reproduce a bug) or over-share one seed (and silently kill the randomness they wanted) — the failure is invisible either way.</div></div>
       <button class="gotit" type="button">Got the three words — let's go</button>
     </div>
 </section>
@@ -363,6 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> the numbers <em>look</em> shuffled and surprising, but the seed is a recipe that fixes the whole order in advance.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where it breaks: a real card shuffle is truly random — you can never repeat it. A PRNG is <strong>not</strong> truly random. It is only unpredictable enough to look random, while staying 100% repeatable from the seed.</div></div>
+      <p><b>直觉 / Intuition:</b> seed 不是"随机的来源"，而是"那份写好的洗牌步骤" — the seed isn't the source of randomness, it's the written recipe that fixes the whole order in advance. The technical point: a PRNG is a deterministic chain <code>state → number → new state</code>, and the seed is just the first state.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -405,6 +407,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A seed is a promise that the same recipe repeats. That promise becomes a trap when many workers get the <em>same</em> seed — the repetition is now happening where you did not want it.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): every worker shares one seed, so their "random" streams are identical (a bug that doesn't announce itself).</b> Training often splits data loading across several parallel workers, each meant to draw fresh random augmentations or a fresh shuffle. If each worker starts from the <em>same</em> fixed seed, they all produce the <strong>exact same</strong> stream — so the "random" crops or noise repeat across workers instead of varying. Nothing errors; results are perfectly reproducible; the data just secretly has far less variety than you think, and the model trains worse for no visible reason. A senior engineer catches this in <b>code review</b> by asking "is the seed offset by the worker id (and the epoch)?" — a single global seed shared by all workers is the tell.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: reproducibility vs. seeing the true variance.</b> Fixing one seed makes a run repeatable, which is priceless for debugging and for others rerunning your result. What you pay: a single seed shows you one draw of a random process, so a lucky (or unlucky) seed can make a change look better or worse than it really is. In a <b>design review</b> the rule is to fix the seed while debugging, but to report a result across <em>several</em> seeds — the spread across seeds is the honest error bar, and a claim backed by one seed is not yet evidence.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A PRNG is fully deterministic — <code>next_state = f(state)</code>, <code>output = g(state)</code>, and the seed is just the first state — so the same seed replays the exact stream, which is what makes runs reproducible. The nuance is two failure modes: no seed means a heisenbug you can't reproduce, and one shared seed across data-loader workers means their 'random' augmentations are identical, so I offset the seed by worker id and epoch and report results across several seeds."</div></div>
       <button class="gotit" type="button">Got the mechanism</button>
     </div>
 </section>
@@ -449,7 +452,13 @@ Create sessions/m01-shape-of-data/day-06-random-seeds/experiment.py that, with a
 3. Makes rng0 = np.random.default_rng(0) and rng1 = np.random.default_rng(1); draws s0 = rng0.random(3) and s1 = rng1.random(3); prints both and asserts NOT np.array_equal(s0, s1) — different seeds give different reproducible streams.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-06-random-seeds/log.md</code>: in your own words, why does the same seed always give the same "random" numbers?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Two unseeded draws differ; two draws after the <em>same</em> <code>np.random.seed(0)</code> are equal (you <code>assert</code> it).</li>
+        <li><code>default_rng(0)</code> and <code>default_rng(1)</code> give different but each-reproducible streams.</li>
+        <li>You can explain why the same seed always yields the same numbers, in one sentence, without saying "it's random".</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m01-shape-of-data/day-06-random-seeds/log.md</code>: (1) in your own words, why the same seed always gives the same "random" numbers; (2) the one place a shared seed would bite you; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

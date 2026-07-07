@@ -359,6 +359,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>So what's today's catch?</h4>
       <p>The catch is that "clean the data" is not optional busywork — it is where you decide, explicitly, what happened to every run that did not produce a clean number. Drop a <code>NaN</code> silently and you lose the chance to notice that every run at <code>lr=1e-3</code> and the two largest <code>N</code> values diverged — which is itself a real finding, not noise.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">How to Scale Your Model (scaling-book)</a> · <a href="https://pandas.pydata.org/docs/" target="_blank" rel="noopener">pandas documentation</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 大家把"清洗数据"当成杂活，其实它是"记录哪些 run 失败了、为什么"的关键一步 — people treat "clean the data" as chore-work, when it's really where you decide what happened to every run that didn't produce a clean number. In plain terms: a blind <code>.dropna()</code> throws away exactly the diverged runs that were trying to tell you something.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -374,6 +375,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> Saturday turns 60 independent jobs into 60 completed jobs without losing hours of work to crashes; Sunday turns 60 scattered result cards into 1 table the whole class (next week's power-law fit) can read at once.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: student projects don't checkpoint themselves, and a knocked-over volcano doesn't silently write <code>NaN</code> on its result card — your training runs do exactly that when they diverge, and catching those silent <code>NaN</code> cases is most of Sunday's real work. Also, unlike independent fair stations, your runs share hardware (the accelerator/cloud instance), so one badly-behaved run can crash a neighbor sharing its memory — a coupling the gym doesn't have.</div></div>
+      <p><b>直觉 / Intuition:</b> 周六是"别让崩溃吃掉几小时的活"，周日是"把 60 张成绩卡合成一张表" — Saturday is "don't let a crash eat hours of work," Sunday is "merge 60 result cards into one table." The technical point: checkpointing bounds crash loss to one save-interval, and aggregation's real job is deciding what happened to the runs that didn't finish cleanly.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -427,6 +429,10 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Dropped rows carry information</strong> — a run that diverged because its learning rate was too high for its model size is a different failure mode than a run that never finished. Recording <em>which</em> rows you dropped, and why, preserves that signal for interpreting next week's fit.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> profiled step time + hardware efficiency (Mon–Fri) → you can now afford to run the full matrix → checkpointing keeps the matrix alive through crashes (Sat) → pandas turns 60 scattered files into 1 clean table (Sun) → next week's power-law fit consumes that table directly.</div></div>
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): survivorship bias from a blind <code>dropna()</code>.</b> Aggregating only the runs that produced a clean number — via <code>df.dropna()</code> or by reading just the JSON files that exist — silently deletes the diverged runs, so your scaling-law fit is computed on <em>survivors only</em>. The frontier looks cleaner and better than reality, and nothing errors. It bites hardest at the exact corner (large N, high lr) where divergence is common and informative. In <b>code review</b>, a senior engineer confirms the aggregated row count matches the planned matrix and that dropped run_ids are logged with a reason.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: drop vs. clip diverged rows.</b> Dropping <code>NaN</code> rows is honest but loses coverage at the informative corner; clipping a diverged loss to a large finite value keeps the point on the plot but biases the fit upward there. Neither is free — the right policy depends on whether you're studying the frontier's shape or its failure boundary, so it's a <b>design-review</b> decision you record <em>before</em> looking at the fit.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "At 60 runs the job is engineering discipline: checkpoint-resume so a crash costs one save-interval, not hours, then aggregate every run's JSON into one pandas table and clean it. The nuance is that cleaning is a decision, not busywork — a blind <code>dropna()</code> removes diverged runs and gives you a survivorship-biased fit. I record a NaN policy up front and assert the row count matches the planned matrix, because a missing row is a finding, not noise."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -491,7 +497,7 @@ Artifact 2 (Sunday) — under sessions/m13-isoflops-scaling-law/day-03-execution
 5. aggregate_results.py: glob results/*.json, load into a pandas DataFrame, print row count before/after cleaning, explicitly drop/flag NaN final_loss rows and duplicate run_ids (log how many and which), then write N/D/final_loss as NumPy arrays to sessions/m13-isoflops-scaling-law/day-03-execution-data-aggregation/reports/week10_loss_table.csv.
 Run it and confirm every acceptance criterion above holds (file counts match, no missing loss without explanation, output shapes printed and equal).</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m13-isoflops-scaling-law/day-03-execution-data-aggregation/log.md</code>: name one gotcha you hit — if you dropped any <code>NaN</code> rows, what would you have missed if you'd called <code>.dropna()</code> blindly without first logging which run_ids and why?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m13-isoflops-scaling-law/day-03-execution-data-aggregation/log.md</code>: (1) the one sentence you'd tell a teammate about why checkpoint-resume matters at 60 runs; (2) one gotcha you hit — if you dropped any <code>NaN</code> rows, what would a blind <code>.dropna()</code> have hidden; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

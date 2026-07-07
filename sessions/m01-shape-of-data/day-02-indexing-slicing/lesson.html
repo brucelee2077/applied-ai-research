@@ -351,6 +351,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>This is the same <code>x[0]</code> and <code>x[1:3]</code> you already use on Python lists. Arrays add one new move: for a grid you separate the dimensions with a <strong>comma</strong> — <code>g[row, col]</code>. And a lone colon <code>:</code> means "everything on this <span class="term" data-tip="One dimension of an array. A 2-D array has two axes: axis 0 = rows, axis 1 = columns.">axis</span>."</p>
       <p>Two symbols do all the work today: the <strong>comma</strong> (separate axes) and the <strong>colon</strong> (a range, or "all"). Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> vLLM, one of the most-used serving engines for LLMs, is built around <b>PagedAttention</b> — it slices the KV cache into fixed-size blocks the exact same way an operating system pages memory. Slicing isn't just a classroom trick.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> <code>x[1:3]</code> 看起来"取到 3"，但其实取不到 — the half-open rule feels arbitrary until it burns you. In plain terms: people read <code>start:stop</code> as inclusive, so their batch is one row short (or one too many), and the off-by-one hides for hours because nothing crashes.</div></div>
       <button class="gotit" type="button">Got the two moves — let's go</button>
     </div>
 </section>
@@ -366,6 +367,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> index picks one; slice picks a range; the comma separates the axes; the colon means "everything on this axis."</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a slice doesn't copy the houses — it's a <strong>view</strong>, a window onto the same data, so changing the slice can change the original. We'll treat slices as plain copies for now and revisit that later.</div></div>
+      <p><b>直觉 / Intuition:</b> 把 <code>:</code> 想成"整条轴"，把逗号想成"换一条轴" — a colon means "all of this axis", a comma means "now the next axis." The technical point: indexing/slicing is pure address arithmetic on a regular grid, so grabbing a batch or a column is O(1) bookkeeping, not a copy loop.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Software analogy:</b> a slice is like a database <code>LIMIT/OFFSET</code> over rows already sorted on disk — you name a start and a count, and the engine reads that window without touching the rest. Same idea: <code>data[0:32]</code> hands you a training batch by pointer, not by copying 32 rows.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -404,6 +407,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Why a frontier lab cares</h4>
       <p>You just met vLLM's <b>PagedAttention</b> above — here's the mechanism underneath it. Slicing is how models move data all day: grab a training <strong>batch</strong> with <code>data[0:32]</code>, or pull one attention head's slice out of a big tensor. vLLM's exact move is to carve the <span class="term" data-tip="The stored keys/values from earlier tokens that a model reuses so it does not recompute them every step. You will meet it later.">KV cache</span> into fixed-size chunks with <code>cache[:, :seq_len]</code> — that's what lets it reuse memory efficiently when two requests share the exact same prompt text, instead of wasting space. It happens millions of times per second.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this causal chain:</b> positions are regular → any sub-region has a fixed address → you grab a batch/row/column with plain arithmetic, no copy-loop → data moves fast. An <strong>off-by-one slice</strong> (forgetting the stop is excluded) is one of the most common bugs there is.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Staff / Research Engineer Lens — two silent failures:</b> (1) the off-by-one — <code>x[a:b]</code> has length <code>b − a</code>, so <code>x[1:3]</code> is 2 elements, not 3; drop a token and your labels shift by one silently. (2) the <em>view vs. copy</em> trap — a slice is a window onto the same memory, so writing into <code>batch = data[0:32]</code> can mutate your dataset in place. <b>⚖️ Trade-off:</b> views are free (no copy) but aliased; when in doubt, <code>.copy()</code> costs memory but buys safety — say which one you chose in review.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Slicing is half-open address arithmetic: <code>x[a:b]</code> is <code>b − a</code> elements and returns a view, not a copy. That's why it's cheap — no data moves — and it's exactly how a batch or a KV-cache block is carved out. The nuance is aliasing: because a slice shares memory, an in-place write can silently corrupt the source, so I copy when I need isolation."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -448,7 +453,14 @@ Create sessions/m01-shape-of-data/day-02-indexing-slicing/experiment.py that, wi
 3. Makes g = np.array([[1,2,3],[4,5,6]]); prints g[1,2] (one cell), g[0,:] (a whole row), and g[:,1] (a whole column).
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-02-indexing-slicing/log.md</code>: which slice result surprised you, and why?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>On a 1-D array you print <code>x[0]</code>, <code>x[-1]</code>, and <code>x[1:3]</code>, and the slice has exactly 2 elements.</li>
+        <li>On a 2-D array you print one cell <code>g[1, 2]</code>, a whole row <code>g[0, :]</code>, and a whole column <code>g[:, 1]</code>.</li>
+        <li>You can state the length of any <code>x[a:b]</code> as <code>b − a</code> before running it.</li>
+        <li>You note in a comment whether each result is a view or a copy.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m01-shape-of-data/day-02-indexing-slicing/log.md</code>: (1) the one sentence you'd tell a teammate about the half-open slice rule; (2) which slice result surprised you, and why; (3) one thing you're still unsure about (view vs. copy is fair game).</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

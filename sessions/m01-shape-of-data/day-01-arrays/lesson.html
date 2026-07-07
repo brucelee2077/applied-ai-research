@@ -353,6 +353,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A Python list is a loose bag: it can hold anything (numbers, text, other lists), in any mix, and to do math you have to loop over it item by item. An array is stricter and, because of that, far faster: <strong>one type, one regular grid</strong> — so the computer can crunch every number at once.</p>
       <p>The single most important thing about an array is its <span class="term" data-tip="A tuple giving the size of an array along each dimension, e.g. (2, 3) = 2 rows, 3 columns.">shape</span> — the sizes of its grid. That is today's puzzle. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> GPT-3's biggest weight matrix is a rigid grid of shape <code>(12288, 49152)</code> — over 600 million numbers, one matrix, inside one model. Shape is not a toy idea.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "array" 听起来只是 Python list 的另一个名字，于是很多人跳过 shape 直接写代码。In plain terms: people treat an array as "just a fast list" and never learn to read its <code>shape</code> — then every later bug (a matmul that won't line up, a batch axis in the wrong place) is really a shape they never learned to see.</div></div>
       <button class="gotit" type="button">Got what an array is — let's go</button>
     </div>
 </section>
@@ -368,6 +369,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> a list is flexible but slow for math; an array is rigid but fast, because everything sits in a regular grid.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: an egg carton is only 2-D (rows × columns), but an array can have <strong>3, 4, or more</strong> dimensions — a stack of cartons, a warehouse of stacks. We'll build up to that.</div></div>
+      <p><b>直觉 / Intuition:</b> 真正重要的不是"数字"，而是"格子的形状" — the picture that matters is the <em>grid</em>, not the numbers inside it. The technical point: an array bundles one dtype + one shape + a contiguous block of memory, so the hardware can act on the whole grid in a single instruction.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Software analogy:</b> a Python <code>list</code> is a folder of loose files you open one at a time; a NumPy array is one fixed-width database column — same type in every row, so the engine scans it in one pass. That "one pass over a regular grid" is exactly what a GPU does to a weight matrix.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -408,6 +411,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Why a frontier lab cares</h4>
       <p>That same <code>(12288, 49152)</code> matrix from the top of this page does not sit alone. It lives inside one of GPT-3's 96 layers, each layer 12,288 numbers wide. A handful of matrices like it repeat in every one of those 96 layers. Every weight, every batch of tokens, every image inside a model is an array (a <span class="term" data-tip="The general word for an array with any number of dimensions (3-D, 4-D, ...). Used everywhere in ML.">tensor</span>). The number-one bug in machine-learning code is a <strong>shape mismatch</strong> — two arrays that don't line up. Reading shapes fluently is the skill that everything later (attention, batching, scaling) is built on. That is why Day 1 is arrays.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Staff / Research Engineer Lens — the silent failure:</b> a shape bug rarely crashes. NumPy will happily broadcast a <code>(32,)</code> against a <code>(32, 1)</code> and hand you a <code>(32, 32)</code> — training keeps running, the loss looks plausible, and you ship a model that learned the wrong thing. <b>⚖️ Trade-off in code review:</b> a one-line <code>assert x.shape == (B, T, C)</code> at each boundary costs nothing and kills the class of bug that otherwise eats an afternoon of debugging.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "An array is a dtype plus a shape over one contiguous block of memory — that is what makes it vectorizable: one instruction over the whole grid. The nuance is that the costliest bugs in ML code aren't crashes, they're silent shape mismatches that broadcast into a wrong-but-plausible result, so I annotate expected shapes at every boundary."</div></div>
       <button class="gotit" type="button">Got the causal chain</button>
     </div>
 </section>
@@ -453,7 +458,14 @@ Create sessions/m01-shape-of-data/day-01-arrays/experiment.py that:
 4. Reshapes np.arange(6) into shape (2,3) and prints the result, showing the same 6 numbers rearranged.
 Add a one-line comment on each step, then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m01-shape-of-data/day-01-arrays/log.md</code>: which shape did you find hardest to read, and why?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The script prints <code>.shape</code>, <code>.ndim</code>, and <code>.dtype</code> for both a 1-D and a 2-D array.</li>
+        <li>It shows one vectorized op (<code>x + 10</code>) with no Python loop.</li>
+        <li>It reshapes a 6-element array to <code>(2, 3)</code>, and the printed grid holds the same six numbers.</li>
+        <li>You can read each printed shape out loud, outer-to-inner, without hesitating.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m01-shape-of-data/day-01-arrays/log.md</code>: (1) the one sentence you'd tell a teammate about what "shape" is; (2) which shape you found hardest to read, and why; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
