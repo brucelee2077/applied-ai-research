@@ -110,7 +110,7 @@ All four are **dependency-free inline SVG + vanilla JS** using the repo `.vlab` 
 ### 5.1 m10a · day-01 · kaplan-paradigm — "Allocation dial"
 - **Learning question:** given a fixed compute budget `C`, how should it split between parameters `N` and data `D`, and what did Kaplan claim?
 - **Control:** one slider = the parameter-exponent `a` in `N ∝ C^a` (with `D ∝ C^(1−a)`), 0 → 1. A preset button snaps to **Kaplan a≈0.73** and **balanced a≈0.5**.
-- **Two panels:** (left) a stacked/див bar showing the N-vs-D share of the budget as `a` moves; (right) a log-log line of `N* vs C` whose **slope readout = a**. Badge reads "parameter-heavy (Kaplan)" vs "balanced".
+- **Two panels:** (left) a stacked bar showing the N-vs-D share of the budget as `a` moves; (right) a log-log line of `N* vs C` whose **slope readout = a**. Badge reads "parameter-heavy (Kaplan)" vs "balanced".
 - **Notice / misconception / simplifies:** Kaplan's slope tilts spend toward giant, under-fed models; the misconception is "bigger model = better" independent of tokens; simplification = single clean power law, no noise.
 
 ### 5.2 m10a · day-02 · chinchilla-correction — "IsoFLOP valley"
