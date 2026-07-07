@@ -351,6 +351,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>At the top, a final <span class="term" data-tip="A single linear layer at the top of the model that turns each token's numbers into one score per word in the vocabulary.">linear head</span> (also called the output projection or the unembedding) turns the top block's numbers into one score — a logit — for every word in the vocabulary. Softmax then gives probabilities, and you pick the next word (Day 7).</p>
       <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.8rem;line-height:1.7">tokens → embed + position → block ×N → linear head → next-word logits</div></div>
       <p>That is a complete decoder-only transformer. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 学了这么多零件，最后"整机"反而怕它很复杂。In plain terms: after all the pieces, the full model feels like it must be complicated. It is not — it is three parts: turn words into numbers (embed + position), ride up through <code>N</code> identical blocks, then turn numbers back into a word (the head). The middle is just one block you already built, repeated.</div></div>
       <button class="gotit" type="button">Got the whole model — let's go</button>
     </div>
 </section>
@@ -364,6 +365,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🏗️</span><h5>Every floor is the same</h5><p>Each floor is one decoder block: meet (attention), then think (feed-forward). The floors look identical, but each has its own learned staff. On the roof, a final desk hands each token a next-word guess.</p></div>
       </div>
       <p><strong>In one line:</strong> a transformer is a tower — names and positions at the bottom, a stack of identical thinking floors in the middle, and a next-word desk on the roof.</p>
+      <p><b>直觉 / Intuition:</b> 底层给词贴名字和座位号，中间是一叠一模一样的思考楼层，屋顶给出下一个词。 The technical point is that the shape stays <code>(seq_len, d_model)</code> through every block, so the whole model is just embeddings, the same block stacked <code>N</code> times, and a final linear head to vocab-sized logits.</p>
       <div class="callout c-info"><span class="ic">🎮</span><div>Your toy tower might have 2 floors and tiny rooms. GPT-3 has 96 floors and huge rooms. Same building design, wildly different size. That is the whole story of scale.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: in a real building each floor is separate, but here the tokens flow through all floors as one continuous set of numbers, and the residual highways (Day 1) mean the ground-floor signal is still present at the roof.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -416,6 +418,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>Take the last position's 8 scores → softmax → pick the next word (Day 7).</li>
       </ul>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the end-to-end forward pass</b>
+<br><b>1 · In words:</b> embed the tokens and add positions, ride up through <code>N</code> masked blocks, then project to one score per vocabulary word (see Steps 1–2).
+<br><b>2 · The formula:</b> <code>x = token_embed[ids] + pos_embed</code>; <code>for block: x = block(x, causal_mask)</code>; <code>logits = x · W_head</code> — <code>x</code> stays <code>(seq_len, d_model)</code>; <code>W_head</code> is <code>(d_model, vocab_size)</code>; <code>logits</code> is <code>(seq_len, vocab_size)</code>.
+<br><b>3 · Tiny numbers:</b> <code>vocab=8, d_model=16, N=2</code>, 2-token prompt → embed <code>(2,16)</code> → block×2 still <code>(2,16)</code> → head <code>(16,8)</code> → logits <code>(2,8)</code>.
+<br><b>4 · Sanity check:</b> shape is <code>(seq_len, d_model)</code> everywhere until the head makes it <code>(seq_len, vocab_size)</code>. If order carries no signal, you forgot <code>+ pos_embed</code> — the silent bug below.</div></div>
+
       <h4>Why it matters — you built the frontier's shape</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> this is the real architecture of a decoder-only LLM. Your toy has maybe a thousand parameters; GPT-4 has trillions. Same embeddings, same stacked blocks, same causal mask, same head. The only differences are size and training data. You now understand, end to end, how a large language model turns text into text.</div></div>
 
@@ -423,6 +431,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Assembling the full model means one line adds position and one pair of big matrices bookends the stack — and both are places where a quiet mistake or a quiet saving lives.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to add the positional embedding.</b> Attention has no built-in sense of order — it treats the tokens as an unordered bag. The <code>+ pos_embed</code> line is what tells the model where each token sits. If you drop it, every shape still matches and the model still trains and produces fluent-looking text, but it cannot tell "dog bites man" from "man bites dog" because word order carries no signal. There is no crash — just a quality ceiling you cannot explain. A senior engineer in <b>code review</b> confirms position information is actually added (or a positional scheme like RoPE is applied inside attention), because a transformer with no positions fails silently, not loudly.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: weight tying saves parameters but couples two jobs.</b> The input token embedding and the output head are both <code>vocab_size × d_model</code> matrices, so for a large vocabulary they can dominate the parameter count. Tying them — using the same matrix for "id → vector" and "vector → word score" — cuts that cost roughly in half and often helps small models. The price is that one matrix must now serve both the input and output roles, which can slightly limit a very large model. In a <b>design review</b> weight tying is the classic choice: worth it to shrink smaller models, sometimes dropped when you have parameters to spare.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: weight tying saves parameters but couples two jobs.</b> The input token embedding and the output head are both <code>vocab_size × d_model</code> matrices, so for a large vocabulary they can dominate the parameter count. Tying them — using the same matrix for "id → vector" and "vector → word score" — cuts that cost roughly in half and often helps small models. The price is that one matrix must now serve both the input and output roles, which can slightly limit a very large model. In a <b>design review</b> weight tying is the classic choice: worth it to shrink smaller models, sometimes dropped when you have parameters to spare.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A decoder-only transformer is three parts: token + positional embeddings at the bottom, <code>N</code> stacked causal blocks in the middle, and a linear head that projects each position to vocab-sized logits — <code>logits = block^N(embed[ids]+pos) · W_head</code>. Shape is <code>(seq_len, d_model)</code> until the head. The nuance is two things: attention has no order, so forgetting <code>+ pos_embed</code> silently caps quality (the model can't tell 'dog bites man' from 'man bites dog'); and tying the input embedding to the output head halves the biggest parameter block for large vocabularies."</div></div>
       <button class="gotit" type="button">Got the full forward pass</button>
     </div>
 </section>
@@ -468,7 +478,13 @@ Create sessions/m05a-text-transformer/day-08-full-transformer/experiment.py that
 4. Prints the total parameter count so the learner can compare their toy model to real LLM sizes.
 Then run it and paste the per-stage shapes and the parameter count at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-08-full-transformer/log.md</code>: what shape came out of the final head, and how many parameters did your toy transformer have?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The forward pass goes embed → <code>N</code> blocks → head, with shape <code>(seq_len, d_model)</code> until the head makes it <code>(seq_len, vocab_size)</code>.</li>
+        <li>The positional embedding is actually added (or a scheme like RoPE is applied inside attention).</li>
+        <li>A short generation loop runs on a toy vocabulary (output can be gibberish — the shapes and loop are real).</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m05a-text-transformer/day-08-full-transformer/log.md</code>: (1) the shape out of the final head and your toy transformer's parameter count; (2) what breaks silently if you forget to add positions; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
 </section>

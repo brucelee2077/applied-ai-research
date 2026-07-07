@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Putting them back together</h4>
       <p>Run all heads, <strong>concatenate</strong> their outputs back to length <code>d_model</code>, then mix them with one final learned matrix <span class="term" data-tip="The output projection matrix in multi-head attention. It mixes the concatenated head outputs back into one d_model-sized vector.">W_O</span>. The result is one richer vector per word. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Llama 3 and Mistral both ship Google's GQA trick in production — sharing Keys/Values across groups of heads to shrink memory, instead of giving every head its own full copy.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 听起来 h 个头应该是 h 倍计算量，其实差不多。In plain terms: people expect "more heads = more compute", but total cost is roughly flat — splitting <code>d_model</code> across heads makes each head work in the smaller size <code>d_k = d_model / h</code>. You are re-slicing the same budget, not adding to it.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -363,6 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🖍️</span><h5>Many highlighters, one summary</h5><p>Like reading with several colored highlighters, each marking a different pattern — then combining all the highlights into one understanding of the word.</p></div>
       </div>
       <p><strong>In one line:</strong> split into several small attentions that each specialize, then merge their results into one vector.</p>
+      <p><b>直觉 / Intuition:</b> 一个头只能盯一种关系，多个头就像几支不同颜色的荧光笔同时读句子。 The technical point is that each head runs its own attention on a smaller <code>d_k</code>-sized slice, so the model tracks several relationships at once and then merges them.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: nobody assigns each head a job — they specialize on their own through training (M3). And the heads run in parallel and cost about the same as one big attention, because each works in the smaller size <code>d_k</code>.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -399,6 +401,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Project:</strong> multiply by <code>W_O</code> to mix the heads into the final output.</li>
       </ol>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — split, attend, merge</b>
+<br><b>1 · In words:</b> split the model width into <code>h</code> smaller heads, let each run its own attention on a slice, stitch the results back together, and mix them with one matrix.
+<br><b>2 · The formula:</b> <code>d_k = d_model / h</code>; <code>MultiHead(x) = Concat(head₁,…,head_h)·W_O</code>, where <code>headᵢ = Attention(x·W_Qⁱ, x·W_Kⁱ, x·W_Vⁱ)</code> — <code>d_model</code> = full width; <code>h</code> = number of heads; <code>d_k</code> = per-head width; <code>W_O</code> has shape <code>(d_model, d_model)</code>.
+<br><b>3 · Tiny numbers:</b> <code>d_model=4</code>, <code>h=2</code> → <code>d_k=2</code>. Two heads each output a length-2 vector; concat → length 4; <code>·W_O</code> (4×4) → length 4. Same width in, same width out.
+<br><b>4 · Sanity check:</b> <code>h</code> must divide <code>d_model</code>, and the concat width <code>h·d_k</code> must equal <code>d_model</code> before <code>W_O</code>. Push <code>h</code> too high (<code>d_model=512, h=64 → d_k=8</code>) and each head is too small to hold a useful subspace.</div></div>
+
       <h4>Why a frontier lab cares</h4>
       <p>Every real transformer is multi-head — small models use 8–16 heads, big ones 32–128 (<b>Llama 3</b>'s biggest runs 128). Heads visibly <strong>specialize</strong> (some track syntax, some copy earlier tokens). It also sets up a big inference cost: the Keys and Values for every head must be cached, which is exactly the cost <span class="term" data-tip="Grouped-Query / Multi-Query Attention: share Keys and Values across heads to shrink the KV cache and speed up inference. Covered in the decoding modules.">GQA / MQA</span> — the trick <b>Llama 3</b> and <b>Mistral</b> ship in production, per the teaser above — was built to cut, by sharing K/V across groups of heads instead of giving each head its own full copy. Multi-head is the last piece of the attention block.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> split d_model into h heads → each attends with its own Q/K/V → concat the outputs → W_O mixes them. Stack this attention block with the feed-forward layers from M2 and you have a transformer.</div></div>
@@ -407,6 +415,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Knowing the pipeline is not enough. A staff engineer also knows the way it breaks <em>without an error</em>, and the knob you are really turning when you set the head count.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the wrong reshape/transpose when splitting heads.</b> Splitting <code>(seq, d_model)</code> into <code>(h, seq, d_k)</code> takes a reshape <em>and</em> a transpose in the right order. Get the order wrong and the shapes can still line up — so nothing crashes — but each head now attends over scrambled slices of the vector. The model trains and the loss drops; the heads just quietly stop specializing. A senior engineer catches this in <b>code review</b> by printing the per-head shapes, not by waiting for a crash.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more heads vs. wider heads.</b> Total compute is about the same however you slice it, because <code>d_k = d_model / h</code>. More heads means more independent relationship channels, but each is lower-resolution; fewer heads means richer per-head subspaces but fewer patterns tracked at once. Push <code>h</code> too high and <code>d_k</code> shrinks so small a head can't hold a useful subspace. That balance is a <b>design-review</b> call — and it's the same axis GQA / MQA trade along to shrink the KV cache.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Multi-head attention runs <code>h</code> attentions in parallel, each with its own Q/K/V projections into a <code>d_k = d_model/h</code> subspace, then concatenates the heads and mixes them with an output matrix <code>W_O</code>. Different heads specialize on different relationships at roughly the same total cost as one big attention. The nuance is the head-count trade-off: too many heads shrinks <code>d_k</code> until each head is too low-dimensional to be useful — and it's the same axis GQA/MQA trade along to shrink the KV cache at inference."</div></div>
       <button class="gotit" type="button">Got multi-head</button>
     </div>
 </section>
@@ -452,7 +461,13 @@ Create sessions/m03-attention/day-04-multihead/experiment.py that, with a commen
 4. Multiplies by an output matrix Wo (4,4) to get the final (2,4) output; prints shapes at each step and notes each head learned a different pattern.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m03-attention/day-04-multihead/log.md</code>: why split <code>d_model</code> across heads instead of giving every head the full size?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Each head's output has width <code>d_k = d_model / h</code>.</li>
+        <li>The concatenated output has width <code>d_model</code> again (before <code>W_O</code>).</li>
+        <li>The final shape after <code>W_O</code> matches the input — one vector per token.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-04-multihead/log.md</code>: (1) why split <code>d_model</code> across heads instead of giving every head the full size; (2) the shape you printed at each step (per-head → concat → after <code>W_O</code>); (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

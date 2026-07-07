@@ -351,6 +351,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>An <span class="term" data-tip="A transformer with two parts: an encoder that reads the full input and a decoder that generates the output while attending to the encoder's understanding.">encoder-decoder</span> uses both. The encoder reads the whole input (say, an English sentence). The decoder then writes the output (say, the French translation), one token at a time, while looking at the encoder's understanding. It is best when input and output are different sequences.</p>
 
       <div class="callout c-info"><span class="ic">💡</span><div><b>The surprise:</b> the block is identical in all three. Same attention, same feed-forward, same layer norm, same residuals. The only real difference is the mask on the attention. Change the mask, change the family. Keep going 👇</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 三个家族听起来像三种架构，其实只差一个 mask。In plain terms: encoder / decoder / encoder-decoder sound like three different architectures. They are not — the block is byte-for-byte identical; the only real difference is whether attention adds a causal mask. Get that one idea and the whole family tree collapses to a single switch.</div></div>
       <button class="gotit" type="button">Got the three families — let's go</button>
     </div>
 </section>
@@ -368,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🎭</span><h5>Same brain, different job</h5><p>The reader, writer, and translator are the same person doing three jobs. In transformers, the "person" is the block; the "job" is chosen by the mask.</p></div>
       </div>
       <p><strong>In one line:</strong> encoders read the whole thing at once, decoders write left to right, and encoder-decoders read then write — all from the same block with a different mask.</p>
+      <p><b>直觉 / Intuition:</b> 同一个"人"（block）做三种工作，靠一个开关（mask）切换。 The technical point is that all three families share the same block; the mask alone decides whether a token can see the future (encoder) or only the past (decoder).</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a human reader and writer are truly different skills, but here they share the exact same architecture. Do not think of them as separate machines — think of one machine with a switch called "the mask".</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -432,6 +434,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Because the mask is the <em>only</em> difference, it is one line — and one line is exactly what gets flipped or forgotten without any error to warn you.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): building a generation model but leaving attention bidirectional.</b> The block for an encoder and a decoder is byte-for-byte the same except <code>+ causal_mask</code>. If you copy an encoder block to build a text generator and forget to add the mask, every training token can see the words after it. It runs, and training loss looks great — but at generation time those future words do not exist yet, so the model was trained on information it will never have and produces degenerate output. A senior engineer in <b>code review</b> asserts the decoder's attention is actually masked (position <code>i</code> sees only <code>0…i</code>), because "generation model with no mask" fails silently, not loudly.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bidirectional understanding vs the ability to generate.</b> An encoder reads the whole input at once, so every token draws on both sides — richer for understanding tasks like classification and search. But that same full visibility means it cannot generate text left to right: it was never trained to predict a next token from the past alone. A decoder gives up right-side context to gain autoregressive generation. In a <b>design review</b> you choose the encoder when the job is to <em>understand</em> a fixed input and the decoder when the job is to <em>write</em> new text — and reach for an encoder-decoder only when you truly need both.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: bidirectional understanding vs the ability to generate.</b> An encoder reads the whole input at once, so every token draws on both sides — richer for understanding tasks like classification and search. But that same full visibility means it cannot generate text left to right: it was never trained to predict a next token from the past alone. A decoder gives up right-side context to gain autoregressive generation. In a <b>design review</b> you choose the encoder when the job is to <em>understand</em> a fixed input and the decoder when the job is to <em>write</em> new text — and reach for an encoder-decoder only when you truly need both.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Encoder, decoder, and encoder-decoder are the same transformer block; the only architectural difference is the attention mask. An encoder uses no mask (bidirectional — every token sees both sides, best for understanding, e.g. BERT); a decoder adds a causal mask (each token sees only the past, best for generation, e.g. GPT). The nuance is that it's a silent failure mode — build a generator but forget the mask and it trains with a great-looking loss because every token sees its future, then generates nonsense, so you assert the decoder's attention is actually masked."</div></div>
       <button class="gotit" type="button">Got the difference</button>
     </div>
 </section>
@@ -477,7 +481,13 @@ Create sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py th
 4. Prints a small table mapping encoder→BERT, decoder→GPT, encoder-decoder→T5.
 Then run it and paste both weight grids at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-06-encoder-vs-decoder/log.md</code>: in one sentence, what is the only architectural difference between an encoder and a decoder?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>One <code>attention(scores, causal=False)</code> function serves both families.</li>
+        <li>With <code>causal=False</code> the whole weight grid is filled; with <code>causal=True</code> it is zero above the diagonal.</li>
+        <li>You can name which family powers BERT, GPT, and T5.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m05a-text-transformer/day-06-encoder-vs-decoder/log.md</code>: (1) in one sentence, the only architectural difference between an encoder and a decoder; (2) which family you'd pick for a classifier vs a chatbot; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 7</button>
     </div>
 </section>

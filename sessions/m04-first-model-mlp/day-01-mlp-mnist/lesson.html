@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Train, then test</h4>
       <p>Train with the M3 loop on 60,000 images, then measure <span class="term" data-tip="The fraction of test examples the model classifies correctly. Measured on data not used in training.">accuracy</span> on 10,000 <strong>held-out</strong> images the model never trained on. Testing on unseen data is how you know it truly learned, not just memorized. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> the cross-entropy loss you're about to use on 10 digit classes is the exact same formula a GPT-style model uses to predict its next token out of a 100,000+ word vocabulary.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人以为"第一个真实模型"一定有全新的东西。In plain terms: there is <em>nothing new</em> here — it is M1's reshape, M2's <code>relu(x@W+b)</code>, and M3's loss + loop, all pointed at real data. The one genuinely new idea is small but important: you grade on a <em>held-out</em> test set, not the data you trained on.</div></div>
       <button class="gotit" type="button">Got the setup — let's go</button>
     </div>
 </section>
@@ -363,6 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📝</span><h5>Testing = a pop quiz</h5><p>Then quiz it on 10,000 <strong>new</strong> digits it never studied. Accuracy on those is the real score — it can't have memorized them.</p></div>
       </div>
       <p><strong>In one line:</strong> practice on the training set with the loop, then grade on a held-out test set to see if it really learned.</p>
+      <p><b>直觉 / Intuition:</b> 训练像刷抽认卡，测试像突击小考——只有做没背过的题，分数才算数。 The technical point is that accuracy only means something on data the model never trained on; that held-out score is your first taste of real evaluation.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student can't literally memorize 60,000 cards, but a big model can start to <span class="term" data-tip="When a model fits the training data well but does worse on new data. The gap between train and test accuracy reveals it.">overfit</span> — score high on training yet worse on the test set. Watching the two scores diverge is how you catch it.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -400,6 +402,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Train:</strong> backprop + update, looped over the data (M3 D2–3). Then measure accuracy on the held-out test set.</li>
       </ul>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the MLP forward pass</b>
+<br><b>1 · In words:</b> multiply the pixels by the first weights and bend the result with ReLU to get hidden features, then multiply those by the second weights to get one score per digit.
+<br><b>2 · The formula:</b> <code>logits = relu(x·W1+b1)·W2 + b2</code> — <code>x</code> = one flattened image <code>(1,784)</code>; <code>W1 (784,128), b1 (128)</code>; <code>relu</code> zeroes negatives → <code>h (1,128)</code>; <code>W2 (128,10), b2 (10)</code> → <code>logits (1,10)</code>, one score per digit.
+<br><b>3 · Tiny numbers:</b> <code>x=[2,-3]</code>, <code>W1=I</code>, <code>b1=0</code> → pre-activation <code>[2,-3]</code> → <code>relu → [2,0]</code> (the −3 is clipped). Then <code>W2=[[1],[1]]</code> → score <code>= 2·1 + 0·1 = 2</code>.
+<br><b>4 · Sanity check:</b> <code>h</code> has one entry per hidden unit (128) and <code>logits</code> has one per class (10). ReLU can only zero or keep a value — never make it negative. A negative entry after ReLU means a bug.</div></div>
+
       <h4>Why a frontier lab cares</h4>
       <p>This tiny classifier is the <strong>same recipe</strong> as a giant LLM: represent input as vectors, forward pass, loss, backprop, loop. In fact the loss function is <em>identical</em> — the cross-entropy loss you used on 10 digit classes is the exact same formula a GPT-style model uses to predict its next token out of a 100,000+ word vocabulary. Only the scale and the architecture change. And the <strong>train/test split + accuracy</strong> is your first taste of evaluation — the discipline that keeps you honest as models get bigger.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> image → flatten → MLP forward → softmax → cross-entropy loss → train loop → test accuracy. Every module so far (M1–M4) shows up in this one working model.</div></div>
@@ -408,6 +416,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The test-set number is the whole point of this lesson — so the ways it can lie to you matter just as much as the model itself.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the test set leaks into training.</b> This is a bug that doesn't announce itself. If you scale the pixels using a mean and range computed over <em>all</em> 70,000 images (train + test together), or you shuffle before splitting and the same image lands in both sets, the model has secretly seen the test data. Training runs fine, no error prints, and the test accuracy looks great — but it is inflated, and the model does worse on truly new digits. A senior engineer in <b>code review</b> checks that the split happens <em>first</em> and that every statistic (scaling, normalization) is computed on the training set only, then applied to the test set.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: model size vs. honest generalization.</b> A bigger hidden layer (say 1024 instead of 128) can push training accuracy higher, but it also has more room to memorize the 60,000 training digits instead of learning the shapes. In a <b>design review</b> you weigh this: more capacity can raise the ceiling, but only if you also watch the train-vs-test gap and add regularization. Chasing training accuracy alone buys you a model that shines in practice and fails on real handwriting.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "An MNIST classifier is a 2-layer MLP: flatten the 784 pixels, <code>h = relu(x·W1+b1)</code> gives 128 hidden features, <code>logits = h·W2+b2</code> gives 10 class scores, then softmax + cross-entropy is the loss and you train with the standard backprop loop. It's the same recipe as an LLM — the cross-entropy over 10 classes is identical to next-token loss over a 100k-word vocab. The nuance is evaluation discipline: accuracy only means something on a held-out test set, and any scaling statistic must be computed on train data only, or the test number is silently inflated."</div></div>
       <button class="gotit" type="button">Got the full model</button>
     </div>
 </section>
@@ -453,7 +462,13 @@ Create sessions/m04-first-model-mlp/day-01-mlp-mnist/experiment.py that, with a 
 4. Prints training loss and TEST accuracy each epoch; confirms test accuracy climbs to ~95%+.
 Then run it and paste the final accuracy at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-01-mlp-mnist/log.md</code>: what was your test accuracy, and how did it compare to the training accuracy?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The forward pass maps a batch of shape <code>(batch, 784)</code> to <code>(batch, 10)</code>.</li>
+        <li>Test accuracy is reported on <em>held-out</em> data (not the training set) and reaches ~95%+.</li>
+        <li>Any pixel-scaling statistic is computed on the training set only, then applied to the test set.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-01-mlp-mnist/log.md</code>: (1) your test accuracy and how it compared to the training accuracy; (2) the number or shape that surprised you; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

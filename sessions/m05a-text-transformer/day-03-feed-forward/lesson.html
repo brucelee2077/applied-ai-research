@@ -354,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Why widen then narrow</h4>
       <p>The middle is bigger than the input — usually 4 times bigger. If a token's list is 512 numbers long, the FFN expands it to 2048, filters, then compresses back to 512. The wider middle gives the model more room to combine features before packing the answer back into the original size. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 注意力已经让词互相看过了，为什么还要这一层？In plain terms: after attention mixed the tokens, the FFN looks redundant. The point is a division of labor — attention decides <em>which</em> tokens to combine, and the FFN decides <em>what to do</em> with the combined information, one token at a time. Without it, the block can route information but can't really transform it.</div></div>
       <button class="gotit" type="button">Got the shape — let's go</button>
     </div>
 </section>
@@ -367,6 +368,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📋</span><h5>A big whiteboard, then a small note card</h5><p>Inside the room is a big whiteboard (the wide middle). The word spreads its ideas out, crosses out the ones that do not help (the filter), then copies the final answer onto a small note card to carry out (compress back down).</p></div>
       </div>
       <p><strong>In one line:</strong> the feed-forward layer is each token's private thinking step — spread out on scratch paper, filter, then write the answer back in the original size.</p>
+      <p><b>直觉 / Intuition:</b> 先把想法摊开到大白板上（放大），划掉没用的（ReLU），再抄回小卡片（压缩）。 The technical point is that the wide middle (<code>d_ff ≈ 4·d_model</code>) plus a nonlinearity is what gives the token room to combine features before packing back to the original size.</p>
       <div class="callout c-info"><span class="ic">🎮</span><div>Attention decides <b>which</b> words to combine. The feed-forward layer decides <b>what to do</b> with the combined information. Two different jobs, side by side in every block.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real rooms are separate places, but in the FFN every token uses the <b>exact same weights</b> — the same room and the same whiteboard rules. It only feels private because tokens never look at each other during this step.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -420,6 +422,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <p>The token went in as 2 numbers, spread out to 4, got filtered, and came back as 2 numbers — a new, "thought-about" version of itself.</p>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the position-wise FFN</b>
+<br><b>1 · In words:</b> expand the token with a first matrix, filter with ReLU, compress with a second matrix (see Steps 1–2).
+<br><b>2 · The formula:</b> <code>h = ReLU(x·W1 + b1)</code>; <code>y = h·W2 + b2</code> — <code>x</code> shape <code>(d_model,)</code>; <code>W1</code> is <code>(d_model, d_ff)</code>; <code>h</code> is the wide hidden <code>(d_ff,)</code>; <code>W2</code> is <code>(d_ff, d_model)</code>; <code>y</code> is back to <code>(d_model,)</code>.
+<br><b>3 · Tiny numbers:</b> <code>d_model=2, d_ff=4</code>, <code>x=[1,−1]</code> → expand <code>[2,−3,0.5,−1]</code> → ReLU <code>[2,0,0.5,0]</code> → compress <code>[1.3,−0.4]</code>.
+<br><b>4 · Sanity check:</b> input and output have the same length <code>d_model</code>; the hidden is <code>d_ff</code> (usually <code>4·d_model</code>). Drop the ReLU and the two matmuls collapse to one — the silent bug below.</div></div>
+
       <h4>Why it matters — the muscle of the transformer</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> the FFN holds most of a transformer's weights — often two thirds of them. Attention decides who talks to whom; the FFN is where the model actually stores and applies most of what it has learned. In real models the activation is often GELU or SwiGLU instead of ReLU, but the widen-filter-narrow shape is the same.</div></div>
 
@@ -427,6 +435,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The FFN is the model's memory, and its power comes entirely from one small nonlinear step in the middle — and from how wide you make that middle.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the activation goes missing and the FFN collapses to one linear layer.</b> The whole point of <code>ReLU(x · W1) · W2</code> is the ReLU in the middle. If you drop it (or leave a placeholder that just passes numbers through), you get <code>(x · W1) · W2</code>, which is mathematically the same as multiplying by one single matrix. Nothing crashes — the shapes are identical and the code runs — but two layers are now doing the work of one, so the model quietly loses most of its capacity and plateaus at a worse loss you cannot explain from the numbers. A senior engineer in <b>code review</b> confirms a real nonlinearity sits <em>between</em> the two linear layers, because two stacked linears with nothing between them are secretly just one.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: d_ff width buys capacity but dominates the compute and memory bill.</b> The middle size <code>d_ff</code> (usually <code>4 × d_model</code>) is where most of the model's parameters and matmul FLOPs live. Making it wider gives the model more room to store and combine features, but it grows the parameter count and the per-token compute faster than almost any other knob. In a <b>design review</b> the FFN width is the main lever for trading model quality against training cost and inference latency — which is also why sparse mixture-of-experts replaces one wide FFN with many, activating only a few per token.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The feed-forward network is a position-wise two-layer MLP: <code>y = ReLU(x·W1+b1)·W2+b2</code>, applied to each token independently with shared weights. It expands to a wide hidden (usually <code>4·d_model</code>), applies a nonlinearity, and compresses back — that's where most of a transformer's parameters and FLOPs live. The nuance is the nonlinearity is load-bearing: drop it and the two linears collapse into one matrix, so the model silently loses capacity; and <code>d_ff</code> is the main quality-vs-cost lever, which is why MoE swaps one wide FFN for many sparse experts."</div></div>
       <button class="gotit" type="button">Got how the FFN works</button>
     </div>
 </section>
@@ -472,7 +481,13 @@ Create sessions/m05a-text-transformer/day-03-feed-forward/experiment.py that, wi
 4. Prints how many parameters the FFN has (W1, b1, W2, b2 counts).
 Then run it and paste the shapes and the parameter count at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-03-feed-forward/log.md</code>: what were the three shapes (4 → ? → 4), and how many parameters did the FFN have?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The shapes go <code>4 → 16 → 4</code> (expand → ReLU → compress) with <code>d_model=4, d_ff=16</code>.</li>
+        <li>Every token uses the same <code>W1, W2</code> — permuting tokens permutes the output the same way (position-wise).</li>
+        <li>You can state the FFN's parameter count from <code>W1, b1, W2, b2</code>.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m05a-text-transformer/day-03-feed-forward/log.md</code>: (1) the three shapes (4 → ? → 4) and the FFN's parameter count; (2) why the ReLU in the middle can't be removed; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 4</button>
     </div>
 </section>

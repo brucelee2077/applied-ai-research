@@ -349,6 +349,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Dropout — a simple cure</h4>
       <p><span class="term" data-tip="A regularization trick: during training, randomly set a fraction of neuron outputs to zero each step, so the network cannot depend on any single neuron.">Dropout</span> fights overfitting. During training, at each step you randomly switch off a fraction of neurons (set them to zero). The network is forced to spread its knowledge around instead of leaning on any one neuron. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人盯着 training loss 一路下降，就以为在进步。In plain terms: a falling <em>training</em> loss feels like success, but it's the wrong curve to trust alone — the model may be memorizing. The signal that matters is the <em>gap</em> between training and validation loss; when validation turns upward, you're overfitting.</div></div>
       <button class="gotit" type="button">Got the goal — let's go</button>
     </div>
 </section>
@@ -362,6 +363,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🏀</span><h5>Dropout = a random benched player</h5><p>Each practice drill, bench one or two players at random. Now no single star can be the whole plan. Everyone learns to contribute, so the team stays strong even when someone is off.</p></div>
       </div>
       <p><strong>In one line:</strong> read the two loss curves to spot memorizing, and use dropout — randomly benching neurons during training — so no single neuron becomes a point of failure.</p>
+      <p><b>直觉 / Intuition:</b> 每次训练随机让几个神经元"请假"，逼着团队里没有谁是不可替代的。 The technical point is that dropping a different random subset of neurons each step stops the network from over-relying on any one of them, so it generalizes better.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a benched player rests and comes back unchanged, but dropout switches off <em>different</em> neurons every single step, and at test time <strong>all</strong> neurons play together. So the model trains as many overlapping "teams" and then uses the whole roster to make predictions.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -410,6 +412,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Step 3 — a worked feel</h4>
       <p>With <code>p = 0.2</code> and 128 hidden neurons, about 26 are zeroed each step, and the surviving ~102 are scaled up by <code>1/0.8 = 1.25</code>. Next step, a different 26 are off. Over many steps the model learns to be robust to any subset being missing.</p>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — inverted dropout</b>
+<br><b>1 · In words:</b> randomly zero a fraction of neurons each step, and scale up the survivors so the average signal reaching the next layer is unchanged — see Steps 1–2 above.
+<br><b>2 · The formula:</b> <code>mask = (rand(h.shape) &gt; p)</code>; <code>h = h · mask / (1−p)</code> — <code>h</code> = hidden activations, <code>p</code> = drop rate, <code>mask</code> = random keep pattern, <code>1/(1−p)</code> = the rescale that preserves the mean.
+<br><b>3 · Tiny numbers:</b> <code>p=0.2</code>, 128 units → ~26 zeroed; survivors scaled by <code>1/0.8 = 1.25</code> (Step 3).
+<br><b>4 · Sanity check:</b> the expected output equals the no-dropout output (that is what <code>/(1−p)</code> guarantees), and dropout must be <em>off</em> at test time. If test accuracy jitters run-to-run, dropout is still on.</div></div>
+
       <h4>Why labs care</h4>
       <p>The loss curve is the primary dashboard for every training run, from this MLP to a giant LLM — engineers stare at it for days. And overfitting never goes away; it just changes shape. Dropout, weight decay, and early stopping are the everyday tools that keep big models honest.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The habit:</b> always watch validation loss, not just training loss. The moment the two diverge is the moment your model stops learning the task and starts memorizing the answers.</div></div>
@@ -418,6 +426,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Dropout has one on/off switch you must flip at the right time, and one knob that trades stability for capacity.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dropout left on at test time.</b> This is a bug that doesn't announce itself. Dropout should run <em>only</em> during training; at test time every neuron must be used. If you forget to switch it off, the model keeps randomly zeroing neurons while you evaluate — so its answers become random and its test accuracy is quietly lower and jittery from run to run, with no error. The matching trap is the scaling: if you drop neurons but forget to divide the survivors by <code>(1 - p)</code>, the average signal into the next layer shrinks, so train and test behave differently even when the switch is right. A senior engineer in <b>code review</b> checks that evaluation flips dropout off (in a framework, <code>model.eval()</code>) and that the <code>(1 - p)</code> scaling is present.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: dropout rate — less overfitting vs. slower learning.</b> A higher <code>p</code> (say 0.5) forces more robustness and fights overfitting harder, but it throws away more signal each step, so training is noisier and slower to converge. A lower <code>p</code> (say 0.1) trains fast but regularizes weakly. In a <b>design review</b> you tune <code>p</code> to the size of the train-vs-validation gap: reach for more dropout only when that gap is actually growing, not by default.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Dropout fights overfitting by randomly zeroing a fraction <code>p</code> of activations each training step and scaling the survivors by <code>1/(1−p)</code> so the expected signal is unchanged; at test time it's off and all neurons fire. Reading the loss curve is how you know you need it — when validation loss turns up while training loss keeps falling, you're memorizing. The nuance is two silent bugs: leaving dropout on at eval (jittery, lower accuracy) and dropping without the <code>1/(1−p)</code> rescale, so train and test see different signal levels."</div></div>
       <button class="gotit" type="button">Got curves and dropout</button>
     </div>
 </section>
@@ -465,7 +474,13 @@ Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py t
 4. Retrains and prints the train-vs-validation gap with and without dropout, showing the gap shrinks with dropout.
 Then run it and paste the two gaps at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md</code>: at which epoch did validation loss stop improving, and how much did dropout shrink the train-vs-validation gap?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Both curves — training and validation loss — are recorded each epoch and plotted on one figure.</li>
+        <li>The overfitting turn (where validation loss stops improving) is identified.</li>
+        <li>With dropout on (training only, scaled by <code>1/(1−p)</code>), the train-vs-validation gap shrinks.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md</code>: (1) at which epoch validation loss stopped improving; (2) how much dropout shrank the train-vs-validation gap; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

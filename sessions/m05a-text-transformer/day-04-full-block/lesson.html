@@ -358,6 +358,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The magic: it stacks</h4>
       <p>The output has the same shape as the input. So you can feed the output straight into another identical block, and another, and another. Stack 12 of them and you have GPT-2 Small. Stack 96 and you have GPT-3. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 四个零件都学过了，但"怎么接线"最容易出错。In plain terms: the pieces are familiar, but the <em>wiring order</em> is where mistakes hide. The one rule that makes it click: normalize a copy, run the sub-layer, and add back the <em>original</em> input — the same pattern twice. Get the "add back the original, not the normalized copy" part right and the block just works.</div></div>
       <button class="gotit" type="button">Got the layout — let's go</button>
     </div>
 </section>
@@ -371,6 +372,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🛣️</span><h5>A check and a bypass at each</h5><p>Before each station, a quality check tidies the numbers (LayerNorm). Around each station, a bypass lane carries the original safely to the far side and merges it back (the residual). If a station adds nothing, the bypass still delivers the input.</p></div>
       </div>
       <p><strong>In one line:</strong> the block is two work stations, each with a tidy-up before it and a bypass lane around it, and the product keeps the same shape so the next block can pick it up.</p>
+      <p><b>直觉 / Intuition:</b> 一个模板重复用两次：先归一化、再跑子层、最后把原始输入加回来。 The technical point is that both sub-layers share the identical pre-LN wrapper <code>x = x + sublayer(LayerNorm(x))</code>, and because the shape is preserved, the same block stacks N times to make the whole model.</p>
       <div class="callout c-info"><span class="ic">🎮</span><div>Every real transformer is just this one station repeated: 12 times, 24 times, 96 times. Same design, different learned weights in each copy. Learn one block and you understand the whole tower.</div></div>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: on a real assembly line the bypass and the station stay separate, but here the bypass output is <b>added</b> to the station output — one set of numbers, not two. And the "check" (LayerNorm) does not reject anything; it rescales.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -425,6 +427,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <p>Output shape: <code>(3, 4)</code> — identical to the input. Feed it straight into the next block.</p>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the pre-LN block</b>
+<br><b>1 · In words:</b> two sub-layers, each wrapped the same way — normalize, run the sub-layer, add the original input back (see Steps 1–2).
+<br><b>2 · The formula:</b> <code>x = x + attention(LayerNorm(x))</code>; <code>x = x + feed_forward(LayerNorm(x))</code> — <code>x</code> = the sequence, shape <code>(seq_len, d_model)</code>; every piece preserves that shape.
+<br><b>3 · Tiny numbers:</b> <code>seq_len=3, d_model=4</code> → input <code>(3,4)</code> → after sub-layer 1 still <code>(3,4)</code> → after sub-layer 2 still <code>(3,4)</code>.
+<br><b>4 · Sanity check:</b> output shape must equal input shape, so blocks compose N deep with no glue. The residual add must use the input from <em>before</em> the norm, not the normalized copy — the silent bug below.</div></div>
+
       <h4>Why it matters — the repeating unit</h4>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> because the shape is preserved, a transformer is just this one block repeated N times, plus embeddings at the bottom and a projection at the top (Day 8). The block is the "floor" of the tower. The only difference between GPT-2 Small and GPT-3 is how many floors you stack.</div></div>
 
@@ -432,6 +440,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The block is where three parts you already learned — LayerNorm, attention, and the residual add — get wired together, and the wiring order is a decision that can go wrong without a single error.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): adding the normalized copy back instead of the real input.</b> In pre-LN the residual add must use the <em>original</em> <code>x</code>: <code>x = x + attention(LayerNorm(x))</code>. It is easy to write <code>x = LayerNorm(x); x = x + attention(x)</code> instead — now you added the <em>normalized</em> copy back, not the raw input, so the clean residual highway from Day 1 no longer carries the true signal through. Shapes still match, no error appears, but very deep stacks train worse and you cannot see why. A senior engineer in <b>code review</b> checks that the tensor added by the residual is the block's input from <em>before</em> the norm, not the normalized version.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: the block bundles a cheap part with an expensive one.</b> The two sub-layers do not cost the same. The feed-forward sub-layer runs on each token alone, so its cost grows linearly with the number of tokens. The attention sub-layer lets every token look at every other token, so its cost grows with the <em>square</em> of the sequence length. Stacking the block N times multiplies both. In a <b>design review</b> this is why long context is expensive: doubling the sequence length roughly quadruples the attention work in every block, which is what pushes teams toward tricks like sliding-window or sparse attention.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: the block bundles a cheap part with an expensive one.</b> The two sub-layers do not cost the same. The feed-forward sub-layer runs on each token alone, so its cost grows linearly with the number of tokens. The attention sub-layer lets every token look at every other token, so its cost grows with the <em>square</em> of the sequence length. Stacking the block N times multiplies both. In a <b>design review</b> this is why long context is expensive: doubling the sequence length roughly quadruples the attention work in every block, which is what pushes teams toward tricks like sliding-window or sparse attention.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A transformer block is two sub-layers — self-attention then a position-wise FFN — each wrapped as <code>x = x + sublayer(LayerNorm(x))</code> in the pre-LN order. Shape is preserved end to end, so you stack the identical block N times; GPT-2 Small is 12, GPT-3 is 96. The nuance is the residual must add the pre-norm input, not the normalized copy, or the clean gradient highway breaks; and the two sub-layers scale differently — FFN is linear in sequence length, attention is quadratic — so long context is an attention-cost problem."</div></div>
       <button class="gotit" type="button">Got how the block is wired</button>
     </div>
 </section>
@@ -477,7 +487,13 @@ Create sessions/m05a-text-transformer/day-04-full-block/experiment.py that, with
 4. Then stacks the block N=3 times and confirms the output is still (3, 4), proving blocks compose.
 Then run it and paste the per-step shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m05a-text-transformer/day-04-full-block/log.md</code>: did the shape stay <code>(3, 4)</code> through every step, and why does that let you stack blocks?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The shape stays <code>(3, 4)</code> after each of the block's four inner steps.</li>
+        <li>The residual add uses the input from <em>before</em> the LayerNorm (pre-LN done right).</li>
+        <li>Stacking the block N=3 times still returns shape <code>(3, 4)</code> — blocks compose.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m05a-text-transformer/day-04-full-block/log.md</code>: (1) whether the shape stayed <code>(3, 4)</code> through every step and why that lets you stack blocks; (2) why adding back the normalized copy instead of the raw input breaks the residual highway; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 5</button>
     </div>
 </section>

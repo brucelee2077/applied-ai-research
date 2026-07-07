@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Step 3 — weighted sum</h4>
       <p>Multiply those weights by the <strong>Values</strong>: <code>output = weights @ V</code>. Each word gets a blend of the other words' Values, weighted by relevance — a new, <strong>context-aware</strong> vector. The full formula: <code>softmax(Q @ Kᵀ / √d_k) @ V</code>. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Gemini 1.5 can hold 1–2 million tokens of context. The reason that's hard: attention's score grid is seq × seq, and this exact <code>Q @ Kᵀ</code> step is what makes long context expensive.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人把公式背下来，却说不出哪一步才是"注意力"。In plain terms: "attention" is not one number — it's a whole <em>row</em> of weights (one per other word) that must sum to 1. And the <code>÷√d_k</code> step looks arbitrary until you see softmax saturate to all-or-nothing without it.</div></div>
       <button class="gotit" type="button">Got the three steps — let's go</button>
     </div>
 </section>
@@ -363,6 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🧪</span><h5>Output = a weighted mix</h5><p>Blend the Values by those percentages. If "bank" gives 80% of its attention to "river", its new vector is mostly river's Value — so "bank" now means the riverside kind.</p></div>
       </div>
       <p><strong>In one line:</strong> score every word, softmax the scores into a 100% budget, then mix the Values by that budget.</p>
+      <p><b>直觉 / Intuition:</b> 想象你给每个词分配"注意力预算"，加起来正好 100%。 The technical point is that softmax turns a row of raw scores into weights that sum to 1, so each word spends a fixed budget of attention across all the others.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: it's not a person choosing — it's a smooth, differentiable formula, so the training loop (M3) can improve it. And the score grid is <code>seq × seq</code>, which is why long sequences get expensive (the "cost of attention").</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -395,6 +397,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>Attention(Q, K, V) = softmax( Q @ Kᵀ / √d_k ) @ V</code></div></div>
       <p>Why divide by <code>√d_k</code>? With large vectors, the dot products get big, and softmax of big numbers becomes almost all-or-nothing (it "saturates"), which stalls learning. Dividing by <code>√d_k</code> (the square root of the key dimension) keeps the scores in a sane range so softmax stays smooth.</p>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — scaled dot-product attention</b>
+<br><b>1 · In words:</b> score every query-key pair, shrink the scores so softmax doesn't saturate, turn each row into a 100% budget, then blend the Values by that budget.
+<br><b>2 · The formula:</b> <code>softmax(Q·Kᵀ / √d_k)·V</code> — <code>Q,K,V</code> have shape <code>(n, d_k)</code>; <code>Q·Kᵀ</code> is the <code>(n, n)</code> score grid; <code>√d_k</code> is the scaling constant; <code>softmax</code> runs across the <em>last</em> axis so each row sums to 1; the final <code>·V</code> mixes to shape <code>(n, d_k)</code>.
+<br><b>3 · Tiny numbers:</b> one query, raw scores <code>[2, 6]</code>, <code>d_k=4</code> → divide by <code>√4=2</code> → <code>[1, 3]</code>. <code>softmax([1,3]) = [e¹, e³]/(e¹+e³) ≈ [0.12, 0.88]</code>. Output = <code>0.12·V₀ + 0.88·V₁</code>.
+<br><b>4 · Sanity check:</b> each softmax row sums to 1 (<code>0.12+0.88=1.0</code>). If a row does <em>not</em> sum to 1, you softmaxed the wrong axis — the silent bug below.</div></div>
+
       <h4>Why a frontier lab cares</h4>
       <p>This is <strong>the</strong> transformer operation. Two facts fall straight out of it: (1) <code>Q @ Kᵀ</code> and the final <code>@ V</code> are the big matmuls that dominate attention's FLOPs — exactly what <span class="term" data-tip="A GPU-optimized way to compute attention without ever storing the full seq×seq score matrix in slow memory. You'll meet it in the kernels track.">FlashAttention</span> (Dao et al., 2022) speeds up. (2) The score grid is <code>seq × seq</code>, so cost grows with the <strong>square</strong> of the sequence length — exactly the wall Gemini 1.5's 1–2 million token context (the teaser above) has to engineer around. A whole research area exists to fight this quadratic cost.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> Q @ Kᵀ → scores → ÷√d_k → softmax → weights (sum to 1) → @ V → a context-aware vector per word. That single formula, stacked and repeated, is what a transformer <em>is</em>.</div></div>
@@ -403,6 +411,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The formula is only half the job. A staff engineer also knows the one way it breaks <em>without telling you</em>, and the one price you pay to use it at all.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): softmax on the wrong axis.</b> Write <code>softmax(scores, axis=0)</code> (down the columns) or over the whole grid instead of <code>axis=-1</code> (across each row), and it <em>still</em> sums to 1 — so nothing crashes and the loss looks plausible. But each query no longer gets its own distribution over the keys, so the attention is quietly meaningless. This is the bug a senior engineer catches in <b>code review</b>, precisely because it never throws an error.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: the seq×seq score grid.</b> Computing <code>Q @ Kᵀ</code> in full is exact and perfectly parallel — every token pair scored at once, ideal for a GPU. The price is <span class="term" data-tip="O(n²) means work and memory grow with the square of the sequence length n. Double the tokens and you quadruple the cost.">O(n²)</span> memory and compute: double the sequence length and the grid quadruples. That is the cost a staff engineer raises in a <b>design review</b> — it decides whether your model reads a whole book or just a paragraph, and it is exactly what FlashAttention and long-context research exist to soften.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Scaled dot-product attention scores every query against every key with <code>Q·Kᵀ</code>, divides by <code>√d_k</code> so the softmax doesn't saturate, normalizes each row into weights that sum to 1, then takes that weighted sum of the Values. The nuance is the <code>seq×seq</code> score grid makes it <code>O(n²)</code> in sequence length — that quadratic cost is why long context is hard and why FlashAttention and related work exist to avoid ever materializing the full grid."</div></div>
       <button class="gotit" type="button">Got the formula</button>
     </div>
 </section>
@@ -448,7 +457,13 @@ Create sessions/m03-attention/day-03-attention-scores/experiment.py that, with a
 4. Computes output = weights @ V; prints scores, weights, and output, noting the output is a weighted blend of the Values.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m03-attention/day-03-attention-scores/log.md</code>: why must each row of the softmax weights sum to 1?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The score grid <code>Q @ Kᵀ</code> has shape <code>(seq, seq)</code>.</li>
+        <li>Each <em>row</em> of the softmax weights sums to <code>1.0</code> (softmax over <code>axis=-1</code>).</li>
+        <li>The output has the same shape as <code>V</code> — one context-aware vector per token.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-03-attention-scores/log.md</code>: (1) why each row of the softmax weights must sum to 1; (2) what changed in the weights when you did (or imagined) removing <code>÷√d_k</code>; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

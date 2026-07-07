@@ -353,6 +353,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The same loop, far shorter</h4>
       <p>The training loop keeps the exact shape you already know: forward, loss, backward, update. In PyTorch it is three short calls: <code>loss = criterion(model(x), y)</code>, <code>loss.backward()</code>, <code>optimizer.step()</code> — plus <code>optimizer.zero_grad()</code> to reset. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人担心"一用框架就等于不懂了"。In plain terms: it feels like switching to PyTorch means giving up understanding. The opposite is true — because you hand-wired the forward, backward, and update, you know exactly what <code>nn.Linear</code>, <code>loss.backward()</code>, and <code>optimizer.step()</code> stand for, so the framework is a power tool, not a black box.</div></div>
       <button class="gotit" type="button">Got the pieces — let's go</button>
     </div>
 </section>
@@ -366,6 +367,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">⚡</span><h5>Power tools (PyTorch)</h5><p>Now you pick up a power saw. It cuts the same joints in seconds. Because you know how the wood behaves, you use it well — and you can tell when it goes wrong.</p></div>
       </div>
       <p><strong>In one line:</strong> PyTorch does the same job as your NumPy code, just far faster to write — and your week of hand tools is why you can trust the power tools.</p>
+      <p><b>直觉 / Intuition:</b> 手工锯让你懂木头，电锯让你快——正因为懂了，才敢用电锯。 The technical point is that PyTorch automates the exact three things you built by hand — the module, autograd, and the optimizer — so nothing new is happening; it is just faster and GPU-ready.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a power saw only cuts faster, but PyTorch also adds things a hand saw never could — automatic gradients for any model you write, and running on a GPU for a huge speed-up. It is not just faster; it unlocks scale.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -434,6 +436,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>PyTorch's convenience hides a piece of state you now have to manage yourself: gradients that quietly add up unless you clear them.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting <code>optimizer.zero_grad()</code>.</b> This is a bug that doesn't announce itself. PyTorch <em>adds</em> each new <code>.backward()</code> onto whatever gradient is already stored. In your hand-written NumPy code the gradient was fresh every batch, so this never came up — but in PyTorch, if you skip <code>zero_grad()</code>, batch 2's gradient piles on top of batch 1's, batch 3 on top of that, and the update steps grow far too large. No error prints; the loss just explodes to <code>NaN</code> or refuses to fall. The same class of bug is forgetting <code>model.eval()</code> before evaluation, which leaves dropout on and quietly lowers test accuracy. A senior engineer in <b>code review</b> checks that every training step starts with <code>zero_grad()</code> and that evaluation switches to <code>model.eval()</code>.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: framework convenience vs. hidden state.</b> <code>loss.backward()</code> and <code>optimizer.step()</code> save you from ever hand-wiring a gradient again, which is a huge win. What you pay is that the framework now holds state you cannot see — accumulated <code>.grad</code> buffers, train-vs-eval mode, the autograd graph. In a <b>design review</b> the framework is the obvious choice for anything real, but the team treats "manage the hidden state correctly" (<code>zero_grad</code>, <code>eval</code>, <code>no_grad</code>) as a required checklist, not an afterthought.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "PyTorch gives you three things you'd otherwise hand-wire: <code>nn.Module</code> holds the layers and weights, <code>loss.backward()</code> runs autograd to fill every <code>.grad</code>, and <code>optimizer.step()</code> applies the update — so the loop is <code>zero_grad → forward → loss → backward → step</code>. The nuance is the hidden state you now manage: gradients <em>accumulate</em>, so you must <code>zero_grad()</code> each step, and you must switch to <code>model.eval()</code> (and <code>torch.no_grad()</code>) at test time or dropout stays on. Both are silent bugs — no error, just wrong numbers."</div></div>
       <button class="gotit" type="button">Got the PyTorch loop</button>
     </div>
 </section>
@@ -479,7 +482,13 @@ Create sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py that, w
 4. Prints test accuracy each epoch and confirms it reaches ~95%+, matching the NumPy version.
 Add a short comment mapping each PyTorch line to the NumPy line it replaces. Then run it and paste the final accuracy at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-05-pytorch-version/log.md</code>: how many lines shorter was the PyTorch version, and did its accuracy match your NumPy MLP?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The model is an <code>nn.Module</code> with the 784→128→10 layers; <code>forward</code> returns logits (no softmax — <code>CrossEntropyLoss</code> folds it in).</li>
+        <li>Every training step calls <code>zero_grad → backward → step</code>.</li>
+        <li>Test accuracy matches your NumPy version (~95%+).</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-05-pytorch-version/log.md</code>: (1) how many lines shorter the PyTorch version was and whether its accuracy matched your NumPy MLP; (2) which NumPy step each of <code>backward()</code>/<code>step()</code> replaced; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

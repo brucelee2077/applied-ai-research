@@ -255,6 +255,36 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 #term-tip.show{opacity:1;transform:translateY(0)}
 #term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:.2rem}
 
+/* ---------- vlab (inline interactive mechanism visual) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-fit{stroke:#111827;stroke-width:2;fill:none}
+.vlab-fit.dash{stroke:#B0453A;stroke-dasharray:5 4}
+.vlab-pt{stroke:#1F2937;stroke-width:1.1}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-badge{font-family:var(--body);font-size:.74rem;font-weight:700;border-radius:999px;padding:.15rem .6rem;margin-left:.4rem;white-space:nowrap}
+.vlab-badge.ok{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.vlab-badge.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+
 /* ---------- responsive ---------- */
 #scrim{display:none}
 @media(max-width:900px){
@@ -349,6 +379,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The check that keeps you honest</h4>
       <p>Hand-wired gradients are easy to get subtly wrong. So you compare them to a <span class="term" data-tip="An estimate of a gradient found by nudging a weight up and down a tiny amount and measuring how the loss changes. Slow but almost impossible to get wrong.">numerical gradient</span> — nudge a weight, watch the loss, divide. If the two match, your wiring is correct. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "反向"听起来像另一套算法，其实是同一条链子倒着走。In plain terms: the backward pass is not a new algorithm — it is the <em>same</em> forward chain walked in reverse, reusing the values you already computed. The confusing part is only the bookkeeping: which transpose, and where the ReLU gate blocks the blame.</div></div>
       <button class="gotit" type="button">Got the goal — let's go</button>
     </div>
 </section>
@@ -363,6 +394,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> each layer takes the blame it received from the layer after it, keeps its own share, and passes the rest further back — that passing-back is the chain rule.</p>
       <p>Your forward pass is the assembly line: <code>x → layer 1 → h → layer 2 → logits → loss</code>. The backward pass sends the blame the other way: <code>loss → layer 2 → h → layer 1 → x</code>. At each layer, the blame it holds tells it exactly how to fix its own weights.</p>
+      <p><b>直觉 / Intuition:</b> 把误差想成"责任"：从最后一道工序往回传，每层留下自己的一份，再把剩下的递给前一层。 The technical point is that the chain rule multiplies the local slopes back through the network, so each layer learns exactly how much it contributed to the final loss.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers each pass blame once, but the same intermediate value (like <code>h</code>) can feed many later steps. The chain rule handles that by <strong>adding up</strong> all the blame that flows back through it — a worker can be blamed by several people at once.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -372,6 +404,26 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s3" data-sec="play">
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Forward, then walk the blame back, then check it</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
+      <p>First, an interactive picture. <strong>Drag the step slider</strong> to walk the blame backward, one hop at a time, and watch the ReLU gate stop it at a dead unit.</p>
+      <div class="vlab" id="bwlab">
+        <div class="vlab-q">Learning question: how does one loss number turn into a gradient for every weight — and why does ReLU stop the blame at a dead unit?</div>
+        <div class="vlab-head">
+          <span class="vlab-title">Blame flows backward</span>
+          <span class="vlab-readout" id="bw-read">step 0 · forward pass only</span>
+        </div>
+        <div class="vlab-panels">
+          <figure class="vlab-fig"><figcaption>forward ↑ (blue) · gradient ↓ (red), revealed step by step</figcaption>
+            <svg class="vlab-svg" id="bw-flow" viewBox="0 0 260 230" role="img" aria-label="Forward and backward pass through a tiny MLP"></svg>
+          </figure>
+          <figure class="vlab-fig"><figcaption>the ReLU gate: blame passes only where z1 &gt; 0</figcaption>
+            <svg class="vlab-svg" id="bw-gate" viewBox="0 0 260 230" role="img" aria-label="ReLU gate zeroing the gradient of a dead unit"></svg>
+          </figure>
+        </div>
+        <div class="vlab-controls">
+          <label>walk the blame back <input type="range" id="bw-step" min="0" max="4" step="1" value="0" aria-label="backward pass step"><span class="vlab-val" id="bw-step-v">0 / 4</span></label>
+        </div>
+        <p class="vlab-note"><b>Notice:</b> the gradient starts as <code>probs − y_true</code> at the loss and multiplies its way back; at the ReLU, the dead unit (<code>z1 &lt; 0</code>) has its blame gated to exactly 0, so its weights get no update this step. <b>Misconception:</b> backprop is not a separate algorithm — it is the same chain walked in reverse, reusing the saved forward values. <b>Where this simplifies:</b> one sample, 2→2→2, fixed weights; real nets batch this over many layers. <b>Frontier relevance:</b> every LLM learns with exactly this sweep — <code>probs − y</code>, then "transpose the input, multiply the blame", gated at each nonlinearity.</p>
+      </div>
       <p>Below is a simulated Python terminal. Run the forward pass, wire the gradients backward, then verify against a numerical gradient. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
@@ -410,6 +462,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Step 3 — a worked example (tiny numbers)</h4>
       <p>Say the true digit is class 0, so <code>y_true = [1, 0, 0, …]</code>, and softmax gave <code>probs = [0.7, 0.2, 0.1, …]</code>. Then <code>dlogits = probs − y_true = [-0.3, 0.2, 0.1, …]</code>. The <code>-0.3</code> on the true class says "push this logit up"; the positives say "push those down". Feed that into <code>dW2 = h.T @ dlogits</code> and you get one gradient number per weight in <code>W2</code>. The ReLU gate <code>(z1 &gt; 0)</code> then zeroes out blame for any hidden unit that was switched off.</p>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the backward sweep</b>
+<br><b>1 · In words:</b> start with predicted − true at the output, then repeat "transpose the input, multiply the blame", gating at ReLU — see Steps 1–3 above.
+<br><b>2 · The formula:</b> <code>dlogits = probs − y_true</code>; <code>dW2 = hᵀ·dlogits</code>; <code>dh = dlogits·W2ᵀ</code>; <code>dz1 = dh·(z1&gt;0)</code>; <code>dW1 = xᵀ·dz1</code>.
+<br><b>3 · Tiny numbers:</b> true class 0, <code>probs=[0.7,0.2,0.1,…]</code> → <code>dlogits=[-0.3,0.2,0.1,…]</code>; a hidden unit with <code>z1&lt;0</code> gets <code>dz1=0</code> (its blame is blocked).
+<br><b>4 · Sanity check:</b> each <code>dW</code> has the same shape as its <code>W</code>, and a numerical gradient <code>(loss(W+ε)−loss(W−ε))/(2ε)</code> must match to several decimals. If it does not, a transpose or the ReLU gate is wrong.</div></div>
+
       <h4>Why this is the whole game</h4>
       <p>Every deep network — including a giant LLM — learns with exactly this backward sweep: start with <code>probs − y_true</code>, then repeat "transpose the input, multiply the blame" through each layer, gating at each nonlinearity. Tomorrow you will run it in a loop over mini-batches.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The check:</b> a numerical gradient nudges one weight by a tiny <code>ε</code>, measures <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code>, and should match your hand-wired <code>dW</code> to several decimal places. If it doesn't, a transpose or a gate is wrong.</div></div>
@@ -418,6 +476,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A hand-wired backward pass is where wrong gradients hide — the arithmetic still runs, so nothing tells you the math is off.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a wrong gradient that still runs.</b> This is a bug that doesn't announce itself. If you write <code>dW2 = dlogits @ h.T</code> instead of <code>h.T @ dlogits</code>, or forget the ReLU gate <code>(z1 &gt; 0)</code>, or flip a sign, the shapes can still line up and the code runs with no error. But the gradient points in the wrong direction, so training crawls, wanders, or the loss slowly rises. There is nothing to see in the output. A senior engineer never trusts a hand-wired backward pass without a <b>code-review</b> gradient check: nudge one weight by a tiny <code>ε</code> and confirm <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code> matches your <code>dW</code> to several decimals before running any real training.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hand-wiring gradients vs. automatic differentiation.</b> Deriving each <code>dW</code> by hand teaches you exactly how learning works and lets you optimize a specific layer, but it is slow to write and easy to get subtly wrong. A framework's autograd (M5 later) computes gradients for you and is almost never wrong, at the cost of hiding the mechanism. In a <b>design review</b> the call is clear for anything real: use autograd and keep the hand-derivation for understanding and for the rare custom kernel where you must.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Backprop computes <code>dL/dW</code> for every weight in one reverse sweep. For softmax + cross-entropy the output gradient is just <code>probs − y_true</code>; from there each layer's weight gradient is its input transposed times the incoming blame — <code>dW2 = hᵀ·dlogits</code> — and the blame handed further back is <code>dh = dlogits·W2ᵀ</code>, gated through ReLU by <code>(z1&gt;0)</code>. The nuance is that a wrong transpose or a missing gate still runs — shapes line up, no error — so I always gradient-check against a numerical <code>(loss(W+ε)−loss(W−ε))/(2ε)</code> before trusting a hand-wired backward pass."</div></div>
       <button class="gotit" type="button">Got the full backward pass</button>
     </div>
 </section>
@@ -464,7 +523,13 @@ Create sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py that, wit
 Print the maximum absolute difference for W1 and W2 and confirm it is below 1e-6.
 Then run it and paste the max difference at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-02-backward-pass/log.md</code>: what was the largest gap between your hand-wired gradient and the numerical one, and did any layer surprise you?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Analytic <code>dW2</code> and <code>dW1</code> have the same shapes as <code>W2</code> and <code>W1</code>.</li>
+        <li>The ReLU gate zeroes <code>dz1</code> wherever <code>z1 ≤ 0</code>.</li>
+        <li>The max absolute difference vs the numerical gradient is below about <code>1e-6</code>.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-02-backward-pass/log.md</code>: (1) the largest gap between your hand-wired gradient and the numerical one, and whether any layer surprised you; (2) what the ReLU gate did to the dead unit's gradient; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -777,6 +842,87 @@ refresh();
     var f = document.getElementById('bcastFrame');
     if(f) f.src = f.src;
   });
+})();
+</script>
+
+<!-- ── vlab: backward-pass "blame flows backward" (P0 mechanism visual) ── -->
+<script>
+(function(){
+  "use strict";
+  var lab=document.getElementById('bwlab'); if(!lab) return;
+  var flow=document.getElementById('bw-flow'), gate=document.getElementById('bw-gate');
+  var read=document.getElementById('bw-read'), stepS=document.getElementById('bw-step'), stepV=document.getElementById('bw-step-v');
+  // fixed tiny MLP, one sample — all forward + backward values computed here (real chain-rule math)
+  var x=[1,2];
+  var W1=[[0.5,-1.0],[1.0,-0.5]], b1=[0,0];
+  var W2=[[1.0,0.0],[0.5,1.0]];
+  var y=[1,0];
+  var z1=[x[0]*W1[0][0]+x[1]*W1[1][0]+b1[0], x[0]*W1[0][1]+x[1]*W1[1][1]+b1[1]]; // [2.5,-2.0]
+  var h=[Math.max(0,z1[0]), Math.max(0,z1[1])];                                  // [2.5,0]
+  var logits=[h[0]*W2[0][0]+h[1]*W2[1][0], h[0]*W2[0][1]+h[1]*W2[1][1]];         // [2.5,0]
+  var mmax=Math.max(logits[0],logits[1]), e0=Math.exp(logits[0]-mmax), e1=Math.exp(logits[1]-mmax), Z=e0+e1;
+  var probs=[e0/Z, e1/Z];
+  var loss=-Math.log(probs[0]);                                                  // true class 0
+  var dlogits=[probs[0]-y[0], probs[1]-y[1]];
+  var dh=[dlogits[0]*W2[0][0]+dlogits[1]*W2[0][1], dlogits[0]*W2[1][0]+dlogits[1]*W2[1][1]]; // dlogits @ W2ᵀ
+  var dz1=[dh[0]*(z1[0]>0?1:0), dh[1]*(z1[1]>0?1:0)];
+  function f2(v){ return v.toFixed(2); }
+  function vecs(v){ return '['+v.map(f2).join(', ')+']'; }
+  var msgs=['step 0 · forward pass only — values saved for the sweep',
+            'step 1 · dlogits = probs − y_true',
+            'step 2 · dh = dlogits · W2ᵀ (blame handed to hidden)',
+            'step 3 · ReLU gate: dz1 zeroes the dead unit',
+            'step 4 · dW1 = xᵀ · dz1 (blame reaches first weights)'];
+
+  function drawFlow(step){
+    var rows=[
+      {fv:'loss = '+loss.toFixed(2),        g:'',                                       gs:9},
+      {fv:'logits = '+vecs(logits),         g:'dlogits = probs−y = '+vecs(dlogits),      gs:1},
+      {fv:'h = relu(z1) = '+vecs(h),        g:'dh = dlogits·W2ᵀ = '+vecs(dh),            gs:2},
+      {fv:'z1 = x·W1 = '+vecs(z1),          g:'dz1 = dh·(z1>0) = '+vecs(dz1)+'  ← gated', gs:3},
+      {fv:'x (input) = '+vecs(x),           g:'dW1 = xᵀ·dz1  (weights updated)',          gs:4}
+    ];
+    var top=12, rh=43, bx=8, bw=244, bh=34;
+    var s='<g font-family="monospace" font-size="8.5">';
+    for(var i=0;i<5;i++){
+      var r=rows[i], yy=top+i*rh, on=(step===r.gs);
+      s+='<rect x="'+bx+'" y="'+yy+'" width="'+bw+'" height="'+bh+'" rx="5" fill="#EEF2F7" stroke="'+(on?'#C0392B':'#8A93A0')+'" stroke-width="'+(on?1.8:1)+'"/>';
+      s+='<text x="'+(bx+7)+'" y="'+(yy+14)+'" fill="#2C2A28">'+r.fv+'</text>';
+      if(r.g && step>=r.gs) s+='<text x="'+(bx+7)+'" y="'+(yy+27)+'" fill="#C0392B">'+r.g+'</text>';
+      if(i<4){
+        var midy=yy+bh+(rh-bh)/2+3;
+        s+='<text x="'+(bx+bw-12)+'" y="'+midy+'" fill="#2A7B9B" font-size="11">↑</text>';
+        if(step>=rows[i+1].gs && rows[i+1].gs<9) s+='<text x="'+(bx+10)+'" y="'+midy+'" fill="#C0392B" font-size="11">↓</text>';
+      }
+    }
+    s+='</g>';
+    flow.innerHTML=s;
+  }
+
+  function drawGate(step){
+    var cols=[75,185], base=118, sc=26;
+    var s='<g font-family="monospace" font-size="9" text-anchor="middle">';
+    s+='<text x="130" y="16" fill="#5A6472">ReLU gate (per hidden unit)</text>';
+    s+='<line x1="20" y1="'+base+'" x2="240" y2="'+base+'" class="vlab-axis"/>';
+    for(var u=0;u<2;u++){
+      var cx=cols[u], zv=z1[u], open=zv>0;
+      var bh=Math.min(70,Math.abs(zv)*sc), by=open?base-bh:base, colr=open?'#2D8B55':'#AEB6C2';
+      s+='<rect x="'+(cx-24)+'" y="'+by+'" width="48" height="'+bh+'" rx="3" fill="'+colr+'"/>';
+      s+='<text x="'+cx+'" y="'+(open?by-4:by+bh+12)+'" fill="#5A6472">z1='+zv.toFixed(1)+'</text>';
+      s+='<text x="'+cx+'" y="'+(base+22)+'" fill="'+(open?'#1a5c38':'#8A93A0')+'">'+(open?'OPEN ✓':'CLOSED ✕')+'</text>';
+      if(step>=3){
+        s+='<text x="'+cx+'" y="'+(base+40)+'" fill="#5A6472" font-size="8">dh in = '+dh[u].toFixed(2)+'</text>';
+        s+='<text x="'+cx+'" y="'+(base+54)+'" fill="'+(open?'#C0392B':'#8A93A0')+'" font-size="8">dz1 out = '+dz1[u].toFixed(2)+(open?'':' (blocked)')+'</text>';
+      }
+      s+='<text x="'+cx+'" y="'+(base+74)+'" fill="#96A0AF" font-size="8">unit '+u+'</text>';
+    }
+    s+='</g>';
+    gate.innerHTML=s;
+  }
+
+  function draw(){ var st=+stepS.value; drawFlow(st); drawGate(st); read.textContent=msgs[st]; stepV.textContent=st+' / 4'; }
+  stepS.addEventListener('input', draw);
+  draw();
 })();
 </script>
 </body>

@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>How is it stored?</h4>
       <p>As a big lookup table — an <span class="term" data-tip="A matrix of shape (vocabulary size, d_model). Row i is the embedding vector for token id i.">embedding matrix</span>. Give it token id <code>i</code> and it hands back row <code>i</code> (indexing a row — M1 Day 2!). Those numbers aren't hand-set; they're <strong>learned during training</strong> (M3's loop), so meaning gradually becomes geometry. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Llama 3's tokenizer has a 128,256-token vocabulary; GPT-4o's has roughly 200,000. Each of those is a row in a real embedding matrix, exactly like the one you're about to build.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人以为 embedding 是某种复杂算法。In plain terms: the lookup itself is trivial — it is just "grab row <code>i</code>". What feels like magic is that <em>meaning</em> ends up living in those numbers at all. Nothing computes similarity for you at lookup time; it is already there because training slowly moved similar words' rows close together.</div></div>
       <button class="gotit" type="button">Got what an embedding is — let's go</button>
     </div>
 </section>
@@ -363,6 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🎨</span><h5>Like a color code</h5><p>A color is just three numbers (R, G, B). A word is a longer list of numbers. Nearby lists = alike; and directions can carry meaning ("king − man + woman ≈ queen").</p></div>
       </div>
       <p><strong>In one line:</strong> an embedding turns each word into a point in space so that meaning becomes distance and direction.</p>
+      <p><b>直觉 / Intuition:</b> 把每个词想成地图上的一个点，意思越接近，点就越靠近。 The technical point is that an embedding places each token at coordinates in a <code>d_model</code>-dimensional space, so "similar meaning" becomes "small distance" and a dot product reads that closeness off directly.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real embedding isn't 2-D — it's hundreds of dimensions (a size called <code>d_model</code>). We draw 2-D pictures, but the model works in a much bigger space you can't fully visualize.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -403,10 +405,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>This is <strong>step 1 of every language model</strong>: text → tokens → embeddings, and everything after (attention, the layers you built in M2) operates on these vectors. <code>d_model</code> is a core size knob, and the embedding matrix is a big share of a model's parameters — exactly as many rows as the vocabulary size, which is why the two tokenizers from the teaser above translate directly into that many rows of learned vectors, no more, no less. Get the input representation right and the rest has something meaningful to work with.</p>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> text → tokens → ids → embedding lookup → vectors that place meaning in space. Next lessons: how a word's vector <em>looks at</em> the other words' vectors to understand context — that's attention (Q, K, V).</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — similarity as a dot product</b>
+<br><b>1 · In words:</b> to score how alike two word-vectors are, multiply them position-by-position and add it all up.
+<br><b>2 · The formula:</b> <code>sim(a,b) = a·b = Σᵢ aᵢ·bᵢ</code> — <code>a</code>, <code>b</code> = two embedding vectors of length <code>d_model</code>; <code>aᵢ</code>, <code>bᵢ</code> = their i-th numbers; the sum runs over all <code>d_model</code> positions.
+<br><b>3 · Tiny numbers:</b> cat <code>=[0.9, 0.1]</code>, dog <code>=[0.8, 0.2]</code> → <code>0.9·0.8 + 0.1·0.2 = 0.72 + 0.02 = 0.74</code>. car <code>=[-0.7, 0.6]</code> → cat·car <code>= 0.9·(-0.7) + 0.1·0.6 = -0.63 + 0.06 = -0.57</code>.
+<br><b>4 · Sanity check:</b> the two animals (0.74) score far above cat-vs-car (−0.57). If a pair you <em>expect</em> to be similar scores lower than an unrelated pair, the vectors — not the formula — are wrong.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>The lookup is simple, which is exactly why its failures hide. A staff engineer knows the one that never crashes, and the size knob they defend in review.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a token indexes the wrong row.</b> If the tokenizer and the embedding matrix disagree on ids — or rare words all collapse to one <code>&lt;unk&gt;</code> row — nothing crashes. The model trains and the loss drops, but every occurrence of an affected word gets a consistent-but-wrong vector, and distinct rare words become literally indistinguishable. A senior engineer catches this in <b>code review</b> by checking <code>vocab_size == embedding rows</code> and that out-of-vocabulary tokens are not silently merged.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how wide to make <code>d_model</code>.</b> Wider vectors hold more nuance, but the embedding matrix is <code>(vocab × d_model)</code> — often the single biggest parameter block in a small model — so width costs memory and can overfit on little data. Too narrow and distinct words can't get distinct-enough vectors. Choosing the width for a given vocab and data budget is a <b>design-review</b> call.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "An embedding is a learned lookup table: token id <code>i</code> returns row <code>i</code> of a <code>(vocab_size, d_model)</code> matrix, and because training pulls together words used in similar contexts, a dot product between two rows measures how related they are. The nuance is that this matrix is often the single largest parameter block in a small model, so <code>d_model</code> and vocabulary size are a real memory-vs-expressiveness trade-off, not a free knob."</div></div>
       <button class="gotit" type="button">Got embeddings</button>
     </div>
 </section>
@@ -452,7 +461,13 @@ Create sessions/m03-attention/day-01-embeddings/experiment.py that, with a comme
 4. Defines sim(a,b)=np.dot(a,b) and prints sim(cat,dog) vs sim(cat,car), confirming animals score higher than cat-vs-car.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m03-attention/day-01-embeddings/log.md</code>: why is it useful that similar words end up with nearby vectors?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>E</code> has shape <code>(4, 2)</code> and each word looks up its own row by id.</li>
+        <li><code>sim(cat, dog)</code> is clearly higher than <code>sim(cat, car)</code> — the animals win.</li>
+        <li>You can say, in one sentence, why the numbers are <em>learned</em> and not hand-set.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-01-embeddings/log.md</code>: (1) why it is useful that similar words end up with nearby vectors; (2) the similarity number that surprised you; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

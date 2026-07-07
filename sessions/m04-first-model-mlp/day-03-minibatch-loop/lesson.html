@@ -349,6 +349,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The one-line bug catcher</h4>
       <p>Before a long run, take a single small batch and train only on it. Correct code can drive the loss to nearly zero — the model just memorizes those few examples. This is the <span class="term" data-tip="A sanity check: train on one tiny batch only. If the loss cannot reach near zero, something in your forward, backward, or update code is broken.">overfit-one-batch</span> test. If the loss will not drop, your wiring is broken — stop and fix it. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人直接开跑几个小时的训练，才发现代码有 bug。In plain terms: the tempting mistake is to launch a long run before proving the code even works. The boring-but-powerful fix is to overfit one tiny batch first — if the loss won't hit ~0 on data the model can trivially memorize, the bug is in your <em>wiring</em>, not the data.</div></div>
       <button class="gotit" type="button">Got the goal — let's go</button>
     </div>
 </section>
@@ -362,6 +363,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🎯</span><h5>The wiring test</h5><p>Before a big study session, prove you <em>can</em> learn: take 8 cards and drill only those until you get every one right. If you cannot, your study method is broken — not your effort.</p></div>
       </div>
       <p><strong>In one line:</strong> update on small handfuls to stay fast and steady, and use a single handful you can memorize as a quick test that the whole machine works.</p>
+      <p><b>直觉 / Intuition:</b> 一次学一小叠卡片：比一张更稳，比整副更快。 The technical point is that a mini-batch gradient is the average of a few per-example gradients, so it cancels some of the noise of a single example while still letting you update often.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student who memorizes 8 cards has learned nothing useful, and that is bad. But in the overfit-one-batch test, memorizing is exactly the <strong>goal</strong> — reaching near-zero loss proves the forward, backward, and update code all connect.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -410,12 +412,20 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Why the overfit test is so trusted</h4>
       <p>A model with thousands of weights has more than enough capacity to memorize a handful of examples. So if you train on 8 examples and the loss <strong>cannot</strong> reach near zero, the fault is not "hard data" — it is a bug: a wrong transpose in the backward pass, an update with the wrong sign, or a learning rate of zero. This one test catches most training bugs in seconds instead of hours.</p>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the mini-batch update</b>
+<br><b>1 · In words:</b> average the gradient over the examples in the batch, then take one small step downhill by subtracting a slice of that average.
+<br><b>2 · The formula:</b> <code>W ← W − lr · (1/B) · Σᵢ dwᵢ</code> — <code>W</code> = a weight matrix; <code>lr</code> = learning rate (step size); <code>B</code> = batch size; <code>dwᵢ</code> = the gradient from example <code>i</code>; the sum runs over the <code>B</code> examples in the batch.
+<br><b>3 · Tiny numbers:</b> <code>B=4</code>, per-example gradients for one weight <code>=[0.2, 0.4, 0.0, 0.2]</code> → average <code>= 0.8/4 = 0.2</code>. With <code>lr=0.1</code>: <code>W ← W − 0.1·0.2 = W − 0.02</code>.
+<br><b>4 · Sanity check:</b> the averaged gradient has the same shape as <code>W</code>, and one epoch of 60,000 images at batch 32 is <code>≈1,875</code> updates. If the loss jumps around instead of trending down, you probably forgot to shuffle, so each batch is not representative.</div></div>
+
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Golden rule:</b> overfit one batch <em>first</em>. Only after the loss hits near zero on that batch do you unleash the full multi-epoch run. Even labs training giant models start every new setup this way.</div></div>
 
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>The loop has one line that looks optional but isn't — and one number, the batch size, that trades speed for smoothness.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to shuffle before batching.</b> This is a bug that doesn't announce itself. If the data is stored in order (all the 0s, then all the 1s, …) and you skip the <code>shuffle(data)</code> line, every batch contains almost one digit. The code runs, the loss even falls, but each update yanks the model toward the current batch's single class, then the next batch yanks it back — it never settles, and test accuracy stays low. Nothing errors. A senior engineer in <b>code review</b> checks that the data is shuffled every epoch <em>before</em> it is cut into batches, and is suspicious of a training loss that jumps around instead of trending down.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batch size — speed vs. gradient noise.</b> A small batch (say 8) gives many fast, noisy updates; a large batch (say 4096) gives few, very smooth updates that use the hardware well but move little per step and eat memory. In a <b>design review</b> you pick a size (often 32–256) that balances enough averaging to be stable against enough updates to learn quickly — and you remember that changing the batch size usually means re-tuning the learning rate.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Mini-batch SGD updates the weights after each small batch using the average gradient, <code>W ← W − lr·(1/B)·Σ dwᵢ</code>. Small batches give many fast, slightly noisy updates; the whole dataset gives one smooth but slow update — 32–256 is the usual sweet spot. Before any long run I overfit a single batch: a model with enough capacity should drive that loss to near zero, so if it can't, the bug is in my forward/backward/update wiring, not the data. The nuance is shuffling every epoch before batching — skip it and each batch is one class, so the model never settles."</div></div>
       <button class="gotit" type="button">Got the loop and the test</button>
     </div>
 </section>
@@ -460,7 +470,13 @@ Create sessions/m04-first-model-mlp/day-03-minibatch-loop/experiment.py that, wi
 3. Then the full loop: for each epoch, shuffle, iterate over batches, run forward -> loss -> backward -> update, and print the average loss per epoch (a few epochs on a small subset is fine).
 Then run it and paste the overfit loss and the per-epoch losses at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-03-minibatch-loop/log.md</code>: how low did the loss go on the single batch, and roughly how many steps did it take?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>make_batches</code> shuffles and yields batches of the requested size.</li>
+        <li>The overfit-one-batch loss drops below about <code>0.01</code>.</li>
+        <li>Per-epoch average loss trends down over a few epochs.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-03-minibatch-loop/log.md</code>: (1) how low the loss went on the single batch and roughly how many steps it took; (2) what the per-epoch loss did once you shuffled; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

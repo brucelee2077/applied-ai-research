@@ -352,6 +352,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>What the framework hands you</h4>
       <p>On top of tensors, PyTorch gives you ready-made pieces: layers (<code>nn.Linear</code>), losses (<code>nn.CrossEntropyLoss</code>), and optimizers (<code>torch.optim</code>) — all built from the same tensor operations. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 昨天三行代码像魔法，今天要把魔法拆开。In plain terms: after Day 5 it's tempting to leave PyTorch as a black box. This finale's point is that a tensor is <em>just</em> a NumPy array with two additions — autograd (a hidden record of your operations) and the GPU — so nothing is magic; you already know the grammar.</div></div>
       <button class="gotit" type="button">Got the mirror — let's go</button>
     </div>
 </section>
@@ -365,6 +366,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🦸</span><h5>The superpowers bolt on</h5><p>Autograd remembers how each tensor was made, so gradients come for free. And a tensor can jump to a GPU for a massive speed-up. Same sentences, but now they can fly.</p></div>
       </div>
       <p><strong>In one line:</strong> a tensor is a NumPy array that can compute its own gradients and run on a GPU — everything else you already know still holds.</p>
+      <p><b>直觉 / Intuition:</b> 你早就会这门语言的语法（形状、广播、索引），PyTorch 只是加了两个新词。 The technical point is that tensors keep NumPy's shapes, broadcasting, and indexing unchanged; autograd and the GPU bolt on without touching any of that.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a new word in a language is just a label, but autograd is a real machine — it builds a hidden record of your operations as you go. If you do math outside that record (for example with plain NumPy in the middle), the gradients break. So stay in tensors during the parts you want gradients for.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -422,6 +424,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Autograd's "just track everything" convenience is exactly what quietly costs you memory when you forget to turn the tracking off.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): keeping the autograd graph alive when you don't need gradients.</b> This is a bug that doesn't announce itself. Every operation on a <code>requires_grad=True</code> tensor gets recorded so <code>.backward()</code> can walk it later. If you evaluate the model without wrapping it in <code>torch.no_grad()</code>, or you sum a running total with <code>total_loss += loss</code> instead of <code>total_loss += loss.item()</code>, PyTorch keeps that whole graph in memory. The code runs and the numbers are correct — but memory creeps up every step until the run slows to a crawl or dies with an out-of-memory error much later, far from the real cause. A senior engineer in <b>code review</b> checks that evaluation is inside <code>torch.no_grad()</code> and that any value you only want to <em>read</em> (a loss to log, an accuracy) is pulled out with <code>.item()</code> or <code>.detach()</code> so the graph can be freed.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: automatic gradients vs. the memory they cost.</b> Autograd gives you <code>.backward()</code> for any expression you can write, so you never hand-derive a gradient again — a huge win over the Day-2 NumPy work. What you pay is memory: to differentiate later, PyTorch must store the intermediate values and the graph from the forward pass. In a <b>design review</b> you accept that cost during training (you need the graph), but you deliberately switch it off everywhere you don't — inference, evaluation, and metric logging — with <code>torch.no_grad()</code> and <code>.item()</code>, because paying for gradients you never use is wasted memory.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A PyTorch tensor is a NumPy array with two additions: autograd, which records every operation on a <code>requires_grad</code> tensor so <code>loss.backward()</code> replays the chain rule and fills <code>.grad</code>, and device placement, so <code>.to('cuda')</code> runs the same code on a GPU. The nuance is that the autograd graph costs memory — it stores the forward intermediates — so anywhere I don't need gradients (eval, logging) I wrap in <code>torch.no_grad()</code> and pull scalars out with <code>.item()</code>, or memory creeps up until an out-of-memory crash far from the real cause."</div></div>
       <button class="gotit" type="button">Got why it mirrors NumPy</button>
     </div>
 </section>
@@ -466,7 +469,13 @@ Create sessions/m04-first-model-mlp/day-06-why-pytorch/experiment.py that, with 
 3. Prints whether a GPU (cuda) is available and, if so, moves a tensor with .to("cuda") and confirms its device.
 Then run it and paste the max gradient difference and the device at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m04-first-model-mlp/day-06-why-pytorch/log.md</code>: did the by-hand and autograd gradients match, and which NumPy operation surprised you by working identically in torch?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The same operations (create / reshape / broadcast / matmul) give equal results in NumPy and torch.</li>
+        <li>The by-hand NumPy gradient matches autograd's <code>.grad</code> to about <code>1e-6</code>.</li>
+        <li>The script reports the device and moves a tensor to the GPU if one is available.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-06-why-pytorch/log.md</code>: (1) whether the by-hand and autograd gradients matched, and which NumPy operation surprised you by working identically in torch; (2) what autograd stores in memory that plain NumPy does not; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
 </section>
