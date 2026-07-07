@@ -269,6 +269,29 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   .relate{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+/* ── inline SVG visual lab (playground) — dependency-free, theme-aware ── */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.4rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
 </style>
 </head>
 
@@ -378,7 +401,37 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s3" data-sec="play">
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Build the 6 up, one pass at a time</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
-      <p>A simulated calculator. We start with the forward pass only, add the backward pass to reach the full <code>6ND</code>, then plug in real GPT-3 numbers. <strong>Click all three</strong> to finish.</p>
+      <p>First, <strong>see the 6 split apart</strong>: drag the toggle to add and remove the backward pass, and the sliders to price a real run. Then click through the three exact-number cases in the terminal. <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">Where the 6 comes from — and why inference is 3× cheaper</span>
+          <span class="vlab-readout" id="fl-read">per (param·token): <b>6 FLOPs = 2 fwd + 4 bwd</b> → C ≈ 6ND</span>
+        </div>
+        <p class="vlab-q">Learning question: the rule is <code>C ≈ 6ND</code> — where does the <code>6</code> come from, and what happens to the bill if you only run the model forward (inference) instead of training it?</p>
+        <div class="vlab-panels">
+          <figure class="vlab-fig"><figcaption>Left · FLOPs for one (parameter, token) touch</figcaption>
+            <svg class="vlab-svg" id="fl-left" viewBox="0 0 460 300" role="img" aria-label="A stacked bar: the forward pass is 2 FLOPs, the backward pass adds 4, for 6 FLOPs total per parameter per token."></svg></figure>
+          <figure class="vlab-fig"><figcaption>Right · the whole bill for your N and D</figcaption>
+            <svg class="vlab-svg" id="fl-right" viewBox="0 0 460 300" role="img" aria-label="Two bars comparing inference cost 2ND against training cost 6ND for the chosen model size and token count."></svg></figure>
+        </div>
+        <div class="vlab-controls">
+          <span class="vlab-toggle" role="group" aria-label="Pass mode">
+            <button type="button" class="vlab-btn" id="fl-inf" aria-pressed="false">inference · forward only (2ND)</button>
+            <button type="button" class="vlab-btn active" id="fl-train" aria-pressed="true">training · fwd + bwd (6ND)</button>
+          </span>
+          <label>N — parameters
+            <input type="range" id="fl-N" min="6" max="12" step="0.1" value="11.24" aria-label="number of parameters (log scale)">
+            <span class="vlab-val" id="fl-N-lbl">175 B</span>
+          </label>
+          <label>D — tokens
+            <input type="range" id="fl-D" min="8" max="13" step="0.1" value="11.48" aria-label="number of training tokens (log scale)">
+            <span class="vlab-val" id="fl-D-lbl">300 B</span>
+          </label>
+        </div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the <code>6</code> is not magic — it is <b>2 (forward) + 4 (backward)</b> FLOPs stacked, per parameter per token. Flip to <b>inference</b> and the backward block disappears: only the forward <code>2ND</code> is left, so serving a model costs about <b>one-third</b> of training it. The right-hand bill scales with both <code>N</code> and <code>D</code> — double either and it doubles.</div></div>
+        <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common misconception:</b> the <code>6</code> is a <em>floor</em>, not the whole bill. It counts only dense parameter·token FLOPs — it ignores attention's <code>O(seq²)</code> term (which grows with context length), activation recomputation, and sub-100% hardware use (MFU). A real run always costs more than <code>6ND</code>.</div></div>
+        <p class="vlab-note"><b>How to read it:</b> the toggle switches between forward-only (inference) and forward + backward (training) accounting; the sliders set model size and token count. <b>Effective throughput assumed:</b> ~<code>1e15</code> FLOP/s (one H100 at realistic utilization). <b>Where this simplifies reality:</b> the backward pass being ~2× the forward is an average over the dense layers, and the H100 time here ignores the <code>O(seq²)</code> attention term.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="forward" type="button">① forward only = 2ND</button>
@@ -686,6 +739,83 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── playground visual: decompose the 6 (2 fwd + 4 bwd) + inference-vs-training bill (dependency-free SVG) ── -->
+<script>
+(function(){
+  "use strict";
+  var left=document.getElementById('fl-left'), right=document.getElementById('fl-right');
+  if(!left || !right) return;
+  var W=460,H=300,padL=44,padR=14,padT=26,padB=54;
+  function sy(v,d0,d1){ return (H-padB)-(v-d0)/(d1-d0)*((H-padB)-padT); }
+  function trim(x){ return x>=100?Math.round(x):(x>=10?Math.round(x*10)/10:Math.round(x*100)/100); }
+  function fmtCount(v){ if(v>=1e12) return trim(v/1e12)+' T'; if(v>=1e9) return trim(v/1e9)+' B'; if(v>=1e6) return trim(v/1e6)+' M'; return v.toExponential(0); }
+  function fmtSci(v){ return v.toExponential(1).replace('e+','e'); }
+  function fmtTime(s){ if(s<60) return (Math.round(s*10)/10)+' s'; if(s<3600) return (Math.round(s/6)/10)+' min'; if(s<86400) return (Math.round(s/360)/10)+' hr'; return (Math.round(s/8640)/10)+' days'; }
+  function yaxis(ylab){
+    return '<line class="vlab-axis" x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'"/>'
+      +'<line class="vlab-axis" x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(H-padB)+'"/>'
+      +'<text class="vlab-lbl" x="13" y="'+((padT+H-padB)/2)+'" text-anchor="middle" transform="rotate(-90 13 '+((padT+H-padB)/2)+')">'+ylab+'</text>';
+  }
+  // LEFT · stacked bar: forward 2 + backward 4 = 6 FLOPs per (param, token)
+  function renderLeft(train){
+    var d0=0,d1=6.8, cx=(padL+W-padR)/2, bw=126, x0=cx-bw/2, s='';
+    [0,2,4,6].forEach(function(v){ var y=sy(v,d0,d1);
+      s+='<line class="vlab-grid" x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'"/>'
+        +'<text class="vlab-lbl mut" x="'+(padL-5)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v+'</text>'; });
+    s+=yaxis('FLOPs per parameter · token');
+    var yF0=sy(0,d0,d1), yF2=sy(2,d0,d1);
+    s+='<rect x="'+x0.toFixed(1)+'" y="'+yF2.toFixed(1)+'" width="'+bw+'" height="'+(yF0-yF2).toFixed(1)+'" fill="#2563EB" stroke="#1E3A8A" stroke-width="1"/>';
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+((yF0+yF2)/2+4).toFixed(1)+'" text-anchor="middle" style="fill:#fff;font-weight:700">forward = 2</text>';
+    var top=2;
+    if(train){
+      var yB2=sy(2,d0,d1), yB6=sy(6,d0,d1);
+      s+='<rect x="'+x0.toFixed(1)+'" y="'+yB6.toFixed(1)+'" width="'+bw+'" height="'+(yB2-yB6).toFixed(1)+'" fill="#D97706" stroke="#92400E" stroke-width="1"/>';
+      s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+((yB2+yB6)/2+4).toFixed(1)+'" text-anchor="middle" style="fill:#fff;font-weight:700">backward = 4</text>';
+      top=6;
+    }
+    var yTop=sy(top,d0,d1);
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(yTop-8).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700;font-size:13px">= '+top+' FLOPs ('+(train?'training':'inference')+')</text>';
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(H-padB+16)+'" text-anchor="middle">one (parameter, token) touch</text>';
+    if(!train) s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(H-padB+30)+'" text-anchor="middle" style="fill:#96A0AF">backward pass skipped — no learning</text>';
+    left.innerHTML=s;
+  }
+  // RIGHT · inference (2ND) vs training (6ND) bars at real scale
+  function renderRight(N,D,train){
+    var Cinf=2*N*D, Ctrain=6*N*D, d0=0,d1=Ctrain*1.14, H100=1e15, s=yaxis('training compute C (FLOPs)');
+    var bw=94, cxI=padL+(W-padL-padR)*0.32, cxT=padL+(W-padL-padR)*0.72;
+    function bar(cx,C,label,color,active){
+      var y=sy(C,d0,d1), y0=sy(0,d0,d1), t='';
+      t+='<rect x="'+(cx-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw+'" height="'+(y0-y).toFixed(1)+'" fill="'+color+'" fill-opacity="'+(active?1:0.5)+'" stroke="'+(active?'#111827':'#94A3B8')+'" stroke-width="'+(active?2.4:1)+'"/>';
+      t+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(y-16).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:'+(active?700:600)+'">'+label+'</text>';
+      t+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(y-4).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700">'+fmtSci(C)+'</text>';
+      t+='<text class="vlab-lbl mut" x="'+cx.toFixed(1)+'" y="'+(H-padB+16)+'" text-anchor="middle">'+fmtTime(C/H100)+' · 1 H100</text>';
+      return t;
+    }
+    s+=bar(cxI,Cinf,'inference 2ND','#2563EB',!train);
+    s+=bar(cxT,Ctrain,'training 6ND','#D97706',train);
+    s+='<text class="vlab-lbl mut" x="'+((padL+W-padR)/2)+'" y="'+(H-padB+31)+'" text-anchor="middle">training ≈ 3× inference · ~1e15 FLOP/s assumed</text>';
+    right.innerHTML=s;
+  }
+  var tInf=document.getElementById('fl-inf'), tTrain=document.getElementById('fl-train');
+  var sN=document.getElementById('fl-N'), sD=document.getElementById('fl-D');
+  var lN=document.getElementById('fl-N-lbl'), lD=document.getElementById('fl-D-lbl'), read=document.getElementById('fl-read');
+  var train=true;
+  function update(){
+    var N=Math.pow(10,parseFloat(sN.value)), D=Math.pow(10,parseFloat(sD.value));
+    renderLeft(train); renderRight(N,D,train);
+    lN.textContent=fmtCount(N); lD.textContent=fmtCount(D);
+    read.innerHTML = train ? 'per (param·token): <b>6 FLOPs = 2 fwd + 4 bwd</b> → C ≈ 6ND'
+                           : 'per (param·token): <b>2 FLOPs = forward only</b> → C ≈ 2ND';
+    tTrain.classList.toggle('active',train); tTrain.setAttribute('aria-pressed',train);
+    tInf.classList.toggle('active',!train); tInf.setAttribute('aria-pressed',!train);
+  }
+  tInf.addEventListener('click',function(){train=false;update();});
+  tTrain.addEventListener('click',function(){train=true;update();});
+  sN.addEventListener('input',update); sD.addEventListener('input',update);
+  update();
 })();
 </script>
 

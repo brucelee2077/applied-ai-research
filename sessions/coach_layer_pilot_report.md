@@ -172,3 +172,40 @@ Do the migrator kicker/finale sweep (risk #1) **before or alongside** step 1 so 
 - [x] Each lesson asks for a concrete artifact with acceptance criteria.
 - [x] `lesson_audit.py` reports the 4 pilots OK with no hard failures; Chinese not degraded.
 - [x] Adversarial verification workflow findings addressed — see §10 (1 confirmed defect fixed; all lenses pass).
+
+---
+
+## 15. Visual upgrade pass — playgrounds (follow-on, 2026-07-06)
+
+After the Coach-Layer prose pass, the same 4 pilots were run through the `frontier-visual-auditor` (audit + adversarial re-verify, 8-agent workflow) to decide whether their **playgrounds** create a mental model or merely decorate. Consensus scores / priority:
+
+| Lesson | Category | Score | Priority | The gap the audit found |
+|--------|----------|:---:|:---:|---|
+| m01 · day-05 · logs | A (static scroll-reveal SVG) | 3.5 | **P0** | Concept visual frozen at one exponent; "playground" was a fake terminal that never draws a line |
+| m08 · day-01 · 6ND | B (D3 iframe calculator) | 4.0 | P2-high | Strong iframe, but *why 6 = 2 fwd + 4 bwd* never drawn; viz/lesson wording mismatch |
+| m10a · day-04 · power law | A (dual-panel SVG lab) | 4.0–4.5 | P2 | Correct pattern, but exponent `a` hard-coded — learner can't rotate the fit |
+| m08 · day-03 · KV cache | A (dual-panel SVG + D3) | 4.5 | P2 | Reference-quality; schematic axis, no predict-prompt, no shared-HBM band |
+
+### What was built (all dependency-free inline SVG + vanilla JS, matching the repo `.vlab` template — no CDN, offline-safe)
+
+- **logs & exponents (P0 rescue).** Added an interactive two-panel lab to Section 3: an **exponent-`b` slider** (−1 → 3) that reshapes a power law on normal axes (left, bends) and log-log axes (right, straight line whose slope readout **= b**, with a rise/run triangle). A **"log y only"** toggle shows the same points staying curved — the misconception demo — and presets jump to `y=x²` and the real Kaplan loss slope (b=−0.05). This is the recommended logs/exponents pattern; the frozen scroll-reveal build is kept below it.
+- **transformer arithmetic (P2-high).** Added a **"decompose the 6"** lab: a stacked bar makes `6 = 2 (forward) + 4 (backward)` a visible object, an **inference (2ND) vs training (6ND) toggle** removes the backward block (serving ≈ ⅓ of training), and N/D log-sliders price a real run with an H100-time readout. Also **reconciled the wording bug** the earlier audit surfaced: `viz/transformer-flops.html` now leads with "2 forward + 4 backward FLOPs per parameter · token" (matching the lesson) while keeping the "2 FLOP/MAC × [1 fwd + 2 bwd passes]" derivation as the explanation.
+- **power-law derivation (P2).** Added a draggable **exponent-`a` slider** that rotates the log-log fit line (rotated around the point cloud's center so points stay on-panel), a live **regime badge** (≈ Chinchilla / leaning-Kaplan / too-much-into-D) with implied `b = 1−a` and `a+b = 1.00`, a bold learning question, and a **fix to the stale raw-mode readout** — the headline now switches from `a = 0.49` to the tiny raw-axis slope (`5.4e-13 — not the exponent`) so the number visibly changes with the toggle.
+- **KV cache (P2 polish).** Added a **predict-before-you-drag** question, drew a grey **"weights ~14 GB" band** the cache stacks on top of (so weights + KV share the 80 GB HBM ceiling — a full batch at 8k context now visibly overflows it), and **relabeled the left y-axis** to "relative work (schematic)" so the uncalibrated recompute triangle can't be misread as FLOPs.
+
+### Files changed (visual pass)
+
+`m01/day-05`, `m08/day-01`, `m08/day-03`, `m10a/day-04` `lesson.html` (Section-3 lab + `.vlab` CSS added where missing) and `sessions/viz/transformer-flops.html` (2 wording strings). Strictly additive to Section 3; the terminal playgrounds and their **completion gate**, plus nav/quest-id/quiz/build/tooltip machinery, are untouched.
+
+### Verification (visual pass)
+
+`vm.Script` syntax check + jsdom render + interaction tests (dispatch `input`/`click`, assert SVG re-renders and readouts respond). Result across all 4: **new lab SVGs populate, 7 sections / 7 checklist / 4 quiz intact, terminal "got it" gate preserved, 8 nav links, 0 runtime errors.** Interaction spot-checks confirmed: power-law badge flips Chinchilla→Kaplan→too-much-D as `a` moves and the raw-mode number changes; KV weights band renders and a 16×8k load overflows 80 GB.
+
+### Definition of done — visual pass
+
+- [x] P0 lesson (logs) now has a real interactive mechanism, not a fake terminal.
+- [x] Every new visual has a learning question, labeled axes, a "what you should notice" + misconception note, and a "where this simplifies reality" line (per the D3-visual-lab required card).
+- [x] All new labs are dependency-free (no CDN), theme-aware, keyboard-reachable sliders, offline-safe.
+- [x] Wording mismatch between `day-01` and its embedded viz reconciled.
+- [x] 4/4 render clean, 0 JS errors; existing interactivity + gates preserved.
+- [x] kv-cache and power-law remain the reference `.vlab` templates for the curriculum-wide rollout.

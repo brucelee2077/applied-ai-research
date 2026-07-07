@@ -298,6 +298,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
 .vlab-btn.active{background:var(--accent);color:#fff}
 .vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
 </style>
 </head>
 
@@ -415,6 +416,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
           <span class="vlab-title">KV cache: compute saved vs. memory spent</span>
           <span class="vlab-readout">cache <b><span id="kv-gb">1.07 GB</span></b> · recompute saved <b><span id="kv-mult">≈1024×</span></b></span>
         </div>
+        <p class="vlab-q">Predict before you drag: if you <em>double</em> seq_len, which grows — the recompute triangle on the left, the memory stack on the right, or both — and by how much each?</p>
         <div class="vlab-panels">
           <figure class="vlab-fig"><figcaption>Left · no cache — recompute grows like a triangle (O(n²))</figcaption>
             <svg class="vlab-svg" id="kv-left" viewBox="0 0 460 300" role="img" aria-label="Without a KV cache, per-step recomputation forms a triangle whose area grows quadratically with sequence length; with a cache the work is a flat line."></svg></figure>
@@ -431,9 +433,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
             <span class="vlab-val" id="kv-batch-lbl">1</span>
           </label>
         </div>
-        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the KV cache flattens the recompute triangle into a thin line — enormous compute saved. But the memory stack on the right keeps growing with every token <em>and</em> every request: at <code>seq_len = 8192</code> it is already ~4.3 GB for a single request, and a full batch marches toward the HBM ceiling. <em>Compute saved, memory spent.</em></div></div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the KV cache flattens the recompute triangle into a thin line — enormous compute saved. But the memory stack on the right keeps growing with every token <em>and</em> every request: at <code>seq_len = 8192</code> it is already ~4.3 GB for a single request, and a full batch marches toward the HBM ceiling. The grey band at the bottom is the model weights (~14 GB, 7B fp16) — the cache stacks <em>on top</em> of them, so weights + KV share the 80 GB budget, and a big batch at long context blows straight past it. <em>Compute saved, memory spent.</em></div></div>
         <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Misconception:</b> the KV cache saves <em>recompute</em>, but it does <b>not</b> save memory — it <b>adds</b> it. Growing, linear memory is the price of skipping the recompute, and at long context that memory becomes the serving bottleneck.</div></div>
-        <p class="vlab-note"><b>How to read it:</b> drag <code>seq_len</code> to grow the triangle (quadratic) and the memory stack (linear); drag <code>batch</code> to add request blocks. GB uses the lesson formula <code>2·L·H·d·s·b·bytes</code> with the 7B config (L=32, H=32, d=128, fp16). <b>Simplified:</b> recompute is shown in schematic units (not calibrated FLOPs) and this ignores attention's own O(n²) FLOPs, GQA/MQA, and cache quantization.</p>
+        <p class="vlab-note"><b>How to read it:</b> drag <code>seq_len</code> to grow the recompute triangle (quadratic) and the memory stack (linear); drag <code>batch</code> to add request blocks stacked on top of the grey model-weights band. GB uses the lesson formula <code>2·L·H·d·s·b·bytes</code> with the 7B config (L=32, H=32, d=128, fp16). <b>Simplified:</b> the left panel's y-axis is <em>relative work (schematic)</em>, not calibrated FLOPs; the grey band is a stand-in for ~14 GB of 7B fp16 weights; and this ignores attention's own O(n²) FLOPs, GQA/MQA, and cache quantization.</p>
       </div>
       <div class="play">
         <div class="play-btns">
@@ -761,7 +763,7 @@ refresh();
   "use strict";
   var left=document.getElementById('kv-left'), right=document.getElementById('kv-right');
   if(!left || !right) return;
-  var W=460,H=300,padL=44,padR=16,padT=18,padB=32,SMAX=8192,GBMAX=80;
+  var W=460,H=300,padL=44,padR=16,padT=18,padB=32,SMAX=8192,GBMAX=80,WGT=14;
   var PERTOK=2*32*32*128*2; // bytes per token = 524288 : 2 (K&V) x 32 layers x 32 heads x 128 head_dim x 2 bytes (fp16)
   function perReqGB(s){ return PERTOK*s/1e9; }
   function sx(v){ return padL+(v/SMAX)*(W-padL-padR); }
@@ -774,7 +776,7 @@ refresh();
       +'<text class="vlab-lbl" x="12" y="'+((padT+H-padB)/2)+'" text-anchor="middle" transform="rotate(-90 12 '+((padT+H-padB)/2)+')">'+ylab+'</text>';
   }
   function renderLeft(s){
-    var g=axes('decode step →','K,V recomputed / step');
+    var g=axes('decode step →','relative work / step (schematic)');
     g+='<line class="vlab-grid" stroke-dasharray="4 4" x1="'+sx(0).toFixed(1)+'" y1="'+syL(0).toFixed(1)+'" x2="'+sx(SMAX).toFixed(1)+'" y2="'+syL(SMAX).toFixed(1)+'"/>';
     g+='<polygon points="'+sx(0).toFixed(1)+','+syL(0).toFixed(1)+' '+sx(s).toFixed(1)+','+syL(s).toFixed(1)+' '+sx(s).toFixed(1)+','+syL(0).toFixed(1)+'" fill="rgba(240,120,88,.35)" stroke="#C0392B" stroke-width="1.5"/>';
     g+='<line x1="'+sx(0).toFixed(1)+'" y1="'+syL(160).toFixed(1)+'" x2="'+sx(SMAX).toFixed(1)+'" y2="'+syL(160).toFixed(1)+'" stroke="#059669" stroke-width="2.6"/>';
@@ -790,10 +792,16 @@ refresh();
     g+='<line class="vlab-fit dash" x1="'+padL+'" y1="'+syG(80).toFixed(1)+'" x2="'+(W-padR)+'" y2="'+syG(80).toFixed(1)+'"/>';
     g+='<text class="vlab-lbl" x="'+(W-padR-4)+'" y="'+(syG(80)+13).toFixed(1)+'" text-anchor="end" style="fill:#B0453A">H100 HBM ≈ 80 GB</text>';
     var cx=(padL+W-padR)/2, bw=104, x0=cx-bw/2, k;
-    for(k=0;k<b;k++){ var yTop=syG((k+1)*perReq), yBot=syG(k*perReq);
+    // model weights band — shares the HBM budget with the cache
+    var yW0=syG(0), yW1=syG(WGT);
+    g+='<rect x="'+x0.toFixed(1)+'" y="'+yW1.toFixed(1)+'" width="'+bw+'" height="'+(yW0-yW1).toFixed(1)+'" fill="rgba(147,160,178,.55)" stroke="#5A6472" stroke-width="0.8"/>';
+    g+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+((yW0+yW1)/2+4).toFixed(1)+'" text-anchor="middle" style="fill:#3A4250">weights ~14 GB</text>';
+    // KV cache stacked on top of the weights band
+    for(k=0;k<b;k++){ var yTop=syG(WGT+(k+1)*perReq), yBot=syG(WGT+k*perReq);
       g+='<rect x="'+x0.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+bw+'" height="'+Math.max(1.2,yBot-yTop).toFixed(1)+'" fill="rgba(128,145,255,.8)" stroke="#2F3A4A" stroke-width="0.8"/>'; }
-    g+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(syG(GB)-6).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700">'+GB.toFixed(1)+' GB</text>';
-    g+='<text class="vlab-lbl mut" x="'+cx.toFixed(1)+'" y="'+(H-padB+12)+'" text-anchor="middle">'+b+' request'+(b>1?'s':'')+' × '+perReq.toFixed(2)+' GB</text>';
+    var yLabel=Math.max(padT+10, syG(WGT+GB)-6);
+    g+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+yLabel.toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700">+ '+GB.toFixed(1)+' GB cache</text>';
+    g+='<text class="vlab-lbl mut" x="'+cx.toFixed(1)+'" y="'+(H-padB+12)+'" text-anchor="middle">'+b+' request'+(b>1?'s':'')+' × '+perReq.toFixed(2)+' GB + weights</text>';
     right.innerHTML=g;
   }
   var seq=document.getElementById('kv-seq'), bat=document.getElementById('kv-batch');
