@@ -443,9 +443,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
             <button type="button" class="vlab-btn" id="pl-scale-raw" aria-pressed="false">raw C vs N</button>
           </span>
         </div>
-        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> every budget's parabola has one lowest point — its best model size. Keep just those vertices and plot them: in <b>log–log</b> they line up straight, and that slope is the exponent <code>a</code>. Flip to <b>raw C vs N</b> and the same points bend into a curve no straight line fits. Now <b>drag exponent a</b> — the log–log line <em>rotates</em>, the fitted-slope readout tracks it, and the implied <code>b = 1 − a</code> keeps <code>a + b ≈ 1</code> (the built-in sanity check); push <code>a</code> up toward Kaplan's 0.73 and the badge warns you. <em>Many local parabolas → keep the vertices → one global power law.</em></div></div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> every budget's parabola has one lowest point — its best model size. Keep just those vertices and plot them: in <b>log–log</b> they line up straight, and that slope is the exponent <code>a</code>. Flip to <b>raw C vs N</b> and the same points bend into a curve no straight line fits. Now <b>drag exponent a</b> — the log–log line <em>rotates</em>, the fitted-slope readout tracks it, and <code>b</code> is fit <em>independently</em> from its own <code>D_opt</code> series (with a small fixed simulated scatter) — so <code>a + b</code> lands <em>close to but not exactly</em> <code>1</code>, a real cross-check rather than an algebraic identity; push <code>a</code> up toward Kaplan's 0.73 and the badge warns you. <em>Many local parabolas → keep the vertices → one global power law.</em></div></div>
         <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Misconception:</b> do <b>not</b> regress raw <code>C</code> vs <code>N</code>. A power law is only a straight line after logs — regress <code>log C</code> vs <code>log N</code>, and the slope is <code>a</code>. On the <b>raw C vs N</b> toggle the headline slope changes to a tiny near-zero number precisely because those axes give no meaningful exponent.</div></div>
-        <p class="vlab-note"><b>How to read it:</b> drag <b>exponent a</b> to rotate the fitted power law and watch the slope readout and <code>a+b</code> badge respond; drag <b>Highlight budget</b> to spotlight one budget in both panels; use the toggle to switch the right panel between log–log and raw axes. <b>Simplified:</b> 5 clean synthetic budgets (real fits use ~9 noisy ones), the constant is held fixed so only the slope moves, and each vertex's <code>D_opt</code> follows from <code>C ≈ 6ND</code>.</p>
+        <p class="vlab-note"><b>How to read it:</b> drag <b>exponent a</b> to rotate the fitted power law and watch the slope readout and <code>a+b</code> badge respond; drag <b>Highlight budget</b> to spotlight one budget in both panels; use the toggle to switch the right panel between log–log and raw axes. <b>Simplified:</b> 5 clean synthetic budgets (real fits use ~9 noisy ones), the constant is held fixed so only the slope moves, and each vertex's <code>D_opt</code> follows from <code>C ≈ 6ND</code> plus a small fixed simulated measurement scatter — so the <code>a+b</code> readout comes from two independently-fit slopes, not an algebraic identity.</p>
       </div>
       <div class="play">
         <div class="play-btns">
@@ -785,8 +785,10 @@ refresh();
   if(!left || !right) return;
   var W=460,H=300,padL=46,padR=14,padT=18,padB=32;
   var K=0.55,LOSSMAX=3.8,CMID=20.5,NMID=9.3,i;   // rotate the fit around (CMID,NMID) so points stay on-panel as a changes
+  var LOG6=Math.log(6)/Math.LN10;
+  var DPERT=[0.06,-0.09,0.045,0.075,-0.09];      // fixed small simulated scatter on D_opt, so b is fit independently, not just 1-a
   var logC=[]; for(i=0;i<5;i++){ logC.push(19+0.75*i); }
-  var logN=[],Lmin=[],Craw=[],Nraw=[],fitLog,fitRaw;
+  var logN=[],Lmin=[],Craw=[],Nraw=[],logD=[],fitLog,fitRaw,fitD;
   function lsq(xs,ys){ var n=xs.length,mx=0,my=0,j; for(j=0;j<n;j++){mx+=xs[j];my+=ys[j];} mx/=n;my/=n;
     var num=0,den=0; for(j=0;j<n;j++){num+=(xs[j]-mx)*(ys[j]-my);den+=(xs[j]-mx)*(xs[j]-mx);} return {m:num/den,b:my-num/den*mx}; }
   function rebuild(a){
@@ -795,6 +797,9 @@ refresh();
     fitLog=lsq(logC,logN);
     Craw=logC.map(function(v){return Math.pow(10,v);}); Nraw=logN.map(function(v){return Math.pow(10,v);});
     fitRaw=lsq(Craw,Nraw);
+    // independent D_opt series: D = C/(6N) plus a fixed small scatter, then its own regression for b
+    logD=[]; for(j=0;j<5;j++){ logD.push(logC[j]-LOG6-logN[j]+DPERT[j]); }
+    fitD=lsq(logC,logD);
   }
   var PAL=['#2563EB','#7C3AED','#DB2777','#059669','#D97706'];
   function fmtSci(v){ var e=Math.floor(Math.log(v)/Math.LN10), m=v/Math.pow(10,e); return (Math.round(m*10)/10)+'e'+e; }
@@ -861,7 +866,7 @@ refresh();
     blab.textContent='C'+(hi+1)+' ≈ '+fmtSci(Craw[hi])+' FLOPs · best N ≈ '+fmtSci(Nraw[hi]);
     if(mode==='log'){
       var reg=regime(a);
-      readout.innerHTML='fitted log–log slope <b>a = '+fitLog.m.toFixed(2)+'</b> · implied b = '+(1-a).toFixed(2)+' · a+b = '+(a+(1-a)).toFixed(2)+' <span class="vlab-badge '+reg.cls+'">'+reg.txt+'</span>';
+      readout.innerHTML='fitted log–log slope <b>a = '+fitLog.m.toFixed(2)+'</b> · independently-fit b = '+fitD.m.toFixed(2)+' · a+b = '+(a+fitD.m).toFixed(2)+' <span class="vlab-badge '+reg.cls+'">'+reg.txt+'</span>';
       rcap.textContent='Right · vertices in log–log — a straight line';
     } else {
       readout.innerHTML='raw-axis slope <b>'+fitRaw.m.toExponential(1)+'</b> <span class="vlab-badge warn">not the exponent — the points curve</span>';
