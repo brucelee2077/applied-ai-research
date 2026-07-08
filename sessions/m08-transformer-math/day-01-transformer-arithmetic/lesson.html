@@ -3,220 +3,365 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
 <title>Week 3 · Day 1 — Transformer Arithmetic: C ≈ 6ND</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* ===========================================================================
+   M1 Day 3 — dark "lab notebook" skin, modeled on visual-tutorial/index.html
+   (sidebar nav + progress checklist + numbered content column), dark palette.
+   Self-contained, offline. Progress persists to localStorage.
+   =========================================================================== */
 :root{
-  --bg:#FAF7F2; --bg-warm:#F5F0E8; --code:#1E1E2E;
-  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
-  --surface:#FFFFFF; --surface2:#FDF9F3;
-  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
-  --ok:#2D8B55; --ok-l:#E8F5EE; --err:#C93B3B; --err-l:#FDE8E8; --warn-l:#FCF3DC;
-  --display:'Bricolage Grotesque',Georgia,serif;
-  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  /* theme-independent: accents, type, radii, shadows */
+  --accent:#8091FF; --accent-d:#6B7BF0; --accent-soft:#1B2340; --on-soft:#EDF1F7;
+  --q:#5B9BFF; --k:#B39BFF; --v:#FF9B5C;
+  --ok:#5BC98A; --ok-ink:#8FE3AE; --ok-soft:#12271C; --ok-line:#1E7E4C;
+  --warn:#E7B04A; --warn-soft:#2A2410; --warn-line:#8A6A18;
+  --err:#F07A6A; --err-ink:#F8A99B; --err-soft:#2C1A17; --err-line:#9A3B2C;
+  --radius:16px; --r-sm:8px; --r-md:12px; --r-full:9999px;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.28);
+  --display:'Bricolage Grotesque',Georgia,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
   --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
-  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
-  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
   --ease:cubic-bezier(.16,1,.3,1);
+  /* default surface = Dim (softer charcoal; also the fallback if no data-theme set) */
+  --bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;
+}
+/* ---- darkness levels (switchable in the sidebar) ---- */
+html[data-theme="dim"]{--bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;}
+html[data-theme="dark"]{--bg:#10151D; --bg2:#0A0E15; --panel:#18202B; --panel2:#202A36; --panel3:#28323F;
+  --ink:#E9EEF5; --ink2:#B8C2D1; --muted:#8B97A8; --line:#28313F; --line2:#35414F;}
+html[data-theme="midnight"]{--bg:#090C12; --bg2:#05070B; --panel:#10151D; --panel2:#161D28; --panel3:#1E2732;
+  --ink:#E6ECF4; --ink2:#AEB9C8; --muted:#828FA1; --line:#212A37; --line2:#2C3644;}
+/* Light mode — the warm cream palette, same notebook layout */
+html[data-theme="light"]{
+  --bg:#FAF7F2; --bg2:#F1EBE0; --panel:#FFFFFF; --panel2:#FBF7F0; --panel3:#F3EDE3;
+  --ink:#2C2A28; --ink2:#55504A; --muted:#6E675F; --line:#E5DFD6; --line2:#D8D0C4;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-soft:#E4F2F7; --on-soft:#1F6280;
+  --q:#1F6280; --k:#5E5191; --v:#9A5A12;
+  --ok:#2D8B55; --ok-ink:#1A5C38; --ok-soft:#E8F5EE; --ok-line:#2D8B55;
+  --warn:#A67D08; --warn-soft:#FCF3DC; --warn-line:#A67D08;
+  --err:#C93B3B; --err-ink:#8F2020; --err-soft:#FDE8E8; --err-line:#C93B3B;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.65;
-  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:5rem}
-a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
-a:hover{border-bottom-color:var(--accent)}
-::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--r-full)}
+body{font-family:var(--body);color:var(--ink);background:var(--bg);line-height:1.65;font-size:16.5px;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(ellipse 110% 55% at 82% -8%,rgba(128,145,255,.10),transparent 60%),
+    radial-gradient(ellipse 90% 50% at 6% 108%,rgba(255,155,92,.06),transparent 60%);
+  background-attachment:fixed}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5px;border-radius:5px;color:var(--q);border:1px solid var(--line)}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:var(--r-full)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
-.nav{position:fixed;top:0;left:0;right:0;height:54px;z-index:100;background:rgba(250,247,242,.93);
-  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
-.nav-bar{position:absolute;bottom:0;left:0;height:3px;width:0%;background:var(--accent);transition:width .4s var(--ease)}
-.nav-in{max-width:1080px;margin:0 auto;height:100%;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.nav-title{font-family:var(--display);font-size:.875rem;font-weight:700}
-.nav-meta{display:flex;align-items:center;gap:1rem}
-.nav-count{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent)}
-.nav-reset{font-size:.7rem;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:.25rem .6rem;cursor:pointer}
-.nav-reset:hover{color:var(--err);border-color:var(--err)}
+/* ---------- top progress bar ---------- */
+#progress-track{position:fixed;top:0;left:0;right:0;height:4px;background:transparent;z-index:60}
+#progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--q),var(--accent),var(--v));
+  transition:width .4s var(--ease);box-shadow:0 0 12px rgba(128,145,255,.5)}
 
-main{max-width:1080px;margin:0 auto;padding:calc(54px + 2.5rem) 1.25rem 0}
-.sec{margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
-  box-shadow:var(--sh-sm);overflow:hidden;scroll-margin-top:70px;transition:box-shadow .3s,border-color .3s}
-.sec.done{border-color:var(--ok)}
-.sec-head{display:flex;align-items:center;gap:.75rem;padding:1.1rem 1.5rem;border-bottom:1px solid var(--border2);background:var(--surface2)}
-.sec-badge{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;color:#fff;background:var(--accent-d);padding:3px .55rem;border-radius:var(--r-sm);white-space:nowrap}
-.sec-badge.s-what{background:#1F6280}.sec-badge.s-study{background:#5E5191}.sec-badge.s-play{background:#BE3E26}
-.sec-badge.s-code{background:#9A5A12}.sec-badge.s-quiz{background:#8A6D12}.sec-badge.s-produce{background:#237046}
-.sec-h{font-family:var(--display);font-size:1.2rem;font-weight:700;flex:1;min-width:0}
-.sec-tick{margin-left:auto;width:26px;height:26px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#fff;transition:all .2s}
-.sec.done .sec-tick{background:var(--ok);border-color:var(--ok)}
-.sec-body{padding:1.5rem}
-.sec-body p{margin-bottom:.9rem}.sec-body p:last-child{margin-bottom:0}
-.sec-body h4{font-family:var(--display);font-size:1rem;font-weight:700;margin:1.3rem 0 .5rem}
+/* ---------- mobile nav toggle ---------- */
+#nav-toggle{display:none}
+
+/* ---------- layout ---------- */
+.layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
+
+/* ---------- sidebar ---------- */
+#sidebar{position:sticky;top:0;height:100vh;width:288px;flex:0 0 288px;
+  display:flex;flex-direction:column;
+  padding:22px 0 0;border-right:1px solid var(--line);background:var(--panel)}
+.sidebar-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;padding:0 16px}
+.brand{padding:6px 8px 14px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand-title{font-family:var(--display);font-weight:800;font-size:1.2rem;letter-spacing:-.02em}
+.brand-dot{color:var(--accent)}
+.brand-sub{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.nav-count{margin-top:10px;font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--ink2)}
+.nav-count b{color:var(--accent)}
+.theme-row{padding:10px 8px 0}
+.theme-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.theme-btn{flex:1;font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn.active{background:var(--accent);color:#fff}
+.nav-group-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:4px 8px;margin-top:10px}
+.nav-link{display:flex;align-items:center;gap:.5rem;padding:7px 10px;margin:1px 0;border-radius:9px;color:var(--ink2);
+  font-size:.86rem;cursor:pointer;border-left:3px solid transparent;transition:all .12s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:var(--body)}
+.nav-link:hover{background:var(--panel2);text-decoration:none;color:var(--ink)}
+.nav-link.active{background:var(--accent-soft);color:var(--on-soft);font-weight:700;border-left-color:var(--accent)}
+.nav-link .nl-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);flex:0 0 auto}
+.nav-link.done .nl-dot{background:var(--ok)}
+.checklist-wrap{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;padding-bottom:16px}
+#checklist{list-style:none;margin:0;padding:0}
+#checklist li{display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--ink2);padding:4px 8px;cursor:pointer;border-radius:7px}
+#checklist li:hover{background:var(--panel2)}
+#checklist li .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--line2);flex:0 0 auto;margin-top:2px;
+  display:grid;place-items:center;font-size:.66rem;color:var(--bg);font-weight:800}
+#checklist li.done .box{background:var(--ok);border-color:var(--ok)}
+#checklist li.done .box::after{content:'✓'}
+#checklist li.done span{color:var(--muted);text-decoration:line-through}
+.ghost-btn{background:none;border:1px solid var(--line2);color:var(--muted);font-size:.74rem;padding:6px 11px;border-radius:8px;cursor:pointer;margin-top:10px;transition:.15s}
+.ghost-btn:hover{border-color:var(--err);color:var(--err)}
+.side-nav{flex:0 0 auto;padding:12px 16px 16px;border-top:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;gap:6px}
+.side-nav a{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);color:var(--ink);transition:.15s}
+.side-nav a:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-1px)}
+.side-nav .d{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.side-nav .t{font-size:.82rem;font-weight:600}
+
+/* ---------- main content ---------- */
+#content{flex:1 1 auto;min-width:0;padding:44px clamp(20px,5vw,60px) 80px;max-width:920px}
+.hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:8px}
+.kicker{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);padding:5px 12px;border-radius:999px}
+.hero h1{font-family:var(--display);font-size:clamp(2rem,4.6vw,2.9rem);letter-spacing:-.03em;margin:.35em 0 .1em;line-height:1.06}
+.hero h1 .sub{display:block;font-size:.5em;font-weight:600;color:var(--ink2);margin-top:.35rem;letter-spacing:-.01em}
+.lede{font-size:1.1rem;color:var(--ink2);max-width:64ch;line-height:1.55}
+.goal{margin-top:1.3rem;display:flex;gap:.8rem;background:linear-gradient(120deg,var(--accent-soft),transparent);
+  border:1px solid var(--accent-d);border-radius:var(--r-md);padding:1rem 1.2rem;max-width:80ch}
+.goal .gic{font-size:1.2rem;flex:0 0 auto}.goal b{color:var(--accent)}.goal code{color:var(--ink)}
+
+.module-section{padding:30px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+.module-section:last-of-type{border-bottom:none}
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.sec-num{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-weight:800;display:grid;place-items:center;font-size:.92rem}
+.sec-num.s-what{background:rgba(91,155,255,.16);color:var(--q)}
+.sec-num.s-study{background:rgba(179,155,255,.16);color:var(--k)}
+.sec-num.s-play{background:rgba(255,155,92,.16);color:var(--v)}
+.sec-num.s-code{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-quiz{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-produce{background:rgba(91,201,138,.16);color:var(--ok)}
+.module-section.done .sec-num{background:var(--ok);color:var(--bg)}
+.sec-h{font-family:var(--display);font-size:1.4rem;font-weight:700;letter-spacing:-.02em;line-height:1.2;flex:1;min-width:0}
+.sec-tag{font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sec-body h4{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--ink);margin:1.4rem 0 .5rem}
 .sec-body h4:first-child{margin-top:0}
-.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem}.sec-body li{margin-bottom:.45rem}
-.sec-body strong{font-weight:600}
-code{font-family:var(--mono);font-size:.85em;background:var(--bg-warm);padding:1px 5px;border-radius:5px;color:var(--accent-d)}
-.term{border-bottom:1.5px dashed var(--accent);font-weight:500}
+.sec-body p{margin-bottom:.9rem;color:var(--ink2)}.sec-body p:last-child{margin-bottom:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem;color:var(--ink2)}.sec-body li{margin-bottom:.45rem}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500;color:var(--ink);cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 
-.hero{margin-bottom:2rem}
-.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
-.hero h1{font-family:var(--display);font-size:2.2rem;font-weight:800;line-height:1.12}
-.hero .lead{margin-top:.6rem;font-size:1.12rem;color:var(--text2);line-height:1.4}
-.goal{margin-top:1.2rem;background:var(--accent-l);border-left:4px solid var(--accent);border-radius:0 var(--r-md) var(--r-md) 0;padding:1rem 1.2rem}
-.goal b{color:var(--accent-d)}
+/* ---------- cards / callouts ---------- */
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.relate .card{background:var(--panel2);border:1px solid var(--line2);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm)}
+.relate .card h5{font-family:var(--display);font-size:.98rem;font-weight:700;color:var(--ink);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem}
+.relate .card .big{font-size:1.5rem}
+.relate .card p{font-size:.88rem;color:var(--ink2);margin:0}
+.callout{border-radius:var(--radius);padding:15px 18px;margin:16px 0;border:1px solid var(--line2);background:var(--panel2);
+  box-shadow:var(--shadow-sm);display:flex;gap:.8rem;font-size:.92rem;line-height:1.55}
+.callout .ic{font-size:1.05rem;flex:0 0 auto;line-height:1.4}
+.callout div{color:var(--ink2)}.callout b{color:var(--ink)}
+.callout code{background:rgba(128,128,128,.2)}
+.c-info{background:linear-gradient(180deg,rgba(91,155,255,.10),transparent);border-color:var(--accent-d)}
+.c-warn{background:linear-gradient(180deg,rgba(231,176,74,.10),transparent);border-color:var(--warn-line)}
+.c-ok{background:linear-gradient(180deg,rgba(91,201,138,.10),transparent);border-color:var(--ok-line)}
+.takeaway{background:var(--panel2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:0 10px 10px 0;font-size:.95rem;margin:14px 0;color:var(--ink2)}
 
-.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.6rem 1.2rem;cursor:pointer;transition:background .2s,transform .1s}
-.gotit:hover{background:var(--accent-d)}.gotit:active{transform:translateY(1px)}
-.sec.done .gotit{background:var(--ok)}
+/* ---------- got-it button ---------- */
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.92rem;font-weight:700;
+  color:#fff;background:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:.62rem 1.25rem;cursor:pointer;
+  transition:background .18s,transform .1s,box-shadow .18s}
+.gotit:hover{background:var(--accent-d);box-shadow:0 6px 20px rgba(128,145,255,.28)}
+.gotit:active{transform:translateY(1px)}
+.gotit:disabled{opacity:.45;filter:grayscale(.5);cursor:not-allowed;box-shadow:none}
+.gotit:disabled:hover{background:var(--accent);transform:none}
+.module-section.done .gotit{background:var(--ok);border-color:var(--ok)}
 
-.callout{display:flex;gap:.8rem;padding:1rem 1.1rem;border-radius:var(--r-md);margin:1.1rem 0;border-left:4px solid;font-size:.92rem}
-.callout .ic{font-size:1.1rem;flex-shrink:0}
-.c-info{background:var(--accent-l);border-color:var(--accent)}
-.c-warn{background:var(--warn-l);border-color:#C99A12}
-.c-ok{background:var(--ok-l);border-color:var(--ok)}
+/* ---------- playground (fake terminal) ---------- */
+.viz-panel{background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);padding:18px;margin:18px 0;box-shadow:var(--shadow-sm)}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);
+  border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--v);color:var(--ink)}
+.play-btn.active{background:var(--v);color:var(--bg2);border-color:var(--v);font-weight:600}
+.play-btn.seen:not(.active){border-color:var(--ok);color:var(--ok-ink)}
+.play-btn.seen::after{content:' ✓';font-weight:700}
+.play-console{background:#080B11;color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1rem 1.15rem;
+  border-radius:var(--r-md);border:1px solid var(--line);min-height:160px;white-space:pre-wrap;overflow-x:auto}
+.play-console .prompt{color:#5C6675}.play-console .kw{color:#C9A9F5}.play-console .str{color:#8FE3A0}
+.play-console .num{color:#F0B366}.play-console .fn{color:#7BB5F5}.play-console .ok{color:#8FE3A0}
+.play-console .bad{color:#F08B8B}.play-console .dim{color:#8891A0}.play-console .hl{color:#F5DC8A}
+.play-take{margin-top:.75rem;padding:.8rem .95rem;font-size:.85rem;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--r-md);color:var(--ink2);line-height:1.5;min-height:2.4em}
+.play-take b{color:var(--ink)}
+.hint{font-size:.85rem;color:var(--muted);margin-top:.8rem}
 
-.relate{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin:1.1rem 0}
-.relate .card{border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;background:var(--surface2)}
-.relate .card h5{font-family:var(--display);font-size:.95rem;margin-bottom:.4rem}
-.relate .card .big{font-size:1.6rem;display:block;margin-bottom:.4rem}
-.relate .card p{font-size:.86rem;color:var(--text2);margin:0}
-
-.play{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1.1rem 0}
-.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;padding:.9rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
-.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
-.play-btn:hover{border-color:var(--accent);color:var(--accent)}
-.play-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.play-console{background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1.1rem 1.2rem;min-height:170px;white-space:pre-wrap}
-.play-console .prompt{color:#6C7086}.play-console .kw{color:#CBA6F7}.play-console .str{color:#A6E3A1}
-.play-console .num{color:#FAB387}.play-console .fn{color:#89B4FA}.play-console .ok{color:#A6E3A1}
-.play-console .bad{color:#F38BA8}.play-console .dim{color:#9399B2}.play-console .hl{color:#F9E2AF}
-.play-take{padding:.8rem 1.2rem;font-size:.86rem;background:var(--surface2);border-top:1px solid var(--border2);color:var(--text2);min-height:2.6em}
-.play-take b{color:var(--text)}
-
-/* ===== BUILD: scroll-reveal visual build-up (replaces the old click stepper) ===== */
-.build{display:flex;flex-direction:column;gap:1rem;margin:1.1rem 0}
+/* ---------- build (scroll reveal) ---------- */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
 .build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
-.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.1rem 1.2rem;border:1px solid var(--border);border-radius:var(--r-md);
-  background:var(--surface2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.05rem 1.15rem;border:1px solid var(--line2);border-radius:var(--r-md);
+  background:var(--panel2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
 .build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
-.build-viz{display:flex;justify-content:center;align-items:center;min-height:56px;overflow-x:auto;padding:.35rem 0}
-.build-viz svg{max-width:100%;height:auto;display:block}
-.build-note{font-size:.93rem;color:var(--text2);line-height:1.55}
-.build-note b{color:var(--text)}
+.build-viz{display:block;text-align:center;min-height:56px;overflow-x:auto;padding:.7rem;background:#F7F9FB;border-radius:var(--r-sm)}
+.build-viz svg{display:inline-block;width:100%;max-width:500px;height:auto;vertical-align:middle}
+.build-note{font-size:.9rem;color:var(--ink2);line-height:1.55}.build-note b{color:var(--ink)}.build-note code{background:var(--bg2)}
 .build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
   font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
-/* inline-diagram primitives usable inside .build-viz (an alternative to raw SVG) */
-.dgram{width:100%;font-family:var(--mono);font-size:.8rem;color:var(--text);display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;justify-content:center}
-.dgram.col{flex-direction:column;gap:.28rem}
-.node{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--accent);background:var(--accent-l);color:var(--accent-d);
-  border-radius:6px;padding:.35rem .6rem;font-weight:600;white-space:nowrap}
-.node.k{border-color:#7C6DAA;background:#EDE9F8;color:#5E5191}
-.node.v{border-color:#C99A12;background:var(--warn-l);color:#9A7208}
-.node.hot{border-color:var(--err);background:var(--err-l);color:var(--err)}
-.node.ok{border-color:var(--ok);background:var(--ok-l);color:#1a5c38}
-.node.dim{border-color:var(--border);background:var(--bg-warm);color:var(--muted)}
-.node.dash{border-style:dashed}
-.arrow{color:var(--muted);font-size:1.05rem;font-weight:700}
-.build-embed{width:100%;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
-.build-embed iframe{width:100%;height:520px;border:0;display:block}
-.build-embed .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--bg-warm);border-top:1px solid var(--border)}
+.build-embed{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;background:#F7F9FB;margin:1rem 0}
+.build-embed iframe{width:100%;height:520px;border:0;display:block;background:#F7F9FB}
+.build-embed .cap{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--panel2);border-top:1px solid var(--line)}
+.build-embed .cap a{color:var(--accent)}
+.build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
+.build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
-.q-ask{font-family:var(--display);font-size:1rem;font-weight:600;margin-bottom:.7rem;line-height:1.35}
+.q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
 .q-opts{display:flex;flex-direction:column;gap:.5rem}
-.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;border:2px solid var(--border);background:var(--surface);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
-.q-opt:hover:not(.locked){border-color:var(--accent)}
-.q-opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
-.q-opt.correct{border-color:var(--ok);background:var(--ok-l)}.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}
-.q-opt.wrong{border-color:var(--err);background:var(--err-l)}.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;color:var(--ink2);
+  border:1.5px solid var(--line2);background:var(--panel2);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent);color:var(--ink)}
+.q-opt .mark{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;display:grid;place-items:center;font-size:.7rem;font-weight:800;color:var(--bg)}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-soft);color:var(--ink)}
+.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}.q-opt.correct .mark::after{content:'✓'}
+.q-opt.wrong{border-color:var(--err);background:var(--err-soft);color:var(--ink)}
+.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}.q-opt.wrong .mark::after{content:'✕'}
 .q-opt.locked{cursor:default}
-.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.85rem;border-radius:var(--r-sm)}
-.q-fb.show{max-height:240px;opacity:1;padding:.7rem .9rem;margin-top:.5rem}
-.q-fb.good{background:var(--ok-l);color:var(--ok)}.q-fb.bad{background:var(--err-l);color:var(--err)}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.86rem;border-radius:var(--r-sm);line-height:1.5}
+.q-fb.show{max-height:360px;opacity:1;padding:.75rem .95rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.q-fb.bad{background:var(--err-soft);color:var(--err-ink);border:1px solid var(--err-line)}
+.q-fb code{background:rgba(128,128,128,.2)}
 
-.prompt{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
-.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem .5rem 1rem;background:var(--bg-warm);border-bottom:1px solid var(--border)}
-.prompt-l{font-family:var(--mono);font-size:.72rem;color:var(--text2)}.prompt-l b{color:var(--accent)}
-.copy{font-size:.72rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .75rem;cursor:pointer}
+/* ---------- produce prompt ---------- */
+.prompt{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.55rem .6rem .55rem 1rem;background:var(--panel2);border-bottom:1px solid var(--line)}
+.prompt-l{font-family:var(--mono);font-size:.74rem;color:var(--ink2)}.prompt-l b{color:var(--accent)}
+.copy{font-family:var(--body);font-size:.74rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .8rem;cursor:pointer;transition:.15s}
 .copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
-.prompt-t{margin:0;padding:1rem;background:var(--code);color:#CDD6F4;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.prompt-t{margin:0;padding:1rem;background:#080B11;color:#C6D2E0;font-family:var(--mono);font-size:.8rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
 
-.fin{margin-top:2rem;padding:2rem;text-align:center;background:var(--ok-l);border:1px solid var(--ok);border-radius:var(--r-lg);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s,max-height .3s}
-.fin.show{opacity:1;max-height:420px}
+/* ---------- completion banner ---------- */
+.fin{margin:1.8rem 0 0;padding:2rem;text-align:center;background:linear-gradient(135deg,var(--ok-soft),var(--accent-soft));
+  border:1px solid var(--ok);border-radius:var(--radius);opacity:0;max-height:0;overflow:hidden;transition:opacity .4s,max-height .4s}
+.fin.show{opacity:1;max-height:480px;padding:2.2rem 2rem}
 .fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
-.fin h3{font-family:var(--display);font-size:1.5rem;color:var(--ok);margin-bottom:.4rem}
-.fin p{color:var(--text2);font-size:.9rem;margin:0}.fin code{background:var(--surface)}
+.fin h3{font-family:var(--display);font-size:1.5rem;font-weight:700;color:var(--ok-ink);margin-bottom:.5rem}
+.fin p{color:var(--ink2);font-size:.92rem;margin:0}.fin b{color:var(--ink)}.fin code{background:rgba(0,0,0,.35)}
 
-footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1px solid var(--border2);font-size:.74rem;color:var(--muted);text-align:center;line-height:1.6}
-.lesson-nav{max-width:1080px;margin:2.5rem auto 0;padding:0 1.25rem;display:flex;align-items:stretch;gap:.6rem}
-.lnav{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;padding:.75rem .9rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface);text-decoration:none;border-bottom:1px solid var(--border);transition:border-color .15s,transform .1s,box-shadow .15s}
-.lnav:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--sh-sm)}
-.lnav.disabled{opacity:.4;pointer-events:none}
-.lnav-dir{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.lnav-t{font-size:.88rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lnav.next{text-align:right}
-.lnav-hub{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 1rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface2);color:var(--accent);text-decoration:none;font-size:1.15rem;transition:all .15s}
-.lnav-hub:hover{border-color:var(--accent);background:var(--accent-l)}
-@media(max-width:600px){.lnav-t{white-space:normal}}
+.site-footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);line-height:1.6}
 
-@media(max-width:600px){.hero h1{font-size:1.7rem}.relate{grid-template-columns:1fr}.sec-body{padding:1.1rem}.play-console,.build-viz .dgram{font-size:.78rem}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
-
-/* ── top prev/next nav + labeled hub link (added by nav-fix) ── */
-.lesson-nav.top{max-width:none;margin:0 auto 1.75rem;padding:0}
-.lnav-hub{flex-direction:column;gap:.1rem;line-height:1.05;padding:.45rem 1rem}
-.lnav-hub .lnav-hub-ic{font-size:1.05rem}
-.lnav-hub .lnav-hub-t{font-family:var(--mono);font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
-@media(max-width:600px){.lesson-nav.top{margin-bottom:1.25rem}}
-
-/* ── hover/tap glossary tooltips for .term (added by term-tooltip) ── */
-.term{cursor:help}
-.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
-#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);
-  background:var(--code);color:#EDEAFE;font-family:var(--body);font-size:.82rem;font-weight:400;
-  line-height:1.45;text-align:left;padding:.55rem .72rem;border-radius:var(--r-sm);box-shadow:var(--sh-md);
-  pointer-events:none;opacity:0;transform:translateY(3px);
-  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+/* ---------- tooltip ---------- */
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);background:#080B11;color:#EDEAFE;font-family:var(--body);font-size:.82rem;
+  font-weight:400;line-height:1.45;text-align:left;padding:.6rem .78rem;border-radius:var(--r-md);border:1px solid var(--line2);
+  box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .15s var(--ease),transform .15s var(--ease)}
 #term-tip.show{opacity:1;transform:translateY(0)}
-#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;
-  text-transform:uppercase;color:#9DB8E8;margin-bottom:.15rem}
-@media(prefers-reduced-motion:reduce){#term-tip{transition:none}}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:.2rem}
+
+/* ---------- responsive ---------- */
+#scrim{display:none}
+@media(max-width:900px){
+  .layout{display:block}
+  #sidebar{position:fixed;z-index:70;top:0;left:0;transform:translateX(-100%);transition:transform .22s var(--ease);
+    box-shadow:var(--shadow);width:290px;height:100vh}
+  #sidebar.open{transform:translateX(0)}
+  #nav-toggle{display:inline-flex;align-items:center;gap:.4rem;position:fixed;top:12px;right:12px;z-index:65;
+    background:var(--accent);color:#fff;border:none;padding:9px 15px;border-radius:10px;font-weight:700;font-family:var(--body);font-size:.85rem;cursor:pointer;box-shadow:var(--shadow)}
+  #scrim.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:69}
+  #content{padding:60px 18px 70px;max-width:100%}
+  .relate{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+/* ── inline SVG visual lab (playground) — dependency-free, theme-aware ── */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.4rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
 </style>
 </head>
 
 <body data-quest-id="w03-d01-arith">
 
-<nav class="nav">
-  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div>
-  <div class="nav-in">
-    <span class="nav-title">Frontier Lab · Week 3 Day 1</span>
-    <div class="nav-meta"><span class="nav-count" id="count">0/7</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
-  </div>
-</nav>
+<div id="progress-track" aria-hidden="true"><div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div></div>
+<button id="nav-toggle" type="button" aria-label="Toggle sections" aria-expanded="false">☰ Sections</button>
+<div id="scrim" aria-hidden="true"></div>
 
-<main>
+<div class="layout">
 
-<nav class="lesson-nav top" aria-label="lesson navigation (top)">
-  <a class="lnav prev" href="../../m07-thinking-in-jax/day-06-vit-capstone/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M7 · Thinking in JAX</span></a>
-  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../day-02-qkv-matrices/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Q, K, V Matrix Anatomy</span></a>
-</nav>
-
-
-  <header class="hero">
-    <span class="eyebrow">Phase 1 · Week 3 · Day 1 (Mon)</span>
-    <h1>Transformer Arithmetic<br>C &asymp; 6ND</h1>
-    <p class="lead">How much does it cost to train a large model? You don't need the source code — you need two numbers. With <code>C &asymp; 6ND</code> you can estimate the training compute of GPT-3, or any model, on the back of a napkin. Today: what the formula means and where the <code>6</code> comes from.</p>
-    <div class="goal">
-      <b>🎯 By the end, you'll be able to:</b> state the rule <code>C &asymp; 6ND</code>, explain why it's <code>6</code> (2 forward + 4 backward FLOPs per parameter per token), plug in real numbers for GPT-3, and turn FLOPs into wall-clock time on an H100.
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="sidebar" aria-label="lesson navigation">
+    <div class="sidebar-scroll">
+    <div class="brand">
+      <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
+      <div class="brand-sub">Frontier Lab · Week 3 Day 1</div>
+      <div class="nav-count" id="count"><b>0</b>/7 sections done</div>
     </div>
-  </header>
 
-  <!-- ===== 1. WHAT IS IT ===== -->
-  <section class="sec" id="s1" data-sec="what">
-    <div class="sec-head"><span class="sec-badge s-what">1 · WHAT IS IT</span><span class="sec-h">What is C &asymp; 6ND, and why does it exist?</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
+    <div class="theme-row" role="group" aria-label="appearance mode">
+      <span class="nav-group-label" style="padding:0">Appearance</span>
+      <div class="theme-btns">
+        <button class="theme-btn" data-theme-set="light" type="button">Light</button>
+        <button class="theme-btn" data-theme-set="dim" type="button">Dim</button>
+        <button class="theme-btn" data-theme-set="dark" type="button">Dark</button>
+        <button class="theme-btn" data-theme-set="midnight" type="button">Midnight</button>
+      </div>
+    </div>
+
+    <nav aria-label="Sections">
+      <div class="nav-group-label">Transformer Math · Week 3</div>
+      <button class="nav-link" data-target="home"><span class="nl-dot"></span>Start here</button>
+      <button class="nav-link" data-target="s1"><span class="nl-dot"></span>1 · What is it</button>
+      <button class="nav-link" data-target="s2"><span class="nl-dot"></span>2 · Intuition</button>
+      <button class="nav-link" data-target="s3"><span class="nl-dot"></span>3 · Playground</button>
+      <button class="nav-link" data-target="s4"><span class="nl-dot"></span>4 · How &amp; why</button>
+      <button class="nav-link" data-target="s5"><span class="nl-dot"></span>5 · Build it up</button>
+      <button class="nav-link" data-target="s6"><span class="nl-dot"></span>6 · Quiz</button>
+      <button class="nav-link" data-target="s7"><span class="nl-dot"></span>7 · Produce</button>
+    </nav>
+
+    <div class="checklist-wrap">
+      <div class="nav-group-label">Progress checklist</div>
+      <ul id="checklist"><!-- built by JS --></ul>
+      <button id="reset" class="ghost-btn" type="button">↺ Reset progress</button>
+    </div>
+    </div><!-- /.sidebar-scroll -->
+
+    <div class="side-nav">
+      <a class="lnav prev" href="../../m07-thinking-in-jax/day-06-vit-capstone/lesson.html"><span class="d">← Prev</span><span class="t">M7 · Thinking in JAX</span></a>
+      <a class="lnav next" href="../day-02-qkv-matrices/lesson.html"><span class="d">Next →</span><span class="t">Q, K, V Matrix Anatomy</span></a>
+      <a class="lnav-hub" href="../../index.html"><span class="d">▦ Map</span><span class="t">Back to curriculum</span></a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main id="content">
+
+    <section id="home" class="hero">
+      <span class="kicker">Transformer Math · Week 3 · Day 1</span>
+      <h1>Transformer Arithmetic<span class="sub">C &asymp; 6ND</span></h1>
+      <p class="lede">How much does it cost to train a large model? You don't need the source code — you need two numbers. With <code>C &asymp; 6ND</code> you can estimate the training compute of GPT-3, or any model, on the back of a napkin. Today: what the formula means and where the <code>6</code> comes from.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> state the rule <code>C &asymp; 6ND</code>, explain why it's <code>6</code> (2 forward + 4 backward FLOPs per parameter per token), plug in real numbers for GPT-3, and turn FLOPs into wall-clock time on an H100.</div></div>
+    </section>
+
+    <!-- ===== 1. WHAT IS IT ===== -->
+    <section class="module-section" id="s1" data-sec="what">
+  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">What is C &asymp; 6ND, and why does it exist?</span><span class="sec-tag">What is it</span></div>
+  <div class="sec-body">
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> you can multiply big numbers and you know a neural network is made of "weights" (also called <span class="term" data-tip="The numbers a neural network learns, like weights and biases. Training changes them so answers get better.">parameters</span>). <b>No prior knowledge of FLOP counting needed.</b></div></div>
 
       <h4>The question: how expensive is it to train a model?</h4>
@@ -230,31 +375,63 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
       <h4>What does "per parameter per token" mean?</h4>
       <p>Here is the key idea. During training, <strong>every parameter does a fixed amount of arithmetic for every token</strong> the model reads. So the total work grows with parameters times tokens. The <code>6</code> is that fixed amount of work — roughly 6 FLOPs each time one parameter meets one token. We'll unpack where the <code>6</code> comes from in the next sections.</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人记得住 <code>6ND</code> 这个公式，却说不清那个 <code>6</code> 是从哪来的，于是设定一变就慌。In plain terms: people memorize "C ≈ 6ND" but can't say <em>why</em> it's 6, so the moment the setup changes — longer context, activation recomputation, low utilization — they can't tell whether the estimate still holds.</div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">How to Scale Your Model — Transformers &amp; FLOP counting</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 2. INTUITION ===== -->
-  <section class="sec" id="s2" data-sec="intuition">
-    <div class="sec-head"><span class="sec-badge s-study">2 · INTUITION</span><span class="sec-h">Every worker shakes every guest's hand</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
+    <!-- ===== 2. INTUITION ===== -->
+    <section class="module-section" id="s2" data-sec="intuition">
+  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Every worker shakes every guest's hand</span><span class="sec-tag">Intuition</span></div>
+  <div class="sec-body">
       <p>Picture a big party. The <strong>workers</strong> are the parameters (there are <code>N</code> of them). The <strong>guests</strong> are the tokens (there are <code>D</code> of them). Training is every worker greeting every guest with a fixed little routine.</p>
       <div class="relate">
         <div class="card"><span class="big">🤝</span><h5>Forward pass = 2 ops</h5><p>When a worker meets a guest, they do one multiply and one add — that's 2 FLOPs. This is the model making a prediction: <code>weight &times; input + running total</code>.</p></div>
         <div class="card"><span class="big">🔁</span><h5>Backward pass = about 4 ops</h5><p>Then the worker figures out how to improve, which is roughly twice the greeting work — about 4 FLOPs. Learning costs more than predicting.</p></div>
       </div>
       <p><strong>In one line:</strong> each of the <code>N</code> workers greets each of the <code>D</code> guests, doing <code>2 + 4 = 6</code> FLOPs each time. Total work = <code>6 &times; N &times; D</code>.</p>
+      <p><b>直觉 / Intuition:</b> 训练之所以贵，是因为「每个参数都要为每个 token 干一点固定的活」，所以总量 = 参数数 × token 数 × 每次的固定量(6)。In systems terms: <code>N</code> is the total size of your weight matrices and <code>D</code> is how many tokens flow through them; one training step is a forward pass plus a backward pass over a batch, and <code>6ND</code> just totals that fixed per-touch work across the whole run.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: workers don't literally meet guests one at a time. The <code>6</code> is an average that folds in the forward and backward passes; the real per-layer math varies, but <code>6ND</code> is an excellent estimate for the dense parts of a Transformer.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 3. PLAYGROUND ===== -->
-  <section class="sec" id="s3" data-sec="play">
-    <div class="sec-head"><span class="sec-badge s-play">3 · PLAYGROUND</span><span class="sec-h">Build the 6 up, one pass at a time</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
-      <p>A simulated calculator. We start with the forward pass only, add the backward pass to reach the full <code>6ND</code>, then plug in real GPT-3 numbers. <strong>Click all three</strong> to finish.</p>
+    <!-- ===== 3. PLAYGROUND ===== -->
+    <section class="module-section" id="s3" data-sec="play">
+  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Build the 6 up, one pass at a time</span><span class="sec-tag">Playground</span></div>
+  <div class="sec-body">
+      <p>First, <strong>see the 6 split apart</strong>: drag the toggle to add and remove the backward pass, and the sliders to price a real run. Then click through the three exact-number cases in the terminal. <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">Where the 6 comes from — and why inference is 3× cheaper</span>
+          <span class="vlab-readout" id="fl-read">per (param·token): <b>6 FLOPs = 2 fwd + 4 bwd</b> → C ≈ 6ND</span>
+        </div>
+        <p class="vlab-q">Learning question: the rule is <code>C ≈ 6ND</code> — where does the <code>6</code> come from, and what happens to the bill if you only run the model forward (inference) instead of training it?</p>
+        <div class="vlab-panels">
+          <figure class="vlab-fig"><figcaption>Left · FLOPs for one (parameter, token) touch</figcaption>
+            <svg class="vlab-svg" id="fl-left" viewBox="0 0 460 300" role="img" aria-label="A stacked bar: the forward pass is 2 FLOPs, the backward pass adds 4, for 6 FLOPs total per parameter per token."></svg></figure>
+          <figure class="vlab-fig"><figcaption>Right · the whole bill for your N and D</figcaption>
+            <svg class="vlab-svg" id="fl-right" viewBox="0 0 460 300" role="img" aria-label="Two bars comparing inference cost 2ND against training cost 6ND for the chosen model size and token count."></svg></figure>
+        </div>
+        <div class="vlab-controls">
+          <span class="vlab-toggle" role="group" aria-label="Pass mode">
+            <button type="button" class="vlab-btn" id="fl-inf" aria-pressed="false">inference · forward only (2ND)</button>
+            <button type="button" class="vlab-btn active" id="fl-train" aria-pressed="true">training · fwd + bwd (6ND)</button>
+          </span>
+          <label>N — parameters
+            <input type="range" id="fl-N" min="6" max="12" step="0.1" value="11.24" aria-label="number of parameters (log scale)">
+            <span class="vlab-val" id="fl-N-lbl">175 B</span>
+          </label>
+          <label>D — tokens
+            <input type="range" id="fl-D" min="8" max="13" step="0.1" value="11.48" aria-label="number of training tokens (log scale)">
+            <span class="vlab-val" id="fl-D-lbl">300 B</span>
+          </label>
+        </div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the <code>6</code> is not magic — it is <b>2 (forward) + 4 (backward)</b> FLOPs stacked, per parameter per token. Flip to <b>inference</b> and the backward block disappears: only the forward <code>2ND</code> is left, so serving a model costs about <b>one-third</b> of training it. The right-hand bill scales with both <code>N</code> and <code>D</code> — double either and it doubles.</div></div>
+        <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Common misconception:</b> the <code>6</code> is a <em>floor</em>, not the whole bill. It counts only dense parameter·token FLOPs — it ignores attention's <code>O(seq²)</code> term (which grows with context length), activation recomputation, and sub-100% hardware use (MFU). A real run always costs more than <code>6ND</code>.</div></div>
+        <p class="vlab-note"><b>How to read it:</b> the toggle switches between forward-only (inference) and forward + backward (training) accounting; the sliders set model size and token count. <b>Effective throughput assumed:</b> ~<code>1e15</code> FLOP/s — an <b>idealized teaching estimate</b> (one H100's bf16 peak, rounded for clean hand-arithmetic). The interactive calculator in Section 5 uses a <b>realistic effective throughput</b> of <code>989 TFLOP/s × 40% MFU ≈ 3.96×10¹⁴</code> FLOP/s instead, so its wall-clock time runs ~2.5× longer. <b>Where this simplifies reality:</b> the backward pass being ~2× the forward is an average over the dense layers, and the H100 time here ignores the <code>O(seq²)</code> attention term.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="forward" type="button">① forward only = 2ND</button>
@@ -266,12 +443,12 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       </div>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 4. MECHANISM + WHY ===== -->
-  <section class="sec" id="s4" data-sec="why">
-    <div class="sec-head"><span class="sec-badge s-study">4 · HOW &amp; WHY</span><span class="sec-h">Where the 6 comes from, and why the rule holds</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
+    <!-- ===== 4. MECHANISM & WHY ===== -->
+    <section class="module-section" id="s4" data-sec="why">
+  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">Where the 6 comes from, and why the rule holds</span><span class="sec-tag">How &amp; why</span></div>
+  <div class="sec-body">
       <h4>Breaking down the 6</h4>
       <ul>
         <li><strong>Forward pass = 2 FLOPs per parameter per token.</strong> Using a weight means one <em>multiply</em> (weight &times; input) and one <em>add</em> (into a running sum). That is 2 FLOPs, and it happens once per parameter for each token.</li>
@@ -279,6 +456,11 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
         <li><strong>Add them up:</strong> <code>2 (forward) + 4 (backward) = 6</code> FLOPs per parameter per token.</li>
       </ul>
       <div class="callout c-ok"><span class="ic">✅</span><div><code>C &asymp; (2 + 4) &times; N &times; D = 6ND</code><br><span style="font-size:.85rem;color:var(--text2)">Forward is <code>2ND</code>. Backward is about <code>4ND</code>. Training does both for every token, so total training compute is about <code>6ND</code>.</span></div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — C ≈ 6ND</b>
+      <br><b>1 · In words:</b> training compute is a fixed ~6 FLOPs of work for every (parameter, token) pair, summed over the whole run.
+      <br><b>2 · The formula:</b> <code>C ≈ 6·N·D</code> — <code>C</code> = total training compute in FLOPs; <code>N</code> = parameters; <code>D</code> = training tokens; the <code>6</code> = 2 (forward) + 4 (backward) FLOPs per parameter per token.
+      <br><b>3 · Tiny numbers:</b> a 10M-param toy run on 1B tokens → <code>C = 6 × 1e7 × 1e9 = 6e16</code> FLOPs. Assuming the <b>idealized teaching estimate</b> of ~<code>1e15</code> FLOP/s on one H100, that is <code>6e16 / 1e15 ≈ 60</code> seconds.
+      <br><b>4 · Sanity check:</b> GPT-3 (<code>N=175e9</code>, <code>D=300e9</code>) → <code>6 × 175e9 × 300e9 ≈ 3.15e23</code> FLOPs, which matches the published estimate. If your number is off by orders of magnitude, check you used <em>parameters</em> (not bytes) and <em>tokens</em> (not sequences).</div></div>
 
       <h4>Why this rule is so useful</h4>
       <ul>
@@ -292,36 +474,39 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
       <p>The rule is an accounting identity, which is exactly why it fools people. A staff engineer knows what it quietly leaves out, and what question it cannot answer at all.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): trusting 6ND as the whole bill.</b> It never errors — it's just arithmetic — so a GPU-hour budget built on it looks authoritative. But <code>6ND</code> counts only the dense parameter-token FLOPs. It ignores attention's <span class="term" data-tip="Attention compute grows with the square of the sequence length; 6ND does not include it.">O(seq²)</span> term, the extra forward passes from activation recomputation (gradient checkpointing), and the fact that real hardware rarely exceeds ~50% utilization (MFU). Your run comes in over budget with no bug to find. A senior engineer treats <code>6ND</code> as a <em>floor</em>, not the total.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: 6ND prices a config, it doesn't choose one.</b> The formula treats <code>N</code> and <code>D</code> as interchangeable multipliers, so it tells you the <em>cost</em> of a given (model size, tokens) pair but says nothing about which split of a fixed budget gives the lowest <em>loss</em>. That compute-optimal N/D question is the <b>design-review</b> decision — and it's exactly what Chinchilla-style scaling laws exist to answer.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Training compute is about <code>6ND</code>: 6 FLOPs per parameter per token — 2 forward, 4 backward — times <code>N</code> parameters times <code>D</code> tokens. For GPT-3 that's <code>6 × 175B × 300B ≈ 3×10²³</code> FLOPs. The nuance that separates a real answer: it's a <em>floor</em>, not the whole bill — it ignores attention's <code>O(seq²)</code> term, activation recomputation, and sub-100% hardware utilization (MFU), so a real run always costs more."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 5. WORKED EXAMPLE ===== -->
-  <!-- ===== 5. BUILD IT UP (scroll-reveal visual) ===== -->
-  <section class="sec" id="s5" data-sec="build">
-    <div class="sec-head"><span class="sec-badge s-code">5 · BUILD IT UP</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
-      <p>Here is the whole idea, built one piece at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note beside it. No buttons to click; by the bottom the full picture is on one page.</p>
+    <!-- ===== 5. BUILD IT UP ===== -->
+    <section class="module-section" id="s5" data-sec="build">
+  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Watch it assemble — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
+  <div class="sec-body">
+      <p>Here is the whole idea, built one piece at a time. <strong>Play with the interactive tool</strong> below, then <strong>scroll down slowly</strong> — each piece fades in with a short note beside it.</p>
+      <div class="build-embed"><iframe id="bcastFrame" src="../../viz/transformer-flops.html" title="Interactive compute &amp; memory calculator"></iframe>
+      <div class="cap">↑ interactive — drag parameter count and token count and watch the C≈6ND compute bill and memory footprint move. <a href="../../viz/transformer-flops.html" target="_blank" rel="noopener">open full screen ↗</a><button class="reload" id="bcastReload" type="button">↻ reload panel</button></div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Two throughput numbers, on purpose:</b> the interactive calculator above uses a <b>realistic effective throughput at 40% MFU</b> — <code>989 TFLOP/s × 0.40 ≈ 3.96×10¹⁴</code> FLOP/s — while the worked examples in this lesson (the inline lab, the Math Ladder, and the Produce task) use an <b>idealized teaching estimate</b> of <code>~1×10¹⁵</code> FLOP/s, rounded for clean hand-arithmetic. Expect the calculator's wall-clock time to run about <b>2.5× longer</b> than the lesson's round-number estimate for the same <code>N</code>/<code>D</code> — both are legitimate, they just trade precision for easy hand math.</div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 6. QUIZ ===== -->
-  <section class="sec" id="s6" data-sec="quiz">
-    <div class="sec-head"><span class="sec-badge s-quiz">6 · QUIZ</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
+    <!-- ===== 6. QUIZ ===== -->
+    <section class="module-section" id="s6" data-sec="quiz">
+  <div class="sec-head"><span class="sec-num s-quiz">6</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tag">Quiz</span></div>
+  <div class="sec-body">
       <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
       <div id="quiz"></div>
       <button class="gotit" type="button" disabled>answer all four first</button>
     </div>
-  </section>
+</section>
 
-  <!-- ===== 7. PRODUCE ===== -->
-  <section class="sec" id="s7" data-sec="produce">
-    <div class="sec-head"><span class="sec-badge s-produce">7 · PRODUCE</span><span class="sec-h">Build a training-FLOP + cost calculator</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
+    <!-- ===== 7. PRODUCE ===== -->
+    <section class="module-section" id="s7" data-sec="produce">
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Build a training-FLOP + cost calculator</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-body">
       <p>Today's task (from the curriculum): write a small calculator that takes a model size and a token count and returns the training FLOPs and an estimated H100-hours, using <code>C &asymp; 6ND</code>.</p>
       <h4>Acceptance criteria</h4>
       <ul>
@@ -339,31 +524,26 @@ footer{max-width:1080px;margin:3rem auto 0;padding:1.5rem 1.25rem 0;border-top:1
 
 Create sessions/m08-transformer-math/day-01-transformer-arithmetic/experiment.py that:
 1. Defines training_flops(N, D) returning 6 * N * D (the C ≈ 6ND rule; N = parameters, D = training tokens).
-2. Defines h100_hours(flops, util_flops_per_s=1e15) returning flops / util_flops_per_s / 3600, an estimate of wall-clock GPU-hours on one H100 at realistic bf16 utilization.
-3. Prints a table for at least 3 models: a 10M-param toy run (N=10e6, D=1e9), a 1.3B model (N=1.3e9, D=100e9), and GPT-3 (N=175e9, D=300e9), showing FLOPs and H100-hours for each.
+2. Defines h100_hours(flops, util_flops_per_s=1e15) returning flops / util_flops_per_s / 3600, an estimate of wall-clock GPU-hours on one H100 using the idealized teaching estimate of 1e15 FLOP/s (the interactive calculator uses a realistic 989 TFLOP/s x 40% MFU ~= 3.96e14 FLOP/s instead).
+3. Prints a table for at least 3 models: a 10M-param toy run (N=1e7, D=1e9), a 1.3B model (N=1.3e9, D=100e9), and GPT-3 (N=175e9, D=300e9), showing FLOPs and H100-hours for each.
 4. Asserts the GPT-3 row is close to 3.15e23 FLOPs to sanity-check the arithmetic.
 Add a brief comment on each step explaining why 6 = 2 forward + 4 backward FLOPs, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m08-transformer-math/day-01-transformer-arithmetic/log.md</code>: if you double the training tokens <code>D</code>, what happens to the compute <code>C</code>? (Hint: the rule is linear in <code>D</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m08-transformer-math/day-01-transformer-arithmetic/log.md</code>: (1) if you double the training tokens <code>D</code>, what happens to the compute <code>C</code>, and why? (2) the FLOP or hours figure that surprised you; (3) one thing <code>6ND</code> leaves out that you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
-  </section>
+</section>
 
-  <div class="fin" id="fin" role="status" aria-hidden="true">
-    <span class="em">🎉</span>
-    <h3>Day 1 complete!</h3>
-    <p>You can now estimate the training compute of any model from just two numbers: <code>C &asymp; 6ND</code>. You know the <code>6</code> is 2 forward + 4 backward FLOPs per parameter per token, and you can turn FLOPs into GPU-hours.<br>Next: <code>start today</code> → Day 2 is the anatomy of the <code>Q, K, V</code> matrices inside attention.</p>
-  </div>
+    <div class="fin" id="fin" role="status" aria-hidden="true">
+      <span class="em" aria-hidden="true">🎉</span>
+      <h3>Week 3 · Day 1 complete! 🏆</h3>
+      <p>You can estimate any model's training compute with <code>C ≈ 6ND</code> and turn FLOPs into H100-hours on the back of a napkin.<br>Next up: <b>Q, K, V Matrix Anatomy</b> — the three vectors every attention head is built from.</p>
+    </div>
 
-</main>
+    <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
 
-<nav class="lesson-nav" aria-label="lesson navigation">
-  <a class="lnav prev" href="../../m07-thinking-in-jax/day-06-vit-capstone/lesson.html"><span class="lnav-dir">← Prev</span><span class="lnav-t">M7 · Thinking in JAX</span></a>
-  <a class="lnav-hub" href="../../index.html" title="Back to curriculum map" aria-label="Back to curriculum map"><span class="lnav-hub-ic">▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../day-02-qkv-matrices/lesson.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Q, K, V Matrix Anatomy</span></a>
-</nav>
-
-<footer>Frontier Lab · Daily Lesson — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+  </main>
+</div>
 
 <script>
 (function(){
@@ -374,15 +554,32 @@ var state = load();
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
 
-var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
-var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
+var secs = Array.prototype.slice.call(document.querySelectorAll('.module-section'));
+var bar = document.getElementById('bar') || document.getElementById('progress-bar');
+var count = document.getElementById('count'), fin = document.getElementById('fin');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link'));
+
+/* ---- build the sidebar checklist from sections ---- */
+var checklist = document.getElementById('checklist'), checkItems = {};
+secs.forEach(function(sec){
+  var key = sec.getAttribute('data-sec');
+  var title = sec.querySelector('.sec-h') ? sec.querySelector('.sec-h').textContent : key;
+  var num = sec.querySelector('.sec-num') ? sec.querySelector('.sec-num').textContent : '';
+  var li = document.createElement('li');
+  li.innerHTML = '<span class="box" aria-hidden="true"></span><span>'+num+' · '+shorten(title)+'</span>';
+  li.addEventListener('click', function(){ sec.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'}); });
+  checklist.appendChild(li);
+  checkItems[key] = li;
+});
+function shorten(t){ return t.length>34 ? t.slice(0,32).trim()+'…' : t; }
 
 function markDone(sec, scrollNext){
   sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
   if(scrollNext){
     var i = secs.indexOf(sec);
-    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:'smooth',block:'start'}); },180);
-    else setTimeout(function(){ fin.scrollIntoView({behavior:'smooth',block:'center'}); },180);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:RM?'auto':'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'}); },180);
   }
 }
 secs.forEach(function(sec){
@@ -393,16 +590,62 @@ secs.forEach(function(sec){
 function refresh(){
   var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
   var pct = Math.round(done/total*100);
-  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete');
-  count.textContent = done+'/'+total;
+  if(bar){ bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete'); }
+  if(count) count.innerHTML = '<b>'+done+'</b>/'+total+' sections done';
+  secs.forEach(function(s){
+    var k = s.getAttribute('data-sec'), on = s.classList.contains('done');
+    if(checkItems[k]) checkItems[k].classList.toggle('done', on);
+    var nl = navLinks.filter(function(l){return l.getAttribute('data-target')===s.id;})[0];
+    if(nl) nl.classList.toggle('done', on);
+  });
   var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
 }
-document.getElementById('reset').addEventListener('click', function(){
+var resetBtn = document.getElementById('reset');
+if(resetBtn) resetBtn.addEventListener('click', function(){
   if(!confirm('Reset today\'s progress?')) return;
   state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
 });
 
-/* PLAYGROUND */
+/* ---- darkness switcher ---- */
+var themeBtns = Array.prototype.slice.call(document.querySelectorAll('.theme-btn'));
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem('frontier-theme', t); }catch(e){}
+  themeBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme-set')===t); });
+}
+themeBtns.forEach(function(b){ b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme-set')); }); });
+setTheme(document.documentElement.getAttribute('data-theme') || 'dim');
+
+/* ---- sidebar nav: click to scroll, scrollspy to highlight active ---- */
+navLinks.forEach(function(l){
+  l.addEventListener('click', function(){
+    var t = document.getElementById(l.getAttribute('data-target'));
+    if(t) t.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'});
+    setTimeout(function(){ if(window.__revealBuild) window.__revealBuild(); }, RM?60:650);
+    closeSidebar();
+  });
+});
+var spyTargets = [document.getElementById('home')].concat(secs).filter(Boolean);
+if('IntersectionObserver' in window){
+  var spy = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        var id = e.target.id;
+        navLinks.forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-target')===id); });
+      }
+    });
+  }, {threshold:0.01, rootMargin:'-45% 0px -50% 0px'});
+  spyTargets.forEach(function(t){ spy.observe(t); });
+}
+
+/* ---- mobile sidebar toggle ---- */
+var sidebar = document.getElementById('sidebar'), toggle = document.getElementById('nav-toggle'), scrim = document.getElementById('scrim');
+function openSidebar(){ sidebar.classList.add('open'); scrim.classList.add('show'); toggle.setAttribute('aria-expanded','true'); }
+function closeSidebar(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); }
+if(toggle) toggle.addEventListener('click', function(){ sidebar.classList.contains('open')?closeSidebar():openSidebar(); });
+if(scrim) scrim.addEventListener('click', closeSidebar);
+
+/* ===== PLAYGROUND ===== */
 var DEMOS = {
   forward:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># forward pass: 2 FLOPs per parameter per token</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> forward = <span class="num">2</span> * N * D      <span class="dim"># one multiply + one add per weight</span>\n'+
@@ -424,15 +667,14 @@ var playSec=document.getElementById('s3'), consoleEl=document.getElementById('co
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
 playBtns.forEach(function(b){ b.addEventListener('click', function(){
   var k=b.getAttribute('data-demo');
-  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active'); b.classList.add('seen');
   consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
   if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
 }); });
 
-/* BUILD — scroll-reveal visual build-up (auto-baseline; upgrade later) */
-var BUILD=[{"viz": "<div class=\"build-embed\"><iframe src=\"../../viz/transformer-flops.html\" title=\"Interactive: Transformer Compute & Memory (C≈6ND)\" loading=\"lazy\"></iframe><div class=\"cap\">↑ interactive — drag the controls. <a href=\"../../viz/transformer-flops.html\" target=\"_blank\" rel=\"noopener\">open full screen ↗</a></div></div>", "note": "<b>Play with the live version first.</b> Move the sliders above to build intuition for <b>Transformer Compute & Memory (C≈6ND)</b>, then scroll down for the piece-by-piece explanation."}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">N = <span class=\"num\">10e6</span>              <span style=\"color:#6C7086\"># 10 million parameters</span></div>", "note": "<b>10 million parameters</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">D = <span class=\"num\">1e9</span>               <span style=\"color:#6C7086\"># 1 billion training tokens</span></div>", "note": "<b>1 billion training tokens</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">C = <span class=\"num\">6</span> * N * D          <span style=\"color:#6C7086\"># the rule: C ≈ 6ND</span></div>", "note": "<b>the rule: C ≈ 6ND</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># 6 * 10e6 * 1e9</span></div>", "note": "<b>6 * 10e6 * 1e9</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> C = <span class=\"out\">6e16 FLOPs</span>   <span style=\"color:#6C7086\"># sixty thousand trillion ops</span></div>", "note": "<b>→ C = 6e16 FLOPs   # sixty thousand trillion ops</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">h100 = <span class=\"num\">1e15</span>            <span style=\"color:#6C7086\"># ~1e15 FLOP/s (bf16, real utilization)</span></div>", "note": "<b>~1e15 FLOP/s (bf16, real utilization)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">seconds = C / h100      <span style=\"color:#6C7086\"># FLOPs ÷ FLOPs-per-second</span></div>", "note": "<b>FLOPs ÷ FLOPs-per-second</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> <span class=\"out\">60 seconds</span>       <span style=\"color:#6C7086\"># about one minute on one H100</span></div>", "note": "<b>→ 60 seconds       # about one minute on one H100</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># scale up: 100x params AND 100x tokens = 10,000x compute</span></div>", "note": "<b>scale up: 100x params AND 100x tokens = 10,000x compute</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># → 6e20 FLOPs ≈ 6e5 s ≈ ~167 GPU-hours. Now you can budget.</span></div>", "note": "<b>→ 6e20 FLOPs ≈ 6e5 s ≈ ~167 GPU-hours. Now you can budget.</b>"}];
+/* ===== BUILD — scroll-reveal ===== */
+var BUILD=[{"viz": "<div class=\"build-embed\"><iframe src=\"../../viz/transformer-flops.html\" title=\"Interactive: Transformer Compute & Memory (C≈6ND)\" loading=\"lazy\"></iframe><div class=\"cap\">↑ interactive — drag the controls. <a href=\"../../viz/transformer-flops.html\" target=\"_blank\" rel=\"noopener\">open full screen ↗</a></div></div>", "note": "<b>Play with the live version first.</b> Move the sliders above to build intuition for <b>Transformer Compute & Memory (C≈6ND)</b>, then scroll down for the piece-by-piece explanation."}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">N = <span class=\"num\">1e7</span>              <span style=\"color:#6C7086\"># 10 million parameters</span></div>", "note": "<b>10 million parameters</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">D = <span class=\"num\">1e9</span>               <span style=\"color:#6C7086\"># 1 billion training tokens</span></div>", "note": "<b>1 billion training tokens</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">C = <span class=\"num\">6</span> * N * D          <span style=\"color:#6C7086\"># the rule: C ≈ 6ND</span></div>", "note": "<b>the rule: C ≈ 6ND</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># 6 * 1e7 * 1e9</span></div>", "note": "<b>6 * 1e7 * 1e9</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> C = <span class=\"out\">6e16 FLOPs</span>   <span style=\"color:#6C7086\"># sixty thousand trillion ops</span></div>", "note": "<b>→ C = 6e16 FLOPs   # sixty thousand trillion ops</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">h100 = <span class=\"num\">1e15</span>            <span style=\"color:#6C7086\"># ~1e15 FLOP/s (bf16, idealized teaching estimate)</span></div>", "note": "<b>~1e15 FLOP/s (bf16, idealized teaching estimate)</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\">seconds = C / h100      <span style=\"color:#6C7086\"># FLOPs ÷ FLOPs-per-second</span></div>", "note": "<b>FLOPs ÷ FLOPs-per-second</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># →</span> <span class=\"out\">60 seconds</span>       <span style=\"color:#6C7086\"># about one minute on one H100</span></div>", "note": "<b>→ 60 seconds       # about one minute on one H100</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># scale up: 100x params AND 100x tokens = 10,000x compute</span></div>", "note": "<b>scale up: 100x params AND 100x tokens = 10,000x compute</b>"}, {"viz": "<div style=\"width:100%;background:#1E1E2E;color:#CDD6F4;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;padding:.6rem .85rem;border-radius:8px;white-space:pre-wrap;text-align:left\"><span style=\"color:#6C7086\"># → 6e20 FLOPs ≈ 6e5 s ≈ ~167 GPU-hours. Now you can budget.</span></div>", "note": "<b>→ 6e20 FLOPs ≈ 6e5 s ≈ ~167 GPU-hours. Now you can budget.</b>"}];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
-var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 BUILD.forEach(function(item,i){
   var step=document.createElement('div'); step.className='build-step';
   step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
@@ -441,17 +683,29 @@ BUILD.forEach(function(item,i){
 var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
 function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
 function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+function revealVisible(){
+  var vh = window.innerHeight || document.documentElement.clientHeight;
+  bsteps.forEach(function(s){
+    if(s.classList.contains('revealed')) return;
+    // reveal any step whose top has entered (or scrolled above) the viewport — never leave it blank
+    if(s.getBoundingClientRect().top < vh*0.95) seeStep(s);
+  });
+}
+window.__revealBuild = revealVisible;   // sidebar jumps re-check so a jumped-to build is never blank
 if(!bsteps.length){ bUnlock(); }
-else if(!RM && 'IntersectionObserver' in window){
+else if(RM || !('IntersectionObserver' in window)){ bsteps.forEach(seeStep); }
+else {
   buildWrap.classList.add('armed');
-  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.2, rootMargin:'0px 0px -8% 0px'});
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.15, rootMargin:'0px 0px -6% 0px'});
   bsteps.forEach(function(s){ bio.observe(s); });
-} else {
-  bsteps.forEach(seeStep);
+  // robustness: reveal steps already on screen (e.g. after a sidebar jump) and on any scroll/resize
+  window.addEventListener('scroll', revealVisible, {passive:true});
+  window.addEventListener('resize', revealVisible);
+  revealVisible();
+  setTimeout(revealVisible, 700);
 }
 
-
-/* QUIZ */
+/* ===== QUIZ ===== */
 var QS=[{"q": "You estimate a training run at <code>C ≈ 6ND</code> FLOPs and budget GPU-hours from that number alone. The actual run comes in noticeably higher than predicted, even though <code>N</code> and <code>D</code> were correct. What is the most likely cause?", "opts": ["The GPU clock speed was higher than expected, which the formula does not account for", "The formula only counts the dense matrix-multiply FLOPs; it ignores attention's extra quadratic-in-sequence-length cost, activation recomputation, and any wasted compute from low hardware utilization, so real compute is usually >= the 6ND estimate", "N was measured in bytes instead of parameters, which always inflates the estimate", "6ND already includes a safety margin for hardware overhead, so any excess must be a measurement bug in D"], "ans": 1, "fb": "Right. 6ND models only the parameter-token dense FLOPs (the 'every worker greets every guest' part). It does not include attention's O(sequence_length^2) cost, gradient checkpointing / activation recomputation (extra forward passes traded for memory), or the fact that real hardware never hits 100% utilization. All three push real compute above the 6ND floor. The tempting wrong answer (clock speed) is backwards: 6ND is a FLOP count, not a time estimate, so hardware speed changes wall-clock time, not the FLOP total — it can't explain FLOPs being higher than predicted."}, {"q": "A teammate switches training from full backpropagation to a method that recomputes activations during the backward pass instead of storing them (activation/gradient checkpointing), to save memory. The model still trains correctly, but wall-clock time per step goes up more than expected. Where do you look first?", "opts": ["Check if D was miscounted, since checkpointing changes how tokens are counted", "Recheck the backward-pass FLOP assumption: checkpointing adds extra forward-pass recomputation, so the effective backward cost is now higher than the ~4 FLOPs/parameter/token baseline the 6 in 6ND assumes", "Assume the GPU is thermal-throttling, since that is the only thing that slows down a step", "Conclude the 6ND rule is wrong for all Transformers and needs replacing with 8ND permanently"], "ans": 1, "fb": "Right. The '6' bakes in a specific accounting: 2 FLOPs forward + ~4 FLOPs backward per parameter per token, where backward already assumes activations are cached from the forward pass. Checkpointing throws that assumption away — it deliberately re-runs part of the forward pass during backward to save memory, adding real extra FLOPs that the baseline 6ND does not budget for. That is the first place to look. The tempting wrong answer (thermal throttling) is a hardware-level explanation that ignores the fact that the algorithm itself changed; you should rule out the known algorithmic cause before reaching for an environmental one."}, {"q": "Two research groups have the same fixed compute budget C. Group A trains a huge model on relatively few tokens; Group B trains a smaller model on many more tokens. Both satisfy <code>C ≈ 6ND</code>. Which trade-off actually decides which group gets the better final model, and why doesn't 6ND alone answer that question?", "opts": ["6ND says compute is symmetric in N and D, so both choices are always equally good — there is no real trade-off", "The compute-optimal split between model size and data (what later scaling-law work like Chinchilla addresses) is decided by how loss actually falls as you shift the N/D split at fixed C — 6ND only tells you the compute cost of a given (N, D) pair, not which pair minimizes loss for that compute", "Group A wins automatically, because more parameters always means a better model regardless of data", "Group B wins automatically, because more tokens always prevents overfitting regardless of model size"], "ans": 1, "fb": "Right. 6ND is an accounting identity for compute cost, not a statement about model quality — it treats N and D as interchangeable multipliers, so it cannot by itself tell you which split of a fixed budget produces the lowest loss. That question — the compute-optimal ratio of parameters to tokens — is exactly what Chinchilla-style scaling-law fits address by measuring loss across many (N, D) pairs at matched compute. Both 'automatic winner' options are wrong for the same reason: each assumes one variable dominates model quality regardless of the other, which is precisely the naive assumption scaling laws were built to correct."}, {"q": "You change the training setup so the model now uses grouped-query attention and a much longer context window (sequence length increases 8x), keeping parameter count N and total training tokens D fixed. What breaks in the 6ND estimate, and why?", "opts": ["Nothing breaks — 6ND is exact for any architecture and any sequence length as long as N and D stay fixed", "6ND becomes an increasingly loose lower bound: it only captures the linear-in-tokens dense projection cost, while attention's compute scales with sequence length too, so a large context-length increase makes the attention term a bigger (and eventually dominant) share of true compute that 6ND does not model", "6ND overestimates compute in this case, because grouped-query attention always reduces total FLOPs below the 6ND baseline", "6ND still holds exactly, but only if you redefine D as sequence length times batch count instead of total tokens"], "ans": 1, "fb": "Right. 6ND approximates the dense feed-forward and projection FLOPs, which scale linearly with the number of tokens processed. Attention's own compute scales with sequence length (roughly quadratically for full attention, though grouped-query attention reduces the KV-cache and memory cost, not the fundamental attention FLOP scaling with context length). As context length grows much larger relative to model width, the attention term stops being a rounding error and 6ND increasingly undercounts true compute. The tempting wrong answer says GQA 'always reduces total FLOPs below 6ND' — GQA mainly cuts memory bandwidth and KV-cache size, not the attention FLOP scaling with sequence length, so it doesn't rescue the estimate here."}];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){
@@ -474,7 +728,7 @@ QS.forEach(function(item,qi){
   block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
 });
 
-/* COPY */
+/* ===== COPY ===== */
 Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
   btn.addEventListener('click', function(){
     var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
@@ -489,7 +743,84 @@ refresh();
 })();
 </script>
 
-<!-- ── glossary tooltips: hover / focus / tap an underlined .term to see its definition ── -->
+<!-- ── playground visual: decompose the 6 (2 fwd + 4 bwd) + inference-vs-training bill (dependency-free SVG) ── -->
+<script>
+(function(){
+  "use strict";
+  var left=document.getElementById('fl-left'), right=document.getElementById('fl-right');
+  if(!left || !right) return;
+  var W=460,H=300,padL=44,padR=14,padT=26,padB=54;
+  function sy(v,d0,d1){ return (H-padB)-(v-d0)/(d1-d0)*((H-padB)-padT); }
+  function trim(x){ return x>=100?Math.round(x):(x>=10?Math.round(x*10)/10:Math.round(x*100)/100); }
+  function fmtCount(v){ if(v>=1e12) return trim(v/1e12)+' T'; if(v>=1e9) return trim(v/1e9)+' B'; if(v>=1e6) return trim(v/1e6)+' M'; return v.toExponential(0); }
+  function fmtSci(v){ return v.toExponential(1).replace('e+','e'); }
+  function fmtTime(s){ if(s<60) return (Math.round(s*10)/10)+' s'; if(s<3600) return (Math.round(s/6)/10)+' min'; if(s<86400) return (Math.round(s/360)/10)+' hr'; return (Math.round(s/8640)/10)+' days'; }
+  function yaxis(ylab){
+    return '<line class="vlab-axis" x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'"/>'
+      +'<line class="vlab-axis" x1="'+padL+'" y1="'+padT+'" x2="'+padL+'" y2="'+(H-padB)+'"/>'
+      +'<text class="vlab-lbl" x="13" y="'+((padT+H-padB)/2)+'" text-anchor="middle" transform="rotate(-90 13 '+((padT+H-padB)/2)+')">'+ylab+'</text>';
+  }
+  // LEFT · stacked bar: forward 2 + backward 4 = 6 FLOPs per (param, token)
+  function renderLeft(train){
+    var d0=0,d1=6.8, cx=(padL+W-padR)/2, bw=126, x0=cx-bw/2, s='';
+    [0,2,4,6].forEach(function(v){ var y=sy(v,d0,d1);
+      s+='<line class="vlab-grid" x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'"/>'
+        +'<text class="vlab-lbl mut" x="'+(padL-5)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v+'</text>'; });
+    s+=yaxis('FLOPs per parameter · token');
+    var yF0=sy(0,d0,d1), yF2=sy(2,d0,d1);
+    s+='<rect x="'+x0.toFixed(1)+'" y="'+yF2.toFixed(1)+'" width="'+bw+'" height="'+(yF0-yF2).toFixed(1)+'" fill="#2563EB" stroke="#1E3A8A" stroke-width="1"/>';
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+((yF0+yF2)/2+4).toFixed(1)+'" text-anchor="middle" style="fill:#fff;font-weight:700">forward = 2</text>';
+    var top=2;
+    if(train){
+      var yB2=sy(2,d0,d1), yB6=sy(6,d0,d1);
+      s+='<rect x="'+x0.toFixed(1)+'" y="'+yB6.toFixed(1)+'" width="'+bw+'" height="'+(yB2-yB6).toFixed(1)+'" fill="#D97706" stroke="#92400E" stroke-width="1"/>';
+      s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+((yB2+yB6)/2+4).toFixed(1)+'" text-anchor="middle" style="fill:#fff;font-weight:700">backward = 4</text>';
+      top=6;
+    }
+    var yTop=sy(top,d0,d1);
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(yTop-8).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700;font-size:13px">= '+top+' FLOPs ('+(train?'training':'inference')+')</text>';
+    s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(H-padB+16)+'" text-anchor="middle">one (parameter, token) touch</text>';
+    if(!train) s+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(H-padB+30)+'" text-anchor="middle" style="fill:#96A0AF">backward pass skipped — no learning</text>';
+    left.innerHTML=s;
+  }
+  // RIGHT · inference (2ND) vs training (6ND) bars at real scale
+  function renderRight(N,D,train){
+    var Cinf=2*N*D, Ctrain=6*N*D, d0=0,d1=Ctrain*1.14, H100=1e15, s=yaxis('training compute C (FLOPs)');
+    var bw=94, cxI=padL+(W-padL-padR)*0.32, cxT=padL+(W-padL-padR)*0.72;
+    function bar(cx,C,label,color,active){
+      var y=sy(C,d0,d1), y0=sy(0,d0,d1), t='';
+      t+='<rect x="'+(cx-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw+'" height="'+(y0-y).toFixed(1)+'" fill="'+color+'" fill-opacity="'+(active?1:0.5)+'" stroke="'+(active?'#111827':'#94A3B8')+'" stroke-width="'+(active?2.4:1)+'"/>';
+      t+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(y-16).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:'+(active?700:600)+'">'+label+'</text>';
+      t+='<text class="vlab-lbl" x="'+cx.toFixed(1)+'" y="'+(y-4).toFixed(1)+'" text-anchor="middle" style="fill:#111827;font-weight:700">'+fmtSci(C)+'</text>';
+      t+='<text class="vlab-lbl mut" x="'+cx.toFixed(1)+'" y="'+(H-padB+16)+'" text-anchor="middle">'+fmtTime(C/H100)+' · 1 H100</text>';
+      return t;
+    }
+    s+=bar(cxI,Cinf,'inference 2ND','#2563EB',!train);
+    s+=bar(cxT,Ctrain,'training 6ND','#D97706',train);
+    s+='<text class="vlab-lbl mut" x="'+((padL+W-padR)/2)+'" y="'+(H-padB+31)+'" text-anchor="middle">training ≈ 3× inference · ~1e15 FLOP/s (idealized)</text>';
+    right.innerHTML=s;
+  }
+  var tInf=document.getElementById('fl-inf'), tTrain=document.getElementById('fl-train');
+  var sN=document.getElementById('fl-N'), sD=document.getElementById('fl-D');
+  var lN=document.getElementById('fl-N-lbl'), lD=document.getElementById('fl-D-lbl'), read=document.getElementById('fl-read');
+  var train=true;
+  function update(){
+    var N=Math.pow(10,parseFloat(sN.value)), D=Math.pow(10,parseFloat(sD.value));
+    renderLeft(train); renderRight(N,D,train);
+    lN.textContent=fmtCount(N); lD.textContent=fmtCount(D);
+    read.innerHTML = train ? 'per (param·token): <b>6 FLOPs = 2 fwd + 4 bwd</b> → C ≈ 6ND'
+                           : 'per (param·token): <b>2 FLOPs = forward only</b> → C ≈ 2ND';
+    tTrain.classList.toggle('active',train); tTrain.setAttribute('aria-pressed',train);
+    tInf.classList.toggle('active',!train); tInf.setAttribute('aria-pressed',!train);
+  }
+  tInf.addEventListener('click',function(){train=false;update();});
+  tTrain.addEventListener('click',function(){train=true;update();});
+  sN.addEventListener('input',update); sD.addEventListener('input',update);
+  update();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
 <script>
 (function(){
   "use strict";
@@ -501,24 +832,21 @@ refresh();
   var active = null;
   function position(el){
     var r = el.getBoundingClientRect();
-    tip.style.left = '0px'; tip.style.top = '0px';   // reset so width measures naturally
+    tip.style.left = '0px'; tip.style.top = '0px';
     var t = tip.getBoundingClientRect(), pad = 8;
     var left = r.left + r.width/2 - t.width/2;
     left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
-    var top = r.top - t.height - pad;                // prefer above the word
-    if(top < pad) top = r.bottom + pad;              // no room above → flip below
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
     tip.style.left = Math.round(left)+'px';
     tip.style.top  = Math.round(top)+'px';
   }
   function show(el){
-    active = el;
-    tip.textContent = '';
+    active = el; tip.textContent = '';
     var ttl = document.createElement('span'); ttl.className = 'ttl';
     ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
     var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
-    tip.appendChild(ttl); tip.appendChild(body);
-    tip.classList.add('show');
-    position(el);
+    tip.appendChild(ttl); tip.appendChild(body); tip.classList.add('show'); position(el);
   }
   function hide(){ active = null; tip.classList.remove('show'); }
   Array.prototype.forEach.call(terms, function(el){
@@ -531,6 +859,34 @@ refresh();
   window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
   window.addEventListener('resize', function(){ if(active) position(active); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+
+<!-- ── viz iframe: auto-size to content + manual reload safety net ──
+     Root cause of the earlier "blank box" was Safari treating each local file://
+     path as its own origin, so an iframe embedded from a *different* file gets its
+     paint suppressed as a privacy measure — confirmed by: it worked standalone,
+     it worked in Chrome, and it worked over http://localhost. Not a code bug, and
+     it does not affect the deployed (https) site. Auto-resize restored; the reload
+     button stays as a harmless safety net regardless of browser. -->
+<script>
+(function(){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || d.type !== 'viz-height' || typeof d.px !== 'number') return;
+    var frames = document.querySelectorAll('.build-embed iframe');
+    for (var i = 0; i < frames.length; i++){
+      if (frames[i].contentWindow === e.source){
+        frames[i].style.height = Math.min(Math.max(d.px, 320), 3200) + 'px';
+        break;
+      }
+    }
+  });
+  var btn = document.getElementById('bcastReload');
+  if(btn) btn.addEventListener('click', function(){
+    var f = document.getElementById('bcastFrame');
+    if(f) f.src = f.src;
+  });
 })();
 </script>
 </body>

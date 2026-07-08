@@ -1,6 +1,6 @@
 ---
 name: frontier-review-quiz
-description: Review a completed Frontier Lab study session, quiz the learner, identify misconceptions, update notes, and decide whether the day counts. Use after the user pastes code, notes, HTML output, experiment results, or a daily research log.
+description: Review a completed Frontier Lab study session, quiz the learner, identify misconceptions, update notes, and decide whether the day counts.
 ---
 
 # Frontier Review Quiz
@@ -8,6 +8,7 @@ description: Review a completed Frontier Lab study session, quiz the learner, id
 Use this after the learner completes a study or build session.
 
 ## Review output structure
+
 ```markdown
 # Session Review
 
@@ -21,10 +22,10 @@ Concrete things done well.
 Be direct but supportive.
 
 ## 4. Misconceptions
-List likely misunderstandings.
+Likely misunderstandings.
 
 ## 5. Frontier-lab relevance
-Explain why this artifact matters or does not yet matter.
+Why this artifact matters or does not yet matter.
 
 ## 6. Quiz
 5 questions:
@@ -40,19 +41,34 @@ Markdown snippet to paste into today's log.
 ```
 
 ## Grading standards
-A session counts if it produced at least one concrete artifact and the learner can explain the mechanism.
+
+A session counts if:
+
+- it produced at least one concrete artifact
+- the learner can explain the mechanism
+- the artifact can be opened, run, reviewed, or reused
+- there is a research log or result
 
 It does not count if:
-- The learner only read passively.
-- The output is copied without understanding.
-- There is no file/result/diagram/log.
-- The artifact cannot be rerun/opened/reviewed.
+
+- the learner only read passively
+- the output is copied without understanding
+- there is no file/result/diagram/log
+- the artifact cannot be rerun/opened/reviewed
 
 ## Tone
-Warm but not indulgent. Do not overpraise vague effort. Praise concrete progress.
+
+Warm but not indulgent.
+
+Praise concrete progress.
+
+Do not overpraise vague effort.
 
 ## Bilingual quiz style
-Use Chinese for setup, English for key terms and interview phrasing.
+
+Use Chinese for setup.
+
+Use English for key terms and interview phrasing.
 
 Example:
 

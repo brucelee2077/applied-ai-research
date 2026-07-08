@@ -1,60 +1,97 @@
-# Frontier Lab Claude Skills Pack
+# Frontier Lab Claude Skills Pack v2.1
 
-This pack contains Claude Code skills for turning Frontier Lab self-study into low-friction, visual, artifact-driven learning.
+This is a drop-in replacement / upgrade for `frontier_lab_claude_skills`.
 
-## Install options
+It keeps the original spirit:
 
-### Personal install
-Copy all folders inside `skills/` into:
+- lower the bar without lowering the ceiling
+- visual-first learning
+- artifact-driven study
+- bilingual Chinese + English support
+- frontier-lab readiness
 
-```bash
-~/.claude/skills/
-```
+But it adds a missing layer:
 
-Example:
+> a reusable **Coach Layer** for refactoring existing `sessions/` lessons into warm, intuition-first, math-friendly, artifact-driven HTML lessons.
 
-```bash
-mkdir -p ~/.claude/skills
-cp -R skills/* ~/.claude/skills/
-```
+## Recommended install
 
-### Project install
-Copy the folders into a repo-local skills directory:
+From your repo root:
 
 ```bash
+git checkout -b refactor/coach-skills-v2
+
+# Option A: replace the skill pack folder
+rm -rf frontier_lab_claude_skills
+cp -R frontier_lab_claude_skills_v2 frontier_lab_claude_skills
+
+# Option B: install project-local skills for Claude Code
 mkdir -p .claude/skills
-cp -R skills/* .claude/skills/
+cp -R frontier_lab_claude_skills/skills/* .claude/skills/
 ```
 
-Then start Claude Code in that repo.
+Then start Claude Code from the repo root:
 
-## Recommended repo layout
+```bash
+claude
+```
+
+## Main workflow
+
+Use this order:
+
+1. `/frontier-curriculum-refactor`  
+   Plan and run a safe `sessions/` refactor pilot.
+
+2. `/frontier-lesson-humanizer`  
+   Upgrade one existing lesson into warm, intuition-first coach voice.
+
+3. `/frontier-math-unfogger`  
+   Fix math-heavy sections with a Math Ladder.
+
+4. `/frontier-d3-visual-lab`  
+   Improve or add learning-focused visuals.
+
+5. `/frontier-artifact-reviewer` or `/frontier-review-quiz`  
+   Review produced artifacts and decide whether the session counts.
+
+## New skills in v2 / v2.1
+
+- `frontier-curriculum-refactor`
+- `frontier-lesson-humanizer`
+- `frontier-math-unfogger`
+- `frontier-artifact-reviewer`
+- `frontier-visual-auditor`  ← new in v2.1
+
+## Updated skills from v1
+
+- `frontier-session-coach`
+- `frontier-concept-courseware`
+- `frontier-d3-visual-lab`
+- `frontier-experiment-lab`
+- `frontier-paper-course`
+- `frontier-review-quiz`
+- `frontier-portfolio-packager`
+
+## Design principle
+
+Do not let the curriculum become pretty productivity theater.
+
+Every learning day should create evidence:
 
 ```text
-frontier-lab-study-os/
-  .claude/skills/
-  notes/
-  sessions/
-  courseware/
-  experiments/
-  quizzes/
-  portfolio/
+Read → Understand → Explain → Implement → Measure → Write → Reflect
 ```
 
-## Suggested skill loop
 
-1. Ask Claude Code: `/frontier-session-coach topic="attention"`
-2. Use `/frontier-concept-courseware` to generate an HTML mini-course.
-3. Use `/frontier-d3-visual-lab` to create interactive D3 visuals.
-4. Use `/frontier-experiment-lab` to build a tiny reproducible implementation.
-5. Use `/frontier-review-quiz` to quiz you and update the log.
-6. Weekly, use `/frontier-portfolio-packager` to turn outputs into a portfolio-ready writeup.
+## v2.1 visual upgrade
 
-## Design principles
+v2.1 adds a stronger visualization bar for the next curriculum-wide refactor.
 
-- Lower the bar: explain like a smart beginner can follow.
-- Preserve depth: always include the technical mechanism and frontier relevance.
-- Visual-first: HTML and D3.js outputs are preferred whenever useful.
-- Artifact-driven: every session produces a concrete file.
-- Bilingual: Chinese + English, with key technical terms in English.
-- No employer/day-job context by default: self-study only unless explicitly requested.
+A lesson playground should usually be one of:
+
+1. **Visual mechanism** — shows flow, shape, matrix, curve, timeline, routing, or scaling.
+2. **Interactive calculator** — sliders / toggles change parameters and outputs.
+3. **Terminal walkthrough** — acceptable only as a fallback or for implementation-heavy lessons.
+
+For abstract math and systems concepts, terminal-only playgrounds are usually not enough.

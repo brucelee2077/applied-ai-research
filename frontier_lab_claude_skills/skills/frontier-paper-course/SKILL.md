@@ -8,11 +8,17 @@ description: Convert a paper, blog post, transcript, or technical article into a
 Use this when the user gives a paper, blog, transcript, arXiv link, PDF, or paper title and wants to learn it deeply.
 
 ## Learning objective
-Do not merely summarize. Convert the paper into a course:
 
+Do not merely summarize.
+
+Convert the source into:
+
+```text
 Paper → mental model → mechanism → visualization → experiment → frontier-lab relevance → portfolio artifact
+```
 
 ## Output files
+
 Create:
 
 ```text
@@ -30,7 +36,19 @@ experiments/<paper-slug>/src/
 experiments/<paper-slug>/tests/
 ```
 
+## Paper reading map
+
+Tell the learner:
+
+- what to read carefully
+- what to skim
+- what to skip for now
+- which figure/table matters most
+- which claim should be tested with a mini experiment
+- which terms must be understood before reading deeply
+
 ## Paper note structure
+
 ```markdown
 # <Paper Title>
 
@@ -43,10 +61,11 @@ What problem forced this paper to exist?
 Explain with a story or analogy.
 
 ## 4. Core mechanism
-Step-by-step.
+Step by step.
 
 ## 5. Key equations / algorithms
-Explain formulas only after intuition.
+Use Math Ladder:
+problem, intuition, symbols, tiny example, formula, sanity check, misconception.
 
 ## 6. What changed after this paper
 Why it matters historically or practically.
@@ -55,25 +74,22 @@ Why it matters historically or practically.
 What the paper does not solve.
 
 ## 8. Frontier-lab relevance
-Why OpenAI/Anthropic/DeepMind-style teams would care.
+Why OpenAI / Anthropic / DeepMind-style teams would care.
 
 ## 9. Mini experiment
 A small reproduction or toy demo.
 
 ## 10. Quiz
 5 questions.
+
+## 11. Research taste note
+What makes this paper important, overhyped, under-tested, or reusable?
 ```
 
-## Reading strategy
-Tell the learner:
-- What to read carefully
-- What to skim
-- What to skip for now
-- Which figure/table matters most
-- Which claim should be tested with a mini experiment
-
 ## Visualization requirement
-Create at least one visual explanation. Use D3.js when the paper has:
+
+Create at least one visual explanation when the paper has:
+
 - curves
 - matrices
 - routing
@@ -82,8 +98,14 @@ Create at least one visual explanation. Use D3.js when the paper has:
 - distributed-system pipelines
 - before/after comparisons
 
+Use D3.js only when it teaches the concept better than a static diagram.
+
 ## Experiment requirement
-Always propose one small experiment. Examples:
+
+Always propose one small experiment.
+
+Examples:
+
 - implement attention from scratch
 - fit a toy scaling law
 - benchmark batching latency
@@ -92,4 +114,13 @@ Always propose one small experiment. Examples:
 - visualize KV cache growth
 
 ## Tone
-Warm and concrete. The learner should feel: “I can actually understand this paper,” not “I read a fancy abstract and blacked out.”
+
+Warm and concrete.
+
+The learner should feel:
+
+> “I can actually understand this paper.”
+
+Not:
+
+> “I read a fancy abstract and blacked out.”

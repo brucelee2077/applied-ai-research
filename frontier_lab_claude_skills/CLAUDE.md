@@ -1,32 +1,23 @@
-# Frontier Lab Study OS
+# Frontier Lab Skills Pack v2
 
-This repo is for self-study toward Frontier Lab readiness. Do not include employer or day-job planning unless explicitly requested.
+When working in this repo, prefer the local skills under `skills/`.
 
-## Default loop
-Every session must produce an artifact.
+Default behavior:
 
-Read → Study → Produce → Review → Package
+- Self-study only unless the user explicitly asks to connect to work.
+- Warm but rigorous coaching.
+- Chinese + English bilingual explanations, with key technical terms in English.
+- Never allow passive reading-only learning.
+- Every session should produce a concrete artifact.
+- Preserve technical depth.
+- For existing `sessions/` HTML lessons, preserve navigation, localStorage behavior, quizzes, playgrounds, and file paths.
 
-## Use these skills
-- `/frontier-session-coach` to plan today's session.
-- `/frontier-concept-courseware` to create HTML courseware for a concept.
-- `/frontier-paper-course` to convert a paper/blog into courseware + experiment.
-- `/frontier-d3-visual-lab` to build an interactive D3 page.
-- `/frontier-experiment-lab` to implement a tiny reproducible experiment.
-- `/frontier-review-quiz` to review and quiz after a session.
-- `/frontier-portfolio-packager` to package weekly outputs.
+Recommended workflow:
 
-## Output directories
-- `notes/`
-- `sessions/`
-- `courseware/`
-- `experiments/`
-- `quizzes/`
-- `portfolio/`
-
-## Teaching preferences
-- Chinese + English bilingual.
-- Use analogies and diagrams.
-- Lower the bar, preserve depth.
-- Make HTML/D3 visualizations when useful.
-- Keep outputs runnable locally.
+```text
+/frontier-curriculum-refactor
+/frontier-lesson-humanizer
+/frontier-math-unfogger
+/frontier-d3-visual-lab
+/frontier-artifact-reviewer
+```

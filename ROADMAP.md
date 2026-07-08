@@ -53,6 +53,8 @@ These are **self-paced modules, not calendar weeks.** A module is a themed miles
 
 **Staff-lens bar** *(added 2026-07-04)*: any lesson with a Mechanism/math section needs a named **failure-mode** callout and a named **trade-off** callout, plus at least one diagnostic-style quiz question — see the Staff Lens rule in `.claude/skills/frontier-session-coach/TEACHING_PRINCIPLES.md`. Model: `attention-lab-course/modules/04-the-math.html`.
 
+**Industry-anchor bar** *(added 2026-07-06)*: the "why a frontier lab cares" passage in section 4 must name one real, verifiable system (not "a frontier lab" in the abstract), with a matching teaser callout in section 1 — see the Industry Anchor rule in `.claude/skills/frontier-session-coach/TEACHING_PRINCIPLES.md`.
+
 **Legend**
 
 | Marker | Meaning |
@@ -549,6 +551,41 @@ Build in **master-build-table order** (per-module source / action / ~L / status 
 - **This session (2026-07-05):** authored/converted/wrapped the remaining stub modules — M20, M21a, M21b, M24, M25, M16b, M17c, M27b, M28, M18, M19, M23, M27a, M9d — plus completed the generative trio (M22a VQ-VAE/GAN + wired M22b/M22c). Built via the reusable generator `sessions/_lesson_gen.py` (byte-identical shell; per-module builders `sessions/_build_m*.py`) and, for most, a Workflow fan-out (one agent owns one module end-to-end + an adversarial content-verify stage). New modules live in flat `sessions/week-m*/` folders (same layout as the earlier deferred m9b/m9e/m10b/m11/m22* modules).
 - **Open follow-ups (optional, non-blocking):** (1) migrate all `week-m*` modules → canonical `mNN-<slug>/day-*/lesson.html` via `refactor_all_modules.py`, and generalize `staff_lens_audit.js`/`lesson_audit.py` to glob the flat layout (they currently scan `mNN/` only; new modules were built to the staff-lens bar + adversarially verified). (2) The four `+auth follow-up` modules (M7 MLP-capstone/autodiff, M8 FlashAttention-concept + design wraps, M10a data-curation, M16a BPE + design wraps) have their **core reuse lessons** built, wired, and rendering; the flagged `+authored/+wrap` extras remain as enhancement lessons to add. (3) Paid modules (M9d, M12, M13, M15b) are built as **content**; the actual paid TPU/GPU runs stay gated behind the cost caps in Global rules.
 - **Legend:** ⬜ unclaimed · 🔄 in progress · ✅ done & verified · ⛔ blocked.
+
+### Industry-anchor retrofit — ✅ COMPLETE (M01–M04 only, 2026-07-06)
+The Industry Anchor bar (Global rules, above) was added after the user singled out
+`m01-shape-of-data/day-03-broadcasting-dtypes` as content they wanted more of: naming a real
+system instead of staying abstract ("a frontier lab," "a 7B model"). Auditing the curriculum
+found this "why a frontier lab cares" section already existed in exactly 19 lessons (M01 Days
+1–5, M02 Days 1–9, M03 Days 1–4, M04 Day 1) — all abstract. All 19 were retrofitted: each got a
+matching section-1 teaser callout (🏭) plus a section-4 rewrite naming a real, checked system —
+DeepSeek-V3's FP8/MoE training, vLLM's PagedAttention, an NVIDIA H100's matmul throughput,
+Kaplan/Chinchilla's scaling numbers, GPT-3's published config, SwiGLU/GELU, vLLM/TensorRT-LLM/
+SGLang, ZeRO/DeepSpeed, published LR schedules, benchmark decontamination, Llama 3's tokenizer/
+head config, FlashAttention, Gemini 1.5's context window, and the GQA paper — see the fact
+table in `docs/superpowers/specs/2026-07-06-industry-anchor-teaching-principle-design.md`.
+
+**Result: 19 of 19 targeted lessons retrofitted across 4 modules**, executed via
+subagent-driven-development (fresh implementer + spec-compliance review + quality review per
+lesson). The quality-review pass caught and fixed real issues on nearly every lesson — mostly
+teaser/section-4 verbatim redundancy and sentence-density violations of the one-idea-per-sentence
+house style, plus a few factual-precision nits (DeepSeek-V3's FP8 scope, an H100 FLOPs/matmul-ops
+conflation, a Kaplan compute-formula attribution) — each caught by an adversarial reviewer and
+fixed in a follow-up commit before moving to the next lesson.
+
+**Known caveat:** `m01-shape-of-data/day-03-broadcasting-dtypes` and all of `m02-the-neuron`
+were being edited concurrently by another session during this retrofit (a `class="sec"` →
+`class="module-section"` rename plus a CSS/content overhaul). Several of this retrofit's commits
+bundled that unrelated work in alongside the two intended edits, because `git add`+`commit` on a
+file captures its whole current state. Nothing was lost — the concurrent work landed safely in
+git history — but a few commit diffs in this range are larger than their messages suggest. The
+user reviewed this live and chose to leave the bundling as-is rather than rewrite history on
+files still being actively edited by another process.
+
+**M05–M29 (137 lessons) are an explicit, deferred watchlist item — not scheduled.** They don't
+carry this section at all today (different "Why it matters" headers); a future session should
+decide whether to add the Industry Anchor pattern to them or leave those modules' existing
+relevance framing as-is.
 
 ### Staff-lens retrofit — ✅ COMPLETE (curriculum-wide sweep, 2026-07-04)
 The Staff Lens bar (Global rules, above) was added after comparing built lessons against

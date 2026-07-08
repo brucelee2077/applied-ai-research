@@ -3,518 +3,879 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NumPy Broadcasting — Interactive</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>NumPy Broadcasting — The Copy Machine</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
-  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
-  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
-  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
-  --display:'Bricolage Grotesque',Georgia,serif;
-  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
-  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
-  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
-  --ease:cubic-bezier(.16,1,.3,1);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
-  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
-a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
-a:hover{border-bottom-color:var(--accent)}
+  :root{
+    --bg:#FAF7F2; --surface:#FFFFFF; --text:#2C2A28; --muted:#6B645E; --border:#E5DFD6;
+    --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+    --gold-fill:#C98A1E; --gold-ink:#7C5606;
+    --ok-fill:#2D8B55; --ok-ink:#1F6E44;
+    --bad-ink:#A32E1A; --bad-fill:#F6E6E1;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'DM Sans',system-ui,sans-serif;
+    font-size:17px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.15; margin:0;}
+  .mono{font-family:'JetBrains Mono',monospace;}
 
-/* top bar */
-.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
-  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
-.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
-.nav-back{font-size:.85rem;color:var(--muted)}
-.nav-back:hover{color:var(--accent)}
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; background:var(--surface); border-bottom:1px solid var(--border);
+  }
+  .topbar .brand{font-family:'Bricolage Grotesque'; font-weight:800; font-size:18px; letter-spacing:.2px;}
+  .topbar a{color:var(--accent-d); text-decoration:none; font-weight:600; font-size:15px;}
+  .topbar a:hover{text-decoration:underline;}
 
-main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+  .wrap{max-width:900px; margin:0 auto; padding:26px 22px 64px;}
 
-.intro{margin-bottom:1.5rem}
-.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
-.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
-.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+  .hero h1{font-size:33px; font-weight:800; letter-spacing:-0.5px;}
+  .hero .sub{color:var(--muted); font-size:18px; margin-top:10px; max-width:660px;}
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
-  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
-.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+  .bigidea{
+    background:var(--accent-l); border:1px solid #C6E3ED; border-radius:14px;
+    padding:15px 20px; margin:22px 0 6px; font-size:17px;
+  }
+  .bigidea b{color:var(--accent-d);}
 
-/* controls */
-.controls{display:grid;gap:1.15rem}
-.shape-row{display:grid;grid-template-columns:auto 1fr;gap:.75rem;align-items:center}
-.shape-name{font-family:var(--mono);font-size:.9rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
-.dim-pickers{display:flex;flex-wrap:wrap;gap:.5rem}
-.dim-pick{display:flex;flex-direction:column;gap:.25rem;align-items:center}
-.dim-pick-label{font-size:.68rem;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
-.dim-pick select{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--text);
-  background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);
-  padding:.35rem .5rem;cursor:pointer;min-width:66px}
-.dim-pick select:focus{outline:2px solid var(--accent-l);border-color:var(--accent)}
+  /* ---------- example picker ---------- */
+  .picker{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:22px 0 4px;}
+  .picker .lbl{font-weight:600; color:var(--muted); font-size:15px;}
+  .chip{
+    border:1.5px solid var(--border); background:var(--surface); color:var(--text);
+    font-family:'DM Sans'; font-weight:600; font-size:15px;
+    padding:8px 14px; border-radius:999px; cursor:pointer; transition:all .15s;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .chip:hover{border-color:var(--accent);}
+  .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .chip .tag{font-family:'JetBrains Mono'; font-size:13px; opacity:.9;}
+  .chip.fail[aria-pressed="true"]{background:var(--bad-ink); border-color:var(--bad-ink);}
 
-.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
-.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
-  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
-  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
-.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+  /* ---------- progress dots ---------- */
+  .dots{display:flex; gap:6px; align-items:flex-start; margin:18px 0 16px;}
+  .dot{display:flex; flex-direction:column; align-items:center; gap:6px; flex:1;}
+  .dot .circle{
+    width:28px; height:28px; border-radius:50%; border:2px solid var(--border);
+    background:var(--surface); display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono'; font-weight:600; font-size:13px; color:var(--muted);
+    transition:all .2s;
+  }
+  .dot .name{font-size:11.5px; color:var(--muted); text-align:center; line-height:1.2;}
+  .dot[data-state="active"] .circle{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .dot[data-state="done"] .circle{background:var(--ok-fill); border-color:var(--ok-fill); color:#fff;}
+  .dot[data-state="active"] .name{color:var(--text); font-weight:700;}
 
-/* result banner */
-.result{display:flex;align-items:center;gap:.6rem;margin-top:.4rem;
-  background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .95rem}
-.result-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.result-v{font-family:var(--mono);font-size:1.05rem;font-weight:600}
-.result-v.ok{color:var(--ok)}.result-v.bad{color:var(--bad)}
+  /* ---------- card / stage ---------- */
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:22px 22px 20px; box-shadow:0 1px 0 rgba(0,0,0,0.02);
+  }
+  .step-kicker{
+    font-family:'JetBrains Mono'; font-size:13px; font-weight:600;
+    color:var(--accent-d); text-transform:uppercase; letter-spacing:.08em; margin-bottom:5px;
+  }
+  .step-title{font-family:'Bricolage Grotesque'; font-weight:700; font-size:23px; margin:0 0 8px; letter-spacing:-0.01em;}
+  .step-body{color:var(--muted); font-size:16px; margin:0 0 14px; max-width:660px;}
+  .step-body b{color:var(--text);}
 
-/* figure */
-.figwrap{width:100%}
-svg#bcast{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
-.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+  .stage-shell{
+    background:var(--bg); border:1px solid var(--border); border-radius:12px;
+    padding:12px 8px; overflow-x:auto;
+  }
+  svg.stage{display:block; margin:0 auto; max-width:100%; height:auto;}
 
-/* takeaway */
-.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
-  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
-.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
-.takeaway ul{margin:0 0 0 1.15rem}
-.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
-.takeaway li:last-child{margin-bottom:0}
-.takeaway b{color:var(--accent-d)}
-.k-ok{color:var(--ok);font-weight:600}.k-bad{color:var(--bad);font-weight:600}
+  /* svg text classes */
+  .cellnum{font-family:'JetBrains Mono'; font-weight:600; font-size:22px;}
+  .dimnum{font-family:'JetBrains Mono'; font-weight:600; font-size:20px;}
+  .svglabel{font-family:'DM Sans'; font-weight:700; font-size:14px;}
+  .verdictsym{font-family:'JetBrains Mono'; font-weight:600; font-size:18px;}
+
+  /* narration */
+  .note{
+    background:var(--accent-l); border:1px solid #C6E3ED; border-radius:11px;
+    padding:12px 15px; font-size:15.5px; color:var(--accent-d);
+    margin-top:14px; display:flex; gap:10px; align-items:flex-start; min-height:24px;
+  }
+  .note .badge{
+    flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    font-family:'JetBrains Mono'; font-weight:600; font-size:15px; color:#fff; background:var(--accent);
+  }
+  .note.ok{background:#E3F1E9; border-color:#B7DCC5; color:var(--ok-ink);}
+  .note.ok .badge{background:var(--ok-fill);}
+  .note.bad{background:var(--bad-fill); border-color:#E9C4BB; color:var(--bad-ink);}
+  .note.bad .badge{background:var(--bad-ink);}
+  .note .txt b{color:inherit; font-weight:700;}
+  .note code{font-family:'JetBrains Mono'; font-size:13.5px; background:rgba(0,0,0,.05); padding:1px 5px; border-radius:5px;}
+
+  /* controls */
+  .controls{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:18px; flex-wrap:wrap;}
+  .controls .right-grp{display:flex; gap:10px;}
+  .btn{
+    font-family:'DM Sans'; font-weight:700; font-size:16px;
+    padding:11px 20px; border-radius:10px; cursor:pointer; border:1.5px solid transparent;
+    transition:transform .08s ease, background .15s ease; display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .btn-primary:hover{background:var(--accent-d); border-color:var(--accent-d);}
+  .btn-ghost{background:var(--surface); color:var(--accent-d); border-color:var(--border);}
+  .btn-ghost:hover{background:var(--accent-l); border-color:var(--accent);}
+  .btn-play{background:var(--gold-fill); color:#fff; border-color:var(--gold-fill);}
+  .btn-play:hover{background:var(--gold-ink); border-color:var(--gold-ink);}
+  .btn:disabled{opacity:.4; cursor:not-allowed; transform:none;}
+
+  /* legend */
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-size:14px; color:var(--muted); margin-top:14px;}
+  .legend .item{display:flex; align-items:center; gap:6px;}
+  .swatch{width:15px; height:15px; border-radius:4px; display:inline-block; border:1.5px solid rgba(0,0,0,.12);}
+
+  /* rules card */
+  .rules{margin-top:24px;}
+  .rules h2{font-size:22px; margin-bottom:4px;}
+  .rules ol{margin:12px 0 0; padding-left:22px;}
+  .rules li{margin-bottom:10px;}
+  .kchip{
+    display:inline-block; font-family:'JetBrains Mono'; font-size:14px;
+    padding:1px 8px; border-radius:6px; background:var(--accent-l); color:var(--accent-d); font-weight:600;
+  }
+  .kchip.bad{background:var(--bad-fill); color:var(--bad-ink);}
+  .kchip.gold{background:#F6E7C8; color:var(--gold-ink);}
+  .ok{color:var(--ok-ink); font-weight:700;}
+  .bad{color:var(--bad-ink); font-weight:700;}
+  .footnote{margin-top:18px; color:var(--muted); font-size:14px;}
+  .footnote i{color:var(--text);}
+
+  /* ---------- sandbox (locked follow-on) ---------- */
+  .sandbox{margin-top:24px; position:relative;}
+  .sandbox h2{font-size:22px; margin-bottom:4px;}
+  .sandbox .hint{color:var(--muted); font-size:15px; margin:6px 0 14px;}
+  .locked-veil{
+    position:absolute; inset:0; z-index:5; border-radius:16px;
+    background:rgba(250,247,242,0.82); backdrop-filter:blur(1.5px);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    text-align:center; padding:20px;
+  }
+  .locked-veil .lock{font-size:30px;}
+  .locked-veil .msg{font-family:'Bricolage Grotesque'; font-weight:700; font-size:18px; color:var(--muted);}
+  .sandbox.unlocked .locked-veil{display:none;}
+  .sandbox.unlocked{animation:unlockPop .5s ease;}
+  @keyframes unlockPop{0%{transform:scale(.99);opacity:.6;}100%{transform:scale(1);opacity:1;}}
+
+  .steppers{display:flex; gap:22px; flex-wrap:wrap; margin-bottom:14px;}
+  .grp{border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; background:var(--bg);}
+  .grp.A{border-color:#BFD9E4;}
+  .grp.B{border-color:#E6D0A5;}
+  .grp .gname{font-family:'Bricolage Grotesque'; font-weight:800; font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .grp .gname .tag{width:20px; height:20px; border-radius:6px; color:#fff; font-size:13px; display:grid; place-items:center;}
+  .grp.A .tag{background:var(--accent);}
+  .grp.B .tag{background:var(--gold-fill);}
+  .grp .gname .shapeChip{font-family:'JetBrains Mono'; font-size:14px; font-weight:600; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:2px 8px; color:var(--muted); margin-left:auto;}
+  .stepper{display:flex; align-items:center; gap:8px; margin:6px 0;}
+  .stepper .lbl{font-size:14px; color:var(--muted); font-weight:600; min-width:40px;}
+  .btnstep{
+    width:32px; height:32px; border-radius:9px; border:1.5px solid var(--border);
+    background:var(--surface); color:var(--text); font-size:19px; font-weight:700; cursor:pointer;
+    line-height:1; display:flex; align-items:center; justify-content:center; font-family:'DM Sans';
+  }
+  .btnstep:hover:not(:disabled){background:var(--accent-l); border-color:var(--accent);}
+  .btnstep:disabled{opacity:.35; cursor:not-allowed;}
+  .stepper .val{font-family:'JetBrains Mono'; font-size:18px; font-weight:600; min-width:18px; text-align:center;}
+  .sb-verdict{margin-top:12px; font-size:16px; min-height:24px; font-weight:600;}
+  .sb-verdict.ok{color:var(--ok-ink);} .sb-verdict.bad{color:var(--bad-ink);}
+
+  /* animation helpers */
+  .flash{animation:flash .9s ease;}
+  @keyframes flash{0%{filter:brightness(1);}35%{filter:brightness(1.35);}100%{filter:brightness(1);}}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important;}
+    .flash{animation:none;}
+  }
+  @media (max-width:560px){
+    .hero h1{font-size:26px;}
+    .dot .name{font-size:10px;}
+  }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-in">
-    <span class="nav-title">NumPy Broadcasting</span>
-    <a class="nav-back" href="../index.html">&larr; All lessons</a>
-  </div>
-</nav>
+<div class="topbar">
+  <span class="brand">NumPy Broadcasting</span>
+  <a href="../index.html">← All lessons</a>
+</div>
 
-<main>
-  <div class="intro">
-    <span class="eyebrow">Array shapes</span>
-    <h1>NumPy Broadcasting</h1>
-    <p><b>What am I looking at?</b> Broadcasting lets NumPy add or multiply two arrays of
-    different shapes without writing loops. Pick a shape for each array below. NumPy lines the
-    shapes up from the <b>right</b> and checks each pair of dimensions: they match if they are
-    equal, or if one of them is 1 (that side then stretches to fit). The picture shows the two
-    grids, the check for each dimension, and the final shape you get.</p>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>The Copy Machine</h1>
+    <p class="sub">Two lists of numbers have different sizes. Watch how NumPy copies the small one to fit the big one — so you never write a loop.</p>
   </div>
 
+  <div class="bigidea">
+    When shapes do not match, NumPy <b>copies</b> a side that has size <b>1</b> so both sides line up. Then it adds them, one spot at a time. This copying is called <b>broadcasting</b>.
+  </div>
+
+  <!-- example picker -->
+  <div class="picker" role="group" aria-label="Pick an example">
+    <span class="lbl">Try:</span>
+    <button class="chip" id="chipPass" aria-pressed="true">
+      A fits B <span class="tag">(2,3) + (3,)</span>
+    </button>
+    <button class="chip fail" id="chipFail" aria-pressed="false">
+      A clashes B <span class="tag">(2,3) + (2,)</span>
+    </button>
+  </div>
+
+  <!-- progress dots -->
+  <div class="dots" id="dots" aria-hidden="true"></div>
+
+  <!-- ============ STAGE CARD ============ -->
   <div class="card">
-    <h2>Set the two shapes</h2>
-    <div class="controls">
+    <div class="step-kicker" id="kicker">Step 1 of 5</div>
+    <h2 class="step-title" id="title">Meet the two arrays</h2>
+    <p class="step-body" id="body"></p>
 
-      <div class="shape-row">
-        <span class="shape-name" style="color:var(--accent-d)">Array A</span>
-        <div class="dim-pickers" id="pickers-a"></div>
-      </div>
-
-      <div class="shape-row">
-        <span class="shape-name" style="color:var(--warn)">Array B</span>
-        <div class="dim-pickers" id="pickers-b"></div>
-      </div>
-
-      <div class="presets">
-        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Presets:</span>
-        <button class="preset-btn" data-a="3,1" data-b="1,4">(3,1) + (1,4)</button>
-        <button class="preset-btn" data-a="2,3" data-b="3">(2,3) + (3,)</button>
-        <button class="preset-btn" data-a="2,3" data-b="4">(2,3) + (4,) — fails</button>
-      </div>
-
-      <div class="result">
-        <span class="result-k">Result shape</span>
-        <span class="result-v" id="result-shape">&mdash;</span>
-      </div>
-
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>How the shapes line up</h2>
-    <div class="figwrap" id="figwrap">
-      <svg id="bcast" viewBox="0 0 720 460" role="img"
-           aria-label="Two array shapes shown as grids. The shapes are aligned from the right. Each dimension pair is checked: a match when equal or when one side is 1, otherwise a mismatch. When all pairs match, size-1 axes stretch to the result shape.">
+    <div class="stage-shell">
+      <svg class="stage" id="stage" viewBox="0 0 700 360" role="img" aria-labelledby="svgTitle">
+        <title id="svgTitle">Broadcasting animation</title>
       </svg>
     </div>
+
+    <div class="note" id="note"><div class="badge" id="noteBadge">1</div><div class="txt" id="noteTxt"></div></div>
+
+    <div class="legend">
+      <span class="item"><span class="swatch" style="background:var(--accent-l);border-color:var(--accent)"></span> Array A (the grid)</span>
+      <span class="item"><span class="swatch" style="background:#F6E7C8;border-color:var(--gold-fill)"></span> Array B (gets copied)</span>
+      <span class="item"><span class="swatch" style="background:#DBF0E4;border-color:var(--ok-fill)"></span> Result</span>
+      <span class="item"><span class="verdictsym" style="color:var(--ok-ink)">✓</span> fits</span>
+      <span class="item"><span class="verdictsym" style="color:var(--bad-ink)">✗</span> clash</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-ghost" id="backBtn">← Back</button>
+      <div class="right-grp">
+        <button class="btn btn-play" id="playBtn">▶ Play</button>
+        <button class="btn btn-primary" id="nextBtn">Next →</button>
+      </div>
+    </div>
   </div>
 
-  <div class="takeaway">
-    <h2>What to notice</h2>
-    <ul>
-      <li><b>Align from the right.</b> NumPy lines the two shapes up by their <b>last</b> dimension.
-        A shorter shape is treated as if it has extra <span class="k-ok">size-1</span> axes added on the left.</li>
-      <li><b>Each pair must be equal, or one must be 1.</b> If both numbers match, they are fine.
-        If one is <b>1</b>, that axis <span class="k-ok">stretches</span> to match the other.
-        Any other case is a <span class="k-bad">mismatch</span> and NumPy raises an error.</li>
-      <li>A <b>size-1 axis stretches</b> by repeating its single row or column so both
-        arrays reach the same shape. If any pair fails the rule, broadcasting <span class="k-bad">fails</span>.</li>
-    </ul>
+  <!-- ============ THE 3 RULES ============ -->
+  <div class="card rules">
+    <h2>The 3 rules</h2>
+    <p style="color:var(--muted);margin:4px 0 0;font-size:15px;">A <b>shape</b> is just the size of each side of an array. Line up the two shapes from the right. Look at each pair of numbers:</p>
+    <ol>
+      <li><span class="ok">✓ Same number?</span> Great — they already fit. <span class="kchip">3 and 3</span></li>
+      <li><span class="ok">✓ One of them is 1?</span> That side gets <b>copied</b> (stretched) to match the other. <span class="kchip gold">1 and 3 → copy to 3</span></li>
+      <li><span class="bad">✗ Two different numbers, and neither is 1?</span> NumPy stops with an <b>error</b>. <span class="kchip bad">2 and 3 → ✗ error</span></li>
+    </ol>
+    <p class="footnote">The single row never really gets stored many times — NumPy only <i>pretends</i> to copy it, which saves memory. But picturing the copy is exactly the right way to understand what happens.</p>
   </div>
 
-</main>
+  <!-- ============ SANDBOX (locked until wizard finishes) ============ -->
+  <div class="card sandbox" id="sandbox">
+    <div class="locked-veil" id="veil">
+      <div class="lock">🔒</div>
+      <div class="msg">Finish the walk-through above to unlock<br>“Now you try”</div>
+    </div>
+    <h2>Now you try</h2>
+    <p class="hint">Change the sizes with <b>+</b> and <b>−</b> (each side stays between 1 and 4). Watch the shapes line up from the right, and see if they fit. Try to make an error on purpose!</p>
 
-<script src="./d3.v7.min.js"></script>
+    <div class="steppers">
+      <div class="grp A">
+        <div class="gname"><span class="tag">A</span>Array A<span class="shapeChip mono" id="sbShapeA">(2, 3)</span></div>
+        <div class="stepper"><span class="lbl">rows</span>
+          <button class="btnstep" data-arr="A" data-dim="rows" data-d="-1" aria-label="fewer rows in A">−</button>
+          <span class="val mono" id="sbRowsA">2</span>
+          <button class="btnstep" data-arr="A" data-dim="rows" data-d="1" aria-label="more rows in A">+</button>
+        </div>
+        <div class="stepper"><span class="lbl">cols</span>
+          <button class="btnstep" data-arr="A" data-dim="cols" data-d="-1" aria-label="fewer cols in A">−</button>
+          <span class="val mono" id="sbColsA">3</span>
+          <button class="btnstep" data-arr="A" data-dim="cols" data-d="1" aria-label="more cols in A">+</button>
+        </div>
+      </div>
+      <div class="grp B">
+        <div class="gname"><span class="tag">B</span>Array B<span class="shapeChip mono" id="sbShapeB">(1, 3)</span></div>
+        <div class="stepper"><span class="lbl">rows</span>
+          <button class="btnstep" data-arr="B" data-dim="rows" data-d="-1" aria-label="fewer rows in B">−</button>
+          <span class="val mono" id="sbRowsB">1</span>
+          <button class="btnstep" data-arr="B" data-dim="rows" data-d="1" aria-label="more rows in B">+</button>
+        </div>
+        <div class="stepper"><span class="lbl">cols</span>
+          <button class="btnstep" data-arr="B" data-dim="cols" data-d="-1" aria-label="fewer cols in B">−</button>
+          <span class="val mono" id="sbColsB">3</span>
+          <button class="btnstep" data-arr="B" data-dim="cols" data-d="1" aria-label="more cols in B">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-shell">
+      <svg class="stage" id="sbStage" viewBox="0 0 700 200" role="img" aria-label="Live shape alignment ruler"></svg>
+    </div>
+    <p class="sb-verdict" id="sbVerdict"></p>
+  </div>
+
+</div>
+
 <script>
 (function(){
   "use strict";
+  const NS = "http://www.w3.org/2000/svg";
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  var svgEl = document.getElementById("bcast");
+  // ---------- colors ----------
+  const C = {
+    aFill:"#E4F2F7", aStroke:"#2A7B9B", aInk:"#1F6280",
+    bFill:"#F6E7C8", bStroke:"#C98A1E", bInk:"#7C5606",
+    rFill:"#DBF0E4", rStroke:"#2D8B55", rInk:"#1F6E44",
+    okInk:"#1F6E44", badInk:"#A32E1A",
+    muted:"#6B645E", text:"#2C2A28", wall:"#2C2A28", gold:"#C98A1E"
+  };
 
-  // Graceful degradation if D3 failed to load.
-  if (typeof window.d3 === "undefined") {
-    console.warn("[broadcasting] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
-    if (svgEl) {
-      svgEl.outerHTML =
-        '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>' +
-        'Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>';
+  // ---------- examples ----------
+  const EX = {
+    pass:{
+      ok:true,
+      shapeA:[2,3], shapeB:[3],
+      A:[[1,2,3],[4,5,6]],
+      B:[10,20,30],
+      result:[[11,22,33],[14,25,36]]
+    },
+    fail:{
+      ok:false,
+      shapeA:[2,3], shapeB:[2],
+      A:[[1,2,3],[4,5,6]],
+      B:[10,20]
     }
-    return;
+  };
+  let current = "pass";
+  let step = 0;                 // 0..4
+  const TOTAL = 5;
+  let timers = [];
+  let finishedOnce = false;
+
+  // ---------- svg helpers ----------
+  const stage = document.getElementById("stage");
+  function clearStage(){
+    timers.forEach(clearTimeout); timers = [];
+    const keep = document.getElementById("svgTitle");
+    stage.innerHTML = "";
+    if(keep) stage.appendChild(keep);
+  }
+  function el(tag, attrs, text){
+    const n = document.createElementNS(NS, tag);
+    if(attrs) for(const k in attrs) n.setAttribute(k, attrs[k]);
+    if(text != null) n.textContent = text;
+    return n;
+  }
+  function timer(fn, ms){ const t = setTimeout(fn, reduce?0:ms); timers.push(t); return t; }
+
+  // one number cell (group with rect + text) — returns {g, rect, text}
+  function makeCell(x, y, w, h, val, fill, stroke, ink){
+    const g = el("g", {});
+    const rect = el("rect", {x, y, width:w, height:h, rx:9, fill, stroke, "stroke-width":2});
+    const t = el("text", {x:x+w/2, y:y+h/2+8, "text-anchor":"middle", class:"cellnum", fill:ink}, val);
+    g.appendChild(rect); g.appendChild(t);
+    return {g, rect, text:t, x, y, w, h};
+  }
+  function svgLabel(x, y, txt, fill, anchor){
+    return el("text", {x, y, class:"svglabel", fill:fill||C.muted, "text-anchor":anchor||"start"}, txt);
   }
 
-  var reduceMotion = window.matchMedia &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var DUR = reduceMotion ? 0 : 300;
+  // ---------- geometry (fixed viewBox, design-1 style) ----------
+  const CELL = 64, GAP = 10, STEP = CELL + GAP;
+  const AX = 60, AY = 70;          // grid A top-left (used in Meet / Stretch / Result)
 
-  // ---- geometry ----------------------------------------------------------
-  var W = 720, H = 460;
-  var svg = d3.select(svgEl);
-
-  // Each array has up to 2 dimensions here (rows x cols) so the grid stays readable.
-  // "absent" means the axis does not exist for that array.
-  // Options for each picker: absent, 1, 2, 3, 4.
-  var OPTS = ["-", "1", "2", "3", "4"];   // "-" = absent
-
-  // ---- state -------------------------------------------------------------
-  // shapeA / shapeB are arrays of dimension sizes, length 0, 1 or 2.
-  var shapeA = [3, 1];
-  var shapeB = [1, 4];
-
-  // ---- build the dimension pickers ---------------------------------------
-  // Two pickers per array: "axis 0" (outer / rows) and "axis 1" (inner / cols).
-  var pickersA = document.getElementById("pickers-a");
-  var pickersB = document.getElementById("pickers-b");
-
-  function makePicker(container, axisLabel){
-    var wrap = document.createElement("div");
-    wrap.className = "dim-pick";
-    var lab = document.createElement("span");
-    lab.className = "dim-pick-label";
-    lab.textContent = axisLabel;
-    var sel = document.createElement("select");
-    OPTS.forEach(function(o){
-      var opt = document.createElement("option");
-      opt.value = o;
-      opt.textContent = (o === "-") ? "absent" : o;
-      sel.appendChild(opt);
+  // ============================================================
+  //  STEP 1 — MEET
+  // ============================================================
+  function drawGridA(ox, oy, cells){
+    const ex = EX[current];
+    ex.A.forEach((row, r)=>{
+      row.forEach((v, c)=>{
+        const cc = makeCell(ox + c*STEP, oy + r*STEP, CELL, CELL, v, C.aFill, C.aStroke, C.aInk);
+        stage.appendChild(cc.g);
+        if(cells) cells.push(cc);
+      });
     });
-    wrap.appendChild(lab);
-    wrap.appendChild(sel);
-    container.appendChild(wrap);
-    return sel;
+  }
+  function drawRowB(ox, oy, cells){
+    const ex = EX[current];
+    ex.B.forEach((v, c)=>{
+      const cc = makeCell(ox + c*STEP, oy, CELL, CELL, v, C.bFill, C.bStroke, C.bInk);
+      stage.appendChild(cc.g);
+      if(cells) cells.push(cc);
+    });
   }
 
-  // axis 0 = outer (rows), axis 1 = inner (cols)
-  var selA0 = makePicker(pickersA, "dim 0 (rows)");
-  var selA1 = makePicker(pickersA, "dim 1 (cols)");
-  var selB0 = makePicker(pickersB, "dim 0 (rows)");
-  var selB1 = makePicker(pickersB, "dim 1 (cols)");
-
-  // Convert the two select boxes for one array into a shape array.
-  // If dim 0 is absent but dim 1 is set, the array is 1-D (just cols).
-  // If both absent, the array is a scalar (shape ()).
-  function readShape(sel0, sel1){
-    var d0 = sel0.value;
-    var d1 = sel1.value;
-    var shape = [];
-    if (d0 !== "-") shape.push(+d0);
-    if (d1 !== "-") shape.push(+d1);
-    // If dim 0 present but dim 1 absent, treat the present value as the single axis.
-    return shape;
+  function stepMeet(){
+    const ex = EX[current];
+    stage.appendChild(svgLabel(AX, AY-16, "Array A   shape (2, 3)", C.aInk));
+    drawGridA(AX, AY);
+    const bx = AX;
+    const by = AY + 2*STEP + 40;
+    stage.appendChild(svgLabel(bx, by-14, "Array B   shape ("+ex.shapeB.join(", ")+",)", C.bInk));
+    drawRowB(bx, by);
+    stage.appendChild(svgLabel(AX, by + CELL + 34, "A is a grid: 2 rows, 3 numbers each.", C.muted));
+    stage.appendChild(svgLabel(AX, by + CELL + 58, "B is one row of "+ex.shapeB[0]+" numbers. The shapes are different.", C.muted));
   }
 
-  // Write a shape array back into the two select boxes (right-aligned).
-  function writeShape(sel0, sel1, shape){
-    if (shape.length === 0){ sel0.value = "-"; sel1.value = "-"; }
-    else if (shape.length === 1){ sel0.value = "-"; sel1.value = "" + shape[0]; }
-    else { sel0.value = "" + shape[0]; sel1.value = "" + shape[1]; }
-  }
+  // ============================================================
+  //  Shape-strip helpers for LINE UP + CHECK (wall + snap + pills)
+  //  Layout: wall on the right, A strip on top, B strip below.
+  // ============================================================
+  const WALL_X = 470;
+  const TW = 66, TH = 52, TGAP = 12;
+  const ROW_A_Y = 70, ROW_B_Y = 176;
 
-  // ---- broadcasting logic ------------------------------------------------
-  // Returns { pairs, ok, result } where pairs are aligned from the right.
-  function broadcast(a, b){
-    var n = Math.max(a.length, b.length);
-    var pairs = [];      // each: {ai, bi, kind}  kind in {"equal","stretchA","stretchB","mismatch","onlyA","onlyB"}
-    var result = [];
-    var ok = true;
-    for (var k = 0; k < n; k++){
-      // walk from the right: index from the end
-      var ia = a.length - n + k;   // may be negative -> absent
-      var ib = b.length - n + k;
-      var va = ia >= 0 ? a[ia] : null;   // null = axis absent (acts like 1)
-      var vb = ib >= 0 ? b[ib] : null;
-      var ea = (va === null) ? 1 : va;   // effective size
-      var eb = (vb === null) ? 1 : vb;
-      var kind, res;
-      if (va === null){ kind = "onlyB"; res = eb; }
-      else if (vb === null){ kind = "onlyA"; res = ea; }
-      else if (ea === eb){ kind = "equal"; res = ea; }
-      else if (ea === 1){ kind = "stretchA"; res = eb; }
-      else if (eb === 1){ kind = "stretchB"; res = ea; }
-      else { kind = "mismatch"; res = null; ok = false; }
-      pairs.push({ va: va, vb: vb, ea: ea, eb: eb, kind: kind, res: res });
-      result.push(res);
+  function alignedStartX(len){ return WALL_X - (len*TW + (len-1)*TGAP); }
+
+  // build a shape strip. Padded (missing) dims render as a faint dashed "1".
+  // maxLen = length of the longer shape (so short strips get a leading padded "1")
+  function buildShapeStrip(shape, y, maxLen, isA){
+    const g = el("g", {});
+    const pad = maxLen - shape.length;              // padded slots on the LEFT
+    const startX = alignedStartX(maxLen);
+    const tiles = [];
+    for(let i=0;i<maxLen;i++){
+      const x = startX + i*(TW+TGAP);
+      const isPad = i < pad;
+      const val = isPad ? "1" : shape[i-pad];
+      const fill = isA ? C.aFill : C.bFill;
+      const stroke = isA ? C.aStroke : C.bStroke;
+      const ink = isA ? C.aInk : C.bInk;
+      const rect = el("rect", {x, y, width:TW, height:TH, rx:9,
+        fill: isPad ? (isA?"#EEF6F9":"#FBF3E1") : fill,
+        stroke, "stroke-width":2});
+      if(isPad){ rect.setAttribute("stroke-dasharray","5 4"); rect.setAttribute("opacity","0.75"); }
+      const t = el("text", {x:x+TW/2, y:y+TH/2+7, "text-anchor":"middle", class:"dimnum",
+        fill: isPad ? C.muted : ink,
+        opacity: isPad ? "0.8" : "1"}, val);
+      g.appendChild(rect); g.appendChild(t);
+      tiles.push({rect, text:t, cx:x+TW/2, isPad, val:isPad?1:shape[i-pad]});
     }
-    return { pairs: pairs, ok: ok, result: result };
+    return {g, tiles, startX};
   }
 
-  // ---- drawing helpers ---------------------------------------------------
-  // Render one small grid of rows x cols at (gx, gy) with a max cell size.
-  // stretched: {rows:bool, cols:bool} draws the repeated (stretched) part dashed.
-  function drawGrid(g, rows, cols, gx, gy, color, opts){
-    opts = opts || {};
-    var cell = opts.cell || 22;
-    var origRows = opts.origRows == null ? rows : opts.origRows;
-    var origCols = opts.origCols == null ? cols : opts.origCols;
-    var gridW = cols * cell, gridH = rows * cell;
-    // center the grid on (gx, gy)
-    var x0 = gx - gridW / 2;
-    var y0 = gy - gridH / 2;
-    for (var r = 0; r < rows; r++){
-      for (var c = 0; c < cols; c++){
-        var isStretched = (r >= origRows) || (c >= origCols);
-        var rect = g.append("rect")
-            .attr("x", x0 + c * cell)
-            .attr("y", y0 + r * cell)
-            .attr("width", cell - 2)
-            .attr("height", cell - 2)
-            .attr("rx", 3)
-            .attr("fill", isStretched ? "none" : color)
-            .attr("fill-opacity", isStretched ? 0 : 0.9)
-            .attr("stroke", color)
-            .attr("stroke-width", isStretched ? 1.5 : 1)
-            .attr("stroke-dasharray", isStretched ? "3 2" : null)
-            .attr("stroke-opacity", isStretched ? 0.85 : 1);
-        if (DUR){
-          rect.attr("opacity", 0).transition().duration(DUR)
-              .delay((r * cols + c) * 8).attr("opacity", 1);
-        }
-      }
-    }
-    return { w: gridW, h: gridH, x0: x0, y0: y0 };
+  function buildWall(){
+    const g = el("g", {});
+    g.appendChild(el("rect", {x:WALL_X, y:46, width:8, height:150, rx:3, fill:C.wall, opacity:.85}));
+    g.appendChild(el("text", {x:WALL_X+4, y:38, "text-anchor":"middle", class:"svglabel", fill:C.muted}, "right wall"));
+    return g;
   }
 
-  // ---- main draw ---------------------------------------------------------
-  function draw(){
-    shapeA = readShape(selA0, selA1);
-    shapeB = readShape(selB0, selB1);
+  // ---- STEP 2: LINE UP (slide both strips to the wall) ----
+  function stepLineUp(){
+    const ex = EX[current];
+    const maxLen = Math.max(ex.shapeA.length, ex.shapeB.length);
+    stage.appendChild(buildWall());
+    stage.appendChild(svgLabel(40, 36, "Push both shapes against the right wall →", C.text));
 
-    var bc = broadcast(shapeA, shapeB);
+    const aStrip = buildShapeStrip(ex.shapeA, ROW_A_Y, maxLen, true);
+    const bStrip = buildShapeStrip(ex.shapeB, ROW_B_Y, maxLen, false);
+    stage.appendChild(svgLabel(40, ROW_A_Y+TH/2+6, "A", C.aInk));
+    stage.appendChild(svgLabel(40, ROW_B_Y+TH/2+6, "B", C.bInk));
+    stage.appendChild(aStrip.g);
+    stage.appendChild(bStrip.g);
 
-    svg.selectAll("*").remove();
-
-    // ---- result readout (text banner above the figure) ----
-    var resEl = document.getElementById("result-shape");
-    if (bc.ok){
-      resEl.textContent = shapeStr(bc.result);
-      resEl.className = "result-v ok";
+    if(reduce){
+      // instant
     } else {
-      resEl.textContent = "mismatch — cannot broadcast";
-      resEl.className = "result-v bad";
+      aStrip.g.setAttribute("transform","translate(-300,0)");
+      bStrip.g.setAttribute("transform","translate(-300,0)");
+      aStrip.g.style.transition = "transform .65s cubic-bezier(.2,.8,.2,1)";
+      bStrip.g.style.transition = "transform .65s cubic-bezier(.2,.8,.2,1) .2s";
+      timer(()=>{ aStrip.g.setAttribute("transform","translate(0,0)"); bStrip.g.setAttribute("transform","translate(0,0)"); }, 60);
     }
+    setNote("", "B is shorter. Its missing left spot counts as a <b>1</b> — see the faint dashed box. Both shapes now end at the same right edge.", "2");
+  }
 
-    var colA = "var(--accent)";
-    var colB = "var(--warn)";
-    var colR = "var(--ok)";
-
-    // ===== section 1: the two source grids, side by side =====
-    var topY = 84;
-    var laneA = 180, laneB = 540;
-
-    // labels
-    svg.append("text").attr("x", laneA).attr("y", 34)
-      .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-      .attr("font-size", "14px").attr("font-weight", "700").attr("fill", "var(--accent-d)")
-      .text("Array A  " + shapeStr(shapeA));
-    svg.append("text").attr("x", laneB).attr("y", 34)
-      .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-      .attr("font-size", "14px").attr("font-weight", "700").attr("fill", colB)
-      .text("Array B  " + shapeStr(shapeB));
-
-    var gA = svg.append("g");
-    var gB = svg.append("g");
-
-    var rowsA = gridRows(shapeA), colsA = gridCols(shapeA);
-    var rowsB = gridRows(shapeB), colsB = gridCols(shapeB);
-
-    drawGrid(gA, rowsA, colsA, laneA, topY + 44, colA, { cell: cellFor(rowsA, colsA) });
-    drawGrid(gB, rowsB, colsB, laneB, topY + 44, colB, { cell: cellFor(rowsB, colsB) });
-
-    // plus sign between the two source arrays
-    svg.append("text").attr("x", 360).attr("y", topY + 50)
-      .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-      .attr("font-size", "26px").attr("font-weight", "800").attr("fill", "var(--muted)")
-      .text("+");
-
-    // ===== section 2: the alignment table (aligned from the right) =====
-    var tableTop = 200;
-    var n = bc.pairs.length;
-    // right-align: place columns ending at rightEdge
-    var colW = 96;
-    var rightEdge = 620;
-    var startX = rightEdge - n * colW;
-
-    svg.append("text").attr("x", 100).attr("y", tableTop - 8)
-      .attr("text-anchor", "start").attr("font-family", "var(--body)")
-      .attr("font-size", "12px").attr("font-weight", "600").attr("fill", "var(--text2)")
-      .text("Line the shapes up from the right →");
-
-    // row header labels on the left
-    var rowLabels = ["A", "B", "check", "result"];
-    var rowColors = [colA, colB, "var(--text2)", colR];
-    var rowY = [tableTop + 24, tableTop + 60, tableTop + 100, tableTop + 140];
-    for (var ri = 0; ri < rowLabels.length; ri++){
-      svg.append("text").attr("x", startX - 18).attr("y", rowY[ri] + 5)
-        .attr("text-anchor", "end").attr("font-family", "var(--mono)")
-        .attr("font-size", "11px").attr("font-weight", "600").attr("fill", rowColors[ri])
-        .text(rowLabels[ri]);
+  // ---- STEP 3: CHECK (dashed connector + circular ✓/✗ pill per pair) ----
+  function computePairs(){
+    const a = EX[current].shapeA, b = EX[current].shapeB;
+    const n = Math.max(a.length, b.length);
+    const pairs = [];
+    for(let k=1;k<=n;k++){
+      const av = (a.length-k>=0) ? a[a.length-k] : 1;   // missing → 1
+      const bv = (b.length-k>=0) ? b[b.length-k] : 1;
+      let status;
+      if(av===bv) status="equal";
+      else if(av===1 || bv===1) status="one";
+      else status="bad";
+      pairs.push({av, bv, status, idxFromRight:k-1});
     }
+    return pairs; // rightmost first
+  }
 
-    for (var i = 0; i < n; i++){
-      var p = bc.pairs[i];
-      var cx = startX + i * colW + colW / 2;
+  function stepCheck(){
+    const ex = EX[current];
+    const maxLen = Math.max(ex.shapeA.length, ex.shapeB.length);
+    stage.appendChild(buildWall());
+    stage.appendChild(svgLabel(40, 36, "Check each pair, from the right →", C.text));
 
-      // cell background depending on kind
-      var bg, checkTxt, checkCol;
-      if (p.kind === "mismatch"){ bg = "var(--bad)"; checkTxt = "✗ mismatch"; checkCol = "var(--bad)"; }
-      else if (p.kind === "equal"){ bg = "var(--ok)"; checkTxt = "= equal"; checkCol = "var(--ok)"; }
-      else if (p.kind === "stretchA" || p.kind === "stretchB"){ bg = "var(--accent)"; checkTxt = "1 → stretch"; checkCol = "var(--accent-d)"; }
-      else { bg = "var(--muted)"; checkTxt = "add axis"; checkCol = "var(--muted)"; }
+    const aStrip = buildShapeStrip(ex.shapeA, ROW_A_Y, maxLen, true);
+    const bStrip = buildShapeStrip(ex.shapeB, ROW_B_Y, maxLen, false);
+    stage.appendChild(svgLabel(40, ROW_A_Y+TH/2+6, "A", C.aInk));
+    stage.appendChild(svgLabel(40, ROW_B_Y+TH/2+6, "B", C.bInk));
+    stage.appendChild(aStrip.g);
+    stage.appendChild(bStrip.g);
 
-      // faint column highlight
-      svg.append("rect")
-        .attr("x", cx - colW / 2 + 6).attr("y", tableTop + 4)
-        .attr("width", colW - 12).attr("height", 156)
-        .attr("rx", 8)
-        .attr("fill", p.kind === "mismatch" ? "var(--bad)" : (p.kind === "equal" ? "var(--ok)" : "var(--accent)"))
-        .attr("fill-opacity", 0.06)
-        .attr("stroke", checkCol).attr("stroke-opacity", 0.35).attr("stroke-width", 1);
+    const pairs = computePairs();
+    // one verdict per column, tie A-tile to B-tile with a dashed line + pill
+    pairs.forEach((p, i)=>{
+      const colFromLeft = maxLen - 1 - p.idxFromRight;
+      const aTile = aStrip.tiles[colFromLeft];
+      const bTile = bStrip.tiles[colFromLeft];
+      const cx = aTile.cx;
+      let col, sym;
+      if(p.status==="equal"){ col=C.okInk; sym="✓"; }
+      else if(p.status==="one"){ col=C.gold; sym="✓"; }
+      else { col=C.badInk; sym="✗"; }
 
-      // A value
-      svg.append("text").attr("x", cx).attr("y", rowY[0] + 5)
-        .attr("text-anchor", "middle").attr("font-family", "var(--mono)")
-        .attr("font-size", "15px").attr("font-weight", "600").attr("fill", colA)
-        .text(p.va === null ? "—" : p.va);
-      // B value
-      svg.append("text").attr("x", cx).attr("y", rowY[1] + 5)
-        .attr("text-anchor", "middle").attr("font-family", "var(--mono)")
-        .attr("font-size", "15px").attr("font-weight", "600").attr("fill", colB)
-        .text(p.vb === null ? "—" : p.vb);
-      // check row (a small pill)
-      var pill = svg.append("g");
-      pill.append("rect")
-        .attr("x", cx - 42).attr("y", rowY[2] - 12)
-        .attr("width", 84).attr("height", 22).attr("rx", 11)
-        .attr("fill", bg).attr("fill-opacity", 0.14)
-        .attr("stroke", checkCol).attr("stroke-width", 1);
-      pill.append("text").attr("x", cx).attr("y", rowY[2] + 4)
-        .attr("text-anchor", "middle").attr("font-family", "var(--mono)")
-        .attr("font-size", "10px").attr("font-weight", "600").attr("fill", checkCol)
-        .text(checkTxt);
-      // result row
-      svg.append("text").attr("x", cx).attr("y", rowY[3] + 5)
-        .attr("text-anchor", "middle").attr("font-family", "var(--mono)")
-        .attr("font-size", "15px").attr("font-weight", "700")
-        .attr("fill", p.res === null ? "var(--bad)" : colR)
-        .text(p.res === null ? "✗" : p.res);
-    }
+      const y1 = ROW_A_Y + TH, y2 = ROW_B_Y, midY = (y1+y2)/2;
+      const line = el("line", {x1:cx, y1, x2:cx, y2, stroke:col, "stroke-width":2.5, "stroke-dasharray":"5 4", opacity:0});
+      const pill = el("circle", {cx, cy:midY, r:16, fill:"#fff", stroke:col, "stroke-width":2.5, opacity:0});
+      const symT = el("text", {x:cx, y:midY+6, "text-anchor":"middle", class:"verdictsym", fill:col, opacity:0}, sym);
+      stage.appendChild(line); stage.appendChild(pill); stage.appendChild(symT);
+      // recolor the two tiles it links
+      aTile.rect.setAttribute("stroke", col); bTile.rect.setAttribute("stroke", col);
 
-    // ===== section 3: the outcome grid (result) OR failure message =====
-    var outY = 400;
-    if (bc.ok){
-      var rr = gridRows(bc.result), rcgrid = gridCols(bc.result);
-      // draw the result shape, marking any cells that came from a stretched (size-1) axis.
-      // Determine which arrays needed stretching to reach the result.
-      var gR = svg.append("g");
-      var cell = cellFor(rr, rcgrid);
-      // origRows/origCols: the largest single-source extent BEFORE stretch we visualize
-      // Here we simply draw the full result; stretched cells are those beyond an original size-1 axis.
-      // Compute original rows/cols from the operand that was NOT size-1 (already equals result),
-      // so the "stretched" look highlights that broadcasting filled the shape.
-      var geo = drawGrid(gR, rr, rcgrid, 360, outY, colR,
-        { cell: cell, origRows: rr, origCols: rcgrid });
+      const grp = [line, pill, symT];
+      // reveal RIGHT pair first, then left
+      const order = maxLen - 1 - colFromLeft;
+      if(reduce){ grp.forEach(e=>e.setAttribute("opacity","1")); }
+      else timer(()=>{ grp.forEach(e=>{ e.style.transition="opacity .3s"; e.setAttribute("opacity","1"); }); }, 300 + order*650);
+    });
 
-      svg.append("text").attr("x", 360).attr("y", outY - geo.h / 2 - 12)
-        .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-        .attr("font-size", "14px").attr("font-weight", "700").attr("fill", "var(--ok)")
-        .text("Result  " + shapeStr(bc.result));
-
-      // arrow "=" from table down to result
-      svg.append("text").attr("x", 360).attr("y", 356)
-        .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-        .attr("font-size", "20px").attr("font-weight", "800").attr("fill", "var(--muted)")
-        .text("=");
+    if(ex.ok){
+      setNote("ok", "Every pair passes ✓. The <b>3</b> matches <b>3</b>. The missing spot is a <b>1</b>, so B will copy itself. These shapes can broadcast.", "3");
     } else {
-      svg.append("text").attr("x", 360).attr("y", outY - 6)
-        .attr("text-anchor", "middle").attr("font-family", "var(--display)")
-        .attr("font-size", "16px").attr("font-weight", "800").attr("fill", "var(--bad)")
-        .text("✗  Broadcasting fails");
-      svg.append("text").attr("x", 360).attr("y", outY + 18)
-        .attr("text-anchor", "middle").attr("font-family", "var(--body)")
-        .attr("font-size", "12px").attr("font-weight", "500").attr("fill", "var(--text2)")
-        .text("a red dimension is neither equal nor 1, so NumPy raises an error");
+      setNote("bad", "The right pair clashes ✗: <b>3</b> and <b>2</b> are different and neither is <b>1</b>. NumPy stops here.", "✗");
     }
   }
 
-  // ---- shape / grid utilities --------------------------------------------
-  function shapeStr(shape){
-    if (shape.length === 0) return "()";
-    if (shape.length === 1) return "(" + shape[0] + ",)";
-    return "(" + shape.join(", ") + ")";
-  }
-  // For drawing: rows = size of the second-to-last axis (or 1), cols = last axis (or 1).
-  function gridRows(shape){
-    if (shape.length >= 2) return shape[shape.length - 2];
-    return 1;
-  }
-  function gridCols(shape){
-    if (shape.length >= 1) return shape[shape.length - 1];
-    return 1;   // scalar drawn as a single cell
-  }
-  // Pick a cell size so the grid never gets too big.
-  function cellFor(rows, cols){
-    var maxDim = Math.max(rows, cols);
-    if (maxDim <= 2) return 26;
-    if (maxDim === 3) return 22;
-    return 18;
+  // ============================================================
+  //  STEP 4 — STRETCH (the star moment: stamp the row onto the grid)
+  // ============================================================
+  function stepStretch(){
+    const ex = EX[current];
+    if(!ex.ok){
+      // failure path: real ValueError, no stretch
+      stage.appendChild(svgLabel(AX, AY-16, "No copy is possible", C.badInk));
+      const aCells=[]; drawGridA(AX, AY, aCells);
+      const by = AY + 2*STEP + 40;
+      stage.appendChild(svgLabel(AX, by-14, "Array B  shape (2,)", C.bInk));
+      drawRowB(AX, by);
+      const bigX = el("text", {x:AX + 3*STEP + 30, y:AY + STEP, "text-anchor":"middle",
+        fill:C.badInk, "font-size":64, "font-weight":800, "font-family":"'DM Sans',sans-serif"}, "✗");
+      stage.appendChild(bigX);
+      stage.appendChild(svgLabel(AX, by + CELL + 34, "B has 2 numbers. Each row of A needs 3. They cannot line up.", C.badInk));
+      setNote("bad", "NumPy raises: <code>ValueError: operands could not be broadcast together with shapes (2,3) (2,)</code>", "✗");
+      return;
+    }
+
+    // success: draw the real 2x3 grid, then stamp B up into row 0, then row 1.
+    stage.appendChild(svgLabel(AX, AY-16, "Array A   (the grid)", C.aInk));
+    drawGridA(AX, AY);
+
+    // B sits below, in its own spot
+    const by = AY + 2*STEP + 40;
+    stage.appendChild(svgLabel(AX, by-14, "Array B   the row that gets copied", C.bInk));
+    drawRowB(AX, by);
+
+    // two stamp copies that slide UP onto row 0 and row 1 of the grid
+    function makeStampRow(){
+      const g = el("g", {});
+      ex.B.forEach((v,c)=>{
+        const cc = makeCell(AX + c*STEP, by, CELL, CELL, v, C.bFill, C.bStroke, C.bInk);
+        g.appendChild(cc.g);
+      });
+      // slightly translucent so the grid number underneath still reads as "landing on top"
+      g.setAttribute("opacity", "0.92");
+      stage.appendChild(g);
+      return g;
+    }
+
+    const stamp0 = makeStampRow();
+    const stamp1 = makeStampRow();
+    stamp1.setAttribute("opacity","0");
+
+    const dy0 = AY - by;            // to row 0
+    const dy1 = (AY + STEP) - by;   // to row 1
+
+    if(reduce){
+      stamp0.setAttribute("transform","translate(0,"+dy0+")");
+      stamp1.setAttribute("opacity","0.92");
+      stamp1.setAttribute("transform","translate(0,"+dy1+")");
+      setNote("ok", "The single row of B is <b>copied</b> onto BOTH rows of the grid. One row became two — no loop.", "4");
+      return;
+    }
+
+    // stamp 0 slides up first
+    stamp0.style.transition = "transform .7s cubic-bezier(.34,1.3,.5,1)";
+    timer(()=>{ stamp0.setAttribute("transform","translate(0,"+dy0+")"); }, 120);
+    setNote("", "Watch: the row lifts <b>up</b> and stamps onto row 0 of the grid…", "4");
+    // stamp 1 appears and slides up to row 1
+    timer(()=>{
+      stamp1.setAttribute("opacity","0.92");
+      stamp1.style.transition = "transform .7s cubic-bezier(.34,1.3,.5,1)";
+      timer(()=>{ stamp1.setAttribute("transform","translate(0,"+dy1+")"); }, 40);
+      setNote("ok", "…then the <b>same</b> row stamps onto row 1 too. One row became two — no loop was ever written. This is broadcasting.", "4");
+    }, 950);
   }
 
-  // ---- wire up controls --------------------------------------------------
-  [selA0, selA1, selB0, selB1].forEach(function(sel){
-    ["input", "change"].forEach(function(evt){ sel.addEventListener(evt, draw); });
+  // ============================================================
+  //  STEP 5 — RESULT (count-up each cell A -> A+B)
+  // ============================================================
+  function stepResult(){
+    const ex = EX[current];
+    if(!ex.ok){
+      stage.appendChild(svgLabel(AX, AY+10, "There is no result.", C.badInk));
+      stage.appendChild(svgLabel(AX, AY+40, "When shapes clash, NumPy stops instead of guessing.", C.muted));
+      stage.appendChild(svgLabel(AX, AY+64, "That keeps your math safe.", C.muted));
+      const bad = el("text", {x:AX + 3*STEP + 20, y:AY + STEP + 30, "text-anchor":"middle",
+        fill:C.badInk, "font-size":72, "font-weight":800, "font-family":"'DM Sans',sans-serif"}, "✗");
+      stage.appendChild(bad);
+      setNote("bad", "Remember: from the right, each pair must be <b>equal</b> or one side must be <b>1</b>. (2,) beside 3 fails.", "✗");
+      return;
+    }
+
+    stage.appendChild(svgLabel(AX, AY-16, "A + B  =  Result   (add each spot)", C.rInk));
+    // draw green result grid, starting at A's number, count up to A+B
+    const cells = [];
+    ex.A.forEach((row, r)=>{
+      row.forEach((v, c)=>{
+        const cc = makeCell(AX + c*STEP, AY + r*STEP, CELL, CELL, v, C.rFill, C.rStroke, C.rInk);
+        stage.appendChild(cc.g);
+        cells.push({cc, r, c, start:v, end:ex.result[r][c]});
+      });
+    });
+    // little "aVal + bVal" caption under each cell
+    ex.A.forEach((row, r)=>{
+      row.forEach((v, c)=>{
+        const cap = el("text", {x:AX + c*STEP + CELL/2, y:AY + r*STEP + CELL + 20,
+          "text-anchor":"middle", "font-size":13, "font-family":"'JetBrains Mono',monospace", fill:C.muted, opacity:0},
+          v+"+"+ex.B[c]);
+        stage.appendChild(cap);
+        const delay = reduce?0:((r*3+c)*140+120);
+        if(reduce){ cap.setAttribute("opacity","1"); }
+        else timer(()=>{ cap.style.transition="opacity .3s"; cap.setAttribute("opacity","1"); }, delay);
+      });
+    });
+
+    cells.forEach((item, i)=>{
+      const delay = reduce?0:(i*140);
+      timer(()=>countUp(item.cc.text, item.start, item.end), delay);
+      timer(()=>item.cc.g.classList.add("flash"), delay);
+    });
+
+    setNote("ok", "Shape (2, 3). Every green box = A box + the matching B number. You never wrote a loop.", "✓");
+    // unlock the sandbox once the happy path completes
+    timer(()=>{ finishedOnce = true; unlockSandbox(); }, reduce?0:(cells.length*140+300));
+  }
+
+  function countUp(textEl, start, end){
+    if(reduce){ textEl.textContent = end; return; }
+    const t0 = performance.now(), dur = 460;
+    function frame(now){
+      const p = Math.min(1,(now-t0)/dur);
+      textEl.textContent = Math.round(start + (end-start)*p);
+      if(p<1) requestAnimationFrame(frame); else textEl.textContent = end;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ============================================================
+  //  Wizard step registry
+  // ============================================================
+  const STEPS = [
+    { name:"Meet", title:"Meet the two arrays",
+      body:"Here are our two arrays. <b>A</b> is a grid (blue). <b>B</b> is one short row (gold). We want <b>A + B</b>. Their shapes are different — so how can we add them?",
+      render:stepMeet },
+    { name:"Line up", title:"Line the shapes up from the right",
+      body:"To compare shapes, push them both against a <b>right wall</b> and read from the right. Watch them slide over.",
+      render:stepLineUp },
+    { name:"Check", title:"Check each pair of numbers",
+      body:"For each pair from the right: a <b>✓</b> means the numbers are equal, or one of them is <b>1</b> (that side will copy). A <b>✗</b> means they clash. Each verdict is tied to the two numbers it compares.",
+      render:stepCheck },
+    { name:"Stretch", title:"Copy the small one to fit",
+      body:"This is the key move. The short row gets <b>copied</b> — like pressing a stamp — onto every row of the grid. Watch one row become two.",
+      render:stepStretch },
+    { name:"Result", title:"The result",
+      body:"Now both arrays are the same shape. NumPy adds them <b>spot by spot</b>. Watch each answer count up.",
+      render:stepResult }
+  ];
+
+  // ---------- UI wiring ----------
+  const dotsEl = document.getElementById("dots");
+  const kicker = document.getElementById("kicker");
+  const titleEl = document.getElementById("title");
+  const bodyEl = document.getElementById("body");
+  const noteEl = document.getElementById("note");
+  const noteBadge = document.getElementById("noteBadge");
+  const noteTxt = document.getElementById("noteTxt");
+  const backBtn = document.getElementById("backBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const playBtn = document.getElementById("playBtn");
+  const chipPass = document.getElementById("chipPass");
+  const chipFail = document.getElementById("chipFail");
+
+  function setNote(kind, html, badge){
+    noteEl.className = "note" + (kind?(" "+kind):"");
+    noteBadge.textContent = badge;
+    noteTxt.innerHTML = html;
+  }
+
+  function buildDots(){
+    dotsEl.innerHTML = "";
+    STEPS.forEach((s, i)=>{
+      const d = document.createElement("div");
+      d.className = "dot";
+      d.dataset.state = i<step ? "done" : (i===step ? "active" : "todo");
+      d.innerHTML = '<div class="circle">'+(i<step?"✓":(i+1))+'</div><div class="name">'+s.name+'</div>';
+      dotsEl.appendChild(d);
+    });
+  }
+
+  function render(){
+    clearStage();
+    const s = STEPS[step];
+    kicker.textContent = "Step "+(step+1)+" of "+TOTAL;
+    titleEl.textContent = s.title;
+    bodyEl.innerHTML = s.body;
+    buildDots();
+    backBtn.disabled = (step===0);
+    nextBtn.textContent = (step===TOTAL-1) ? "↺ Restart" : "Next →";
+    // Play only makes sense on animated steps (Line up, Check, Stretch, Result)
+    playBtn.style.visibility = (step>=1) ? "visible" : "hidden";
+    if(step===0) setNote("", "Press <b>Next →</b> to walk through it, or <b>▶ Play</b> on any step to replay its animation.", "1");
+    s.render();
+  }
+
+  nextBtn.addEventListener("click", ()=>{
+    if(step===TOTAL-1){ step=0; } else { step++; }
+    render();
+  });
+  backBtn.addEventListener("click", ()=>{ if(step>0){ step--; render(); } });
+  playBtn.addEventListener("click", ()=>{ render(); });   // re-render replays this step
+
+  function pickExample(which){
+    current = which;
+    chipPass.setAttribute("aria-pressed", which==="pass");
+    chipFail.setAttribute("aria-pressed", which==="fail");
+    step = 0;
+    render();
+  }
+  chipPass.addEventListener("click", ()=>pickExample("pass"));
+  chipFail.addEventListener("click", ()=>pickExample("fail"));
+
+  // ============================================================
+  //  SANDBOX — locked until the pass path finishes once
+  // ============================================================
+  const sandbox = document.getElementById("sandbox");
+  const veil = document.getElementById("veil");
+  const sbStage = document.getElementById("sbStage");
+  const sbVerdict = document.getElementById("sbVerdict");
+  const sbState = { A:{rows:2, cols:3}, B:{rows:1, cols:3} };
+
+  function unlockSandbox(){ sandbox.classList.add("unlocked"); renderSandbox(); }
+  function clamp(v){ return Math.max(1, Math.min(4, v)); }
+
+  function renderSandbox(){
+    // update chips + stepper labels + disabled state
+    ["A","B"].forEach(w=>{
+      document.getElementById("sbShape"+w).textContent = "("+sbState[w].rows+", "+sbState[w].cols+")";
+      document.getElementById("sbRows"+w).textContent = sbState[w].rows;
+      document.getElementById("sbCols"+w).textContent = sbState[w].cols;
+    });
+    document.querySelectorAll("#sandbox .btnstep").forEach(b=>{
+      const arr=b.dataset.arr, dim=b.dataset.dim, d=parseInt(b.dataset.d,10);
+      const cur = sbState[arr][dim];
+      b.disabled = (d<0 && cur<=1) || (d>0 && cur>=4);
+    });
+
+    // draw the alignment ruler (A row, B row, verdict pills) with fixed viewBox
+    sbStage.innerHTML = "";
+    const a = [sbState.A.rows, sbState.A.cols];
+    const b = [sbState.B.rows, sbState.B.cols];
+    const maxLen = 2;
+    const TW2=66, TH2=52, G2=12;
+    const wallX = 470;
+    const startX = wallX - (maxLen*TW2 + (maxLen-1)*G2);
+    const yA=54, yB=110;
+
+    // wall
+    sbStage.appendChild(el("rect",{x:wallX, y:34, width:8, height:120, rx:3, fill:C.wall, opacity:.85}));
+    sbStage.appendChild(el("text",{x:40, y:yA+TH2/2+6, class:"svglabel", fill:C.aInk}, "A"));
+    sbStage.appendChild(el("text",{x:40, y:yB+TH2/2+6, class:"svglabel", fill:C.bInk}, "B"));
+
+    let ok = true;
+    for(let i=0;i<maxLen;i++){
+      const x = startX + i*(TW2+G2);
+      const av = a[i], bv = b[i];
+      // A tile
+      sbStage.appendChild(el("rect",{x, y:yA, width:TW2, height:TH2, rx:9, fill:C.aFill, stroke:C.aStroke, "stroke-width":2}));
+      sbStage.appendChild(el("text",{x:x+TW2/2, y:yA+TH2/2+7, "text-anchor":"middle", class:"dimnum", fill:C.aInk}, av));
+      // B tile
+      sbStage.appendChild(el("rect",{x, y:yB, width:TW2, height:TH2, rx:9, fill:C.bFill, stroke:C.bStroke, "stroke-width":2}));
+      sbStage.appendChild(el("text",{x:x+TW2/2, y:yB+TH2/2+7, "text-anchor":"middle", class:"dimnum", fill:C.bInk}, bv));
+      // verdict pill
+      let status;
+      if(av===bv) status="equal"; else if(av===1||bv===1) status="one"; else status="bad";
+      const col = status==="bad" ? C.badInk : (status==="one" ? C.gold : C.okInk);
+      const sym = status==="bad" ? "✗" : "✓";
+      if(status==="bad") ok=false;
+      const cx=x+TW2/2, midY=(yA+TH2+yB)/2;
+      sbStage.appendChild(el("line",{x1:cx, y1:yA+TH2, x2:cx, y2:yB, stroke:col, "stroke-width":2.5, "stroke-dasharray":"5 4"}));
+      sbStage.appendChild(el("circle",{cx, cy:midY, r:15, fill:"#fff", stroke:col, "stroke-width":2.5}));
+      sbStage.appendChild(el("text",{x:cx, y:midY+6, "text-anchor":"middle", class:"verdictsym", fill:col}, sym));
+    }
+
+    if(ok){
+      const rr = Math.max(a[0],b[0]), rc = Math.max(a[1],b[1]);
+      sbVerdict.className = "sb-verdict ok";
+      sbVerdict.innerHTML = "✓ These fit. NumPy copies to shape ("+rr+", "+rc+") and adds. No loop.";
+    } else {
+      sbVerdict.className = "sb-verdict bad";
+      sbVerdict.innerHTML = "✗ ValueError: a pair differs and neither is 1. NumPy stops. Change a size so a pair matches, or set one side to 1.";
+    }
+  }
+
+  document.querySelectorAll("#sandbox .btnstep").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const arr=b.dataset.arr, dim=b.dataset.dim, d=parseInt(b.dataset.d,10);
+      sbState[arr][dim] = clamp(sbState[arr][dim]+d);
+      renderSandbox();
+    });
   });
 
-  // preset buttons set both shapes
-  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
-    btn.addEventListener("click", function(){
-      var a = btn.getAttribute("data-a").split(",").map(Number);
-      var b = btn.getAttribute("data-b").split(",").map(Number);
-      writeShape(selA0, selA1, a);
-      writeShape(selB0, selB1, b);
-      draw();
-    });
-  });
+  // init
+  render();
+})();
+</script>
 
-  // initial shapes: (3,1) and (1,4)
-  writeShape(selA0, selA1, shapeA);
-  writeShape(selB0, selB1, shapeB);
-  draw();
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
 })();
 </script>
 </body>
