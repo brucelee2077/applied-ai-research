@@ -351,11 +351,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The answer: <code>vmap</code></h4>
       <p><span class="term" data-tip="A JAX tool that takes a function for one example and turns it into one that handles a whole batch at once.">vmap</span> (short for "vectorizing map") takes your one-example function and <strong>automatically</strong> turns it into one that handles a batch — as a single vectorized hardware operation, not a loop. You write the simple version once; JAX does the batching for you:</p>
-      <div class="callout c-info"><span class="ic">📦</span><div><code>batched_f = jax.vmap(f)</code> &nbsp;→&nbsp; <code>batched_f(X)</code> applies <code>f</code> to every row of <code>X</code> at once.<br><span style="font-size:.85rem;color:var(--text2)">Think of Python's <code>map(f, list)</code> — but vectorized on GPU/TPU instead of looping, and it figures out the batch dimension for you.</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>batched_f = jax.vmap(f)</code> &nbsp;→&nbsp; <code>batched_f(X)</code> applies <code>f</code> to every row of <code>X</code> at once.<br><span style="font-size:.85rem;color:var(--ink2)">Think of Python's <code>map(f, list)</code> — but vectorized on GPU/TPU instead of looping, and it figures out the batch dimension for you.</span></div></div>
 
       <h4>So what's today's catch?</h4>
       <p>Mostly there's no catch — it just works. The one thing to learn is <code>in_axes</code>: how to tell <code>vmap</code> <em>which</em> argument is the batch (and which should be held fixed). We'll cover it in the playground.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/automatic-vectorization.html" target="_blank" rel="noopener">Automatic Vectorization in JAX</a> · <a href="https://docs.jax.dev/en/latest/_autosummary/jax.vmap.html" target="_blank" rel="noopener">jax.vmap API</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 你为"一个例子"写好了函数，却要让它跑一整批，第一反应是写 for 循环或手动加 batch 维度 —— 又慢又容易出 shape bug。In plain terms: people reach for a Python loop (slow, hard to compile) or hand-roll extra batch dimensions (fiddly, a top source of shape bugs), instead of letting <code>vmap</code> add the batch axis for them.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -370,6 +371,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🍪🍪🍪</span><h5>vmap = stamp the whole sheet</h5><p>vmap builds a giant cutter that stamps the entire sheet in one press. You designed one shape; it applies it across the batch in a single vectorized move.</p></div>
       </div>
       <p><strong>In one line:</strong> write the function for one example; <code>vmap</code> applies it across the whole batch at once, no loop.</p>
+      <p><b>直觉 / Intuition:</b> 把你的函数当成一个"饼干模具" —— vmap 帮你一次性压出一整盘，而不是一个一个压。The technical point is that <code>vmap</code> rewrites your one-example function to operate on an extra batch axis, so the compiler runs the whole batch as one vectorized op instead of a Python loop.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: vmap doesn't actually loop or copy the cutter. It rewrites your computation to operate on an extra "batch" dimension, so the compiler runs it as one big parallel operation.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -404,7 +406,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><code>in_axes</code> says which axis is the batch for each argument. <code>in_axes=0</code> = batch over axis 0; <code>in_axes=None</code> = don't batch this argument, broadcast it to all examples (e.g. shared weights).</li>
         <li><code>out_axes</code> (rarely needed) says where the batch dimension lands in the output.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>jax.vmap(predict, in_axes=(None, 0))(W, X)</code><br><span style="font-size:.85rem;color:var(--text2)">"Hold the weights <code>W</code> fixed (None), and map over the batch of inputs <code>X</code> (axis 0)." Returns one prediction per input.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>jax.vmap(predict, in_axes=(None, 0))(W, X)</code><br><span style="font-size:.85rem;color:var(--ink2)">"Hold the weights <code>W</code> fixed (None), and map over the batch of inputs <code>X</code> (axis 0)." Returns one prediction per input.</span></div></div>
 
       <h4>Why it's a superpower</h4>
       <ul>
@@ -418,6 +420,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p><code>vmap</code> is powerful because it hides the batch dimension, but that same hiding is exactly what lets a wrong-axis bug slip through without a crash.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mapping the wrong axis with a bad <code>in_axes</code>.</b> Say your batch is <code>X</code> of shape <code>(batch, features)</code> but you (or a transpose upstream) hand vmap data shaped <code>(features, batch)</code> and leave <code>in_axes=0</code>. vmap dutifully slices along axis 0 — now it treats each <em>feature</em> as an "example" and each real example as a "feature". The shapes can still line up, so there is no error; the numbers just come out subtly wrong and the model learns garbage. A senior engineer checks in code review that <code>in_axes</code> points at the true batch axis of <em>each</em> argument, and prints the shape going in and the shape coming out.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hidden batching for lost visibility.</b> vmap lets you write clean single-example code and get batching for free, which removes a whole class of manual batch-dimension bugs. The cost is that the batch axis is now invisible in your function body — when a shape goes wrong, there is no explicit loop to read, so you must reason about <code>in_axes</code> instead of a line of code. The design-review question: is the cleaner single-example logic worth giving up the explicit, easy-to-eyeball loop? For accelerator code, almost always yes.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "vmap auto-vectorizes a single-example function over a batch axis — you get batching as one hardware op, not a loop, and it composes with <code>jit</code> and <code>grad</code>, so <code>vmap(grad(loss))</code> gives per-example gradients with no extra code. The nuance is the silent failure: if <code>in_axes</code> points at the wrong axis — the data arrives <code>(features, batch)</code> but you left <code>in_axes=0</code> — the shapes can still line up, nothing errors, and vmap maps the wrong dimension so the model learns garbage. I always print the in-shape and out-shape."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -456,7 +459,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>Prove it matches a for-loop: assert <code>batched(X)</code> equals <code>jnp.stack([forward(x) for x in X])</code>.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Extend <code>sessions/m07-thinking-in-jax/day-03-vmap/experiment.py</code> into <code>sessions/m07-thinking-in-jax/day-03-vmap/experiment.py</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m07-thinking-in-jax/day-03-vmap/experiment.py</code> (or extend your Day 2 file) with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -469,7 +472,8 @@ Create sessions/m07-thinking-in-jax/day-03-vmap/experiment.py that:
 4. Asserts batched(X) equals jnp.stack([forward(x) for x in X]) to prove vmap matches the for-loop.
 Add a brief comment on each step explaining vmap, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-03-vmap/log.md</code>: in <code>vmap(forward)</code>, why don't the weights <code>W1, W2</code> need a batch dimension? (Hint: <code>in_axes</code>.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m07-thinking-in-jax/day-03-vmap/log.md</code>: (1) the one sentence you'd tell a teammate about what <code>vmap</code> does; (2) why the weights <code>W1, W2</code> don't need a batch dimension (hint: <code>in_axes</code>); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe what your batched MLP did (single-example <code>forward</code> → <code>vmap</code> → <code>(32,2)</code> output matching the for-loop), <b>why</b> vmap scales (one vectorized op on GPU/TPU, composes with <code>jit</code>/<code>grad</code>) instead of a Python loop, and <b>what would break</b> in production if <code>in_axes</code> pointed at the wrong axis — no crash, mismatched batching, a model that silently learns garbage.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

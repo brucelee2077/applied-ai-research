@@ -355,6 +355,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>So what's today's catch?</h4>
       <p>There is no new mechanism to learn — that's intentional. The catch is discipline: it is tempting to skim the exercises because "I already know this." Skimming is exactly what this day is built to catch. If you can't rebuild the derivation without looking at last week's notes, you don't own it yet.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noopener">The Scaling Book — Contents</a> · <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">Chapter 1 — Rooflines</a> · <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">Chapter 4 — Transformer Math</a> · <a href="https://www.dwarkesh.com/p/reiner-pope" target="_blank" rel="noopener">Dwarkesh × Reiner Pope interview</a> · <a href="https://www.youtube.com/watch?v=xmkSf5IS-zw" target="_blank" rel="noopener">Related talk (video)</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 这些公式上周都"懂了"，但真让你空白一张纸从头推、还要边推边讲，很多人才发现自己只是"看懂"而没"会推"。In plain terms: people conflate "I followed the lesson" with "I can rebuild the derivation cold" — and only discover the gap when asked to narrate it live with one number changed.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -369,6 +370,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🎤</span><h5>the concert = the interview</h5><p>Under stage lights, with people watching, is not the time to discover you're shaky on a scale. Rehearsal under low pressure builds the fluency you need under high pressure.</p></div>
       </div>
       <p><strong>In one line:</strong> re-deriving known math by hand, then explaining it out loud, is the "scales" that make your reasoning automatic before the "concert" of a live interview.</p>
+      <p><b>直觉 / Intuition:</b> 把这些推导当成音乐家上台前练的音阶 —— 不是学新曲子，而是把已知的东西练到手指不犹豫。The technical point is that re-deriving arithmetic intensity, KV-cache sizing, and <code>C≈6ND</code> by hand (then out loud) turns "I understood it" into "I can rebuild it under pressure when one parameter changes."</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a musician's scales never change. Your "scales" here — arithmetic intensity, KV cache sizing, <code>C≈6ND</code> — are exercises you must be able to <em>rebuild from first principles</em>, not just replay from muscle memory. If an interviewer changes one number (batch size, sequence length, dtype), you need to re-derive, not recite.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -403,7 +405,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Then say it out loud.</strong> Writing the derivation and speaking it are different skills. Speaking forces you to sequence your reasoning into sentences a listener can follow in real time.</li>
         <li><strong>Rehearse under a simulated follow-up.</strong> After you explain a step, ask yourself "why?" one more time than feels natural. That's what an interviewer does.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>arithmetic intensity = FLOPs / bytes moved</code>, compared to <code>hardware ridge point = peak FLOPs/s ÷ peak bytes/s</code><br><span style="font-size:.85rem;color:var(--text2)">"If my op's intensity is below the ridge point, I'm memory-bound — the chip is waiting on data, not compute." That single comparison is the seed of most systems-interview questions this week.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>arithmetic intensity = FLOPs / bytes moved</code>, compared to <code>hardware ridge point = peak FLOPs/s ÷ peak bytes/s</code><br><span style="font-size:.85rem;color:var(--ink2)">"If my op's intensity is below the ridge point, I'm memory-bound — the chip is waiting on data, not compute." That single comparison is the seed of most systems-interview questions this week.</span></div></div>
 
       <h4>Why it's a superpower</h4>
       <ul>
@@ -412,6 +414,18 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>It exposes the gaps code was hiding</strong> — a notebook cell that runs correctly can mask a step you don't actually understand. Paper forces you to write out every step, so gaps have nowhere to hide.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> Week 3's daily lessons taught the individual facts (roofline, QKV shapes, KV cache, <code>C≈6ND</code>) → today you re-derive them by hand without lesson scaffolding → then you rehearse explaining them out loud → interview-day fluency.</div></div>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — training compute C ≈ 6·N·D</b>
+      <br><b>1 · In words:</b> one token, in one training step, costs about 6 FLOPs per parameter — so total training compute is 6 × (parameters) × (tokens).
+      <br><b>2 · The formula:</b> <code>C ≈ 6·N·D</code> — <code>N</code> = parameters; <code>D</code> = training tokens; the <code>6</code> = 2 FLOPs per multiply-add × 3 (≈ 1 forward + 2 backward-equivalent passes).
+      <br><b>3 · Tiny numbers:</b> <code>N = 7e9</code>, <code>D = 2e12</code> → <code>C ≈ 6 × 7e9 × 2e12 = 8.4e22</code> FLOPs.
+      <br><b>4 · Sanity check:</b> forward alone is ≈ <code>2ND</code>; if your "6" ever comes out "2", you dropped the backward pass — which costs about twice the forward.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Two things separate a rehearsed answer from a lucky one: the unit slip that flips a verdict, and how you spend limited prep time.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): comparing arithmetic intensity to the wrong ridge point.</b> Intensity = <code>FLOPs / bytes</code> means nothing until you compare it to the hardware's ridge = <code>peak FLOPs/s ÷ peak bytes/s</code>. Mix the units — quote peak FLOPs without the matching bandwidth, or count fp32 bytes for a bf16 kernel — and your memory-bound-vs-compute-bound verdict flips with no error, so you optimize the wrong thing. In a live answer, a staff engineer states the ridge point explicitly and keeps the dtype consistent between the FLOP count and the byte count.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: depth vs. breadth in prep.</b> You can re-derive a few core formulas until they are automatic, or skim many topics shallowly. Depth wins a systems interview — they change one number and watch you re-derive live; breadth wins a recall quiz. This weekend is deliberately depth: two derivations, spoken cold, over many topics half-remembered.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "<code>C≈6ND</code>: 2 FLOPs per multiply-add, times 3 for roughly one forward plus two backward-equivalent passes, per parameter per token — for a 7B model on 2T tokens that's about <code>8.4e22</code> FLOPs. The nuance is the '6' — forward alone is <code>2ND</code> and backward costs about twice forward, so slipping to '2' or '4' is the classic error. And arithmetic intensity only tells you compute- vs memory-bound <em>relative to the hardware's ridge point</em>, with the same dtype used in the byte count."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -494,7 +508,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
 3. Say the script out loud at least once before marking today done.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After finishing both files, write one line in <code>sessions/m08-transformer-math/day-06-scaling-exercises-rehearsal/log.md</code>: which single derivation felt shakiest when you said it out loud, and why — that's your flag for what to re-drill next week.</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m08-transformer-math/day-06-scaling-exercises-rehearsal/log.md</code>: (1) the one derivation you can now rebuild cold; (2) which single derivation felt shakiest when you said it out loud, and why — your flag for what to re-drill next week; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> — this is literally <code>rehearsal_script.md</code>: write out, in spoken sentences, the <code>C≈6ND</code> and KV-cache derivations, saying <b>what</b> each number is, <b>why</b> the "6" and the per-layer KV bytes come out that way, and <b>what would break</b> in a real capacity estimate if you compared intensity to the wrong ridge point or forgot the backward pass. Then say it out loud once.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

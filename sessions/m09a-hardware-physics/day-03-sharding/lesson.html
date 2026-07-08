@@ -365,6 +365,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>So what's today's catch?</h4>
       <p>The catch is cost. These collectives move a lot of data between chips over the wires that connect them (the <span class="term" data-tip="The wires that connect chips, letting them send data to each other.">interconnect</span>). When you scale to hundreds of devices, that communication — not the math — is often the slowest part. Knowing which collective you are paying for is the whole game.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/sharding/" target="_blank" rel="noopener">How to Scale Your Model — Sharding</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 把数组切开分给多张卡不难，难的是"切开之后怎么再拼回来" —— 三个 collective 名字很像，新手常分不清哪个在<em>求和</em>、哪个只是<em>复制</em>。In plain terms: splitting is easy; the confusion is the three collectives — <code>AllGather</code>, <code>ReduceScatter</code>, <code>AllReduce</code> look alike, and people mix up which ones sum versus which just copy.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -384,6 +385,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🔗</span><h5>AllReduce = ReduceScatter + AllGather</h5><p>First everyone keeps a slice of the sum (ReduceScatter). Then everyone photocopies the slices to reassemble the whole sum (AllGather). Two steps, one result.</p></div>
       </div>
       <p><strong>In one line:</strong> shard to fit; then use a collective — gather to get a full copy, reduce-scatter to keep a slice of the sum, all-reduce to give everyone the full sum.</p>
+      <p><b>直觉 / Intuition:</b> 想象一个小组分工写一份长文档：切开是 sharding，拼回来就是 collective —— 全体互相复印(AllGather)、各留一片汇总(ReduceScatter)、或人人都拿到完整汇总(AllReduce)。The technical point is that a collective's cost is the interconnect traffic it triggers — and that traffic, not the math, becomes the bottleneck at scale.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real devices don't take turns like polite people. Collectives are carefully scheduled so many chips send and receive at the same moment over the interconnect — and that traffic is what costs time.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -418,7 +420,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>ReduceScatter</strong> — reduce (usually sum) then split. Devices sum their contributions element by element, then each device keeps only <em>one slice</em> of that sum. Use it to spread a summed result so no device holds the whole thing.</li>
         <li><strong>AllReduce</strong> — reduce, then everyone gets the whole result. Devices sum everything, and every device ends up with the identical full sum. Use it when all devices need the same combined answer (for example, summed gradients in training).</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>AllReduce = ReduceScatter → AllGather</code><br><span style="font-size:.85rem;color:var(--text2)">First each device keeps a slice of the sum (ReduceScatter). Then those slices are gathered back to everyone (AllGather). That is why AllReduce moves roughly twice the data of a single gather.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>AllReduce = ReduceScatter → AllGather</code><br><span style="font-size:.85rem;color:var(--ink2)">First each device keeps a slice of the sum (ReduceScatter). Then those slices are gathered back to everyone (AllGather). That is why AllReduce moves roughly twice the data of a single gather.</span></div></div>
 
       <h4>Why communication is the scaling bottleneck</h4>
       <ul>
@@ -428,10 +430,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> models too big for one chip → shard across devices → devices hold only pieces → collectives recombine them → collective traffic dominates at scale → communication, not math, sets the speed limit.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the cost of a collective is bytes moved, not FLOPs</b>
+      <br><b>1 · In words:</b> a collective's price is how many shard-bytes it pushes across the interconnect; AllReduce is the priciest because it is two collectives back to back.
+      <br><b>2 · The formula:</b> for <code>P</code> devices and a total array of <code>N</code> elements, <code>AllGather</code> and <code>ReduceScatter</code> each move ≈ <code>(P−1)·N</code>; <code>AllReduce = ReduceScatter + AllGather ≈ 2·(P−1)·N</code>. (<code>P</code> = devices; <code>N</code> = array size.)
+      <br><b>3 · Tiny numbers:</b> <code>P=4</code> → AllGather ≈ <code>3N</code>, ReduceScatter ≈ <code>3N</code>, AllReduce ≈ <code>6N</code>. Double to <code>P=8</code> and each collective's traffic climbs toward ≈ <code>7N</code> — communication grows with device count.
+      <br><b>4 · Sanity check:</b> AllReduce should always cost about <b>2×</b> a single AllGather (it <em>is</em> a ReduceScatter then an AllGather). If your cost model says they're equal, you dropped one of the two phases.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>Sharding is easy to get numerically wrong in a way that still produces a plausible-looking loss curve, and it is easy to shard along the axis that costs the most traffic.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a missing (or wrong) collective, so replicas silently disagree.</b> If each device holds a shard and you forget the AllReduce on gradients — or use AllGather where you needed a summing reduce — every device keeps updating its own copy with only its local information. Nothing crashes: shapes still match, the step runs, and the loss even goes down for a while. But the replicas drift apart and the effective batch is wrong, so the model trains to a worse point than you think. In <b>code review</b>, a senior engineer checks that every quantity which must be identical across devices (gradients, batch-norm stats, the final summed result) actually passes through a reduce collective, not just a gather.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fit a bigger model vs. pay interconnect traffic.</b> Sharding lets you hold a model that no single chip could store, which is the only way to train the largest models at all. The cost is that recombining shards means collectives, and collective traffic grows with model size and device count until the wires — not the math units — set your speed. In a <b>design review</b>, choosing the sharding layout is choosing which axis to split so the collectives you trigger move the fewest bytes across the interconnect.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Sharding splits a too-big array across devices; to finish the math they recombine with three collectives — AllGather (everyone ends with the full copy), ReduceScatter (sum, keep one slice), and AllReduce (sum, everyone gets the full result, which is a ReduceScatter then an AllGather). The nuance is that at scale the interconnect traffic, not the FLOPs, sets the speed — AllReduce moves about 2× an AllGather. The silent failure is using a gather where you needed a summing reduce: shapes match and loss still falls, but replicas drift and the effective batch is wrong."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -485,7 +494,8 @@ Create sessions/m09a-hardware-physics/day-03-sharding/experiment.py that simulat
 5. Print each device's array BEFORE and AFTER every collective so the effect is visible.
 Add a brief comment on each function explaining the collective, then run it to confirm the output matches.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-03-sharding/log.md</code>: why does <code>AllReduce</code> move roughly twice the data of a single <code>AllGather</code>? (Hint: it is two collectives in a row.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09a-hardware-physics/day-03-sharding/log.md</code>: (1) which collectives <em>sum</em> and which just <em>copy</em>; (2) why <code>AllReduce</code> moves roughly twice the data of a single <code>AllGather</code> (hint: two collectives in a row); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe what your numpy simulation showed for each collective (what every device holds before/after), explain <b>why</b> a collective's cost is interconnect bytes ≈ <code>(P−1)·N</code> (and why that scales with device count until communication dominates), and <b>what would break</b> in real training if you used a gather where a summing reduce was needed — silently drifting replicas and a wrong effective batch, with no crash.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

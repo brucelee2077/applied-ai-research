@@ -248,6 +248,36 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
 .site-footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);line-height:1.6}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-fit{stroke:#111827;stroke-width:2;fill:none}
+.vlab-fit.dash{stroke:#B0453A;stroke-dasharray:5 4}
+.vlab-pt{stroke:#1F2937;stroke-width:1.1}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-badge{font-family:var(--body);font-size:.74rem;font-weight:700;border-radius:999px;padding:.15rem .6rem;margin-left:.4rem;white-space:nowrap}
+.vlab-badge.ok{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.vlab-badge.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+
 /* ---------- tooltip ---------- */
 #term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);background:#080B11;color:#EDEAFE;font-family:var(--body);font-size:.82rem;
   font-weight:400;line-height:1.45;text-align:left;padding:.6rem .78rem;border-radius:var(--r-md);border:1px solid var(--line2);
@@ -358,6 +388,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Both also love a number format called <span class="term" data-tip="A 16-bit number format (brain float 16) that uses half the space of a normal 32-bit float.">bf16</span> ("brain float 16"): a 16-bit floating-point number. Normal floats are 32 bits (<code>fp32</code>). bf16 uses half the bytes, so you can move and store twice as much per second and fit twice as much in memory — for a small loss of precision that neural nets usually tolerate well.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/tpus/" target="_blank" rel="noopener">How to Scale Your Model — TPUs</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "systolic array"（脉动阵列）这个词听着很玄，很多人以为芯片一下子就把整个矩阵乘完了。In plain terms: people picture a matmul happening in one instant, so the idea of numbers <em>flowing through a grid over many beats</em> — and cells sitting idle when the matrix is too small — feels mysterious until you watch it move.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -372,6 +403,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🏭➡️➡️➡️</span><h5>TPU MXU = a purpose-built assembly line</h5><p>Inputs stream in one end. Each station on the line multiplies and adds, passing partial sums along. For the single job of matmul, nothing sits idle — the whole line does one huge multiply per pass.</p></div>
       </div>
       <p><strong>In one line:</strong> when the work is one op done a million times (big matmuls), the assembly line beats the flexible room. That is the TPU's bet.</p>
+      <p><b>直觉 / Intuition:</b> 把 MXU 想成一条流水线：权重先"装"进网格，输入像水一样一拍一拍流过，每个格子边乘边累加。The technical point is that the systolic array reuses each loaded weight across many streaming inputs, so a big matmul runs at near-peak efficiency — but a tiny matmul leaves most of the fixed grid idle.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the MXU's cells don't pass a physical object down a belt. Numbers flow through the grid in a timed rhythm and each cell keeps a running sum — the "product" of the whole line is one finished matmul, not a row of separate items.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -382,6 +414,28 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Click through three views of TPU vs. GPU</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>These are click-to-reveal diagrams, not a live terminal. Each one shows one idea from Section 1. <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">Systolic-array beat scrubber</span>
+          <span class="vlab-readout" id="mxu-readout">beat 0 / 6 · active now <b>1</b> · cells used <b>9/9</b> (100%)</span>
+        </div>
+        <p class="vlab-q">Learning question: a fixed grid of multiply-accumulate cells does a <em>whole</em> matmul by <b>streaming</b> data through on staggered beats. Drag the beat to watch the wavefront fill and drain — then switch to batch-1 and see what happens to the grid when the matmul is too small.</p>
+        <div class="vlab-panels" style="grid-template-columns:1fr">
+          <figure class="vlab-fig"><figcaption>3×3 MXU grid computing <code>C = A·B</code> — each cell accumulates one output entry</figcaption>
+            <svg class="vlab-svg" id="mxu-grid" viewBox="0 0 460 300" role="img" aria-label="A 3 by 3 grid of multiply-accumulate cells. A diagonal wavefront of active cells sweeps across as the beat advances, and partial sums grow until each cell holds a finished output entry."></svg></figure>
+        </div>
+        <div class="vlab-controls">
+          <label>beat <input type="range" id="mxu-beat" min="0" max="6" step="1" value="0" aria-label="beat number 0 to 6"></label>
+          <span class="vlab-val" id="mxu-beat-lbl">t = 0</span>
+          <span class="vlab-toggle" role="group" aria-label="workload size">
+            <button type="button" class="vlab-btn active" id="mxu-full">full matmul</button>
+            <button type="button" class="vlab-btn" id="mxu-b1">batch-1 (matrix×vector)</button>
+          </span>
+        </div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> at each beat only a <em>diagonal</em> of cells is active — the wavefront. Drag the beat forward and partial sums grow (blue = mid-sum, gold = adding now) until each cell "retires" green with its finished value; a 3×3 matmul finishes at beat 6 (fill + drain ≈ <code>3n−2</code> beats). Switch to <b>batch-1</b> and two of the three columns never light up — those cells sit idle the whole time.</div></div>
+        <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Misconception:</b> "the TPU does a matmul in one clock." No — it takes ~<code>3n−2</code> beats to fill and drain the grid. The win is <em>reuse</em>: a loaded weight feeds many streaming inputs, so amortized over a big matmul the cost per output is tiny. On a real 128×128 MXU, a batch-1 matmul wastes 127 of every 128 columns.</div></div>
+        <p class="vlab-note"><b>How to read it:</b> cell <code>(i,j)</code> does its <code>k</code>-th multiply-accumulate at beat <code>i+j+k</code>, so starts stagger along the diagonal; a cell retires once it has summed all <code>n</code> products. <b>Simplified:</b> a real MXU is a much larger fixed grid (e.g. 128×128) with pipelined weight-load — this toy uses a 3×3 output-stationary schedule, integer inputs, and no HBM latency.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="mxu" type="button">① MXU: watch data flow the grid</button>
@@ -420,6 +474,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A TPU is fast only when the workload is the shape it was built for; feed it the wrong shape and it stays quietly slow with no error at all.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): tiny matmuls that leave the MXU mostly empty.</b> The MXU is a fixed grid — say 128&times;128 cells. If your matrix dimensions are much smaller than the grid (a small batch, a narrow layer, or a per-example loop), the extra cells sit idle but the pass still takes the same number of beats to drain. The code runs and gives correct answers, but you get a small fraction of peak throughput and no warning. In <b>code review</b>, a senior engineer checks that matmul dimensions (especially batch and the contracted dimension) are large multiples of the MXU tile size, and flags per-example or tiny-batch loops that starve the grid.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fixed-function speed vs. flexibility.</b> A GPU's general SMs run almost any code; the MXU only does one op — matrix multiply — extremely well. You gain near-peak efficiency and lower overhead on the matmul-heavy work that dominates transformer training, and you give up the freedom to run irregular, branchy, or non-matmul kernels efficiently. In a <b>design review</b>, this is the choice between a specialized accelerator that wins on your main workload and a general one that never falls off a cliff on the odd operation.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A TPU's MXU is a systolic array — a fixed grid of multiply-accumulate cells where a weight matrix is loaded once and inputs stream through on staggered beats, so partial sums accumulate and one pass produces a block of the output near peak efficiency. The nuance is the silent failure: the grid is a fixed size, say 128×128, so a small matmul — batch-1 decode, a narrow layer, a per-example loop — leaves most cells idle. The answer is correct and there's no error; you just get a tiny fraction of peak. I keep matmul dimensions large multiples of the tile size."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -471,7 +526,8 @@ Create sessions/m09a-hardware-physics/day-02-tpu-architecture/experiment.py that
 Then create sessions/m09a-hardware-physics/day-02-tpu-architecture/tpu_vs_gpu.md: a short note comparing the MXU (systolic array, purpose-built for matmul) to a GPU SM (general, flexible), and one line each on when each wins.
 Add brief comments explaining the systolic-array idea, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-02-tpu-architecture/log.md</code>: why did bf16 change the time the way it did — and how does that connect to the MXU and HBM being fed with fewer bytes?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09a-hardware-physics/day-02-tpu-architecture/log.md</code>: (1) the one sentence you'd tell a teammate about what a systolic array is; (2) why bf16 changed your matmul time the way it did (fewer bytes through the MXU and HBM); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe what the MXU does (weights loaded, inputs streaming, partial sums accumulating over beats), <b>why</b> that shape wins for transformer training (big matmuls keep every cell busy) and why bf16 doubles throughput, and <b>what would break</b> in production if you fed it tiny/batch-1 matmuls — a correct answer at a tiny fraction of peak, with no error to warn you.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -700,6 +756,53 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── playground visual: systolic-array beat scrubber (dependency-free SVG) ── -->
+<script>
+(function(){
+  "use strict";
+  var svg=document.getElementById('mxu-grid');
+  if(!svg) return;
+  var A=[[1,2,3],[4,5,6],[7,8,9]];
+  var B=[[1,1,1],[0,1,1],[0,0,1]];   // upper-triangular of ones → readable running sums
+  var n=3, MAXT=3*(n-1);             // last cell (n-1,n-1) retires at beat 3(n-1)=6
+  var beatS=document.getElementById('mxu-beat'), beatL=document.getElementById('mxu-beat-lbl'), readout=document.getElementById('mxu-readout');
+  var bFull=document.getElementById('mxu-full'), bB1=document.getElementById('mxu-b1'), mode='full';
+  function full(i,j){ var s=0; for(var k=0;k<n;k++) s+=A[i][k]*B[k][j]; return s; }
+  function partial(i,j,t){ var K=t-i-j; if(K<0) return null; if(K>n-1) K=n-1; var s=0; for(var k=0;k<=K;k++) s+=A[i][k]*B[k][j]; return s; }
+  function started(i,j,t){ return (t-i-j)>=0; }
+  function done(i,j,t){ return (t-i-j)>=(n-1); }
+  function activeNow(i,j,t){ var K=t-i-j; return K>=0 && K<=n-1; }
+  function inWorkload(j){ return mode==='full' || j===0; }   // batch-1 → only output column 0
+  var gx=120, gy=64, cw=84, ch=62;
+  function render(){
+    var t=parseInt(beatS.value,10), s='', i, j;
+    s+='<text class="vlab-lbl" x="230" y="16" text-anchor="middle">beat t = '+t+'   ·   active = diagonal where i+j ≤ t ≤ i+j+'+(n-1)+'</text>';
+    for(i=0;i<n;i++) s+='<text class="vlab-lbl" x="8" y="'+(gy+i*ch+ch/2+4)+'">A row '+i+' →</text>';
+    for(j=0;j<n;j++) s+='<text class="vlab-lbl" x="'+(gx+j*cw+cw/2)+'" y="'+(gy-8)+'" text-anchor="middle">B col '+j+' ↓</text>';
+    var activeCount=0;
+    for(i=0;i<n;i++) for(j=0;j<n;j++){
+      var x=gx+j*cw, y=gy+i*ch, use=inWorkload(j);
+      var fill='#F8FAFC', stroke='#C2C9D4', tcol='#5A6472', sw=1.3, val='·';
+      if(!use){ fill='#EDEFF2'; stroke='#DFE3E9'; tcol='#AEB4BD'; val='idle'; }
+      else if(done(i,j,t)){ fill='#E8F5EE'; stroke='#2D8B55'; tcol='#1A5C38'; val=String(full(i,j)); }
+      else if(activeNow(i,j,t)){ fill='#FCEFD6'; stroke='#C99A12'; tcol='#7A5C0A'; sw=2.2; val=String(partial(i,j,t)); activeCount++; }
+      else if(started(i,j,t)){ fill='#EEF2FE'; stroke='#8091FF'; tcol='#3948A0'; val=String(partial(i,j,t)); }
+      s+='<rect x="'+(x+4)+'" y="'+(y+4)+'" width="'+(cw-10)+'" height="'+(ch-10)+'" rx="7" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+      s+='<text x="'+(x+cw/2)+'" y="'+(y+ch/2-3)+'" text-anchor="middle" font-family="monospace" font-size="15" font-weight="bold" fill="'+tcol+'">'+val+'</text>';
+      s+='<text x="'+(x+cw/2)+'" y="'+(y+ch/2+13)+'" text-anchor="middle" font-family="monospace" font-size="9" fill="'+tcol+'">C['+i+']['+j+']</text>';
+    }
+    svg.innerHTML=s;
+    beatL.textContent='t = '+t;
+    var totalCells=n*n, usedCells=(mode==='full')?n*n:n, pct=Math.round(usedCells/totalCells*100);
+    readout.innerHTML='beat '+t+' / '+MAXT+' · active now <b>'+activeCount+'</b> · cells used <b>'+usedCells+'/'+totalCells+'</b> ('+pct+'%)';
+  }
+  beatS.addEventListener('input',render);
+  bFull.addEventListener('click',function(){ mode='full'; bFull.classList.add('active'); bB1.classList.remove('active'); render(); });
+  bB1.addEventListener('click',function(){ mode='batch1'; bB1.classList.add('active'); bFull.classList.remove('active'); render(); });
+  render();
 })();
 </script>
 

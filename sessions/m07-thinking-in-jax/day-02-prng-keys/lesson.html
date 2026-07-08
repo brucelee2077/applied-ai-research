@@ -349,11 +349,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>How JAX does it: you hold the key</h4>
       <p>JAX makes randomness <strong>explicit</strong>. You create a <span class="term" data-tip="A tiny array in JAX that controls randomness. You pass it into random calls so results are explicit and repeatable.">key</span> (a tiny array) from a seed, then pass it into every random call:</p>
-      <div class="callout c-info"><span class="ic">📦</span><div><code>key = jax.random.PRNGKey(0)</code> &nbsp;→&nbsp; <code>jax.random.normal(key, (3,))</code><br><span style="font-size:.85rem;color:var(--text2)">The same <code>key</code> always returns the same numbers. There is no hidden state — the key <em>is</em> the state, and you carry it yourself. (Newer JAX also writes this as <code>jax.random.key(0)</code>.)</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>key = jax.random.PRNGKey(0)</code> &nbsp;→&nbsp; <code>jax.random.normal(key, (3,))</code><br><span style="font-size:.85rem;color:var(--ink2)">The same <code>key</code> always returns the same numbers. There is no hidden state — the key <em>is</em> the state, and you carry it yourself. (Newer JAX also writes this as <code>jax.random.key(0)</code>.)</span></div></div>
 
       <h4>So what's today's catch?</h4>
       <p>Because the key fully determines the output, <strong>reusing the same key gives you the same numbers again</strong> — a subtle trap. To get fresh, independent randomness you must <strong>split</strong> the key into new keys. That's the whole skill for today.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional, for after): <a href="https://docs.jax.dev/en/latest/jep/263-prng.html" target="_blank" rel="noopener">JAX PRNG design note</a> · <a href="https://docs.jax.dev/en/latest/jax.random.html" target="_blank" rel="noopener">jax.random API</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> NumPy 里 <code>np.random.normal()</code> 直接给你数字，JAX 却要你手里攥着一个 key 到处传，感觉很啰嗦。In plain terms: people treat the key as annoying boilerplate and quietly reuse the same one — not realizing that the key <em>is</em> the randomness, so reusing it hands you the identical "random" numbers with no warning.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -368,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🎫</span><h5>JAX = you hold the ticket</h5><p>You hold a ticket (the key). Same ticket → same numbers, on any machine. Want a different draw? You don't re-cash the same ticket — you <strong>split</strong> it into new tickets.</p></div>
       </div>
       <p><strong>In one line:</strong> NumPy hides and auto-advances the randomness; JAX hands it to you as a key, and you split keys to move forward.</p>
+      <p><b>直觉 / Intuition:</b> key 就像一张"决定了骰子点数的票" — 同一张票永远开出同样的点数。The technical point is that the key fully determines the draw, so to get fresh, independent randomness you must <code>split</code> the key rather than call twice with the same one.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: tickets aren't "used up," and splitting is fully deterministic — splitting the same key always yields the same new keys. Nothing is actually random about the bookkeeping.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -415,6 +417,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Explicit keys buy you purity and reproducibility, but the same "the key <em>is</em> the randomness" rule hides one trap, and it costs you some bookkeeping.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): correlated randomness from a reused key.</b> Reusing a key does not error — <code>random.normal(key, ...)</code> happily returns numbers. But the <em>same</em> key returns the <em>same</em> numbers. So if you initialize two layers with the same key, both layers start with identical weights; if you draw two "independent" noise samples from one key, they are perfectly correlated. Training still runs, the loss still drops a little, but the model quietly underperforms and results look strange. A senior engineer scans code review for a key that is passed into more than one random call without a <code>split</code> in between.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: manual key threading for reproducibility.</b> NumPy's hidden global generator is convenient — you never think about state. JAX makes you carry and split keys by hand, which is more code and one more thing to get wrong. In exchange you get exact reproducibility across runs and machines, and randomness that is safe to <code>jit</code>, <code>vmap</code>, and shard across devices. The design-review question: is the extra key-threading worth being able to reproduce any experiment exactly? For research at scale, yes.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "JAX makes randomness explicit — you pass a key into every random call instead of relying on a hidden global generator, so the function stays pure and the run is bit-for-bit reproducible across machines; to advance you <code>split</code> the key. The nuance is the silent failure: reusing a key doesn't error, it returns the <em>same</em> numbers — so two layers initialized from one key get identical weights, and 'independent' noise samples come out perfectly correlated. Training still runs; the model just quietly underperforms."</div></div>
       <button class="gotit" type="button">Got the three calls</button>
     </div>
 </section>
@@ -467,7 +470,8 @@ Create sessions/m07-thinking-in-jax/day-02-prng-keys/experiment.py that:
 5. Runs the whole script twice (or re-seeds) to show the output is identical = reproducible.
 Add a brief comment on each step explaining the key splitting, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-02-prng-keys/log.md</code>: what would break if you used one key for both layers instead of splitting?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m07-thinking-in-jax/day-02-prng-keys/log.md</code>: (1) the one sentence you'd tell a teammate about why JAX keys are explicit; (2) what would break if you used one key for both layers instead of splitting; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe what your MLP-init script did (one key → <code>split</code> per layer → distinct weights), <b>why</b> explicit keys give purity + exact reproducibility (and why that scales to <code>jit</code>/<code>vmap</code>/multi-device runs), and <b>what would break</b> in research if a key were reused — correlated weights/noise, an experiment that silently underperforms and can't be reproduced or debugged.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

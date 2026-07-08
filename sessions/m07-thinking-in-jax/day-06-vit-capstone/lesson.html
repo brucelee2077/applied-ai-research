@@ -347,7 +347,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The answer: cut the image into patches, treat each patch as a token</h4>
       <p>A <span class="term" data-tip="A small square piece cut out of an image, for example a 4x4 block of pixels.">patch</span> is a small square cut out of the image — for example a <code>4×4</code> pixel square. Cut a <code>32×32</code> image into <code>4×4</code> patches and you get an <code>8×8</code> grid of patches, which is <strong>64 patches total</strong>. Each patch has <code>4×4×3 = 48</code> numbers in it (4 pixels wide, 4 pixels tall, 3 color channels). <span class="term" data-tip="To unroll numbers from a grid or box into one long single list, or vector.">Flatten</span> each patch — unroll its 48 numbers into one long list — and now that patch is just a vector of length 48. That vector is one "token," exactly the kind of thing a Transformer already knows how to read.</p>
-      <div class="callout c-info"><span class="ic">📦</span><div>One <code>32×32×3</code> image &nbsp;→&nbsp; cut into 64 patches of <code>4×4×3</code> &nbsp;→&nbsp; flatten each &nbsp;→&nbsp; a sequence of 64 vectors, each length 48.<br><span style="font-size:.85rem;color:var(--text2)">This is exactly what a sentence looks like to a language model: a sequence of vectors. The image just became "a sentence made of patches."</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div>One <code>32×32×3</code> image &nbsp;→&nbsp; cut into 64 patches of <code>4×4×3</code> &nbsp;→&nbsp; flatten each &nbsp;→&nbsp; a sequence of 64 vectors, each length 48.<br><span style="font-size:.85rem;color:var(--ink2)">This is exactly what a sentence looks like to a language model: a sequence of vectors. The image just became "a sentence made of patches."</span></div></div>
 
       <h4>Two extra ingredients: the [class] token and positional embeddings</h4>
       <p>Once you have 64 patch tokens, a plain ViT (Vision Transformer) adds two more things before running the Transformer:</p>
@@ -359,6 +359,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>So what's today's catch?</h4>
       <p>There's no new JAX mechanic to learn today — you already have vmap, jit, and Flax/Optax from Days 2–5. The catch is <strong>scale and integration</strong>: wiring five days of pieces into one real, trainable model, and knowing how to tell if it actually works before you spend hours training it on the full dataset.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noopener">ViT paper (Dosovitskiy et al., 2020)</a> · <a href="https://www.cs.toronto.edu/~kriz/cifar.html" target="_blank" rel="noopener">CIFAR-10 dataset</a> · <a href="https://flax-linen.readthedocs.io/en/latest/guides/flax_fundamentals/flax_basics.html" target="_blank" rel="noopener">Flax basics guide</a> · <a href="https://www.youtube.com/watch?v=cDyi91onoJ8" target="_blank" rel="noopener">Peterman Pod w/ Vlad Feinberg</a> · <a href="https://www.developing.dev/p/google-deepmind-pre-training-lead" target="_blank" rel="noopener">DeepMind pre-training lead interview</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> Transformer 是给"序列"设计的，但图片是个网格 —— 怎么把一张图喂进一个只会读列表的模型？In plain terms: the jump from a 2-D image grid to a 1-D sequence of tokens feels arbitrary — until you see that one flattened patch simply <em>is</em> a token, the same kind of vector a language model already reads.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -373,6 +374,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🔍🔗</span><h5>attention = "who does this refer to"</h5><p>To understand panel 5, you might glance back at panel 2 and panel 8. Attention lets every patch look at every other patch the same way, to build context about the whole image.</p></div>
       </div>
       <p><strong>In one line:</strong> a ViT cuts the image into patches (panels), turns each into a token, and lets attention connect them the same way it connects words in a sentence.</p>
+      <p><b>直觉 / Intuition:</b> 把图片当成一页漫画，剪成一格一格 —— 每一格就是一个 token，attention 让每格都能"看"其他格。The technical point is that patchify + flatten turns a <code>(32,32,3)</code> grid into a <code>(64,48)</code> sequence, so the very same Transformer that reads words can read image patches.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: comic panels have a fixed reading order — top-left to bottom-right. ViT patches don't. Attention lets any patch look at any other patch <strong>regardless of position</strong>. Position is only an extra hint (the positional embedding) added on top — not a built-in reading order.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -410,7 +412,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Take token 0</strong> (the class token's final state) → <code>(128,)</code>. Everything else is thrown away at this point.</li>
         <li><strong>Linear head:</strong> a final <code>Dense(10)</code> maps <code>(128,) → (10,)</code> — one logit per CIFAR-10 class.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>logits = nn.Dense(10)(x[:, 0])</code><br><span style="font-size:.85rem;color:var(--text2)">"Take only the class token's row, then run it through one more Dense layer to get 10 class scores." Nothing else in the sequence feeds the final prediction directly — only through what attention wrote into the class token.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>logits = nn.Dense(10)(x[:, 0])</code><br><span style="font-size:.85rem;color:var(--ink2)">"Take only the class token's row, then run it through one more Dense layer to get 10 class scores." Nothing else in the sequence feeds the final prediction directly — only through what attention wrote into the class token.</span></div></div>
 
       <h4>⚠️ Gotchas</h4>
       <ul>
@@ -424,6 +426,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The ViT pipeline has many correct-shape ways to be quietly wrong, and it buys its flexibility at a real cost — here is the one silent bug and the one trade-off to have ready.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): positional information that is present in shape but wrong in meaning.</b> Attention treats the 65 tokens as an unordered bag, so the positional embeddings are the <em>only</em> thing telling the model which patch sat where. If you accidentally add the <em>same</em> positional row to every token (a broadcasting slip), or forget the positional add entirely, the shapes still line up at <code>(65, 128)</code> and nothing errors. The model just can no longer tell top-left from bottom-right, so it learns a weaker, position-blind classifier — you only notice as lower accuracy, never as a crash. A senior engineer checks in code review that the positional table is shape <code>(num_patches + 1, embed_dim)</code> (the <code>+1</code> is the class token) and that distinct rows reach distinct positions.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: no built-in inductive bias for the price of flexibility.</b> Unlike a convolutional network, a ViT has no built-in assumption that nearby pixels belong together — it must learn spatial structure from scratch through attention and positional embeddings. That makes it very flexible and strong when data is plentiful, but data-hungry: on a small set like CIFAR-10 from scratch, it can underperform a much simpler CNN. The design-review question: do you have enough data (or a pretrained model) to earn back the missing inductive bias? If not, a CNN may be the better call.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A ViT turns an image into a sequence — cut it into fixed patches, flatten and linearly project each, prepend a learnable class token, add positional embeddings, run N Transformer blocks, then classify off the class token's final state. The nuance is that attention is permutation-invariant, so the positional embeddings are the <em>only</em> signal of where each patch sat: a broadcasting slip that adds the same row everywhere, or a table sized <code>num_patches</code> instead of <code>num_patches+1</code>, still type-checks but silently yields a position-blind classifier. And without a CNN's locality bias, a from-scratch ViT is data-hungry."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -454,6 +457,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Build, overfit, and train a from-scratch ViT</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Today's task is a two-part artifact — the weekend capstone. <strong>Part A (Saturday)</strong> proves your model's plumbing is correct. <strong>Part B (Sunday)</strong> proves it can actually learn.</p>
+
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><strong>Part A (correctness):</strong> a single batch of 8–16 CIFAR-10 images overfits to final loss <code>&lt; 0.05</code> within a few hundred steps (random-guess loss is <code>ln(10) ≈ 2.3</code>) — proof gradients flow end to end.</li>
+        <li><strong>Shapes trace correctly:</strong> <code>(32,32,3) → (64,48) → (64,128) →</code> prepend cls + add pos <code>→ (65,128) →</code> N blocks <code>→ (128,) → (10,)</code>; the positional table is shape <code>(num_patches+1, embed_dim)</code>.</li>
+        <li><strong>Part B (real learning):</strong> the same architecture trained on the full CIFAR-10 train split reports a held-out test accuracy.</li>
+        <li><code>WEEK1_ARCHITECTURE.md</code> documents where <code>params</code>/<code>opt_state</code> live and how <code>jit</code>/<code>vmap</code>/<code>grad</code> compose; the <code>log.md</code> explain-back (below) is written.</li>
+      </ul>
 
       <h4>Part A — overfit a single batch (correctness proof)</h4>
       <p>File: <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py</code></p>
@@ -492,11 +503,12 @@ Create sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py that:
 2. Takes ONE batch of 8-16 CIFAR-10 images and trains on only that batch for a few hundred steps using Optax, printing (step, loss) as a loss curve.
 3. Asserts the final loss is below 0.05, proving gradients flow correctly through the whole model.
 
-Then create sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py that reuses the same ViT architecture, trains it on the FULL CIFAR-10 training set to convergence, and reports held-out test accuracy.
+Then extend the same sessions/m07-thinking-in-jax/day-06-vit-capstone/experiment.py to reuse the same ViT architecture, train it on the FULL CIFAR-10 training set to convergence, and report held-out test accuracy.
 
 Then create sessions/m07-thinking-in-jax/day-06-vit-capstone/WEEK1_ARCHITECTURE.md documenting the functional state-passing design: where params and opt_state actually live (as explicit values, not hidden object state), how jit/vmap/grad compose around pure functions here, and how this ties back to Day 1 (immutability), Day 2 (PRNG keys), Day 3 (vmap), Day 4 (jit), and Day 5 (Flax/Optax).</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running both scripts, write one line in <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/log.md</code>: what was your single-batch overfit loss after the last step, and what was your full-training held-out accuracy?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m07-thinking-in-jax/day-06-vit-capstone/log.md</code>: (1) your single-batch overfit loss after the last step; (2) your full-training held-out accuracy; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe how your ViT turns an image into tokens and traces shapes to <code>(10,)</code>, <b>why</b> overfitting one batch to near-zero loss proves the plumbing (gradients flow end to end) before you spend hours on full training, and <b>what would break</b> in real training if the positional embeddings were mis-broadcast or the table were sized <code>num_patches</code> instead of <code>num_patches+1</code> — no crash, a silently position-blind, weaker classifier.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

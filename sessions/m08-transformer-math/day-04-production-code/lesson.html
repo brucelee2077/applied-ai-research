@@ -358,6 +358,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A high-level library lets you write <code>model.fit(data)</code> and hides all six stages inside. That is convenient, but you cannot see where the time and money go. A production framework like <span class="term" data-tip="A training library that writes out every training stage as plain code you can read, instead of hiding it.">nanotron</span> (and its tiny teaching cousin <span class="term" data-tip="A tiny, easy-to-read program from Hugging Face that shows how the main ways of splitting training across devices work.">picotron</span>) does the opposite on purpose: it writes out every stage as plain code you can read line by line.</p>
       <p>Why bother? Because at scale, <strong>every stage is a cost you may need to see and control</strong> — the forward pass, the gradient sync across devices, the optimizer memory. You cannot tune what a <code>.fit()</code> call hides from you. Reading the loop without abstractions is how you learn where the real work happens.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://github.com/huggingface/nanotron" target="_blank" rel="noopener">nanotron (production framework)</a> · <a href="https://github.com/huggingface/picotron" target="_blank" rel="noopener">picotron (minimal teaching version)</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 平时一句 <code>model.fit()</code> 就训练好了，突然让你手写六个阶段、还要说清 all-reduce 卡在哪一步，很多人不知道从哪下手。In plain terms: people are used to a one-line <code>.fit()</code> and have never seen the six stages laid bare — so they can't say <em>where</em> gradient sync belongs or why its exact position matters.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -372,6 +373,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📐</span><h5>nanotron = read the blueprint</h5><p>You trace every pipe and gear in order: data in → forward → loss → backward → sync → update → (save). Now each stage is visible, so each cost is visible too.</p></div>
       </div>
       <p><strong>In one line:</strong> reading a no-abstraction training loop is walking the factory floor and following the material through every machine, instead of trusting one button.</p>
+      <p><b>直觉 / Intuition:</b> 把一个训练 step 想成流水线上的六道工序，顺序不能乱 —— 尤其"同步梯度"必须卡在"求完梯度之后、更新权重之前"。The technical point is that each stage consumes the previous stage's output, and the cross-device all-reduce must sit between backward and the optimizer step so every replica updates from the <em>same</em> averaged gradient.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a factory line runs its stages at the same time on different products. One training step runs its stages <em>in order</em> on the <em>same</em> batch — forward must finish before loss, loss before backward, and so on.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -406,7 +408,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Checkpointing is periodic, not every step.</strong> Saving to disk is slow, so you do it every N steps. Its only job is to let you resume after a crash.</li>
         <li>On a single device you can skip stage 5 (sync) — there is nothing to synchronize. It exists only because training is spread across many devices (Week 2).</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>grads = backward(loss)</code> → <code>grads = all_reduce(grads) / world_size</code> → <code>optimizer.step(grads)</code><br><span style="font-size:.85rem;color:var(--text2)">"Compute local gradients, average them across all devices, then everyone updates with the same averaged gradient." That middle line is the sync.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>grads = backward(loss)</code> → <code>grads = all_reduce(grads) / world_size</code> → <code>optimizer.step(grads)</code><br><span style="font-size:.85rem;color:var(--ink2)">"Compute local gradients, average them across all devices, then everyone updates with the same averaged gradient." That middle line is the sync.</span></div></div>
 
       <h4>Why read the loop without abstractions</h4>
       <ul>
@@ -415,6 +417,18 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Survive crashes</strong> — a long training run <em>will</em> crash. Checkpointing turns a lost week into a lost hour.</li>
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> many devices (Week 2) → gradients must be synced with all-reduce → that sync sits between backward and the optimizer step → reading the open loop is how you see and place it correctly.</div></div>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — averaged gradient = all_reduce(grads) / world_size</b>
+      <br><b>1 · In words:</b> each device computes gradients from its own slice of the batch; to act like one big batch, all devices must agree on the <em>average</em> gradient before they update.
+      <br><b>2 · The formula:</b> <code>g_sync = (1/W) · Σ&nbsp;g_d</code> — <code>g_d</code> = the gradient tensor on device <code>d</code>; <code>W</code> = <code>world_size</code> (number of devices); the sum <code>Σ</code> over all devices <em>is</em> the all-reduce.
+      <br><b>3 · Tiny numbers:</b> 2 devices, one weight's gradient: device0 <code>= 0.12</code>, device1 <code>= 0.20</code> → sum <code>= 0.32</code> → ÷ 2 <code>= 0.16</code>, now held identically on both devices.
+      <br><b>4 · Sanity check:</b> after sync, every device must hold the <em>identical</em> <code>g_sync</code>. If two devices differ, the all-reduce didn't run (or ran in the wrong place) and the replicas will silently drift apart.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>The fixed stage order is what keeps replicas in sync, and each place you can put a stage wrong is a place to be quietly incorrect — here is the one silent bug and the one trade-off to have ready.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): summing gradients but forgetting to divide by <code>world_size</code>.</b> The all-reduce <em>sums</em> each weight's gradient across all <code>W</code> devices. If you forget the <code>÷ world_size</code> (or hardcode the wrong <code>W</code>), nothing errors — but every weight now sees a gradient <code>W×</code> too large, which is exactly like silently multiplying the learning rate by <code>W</code>. Loss may even drop at first, then diverges or plateaus for no obvious reason. A senior engineer checks in <b>code review</b> that the reduction is a <em>mean</em> (sum ÷ world_size) and confirms a 1-device and an N-device run match on the first few steps.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how often to checkpoint.</b> Saving weights protects a long run from a crash, but writing to disk stalls training. Save too rarely and a crash costs many hours of compute; save too often and checkpoint I/O eats your throughput. In a <b>design review</b> you pick <code>N</code> (steps between saves) from the expected crash rate and the per-save cost — the classic lose-progress-vs-pay-I/O trade.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "One training step is six ordered stages — load/shard, forward, loss, backward, gradient all-reduce, optimizer step — and the sync sits strictly between backward and the update, because you need the gradients first and every replica must agree on the average before stepping. The nuance is that the all-reduce must be a <em>mean</em>: sum across devices, then divide by <code>world_size</code>. Forget the divide and every gradient is <code>world_size×</code> too big — no error, it just silently scales the learning rate and the run diverges. I sanity-check by matching a 1-device and an N-device run on the first few steps."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -470,7 +484,8 @@ Create sessions/m08-transformer-math/day-04-production-code/experiment.py: a min
 4. Print the loss each step so I can see it fall.
 Then run it and show the falling loss. Add a short notes block mapping each of my lines to the matching stage in nanotron's training step.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m08-transformer-math/day-04-production-code/log.md</code>: why must the gradient all-reduce happen <em>after</em> backward but <em>before</em> the optimizer step, and never the other way around?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m08-transformer-math/day-04-production-code/log.md</code>: (1) the six stages of one training step, in order; (2) why the gradient all-reduce must happen <em>after</em> backward but <em>before</em> the optimizer step, and never the other way around; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe the loop you wrote and where each stage sits, explain <b>why</b> the all-reduce is a <em>mean</em> (sum ÷ world_size) and why its position is fixed, and <b>what would break</b> in a real multi-device run if you forgot the divide or synced in the wrong place — a silent learning-rate blow-up or replicas that drift out of sync with no error.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

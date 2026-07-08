@@ -350,11 +350,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>How does it relate to NumPy?</h4>
       <p>Here's the key idea: JAX ships a module called <code>jax.numpy</code> that is <strong>almost a clone of NumPy</strong> — mostly the same function names and usage. So almost all of your NumPy intuition carries straight over. By convention you import it and call it <code>jnp</code>:</p>
-      <div class="callout c-info"><span class="ic">📦</span><div><code>import jax.numpy as jnp</code><br><span style="font-size:.85rem;color:var(--text2)">From now on, read <code>jnp.array(...)</code> as "the JAX version of <code>np.array(...)</code>."</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>import jax.numpy as jnp</code><br><span style="font-size:.85rem;color:var(--ink2)">From now on, read <code>jnp.array(...)</code> as "the JAX version of <code>np.array(...)</code>."</span></div></div>
 
       <h4>So what's today's catch?</h4>
       <p>JAX deliberately differs from NumPy in a few places. The <strong>first one — and the one newcomers hit most</strong> — is this: a JAX array <strong>cannot be modified in place</strong>. In NumPy, <code>x[0] = 99</code> is routine. In JAX, that exact line throws an error.</p>
       <p>Why would JAX be so awkward on purpose? That's today's puzzle. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 你在 NumPy 里写了一辈子 <code>x[0] = 99</code>，突然 JAX 说不行，感觉像被无理由地限制。In plain terms: people read "immutable" as a rule to fight, so they memorize <code>.at[].set()</code> as a workaround — instead of seeing that immutability is the exact property that lets the compiler make the <em>whole program</em> fast.</div></div>
       <button class="gotit" type="button">Got what JAX is — let's go</button>
     </div>
 </section>
@@ -369,6 +370,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📷</span><h5>JAX = printed photo</h5><p>Once a photo is printed, you can't edit it. Want something different? <strong>Print a new one</strong>; the original is untouched (<em>immutable</em>).</p></div>
       </div>
       <p><strong>In one line:</strong> NumPy changes the array in place; JAX leaves the old array untouched and hands you a new one.</p>
+      <p><b>直觉 / Intuition:</b> 把 JAX array 当成"冲印出来的照片" — 改不了，只能重新印一张。The technical point is that every "change" returns a brand-new array and leaves the original untouched — which is what makes each operation a <em>pure function</em> the compiler can safely reorder, fuse, and parallelize.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a photo is "expensive to reprint," but creating a new JAX array is actually <strong>cheap</strong> — the compiler optimizes the waste away. The analogy only carries the "can't edit in place" part.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -399,7 +401,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <h4>The fix: <code>.at[ ].set( )</code></h4>
       <p>Since you can't write <code>x[0] = 99</code>, JAX gives you a replacement syntax called a <span class="term" data-tip="JAX's way to 'change' an array: it returns a brand-new array and leaves the original untouched. Written x.at[i].set(v).">functional update</span>:</p>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>y = x.at[0].set(99)</code><br><span style="font-size:.85rem;color:var(--text2)">Read it as: "based on <code>x</code>, set position 0 to 99, producing a <strong>new array</strong> <code>y</code>." The original <code>x</code> does not change at all.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>y = x.at[0].set(99)</code><br><span style="font-size:.85rem;color:var(--ink2)">Read it as: "based on <code>x</code>, set position 0 to 99, producing a <strong>new array</strong> <code>y</code>." The original <code>x</code> does not change at all.</span></div></div>
 
       <h4>Why is JAX this "awkward"?</h4>
       <p>Because arrays are immutable, every computation in JAX becomes a <span class="term" data-tip="A function that always returns the same output for the same input, and never changes anything outside itself (no side effects).">pure function</span>: the same inputs always give the same output, and it never secretly changes anything outside itself (no side effects).</p>
@@ -411,6 +413,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Immutability protects you loudly (it errors on <code>x[0] = 99</code>), but there is one way it can go quietly wrong, and one cost you pay to get its speed.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a bug that doesn't announce itself — the dropped update.</b> When you write <code>x.at[0].set(99)</code>, JAX builds a <em>new</em> array and returns it. If you forget to catch it — you write <code>x.at[0].set(99)</code> on its own line instead of <code>x = x.at[0].set(99)</code> — the code runs with no error at all. The new array is created and thrown away; <code>x</code> still holds its old values. Nothing crashes; your update just silently vanished, and later math uses stale numbers. A senior engineer scans code review for any <code>.at[...].set(...)</code> whose result is not assigned back to a variable.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: extra copies for safe optimization.</b> Because JAX cannot edit in place, every "change" conceptually makes a fresh array instead of overwriting one — that is more memory traffic than NumPy's in-place edit. In exchange, the compiler gets the purity guarantee it needs to reorder, fuse, and parallelize the whole computation. The design-review question is: do you want the freedom for XLA to make the <em>whole program</em> fast, or the freedom to hand-tune one in-place edit? For accelerators, the whole-program win is almost always worth the copies — and the compiler often optimizes the extra copy away anyway.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "JAX arrays are immutable, so every op is a pure function — same input, same output, no side effects — and that purity is exactly what lets XLA reorder, fuse, and parallelize the whole graph across accelerators. The proof is <code>.at[i].set(v)</code>: it returns a <em>new</em> array rather than editing in place. The nuance is that this makes a <em>silent</em> failure possible — forget to write <code>x = x.at[i].set(v)</code> and the update is built, discarded, and never applied, with no error at all."</div></div>
       <button class="gotit" type="button">Got the causal chain</button>
     </div>
 </section>
@@ -441,6 +444,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Run the script from Section 5 yourself once — that's what makes the day count. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li><code>experiment.py</code> runs top to bottom with no error.</li>
+        <li><strong>NumPy branch:</strong> edits element 0 in place and prints values + <code>id()</code> before/after — the two <code>id()</code>s <em>match</em> (same object, overwritten).</li>
+        <li><strong>JAX fail branch:</strong> <code>x[0] = 99</code> is wrapped in <code>try/except TypeError</code> and the caught message is printed.</li>
+        <li><strong>Functional-update branch:</strong> <code>y = x.at[0].set(99)</code>, then <code>assert</code> both that <code>x</code> is unchanged and that <code>x is not y</code>; print both arrays and their <code>id()</code>s.</li>
+        <li>The <code>log.md</code> explain-back (below) is written.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m07-thinking-in-jax/day-01-jax-immutability/experiment.py</code>, type out the 13 lines from Section 5, and run it. (No JAX installed? <code>pip install jax</code> — the CPU build is enough for today.)</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -455,7 +466,8 @@ Create sessions/m07-thinking-in-jax/day-01-jax-immutability/experiment.py that:
 3. Uses y = x.at[0].set(99), asserts x is unchanged and x is not y, and prints x, y, and their id()s.
 Add a brief comment on each step, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, take one minute to write a single line in <code>sessions/m07-thinking-in-jax/day-01-jax-immutability/log.md</code>: what surprised you most about immutability today?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m07-thinking-in-jax/day-01-jax-immutability/log.md</code>: (1) the one sentence you'd tell a teammate about immutability; (2) what surprised you most today; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe what your script proved (in-place edit vs. functional update, what the <code>id()</code>s showed), <b>why</b> immutability is the property that lets XLA reorder, fuse, and parallelize across accelerators, and <b>what would break</b> in real training if the rule were ignored — the silent dropped-update bug, where a <code>.at[i].set(v)</code> result is never assigned back and stale values flow downstream with no error.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

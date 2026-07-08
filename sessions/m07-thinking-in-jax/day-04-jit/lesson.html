@@ -360,12 +360,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>JAX <em>caches</em> that compiled program, keyed by the input <strong>shape + dtype</strong>.</li>
         <li><strong>Later calls</strong> with the same shape/dtype skip tracing and compiling entirely — they reuse the cached program. That's the big speedup.</li>
       </ol>
-      <div class="callout c-info"><span class="ic">📦</span><div><code>f_jit = jax.jit(f)</code> &nbsp;→&nbsp; <code>f_jit(x)</code> runs the compiled program.<br><span style="font-size:.85rem;color:var(--text2)">The first <code>f_jit(x)</code> pays a one-time cost (trace + compile). Every call after that is fast.</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div><code>f_jit = jax.jit(f)</code> &nbsp;→&nbsp; <code>f_jit(x)</code> runs the compiled program.<br><span style="font-size:.85rem;color:var(--ink2)">The first <code>f_jit(x)</code> pays a one-time cost (trace + compile). Every call after that is fast.</span></div></div>
 
       <h4>Why this is safe (a callback to Days 1–3)</h4>
       <p>Tracing works only because JAX functions are <strong>pure</strong>: arrays are immutable and randomness uses explicit keys (Days 1–2). A pure function has no hidden state, so XLA can safely reorder and fuse its operations without changing the result. That purity is exactly what makes <code>jit</code> possible.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://docs.jax.dev/en/latest/jit-compilation.html" target="_blank" rel="noopener">Just-in-time compilation in JAX</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 代码明明已经能跑，为什么第一次 <code>jit</code> 调用反而更慢？很多人以为 jit 坏了。In plain terms: people expect a wrapper to be instantly faster, so the slow first call feels like a bug — they miss that it pays a one-time trace + compile cost that every later same-shape call cashes in.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -380,6 +381,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">👨‍🍳⚡</span><h5>every cook after = cached fast run</h5><p>Now the chef knows the routine by heart. Each new plate comes out fast and smooth — no pausing to check the recipe. That's the cached compiled program.</p></div>
       </div>
       <p><strong>In one line:</strong> the first call to a jitted function is slow because JAX is "learning the recipe" (tracing and compiling); every call after runs the memorized, optimized version at full speed.</p>
+      <p><b>直觉 / Intuition:</b> jit 就像厨师第一次照着菜谱做很慢，记熟之后每一盘都飞快。The technical point is that the first call traces your pure function and XLA compiles + caches one fused program keyed by shape+dtype; every later same-shape call skips tracing and runs the cached program.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the chef can improvise if the dish changes slightly. XLA cannot. If the input <em>shape</em> or <em>dtype</em> changes, it's a brand-new "recipe" and JAX has to trace and compile again from scratch.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -414,7 +416,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>Inside a jitted function, values are traced as abstract shapes, not real numbers. So Python <code>print(x)</code> runs at <strong>trace time only</strong> — you see it once (during compilation), not on every call.</li>
         <li>Compilation is deferred. Timing is honest only if you force the result to finish with <code>block_until_ready()</code>, because JAX runs work asynchronously and returns before it's done.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>f_jit = jax.jit(f); f_jit(x).block_until_ready()</code><br><span style="font-size:.85rem;color:var(--text2)">"Compile on this first call and wait for it to finish." Now time the <em>next</em> calls — those are the real, compiled speed.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>f_jit = jax.jit(f); f_jit(x).block_until_ready()</code><br><span style="font-size:.85rem;color:var(--ink2)">"Compile on this first call and wait for it to finish." Now time the <em>next</em> calls — those are the real, compiled speed.</span></div></div>
 
       <h4>Two gotchas to avoid</h4>
       <ul>
@@ -434,6 +436,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The shape-keyed cache and the trace-time-only body are what make <code>jit</code> fast, but each hides a way to be quietly wrong — a slowdown that never errors, and a side effect that runs once.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): recompiling on every call because the shape keeps changing.</b> The compiled program is cached by input shape + dtype. If you feed a jitted function a slightly different shape each step — say the last batch of an epoch is smaller, or sequence length varies — JAX sees a new cache key and <em>recompiles</em> every time. Nothing errors; results are correct. But you are paying the one-time compile cost on every call, so the "fast" jitted code is actually slower than no jit at all. A senior engineer checks in code review that batch/sequence shapes are padded to fixed sizes, and watches for a compile log printing repeatedly. (Related trap: a Python <code>print</code> inside the function runs only at <em>trace time</em>, so it fires once — do not rely on it to confirm per-call behavior.)</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: pay compile time up front for fast steady-state.</b> <code>jit</code> spends real wall-clock time tracing and compiling before the first useful result — sometimes seconds. You get that back many times over on every later call, but only if the function is called many times at a stable shape. The design-review question: is this code hot enough (called often, fixed shapes) to earn back the compile cost? For a one-off call, or shapes that never repeat, <code>jit</code> can be a net loss.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "jax.jit traces a pure function once on abstract shapes, hands the recording to XLA which fuses the ops into one compiled program, and caches it keyed by shape + dtype — so the first call is slow and every later same-shape call is fast. The nuance is the silent failure: if the input shape keeps changing — a ragged last batch, varying sequence length — every call is a new cache key, so it silently recompiles each time and the 'fast' jitted code ends up slower than no jit. I pad shapes to fixed sizes and watch for a compile log that keeps firing."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -472,7 +475,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>Time many calls of <code>forward</code> vs. <code>forward_jit</code>, using <code>block_until_ready()</code> on each for honest timing, and print both times — jit should be clearly faster.</li>
       </ul>
       <h4>Option A · write it yourself</h4>
-      <p>Extend <code>sessions/m07-thinking-in-jax/day-04-jit/experiment.py</code> into <code>sessions/m07-thinking-in-jax/day-04-jit/experiment.py</code> with the four bullets above.</p>
+      <p>Create <code>sessions/m07-thinking-in-jax/day-04-jit/experiment.py</code> (or extend your Day 2/3 file) with the four bullets above.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
@@ -485,7 +488,8 @@ Create sessions/m07-thinking-in-jax/day-04-jit/experiment.py that:
 4. Asserts jnp.allclose(forward(X), forward_jit(X)) so the compiled result matches the uncompiled one.
 Add a brief comment on each step explaining trace/compile/cache, then run it to confirm jit is faster.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m07-thinking-in-jax/day-04-jit/log.md</code>: why is the very first <code>forward_jit(X)</code> call slower than the rest? (Hint: trace + compile, cached by shape.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m07-thinking-in-jax/day-04-jit/log.md</code>: (1) the one sentence you'd tell a teammate about what <code>jit</code> does; (2) why the very first <code>forward_jit(X)</code> call is slower than the rest (hint: trace + compile, cached by shape); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: report your measured jit vs. no-jit times, explain <b>why</b> the compiled program is faster (fused ops, one trip to the hardware, cached by shape+dtype), and <b>what would break</b> in production if shapes kept changing — silent recompiles on every call that make jit slower than not using it, plus <code>print</code>/side-effects that only fire at trace time.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

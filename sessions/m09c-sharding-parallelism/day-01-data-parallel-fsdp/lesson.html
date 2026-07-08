@@ -350,11 +350,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The answer: FSDP (a.k.a. ZeRO stage 3)</h4>
       <p><span class="term" data-tip="Fully Sharded Data Parallel. Instead of every device keeping a full copy, each holds only a piece, saving memory.">FSDP</span> stands for Fully Sharded Data Parallel. It is the same idea as <span class="term" data-tip="Another name for FSDP: splitting the model's parameters, gradients, and optimizer state across devices so no chip holds it all.">ZeRO-3</span> (Zero Redundancy Optimizer, stage 3). Instead of every device keeping a full copy, FSDP <strong>shards</strong> — splits — the parameters, the gradients, <em>and</em> the optimizer state across the devices. No single device holds the whole model at rest.</p>
-      <div class="callout c-info"><span class="ic">📦</span><div>When a layer is needed for its forward or backward step, FSDP does a just-in-time <code>all-gather</code>: the devices temporarily pull together that one layer's full parameters, use them, then <strong>discard</strong> them and move on.<br><span style="font-size:.85rem;color:var(--text2)">So the full weights of any one layer exist only for a moment, only where they are needed right now.</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div>When a layer is needed for its forward or backward step, FSDP does a just-in-time <code>all-gather</code>: the devices temporarily pull together that one layer's full parameters, use them, then <strong>discard</strong> them and move on.<br><span style="font-size:.85rem;color:var(--ink2)">So the full weights of any one layer exist only for a moment, only where they are needed right now.</span></div></div>
 
       <h4>So what's the catch?</h4>
       <p>FSDP saves huge amounts of memory, but it is not free. Because each layer's parameters must be gathered on demand every step, FSDP does <strong>more communication</strong> than plain Data Parallel. That is the whole trade you'll study today: memory saved vs. extra communication.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noopener">ZeRO: Memory Optimizations (paper)</a> · <a href="https://jax-ml.github.io/scaling-book/training/" target="_blank" rel="noopener">JAX Scaling Book — Training</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> DP 和 FSDP 算出来的结果一模一样，新手常问"那 FSDP 到底改了什么？" —— 改的不是数学，是每张卡存多少、以及为此多付的通信。In plain terms: DP and FSDP compute the <em>identical</em> update, so people can't see what FSDP changed — the answer is not the math but the memory layout, and the extra communication you pay for it.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -369,6 +370,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📄➡️📄</span><h5>FSDP = one cookbook, split into pages</h5><p>The cookbook is torn into pages and shared out. When a dish is being cooked, the chefs pass around just the one page it needs, use it, then set it down. No chef ever holds the whole book — far less shelf space.</p></div>
       </div>
       <p><strong>In one line:</strong> Data Parallel replicates the whole model on every device; FSDP splits the model into shards and gathers just the piece it needs, right when it needs it.</p>
+      <p><b>直觉 / Intuition:</b> DP 是"每个厨师各有一整本菜谱"（费书架 = 内存）；FSDP 是"一本菜谱撕成页传着用"（省内存，但要不停传页 = 通信）。The technical point is that FSDP shards params + grads + optimizer state so per-device memory drops to ≈ <code>16N/P</code>, at the cost of an all-gather of each layer's weights every step.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: passing pages around costs time. Every "gather one page" is real network communication between devices. FSDP trades saved memory for this extra passing-around — that's the cost you accept.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -409,7 +411,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>all-gather just-in-time</strong>: right before a layer's forward (and again for its backward), the devices gather that one layer's full parameters, use them, then <strong>discard</strong> the gathered copy.</li>
         <li><strong>reduce-scatter the gradients</strong>: after a layer's backward, each device keeps only its shard of the gradient, so nothing full lingers.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div>Per-device static memory: <code>DP ≈ 16N</code> &nbsp;vs&nbsp; <code>FSDP ≈ 16N / num_devices</code> (plus one transient gathered layer).<br><span style="font-size:.85rem;color:var(--text2)">For 8 devices: DP holds all <code>16N</code> on each; FSDP holds about <code>2N</code> on each. The full weights of a single layer flash into existence only while that layer runs.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div>Per-device static memory: <code>DP ≈ 16N</code> &nbsp;vs&nbsp; <code>FSDP ≈ 16N / num_devices</code> (plus one transient gathered layer).<br><span style="font-size:.85rem;color:var(--ink2)">For 8 devices: DP holds all <code>16N</code> on each; FSDP holds about <code>2N</code> on each. The full weights of a single layer flash into existence only while that layer runs.</span></div></div>
 
       <h4>Why FSDP matters — and what it costs</h4>
       <ul>
@@ -419,10 +421,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> training needs 16N per parameter (Week 2) → DP duplicates that on every device → FSDP shards params + grads + optimizer state → per-device memory drops by ~num_devices → the extra all-gathers are the cost you pay.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — per-device memory: DP vs FSDP</b>
+      <br><b>1 · In words:</b> Data Parallel copies the whole model onto every device; FSDP splits it, so each device holds only its slice at rest.
+      <br><b>2 · The formula:</b> <code>DP = 16N</code> per device; <code>FSDP ≈ 16N / P</code> per device (+ one transient gathered layer) — <code>N</code> = parameters; <code>16N</code> = weights <code>4N</code> + grads <code>4N</code> + Adam <code>8N</code> (Week 2 Day 5); <code>P</code> = num_devices.
+      <br><b>3 · Tiny numbers:</b> <code>N = 1e9</code>, fp32, <code>P = 8</code> → DP = <code>16 GB</code> on <em>every</em> device; FSDP = <code>16/8 = 2 GB</code> on each (plus a brief all-gather of one layer). Saving factor = <code>P = 8×</code>.
+      <br><b>4 · Sanity check:</b> the saving factor should equal <code>num_devices</code>. If it comes out smaller, you probably sharded only one of the three (params / grads / opt-state), not all three.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>Both DP and FSDP promise "every replica ends the step as an exact mirror." The dangerous case is when that promise quietly breaks and the loss still goes down.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): replicas drift out of sync.</b> DP stays a true mirror only if <em>every</em> replica runs the all-reduce on the <em>same</em> gradients each step. If one rank skips the sync — a mismatched batch count, an early <code>continue</code> that bypasses <code>backward()</code>, or a data-dependent branch only some ranks take — the copies slowly diverge. Nothing crashes: each replica keeps training on its own slightly different weights, so the loss still falls, just to a worse model than the run should have reached. A senior engineer checks in <b>code review</b> that the number of backward/all-reduce calls is identical across all ranks, and that no branch can make one rank skip the collective.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: memory saved vs. communication paid.</b> FSDP divides per-device static memory by roughly the device count, which is what lets a big model fit at all. You pay for it with a fresh all-gather of every layer's weights on <em>each</em> forward and backward, on top of the gradient reduce — traffic plain DP never generates. In a <b>design review</b> the question is whether your interconnect can overlap that extra communication with compute. If it cannot, FSDP fits the model but leaves devices idle waiting on the network, and plain DP (when the model already fits) is the faster choice.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Data Parallel replicates the full <code>16N</code> (weights + grads + Adam) on every device and all-reduces gradients; FSDP/ZeRO-3 shards all three, so each device holds ~<code>16N/P</code> at rest, all-gathering a layer's params just-in-time and discarding them after. Same math, but per-device memory drops by the device count — the cost is an extra all-gather per layer every step on top of the gradient reduce. The nuance is the silent failure: if one rank skips the collective — a mismatched batch count or a data-dependent branch — replicas drift and the loss still falls, just to a worse model."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -476,7 +485,8 @@ Create sessions/m09c-sharding-parallelism/day-01-data-parallel-fsdp/experiment.p
 5. Draws a simple bar/text diagram comparing DP vs FSDP per-device memory.
 Add a brief comment on each step, then run it to confirm the numbers (16 GB vs 2 GB for the example).</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09c-sharding-parallelism/day-01-data-parallel-fsdp/log.md</code>: FSDP divides the per-device static memory by <code>num_devices</code> — what is the price you pay for that saving? (Hint: communication.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09c-sharding-parallelism/day-01-data-parallel-fsdp/log.md</code>: (1) the one sentence you'd tell a teammate about the DP-vs-FSDP difference; (2) FSDP divides per-device static memory by <code>num_devices</code> — what is the price you pay (hint: communication); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: report your calculator's DP vs FSDP per-device numbers, explain <b>why</b> FSDP cuts static memory to ≈ <code>16N/P</code> while computing the identical update, and <b>what would break</b> in real training if a rank skipped the collective — replicas silently drift to a worse model with no crash.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

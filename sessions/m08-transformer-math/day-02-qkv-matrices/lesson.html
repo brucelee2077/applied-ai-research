@@ -362,6 +362,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p><span class="term" data-tip="It splits the token's numbers into several smaller groups, so attention can look at things in different ways at once.">Multi-head attention</span> splits the <code>d</code> numbers into <code>n_heads</code> smaller groups, each of size <code>head_dim</code>. The only rule you need today: <code>n_heads × head_dim = d_model</code>. The total matrix sizes stay the same, so the parameter count does not change.</p>
 
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">The Scaling Book — Transformers</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 大家一提 attention 就想"Q/K/V 在算什么"，反而忘了一个 block 说到底就是几个权重矩阵。In plain terms: people jump straight to the attention <em>math</em> and never build the shape-level picture — so they freeze when asked the simplest sizing question, "how many parameters is this model?", which is answerable from just <code>d_model</code> and <code>n_layers</code>.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -376,6 +377,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">▽</span><h5>The FFN is a funnel</h5><p>The feed-forward part first stretches the vector <strong>4× wider</strong> (<code>d → 4d</code>), does some work in that wide space, then squeezes it back <strong>down</strong> (<code>4d → d</code>). Wide-then-narrow.</p></div>
       </div>
       <p><strong>In one line:</strong> a block is 4 attention matrices that reshape and recombine, plus a 2-matrix funnel that expands then contracts — six matrices total.</p>
+      <p><b>直觉 / Intuition:</b> 别管 Q/K/V 在"算什么" —— 先把一个 block 看成一张 6 个权重矩阵的清单：4 个注意力矩阵 + 2 个 FFN 矩阵。The technical point is that every matrix is just <code>rows × cols</code> learned numbers, so counting a block's size is pure shape arithmetic — no attention derivation needed.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the matrices are not literally "asking questions." They are just multiplications by learned numbers. "Query / Key / Value" are names for how the results get used later in attention — which you don't need today. Here we only care about their shapes and how many numbers they hold.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -411,7 +413,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Per block:</strong> <code>4d² + 8d² = 12 · d²</code> (ignoring small bias vectors, which are only a few thousand numbers).</li>
         <li><strong>Whole model:</strong> multiply by the number of blocks — <code>n_layers · 12 · d²</code>.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>params_per_block ≈ 12 · d_model²</code><br><span style="font-size:.85rem;color:var(--text2)">For <code>d = 768</code>: <code>12 × 768² ≈ 7.08M</code> parameters per block. Ten blocks ≈ 70M. This is the fast estimate people quote in interviews.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>params_per_block ≈ 12 · d_model²</code><br><span style="font-size:.85rem;color:var(--ink2)">For <code>d = 768</code>: <code>12 × 768² ≈ 7.08M</code> parameters per block. Ten blocks ≈ 70M. This is the fast estimate people quote in interviews.</span></div></div>
 
       <h4>Where multi-head fits</h4>
       <ul>
@@ -427,10 +429,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> token = <code>d</code>-vector → each matrix is <code>rows × cols</code> params → 4 attention (<code>4d²</code>) + 2 FFN (<code>8d²</code>) = <code>12d²</code> per block → × <code>n_layers</code> = model size.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — params per block ≈ 12·d²</b>
+      <br><b>1 · In words:</b> a block's size is 4 attention matrices plus 2 feed-forward matrices, and each matrix holds exactly <code>rows × cols</code> numbers.
+      <br><b>2 · The formula:</b> <code>params ≈ 4·d² + 8·d² = 12·d²</code> — <code>d</code> = <code>d_model</code> (token vector length); <code>4·d²</code> = the four <code>d×d</code> attention matrices <code>Wq/Wk/Wv/Wo</code>; <code>8·d²</code> = the FFN's up-projection <code>d×4d</code> plus down-projection <code>4d×d</code>.
+      <br><b>3 · Tiny numbers:</b> <code>d = 768</code> → attention <code>4·768² = 2,359,296</code> + FFN <code>8·768² = 4,718,592</code> = <code>7,077,888 ≈ 7.08M</code> per block; × 12 layers ≈ <code>85M</code>.
+      <br><b>4 · Sanity check:</b> the FFN should be exactly <b>2×</b> attention (<code>8d²</code> vs <code>4d²</code>). If your counter disagrees, you mis-sized the 4× funnel or double-counted a matrix.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>The <code>12d²</code> rule is a fast estimate, and fast estimates hide what they skip. A staff engineer knows the term that quietly goes missing, and the knob this budget is really about.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting the embedding and output layers.</b> <code>12d²·n_layers</code> counts only the transformer blocks. It leaves out the token embedding and the LM head — each roughly <code>vocab × d</code>, often tens of millions of parameters. For a small model with a large vocabulary, those two matrices can be a big fraction of the real total. Nothing errors; your checkpoint is just noticeably bigger than your napkin math promised. A senior engineer adds the <code>2 · vocab · d</code> term before quoting a size.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: where the <code>d²</code> budget goes.</b> Two-thirds of a block already lives in the FFN (<code>8d²</code> vs attention's <code>4d²</code>). Widening the FFN multiple (the usual 4×) adds representational capacity but grows parameters and memory the fastest; narrowing it saves memory but caps the per-token nonlinearity. The FFN multiplier and <code>d</code> are the two knobs that set model size — a classic <b>design-review</b> call.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "One transformer block is about <code>12·d²</code> parameters — <code>4·d²</code> for the four <code>d×d</code> attention projections and <code>8·d²</code> for the FFN's expand-then-contract funnel — so a <code>d=768</code>, 12-layer model is roughly 85M block params, no calculator. The nuance is that <code>12d²·n_layers</code> omits the token embedding and the LM head, each about <code>vocab×d</code>; for a small model with a large vocabulary those two matrices dominate, so I add a <code>2·vocab·d</code> term before quoting a real checkpoint size."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -483,7 +492,8 @@ Create sessions/m08-transformer-math/day-02-qkv-matrices/experiment.py that:
 5. Verifies that count_params(768, 12, 1) gives per_block == 7_077_888 (~7.08M), then prints a small table for d_model=768/n_layers=12 and d_model=1024/n_layers=24.
 Add a brief comment on each step, then run it to confirm the numbers.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m08-transformer-math/day-02-qkv-matrices/log.md</code>: why does the FFN hold twice as many parameters (<code>8d²</code>) as attention (<code>4d²</code>) in one block?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m08-transformer-math/day-02-qkv-matrices/log.md</code>: (1) the one sentence you'd tell a teammate about the <code>12d²</code> rule; (2) why the FFN holds twice as many parameters (<code>8d²</code>) as attention (<code>4d²</code>) in one block; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: state your counter's per-block and full-model numbers, explain <b>why</b> parameters scale as <code>d²</code> (each matrix is <code>d×d</code>-ish, so doubling <code>d</code> quadruples the cost) and <b>× n_layers</b> for the whole model, and <b>what would break</b> in a real sizing estimate if you ignored the embedding + LM head — a checkpoint noticeably bigger than your napkin math, worst for small models with a large vocabulary.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

@@ -359,6 +359,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Here is the problem. When Device 1 is working on the first layers, Devices 2, 3, and 4 have nothing to do yet — the data has not reached them. They sit <strong>idle</strong>. This wasted idle time is called the <span class="term" data-tip="Wasted idle time when a chip or device has nothing to do while it waits for data. You pay but get no work.">bubble</span>. The same thing happens at the end: once the data has passed Device 1, it goes idle while the later devices finish.</p>
       <p>So a naive pipeline wastes a lot of device time waiting. The fix — <span class="term" data-tip="Splitting a batch into smaller pieces so chips can work at the same time instead of waiting.">micro-batching</span> — is the heart of today's lesson, and we'll build it up in the playground.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://arxiv.org/abs/1811.06965" target="_blank" rel="noopener">GPipe: Efficient Training of Giant Neural Networks (Huang et al., 2018)</a> — the paper that introduced pipeline micro-batching.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 把模型按层切开听着简单，但"为什么设备会空转、又怎么靠 micro-batch 把空转填满"这一步，不在脑子里跑一遍时间线就想不通。In plain terms: splitting by layer is easy to picture, but the <em>bubble</em> — why devices sit idle and how micro-batching overlaps them — only clicks once you trace the timeline step by step.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -373,6 +374,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🧍🏗️🏗️🏗️</span><h5>many products = full line</h5><p>Now feed in many small products back-to-back. As soon as worker 1 passes product A to worker 2, worker 1 starts product B. Soon every worker is busy on a different product. The line stays full.</p></div>
       </div>
       <p><strong>In one line:</strong> devices are the workers, layers are the work each worker does, and feeding many small <span class="term" data-tip="Small pieces of a batch, fed in one after another so different devices stay busy at the same time.">micro-batches</span> (small pieces of the batch) back-to-back keeps every device busy — so the bubble shrinks.</p>
+      <p><b>直觉 / Intuition:</b> 把设备当流水线工人，层是每人做的工序 —— 只送一个产品，大家轮流干、其余人干等(bubble)；送很多小产品(micro-batch)，很快人人都在忙。The technical point is that feeding <code>m</code> micro-batches back-to-back overlaps the stages, so the idle bubble fraction <code>(p−1)/(m+p−1)</code> shrinks as <code>m</code> grows.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers can each build a whole product alone. Pipeline devices cannot — each device only holds <em>some</em> of the layers, so every micro-batch <em>must</em> pass through all stages in order. The dependency is strict.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -409,7 +411,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
 
       <h4>The bubble fraction</h4>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>bubble fraction ≈ (p - 1) / (m + p - 1)</code><br><span style="font-size:.85rem;color:var(--text2)"><code>p</code> = number of stages, <code>m</code> = number of micro-batches. It is the share of device time that is wasted (idle). Fill + drain together cost about <code>p - 1</code> time slots; total useful work spans about <code>m + p - 1</code> slots.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>bubble fraction ≈ (p - 1) / (m + p - 1)</code><br><span style="font-size:.85rem;color:var(--ink2)"><code>p</code> = number of stages, <code>m</code> = number of micro-batches. It is the share of device time that is wasted (idle). Fill + drain together cost about <code>p - 1</code> time slots; total useful work spans about <code>m + p - 1</code> slots.</span></div></div>
       <p>The key insight: <code>p - 1</code> is fixed by how many stages you have, but you can make <code>m</code> as large as you like. Push <code>m</code> up and the fraction falls toward zero. That is the whole trick.</p>
 
       <h4>Why it matters</h4>
@@ -420,10 +422,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> model too big for one device → split layers into stages across devices → strict stage order creates idle bubble → split the batch into many micro-batches → stages overlap → bubble fraction <code>(p-1)/(m+p-1)</code> shrinks as <code>m</code> grows.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the pipeline bubble fraction</b>
+      <br><b>1 · In words:</b> the share of device time wasted waiting is the fixed fill+drain cost divided by the total time; adding micro-batches grows the denominator, so the waste shrinks.
+      <br><b>2 · The formula:</b> <code>bubble ≈ (p − 1) / (m + p − 1)</code> — <code>p</code> = number of stages (devices); <code>m</code> = number of micro-batches; <code>p−1</code> = fill + drain slots (fixed by stage count); <code>m+p−1</code> = total slots the work spans.
+      <br><b>3 · Tiny numbers:</b> <code>p=4</code> → <code>m=1</code>: <code>3/4 = 0.75</code> (75% idle!); <code>m=8</code>: <code>3/11 ≈ 0.27</code>; <code>m=32</code>: <code>3/35 ≈ 0.09</code>. More micro-batches, less bubble.
+      <br><b>4 · Sanity check:</b> as <code>m → ∞</code> the bubble → 0 but never reaches it (the <code>p−1</code> numerator never disappears). If your formula hits exactly 0 at a finite <code>m</code>, you dropped the <code>p−1</code>.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>Overlapping micro-batches is what buys the bubble back, but overlap is also where the subtlest pipeline bug lives — a weight that changed underneath a micro-batch.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): stale weights across micro-batches.</b> The backward pass for a micro-batch must use the <em>same</em> weights its forward pass used. If a stage applies an optimizer update before every in-flight micro-batch has finished its backward — or if the forward and backward of a micro-batch straddle a weight update — the gradient is computed against weights that no longer exist. Nothing crashes: shapes match, the loss keeps dropping, but the update is subtly wrong and training converges slower or to a worse point than the same model on one device. A senior engineer checks in <b>code review</b> that the schedule (e.g. 1F1B) delays the optimizer step until all micro-batches for the step have completed backward, so every micro-batch's forward and backward see one consistent weight version.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: shrink the bubble vs. hold more activations.</b> Raising <code>m</code> drives the bubble fraction <code>(p-1)/(m+p-1)</code> toward zero, so it is tempting to push <code>m</code> as high as possible. But every in-flight micro-batch must keep its forward activations resident until its backward pass reaches it, so peak activation memory grows with how many micro-batches are outstanding. In a <b>design review</b> the decision is how far to push <code>m</code>: far enough to hide the bubble, not so far that activation memory overflows the device or per-micro-batch overhead (communication, kernel launches) eats the savings.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Pipeline parallelism splits a model's layers into <code>p</code> stages, one per device, so a model too big for one chip fits — but the strict stage order leaves later devices idle at the start (fill) and early ones idle at the end (drain): the bubble, fraction <code>(p−1)/(m+p−1)</code>. Micro-batching feeds <code>m</code> small batches so stages overlap and the bubble shrinks toward zero as <code>m</code> grows. The nuance is the silent failure: a micro-batch's backward must see the same weights as its forward, so if an optimizer step lands mid-flight (not a 1F1B schedule) the gradient is stale — no crash, just worse convergence — and raising <code>m</code> costs activation memory."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -475,7 +484,8 @@ Create sessions/m09c-sharding-parallelism/day-03-pipeline-parallel/experiment.py
 4. Saves the figure to sessions/m09c-sharding-parallelism/day-03-pipeline-parallel/pipeline_bubble.png and prints the path.
 Add a brief comment on each step explaining the pipeline bubble and micro-batching, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09c-sharding-parallelism/day-03-pipeline-parallel/log.md</code>: with <code>p</code> stages fixed, why can the bubble never quite reach exactly zero no matter how large <code>m</code> gets? (Hint: the <code>p - 1</code> in the numerator.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09c-sharding-parallelism/day-03-pipeline-parallel/log.md</code>: (1) what the bubble is and what shrinks it; (2) with <code>p</code> fixed, why the bubble can never reach exactly zero no matter how large <code>m</code> gets (hint: the <code>p−1</code> numerator); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: describe your bubble-vs-<code>m</code> plot, explain <b>why</b> the fraction is <code>(p−1)/(m+p−1)</code> and why raising <code>m</code> helps but hits diminishing returns, and <b>what would break</b> in real pipeline training if the schedule let an optimizer update land mid-flight — stale-weight gradients and silently worse convergence, plus the activation-memory cost of a large <code>m</code>.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

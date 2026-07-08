@@ -248,6 +248,36 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
 .site-footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);line-height:1.6}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-fit{stroke:#111827;stroke-width:2;fill:none}
+.vlab-fit.dash{stroke:#B0453A;stroke-dasharray:5 4}
+.vlab-pt{stroke:#1F2937;stroke-width:1.1}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-badge{font-family:var(--body);font-size:.74rem;font-weight:700;border-radius:999px;padding:.15rem .6rem;margin-left:.4rem;white-space:nowrap}
+.vlab-badge.ok{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.vlab-badge.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+
 /* ---------- tooltip ---------- */
 #term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);background:#080B11;color:#EDEAFE;font-family:var(--body);font-size:.82rem;
   font-weight:400;line-height:1.45;text-align:left;padding:.6rem .78rem;border-radius:var(--r-md);border:1px solid var(--line2);
@@ -353,11 +383,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Activations</strong> — the intermediate outputs of each layer, saved during the forward pass so the backward pass can compute gradients. An <span class="term" data-tip="The output of a layer, kept in memory during the forward pass so the backward pass can use it later.">activation</span> is a layer's output that must be kept around until backprop uses it. This term does <em>not</em> scale with <code>N</code> — it scales with <strong>batch size × sequence length × number of layers</strong>, and it is often the <em>biggest</em> term of all.</li>
       </ul>
 
-      <div class="callout c-info"><span class="ic">📦</span><div><b>The static budget (before activations):</b> weights <code>4N</code> + gradients <code>4N</code> + Adam state <code>8N</code> = <code>16N</code> bytes.<br><span style="font-size:.85rem;color:var(--text2)">For 1B params in fp32 that is <code>16 GB</code> — already at the limit of a 16 GB card, and we haven't stored a single activation yet.</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div><b>The static budget (before activations):</b> weights <code>4N</code> + gradients <code>4N</code> + Adam state <code>8N</code> = <code>16N</code> bytes.<br><span style="font-size:.85rem;color:var(--ink2)">For 1B params in fp32 that is <code>16 GB</code> — already at the limit of a 16 GB card, and we haven't stored a single activation yet.</span></div></div>
 
       <h4>So what's today's catch?</h4>
       <p>The catch is that people size their GPU by the weights alone (<code>4N</code>) and forget the other three tenants. The static cost is <code>16N</code> with Adam, and then activations pile on top — and activations grow with your batch. Knowing this lets you predict crashes before they happen.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook" target="_blank" rel="noopener">The Ultra-Scale Playbook (Hugging Face / nanotron)</a> — the memory-accounting sections walk through exactly these four terms.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 大家把"模型多大"直接等于参数量×字节数（1B fp32 = 4GB），照这个买卡 —— 结果一训练就 OOM，不知道另外十几 GB 去哪了。In plain terms: people equate "model size" with the weights alone (1B fp32 = 4 GB) and size hardware around that — then training OOMs, because gradients, optimizer state, and activations are three more tenants they never counted.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -374,6 +405,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🧳</span><h5>Unpacked stuff = activations</h5><p>Everything you spread out during the trip and can't fold back until you're done. It grows with how much you do (batch × sequence × layers) and often fills the whole room.</p></div>
       </div>
       <p><strong>In one line:</strong> the clothes are only a quarter of the load. Weights + gradients + two Adam kits are the fixed <code>16N</code>; the unpacked activations pile on top and often dwarf the rest.</p>
+      <p><b>直觉 / Intuition:</b> 把训练想成打包行李 —— 衣服(权重)只是四样东西之一：还有脏衣袋(梯度)、两个洗漱包(Adam 的 m、v)、以及摊开收不回去的东西(activations)。The technical point is that the static load is <code>16N</code> (weights + grads + Adam), and activations pile on top and grow with <code>batch × seq</code> until they dwarf the rest.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a suitcase has a fixed size, but activations are not fixed — you choose them. A bigger batch or longer sequence unpacks more stuff, so activation memory can balloon far past everything else.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -384,6 +416,28 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Watch the budget grow as you add each tenant</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>A simulated terminal. Our model is <code>N = 1e9</code> parameters in fp32 (4 bytes each). Click each button to add the next memory tenant and watch the total climb. <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">Training memory stack</span>
+          <span class="vlab-readout" id="mem-readout">N=1B · fp32 · Adam · batch 8 → total 48 GB · OOM on 40 GB</span>
+        </div>
+        <p class="vlab-q">Learning question: people quote "weights = 4N" — so why does a 1B model OOM on a 40 GB card long before you'd expect? Drag the controls and watch which tenant blows the budget.</p>
+        <div class="vlab-panels" style="grid-template-columns:1fr">
+          <figure class="vlab-fig"><figcaption>GPU memory during training: four tenants vs the device budget</figcaption>
+            <svg class="vlab-svg" id="mem-svg" viewBox="0 0 460 300" role="img" aria-label="A stacked bar of training memory — weights, gradients, optimizer state, and activations — against a device RAM budget line; activations grow with batch size until they cross the budget."></svg></figure>
+        </div>
+        <div class="vlab-controls">
+          <label>params N (B) <input type="range" id="mem-n" min="1" max="4" step="1" value="1" aria-label="parameters in billions"></label>
+          <span class="vlab-val" id="mem-n-lbl">1 B</span>
+          <label>batch <input type="range" id="mem-b" min="1" max="16" step="1" value="8" aria-label="batch size"></label>
+          <span class="vlab-val" id="mem-b-lbl">8</span>
+          <span class="vlab-toggle" role="group" aria-label="dtype"><button type="button" class="vlab-btn active" id="mem-fp32">fp32</button><button type="button" class="vlab-btn" id="mem-bf16">bf16</button></span>
+          <span class="vlab-toggle" role="group" aria-label="optimizer"><button type="button" class="vlab-btn active" id="mem-adam">Adam</button><button type="button" class="vlab-btn" id="mem-sgd">SGD</button></span>
+        </div>
+        <div class="callout c-info"><span class="ic">👀</span><div><b>What you should notice:</b> the static block (weights + gradients + Adam state = <code>16N</code> at fp32) is only the floor — <em>activations</em> grow with batch and are what actually cross the red budget line. Drag <b>batch</b> up to trigger OOM; switch to <b>bf16</b> to halve the static block, or <b>SGD</b> to drop the <code>8N</code> optimizer tenant entirely.</div></div>
+        <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Misconception:</b> "model memory = parameter count." Weights are one of four tenants. With Adam in fp32 the static cost is <code>16N</code>, not <code>4N</code> — and activations on top scale with <code>batch × seq</code>, so the thing that OOMs you is usually the batch, not the weights.</div></div>
+        <p class="vlab-note"><b>How to read it:</b> weights <code>=N·bpp</code>, grads <code>=N·bpp</code>, Adam state <code>=2N·bpp</code> (SGD 0), activations <code>≈ batch·bpp</code> (folding seq/layers into one constant). <b>Simplified:</b> a fixed per-batch activation estimate, no gradient checkpointing (that's Day 6), and no memory fragmentation.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="weights" type="button">① weights only (4N)</button>
@@ -409,7 +463,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Static total with Adam</strong> = <code>4N + 4N + 8N = 16N</code>, independent of batch size.</li>
         <li><strong>Activations</strong> ≈ (a per-token cost that depends on the architecture) × <code>batch × sequence × layers</code>. It scales with what you feed the model, not with <code>N</code>.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>static = 16 × N × (bytes_per_param / 4)</code><br><span style="font-size:.85rem;color:var(--text2)">For 1B params in fp32: <code>16 × 1e9 = 16 GB</code> before a single activation. Switch to bf16 (2 bytes) and the static term roughly halves — but activations may still dominate.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>static = 16 × N × (bytes_per_param / 4)</code><br><span style="font-size:.85rem;color:var(--ink2)">For 1B params in fp32: <code>16 × 1e9 = 16 GB</code> before a single activation. Switch to bf16 (2 bytes) and the static term roughly halves — but activations may still dominate.</span></div></div>
 
       <h4>Why activations often win</h4>
       <ul>
@@ -419,10 +473,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> parameters need a value (weights) → training needs a slope per value (gradients) → Adam needs two running averages per value (8N, the 2x) → the forward pass must remember its outputs for backprop (activations, batch-dependent) → total memory = <code>16N + activations</code>.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the 16N static-memory rule</b>
+      <br><b>1 · In words:</b> training keeps roughly four model-sized things in memory, and only one of them is the weights you quoted.
+      <br><b>2 · The formula:</b> <code>static = weights + grads + optimizer = 4N + 4N + 8N = 16N</code> (fp32) — <code>N</code> = parameter count; <code>4N</code> = weights (4 bytes each); <code>4N</code> = one gradient per weight; <code>8N</code> = Adam's two per-weight buffers <code>m, v</code>. Activations pile on top and scale with <code>batch × seq</code>.
+      <br><b>3 · Tiny numbers:</b> <code>N = 1e9</code>, fp32 → weights <code>4 GB</code> + grads <code>4 GB</code> + Adam <code>8 GB</code> = <code>16 GB</code> static, before a single activation.
+      <br><b>4 · Sanity check:</b> static should be about <b>4×</b> the weights with Adam. If your budget ≈ 1× the weights, you counted only parameters — the classic OOM surprise.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>Memory math is where a "why did this run out of memory?" question gets answered before you launch, and the classic mistake is counting only the weights.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): budgeting for weights alone and forgetting the 4x.</b> A beginner sizes the job by parameters times bytes — 1B params in fp32 = 4 GB — and picks hardware around that. But training also stores gradients (another 4N) and Adam's two buffers (8N), so the real static cost is <code>16N</code>, four times the weights, before a single activation. This is not a code bug that throws early: your notebook may run on a tiny batch, look fine, then blow up only at the real batch size or later in training when activations pile on top. In <b>code review</b>, a senior engineer checks that the memory estimate includes gradients, optimizer state (Adam = 2x weights), and activations — not just the parameter count — and that it uses the actual training dtype.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast, stable convergence vs. 2x the weight memory.</b> Adam keeps a per-weight momentum <code>m</code> and variance <code>v</code>, which is why it trains reliably with little tuning — but those two buffers cost <code>8N</code>, the whole 2x optimizer-state term. Plain SGD keeps none (0) and momentum-SGD keeps one (4N), so they free memory you could spend on a bigger model or batch. In a <b>design review</b>, choosing the optimizer is partly a memory decision: you weigh Adam's convergence quality against the parameters or batch size that its extra state forces you to give up.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Training memory is four tenants, not one: weights (<code>4N</code> in fp32), gradients (<code>4N</code>), Adam's two moment buffers (<code>8N</code>), and activations — so the static cost is <code>16N</code>, four times the weights people quote, and activations stack on top and scale with <code>batch × seq</code>, so they're usually what OOMs you. The nuance is the silent failure: sizing hardware by parameter count alone runs fine on a tiny batch, then blows up at the real batch or later in training. My knobs are dtype (bf16 halves static), optimizer (SGD drops the <code>8N</code>), and gradient checkpointing (trade compute to shrink activations)."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -475,7 +536,8 @@ Create sessions/m09a-hardware-physics/day-05-memory-footprint/experiment.py that
 5. Includes a sanity check: assert the static subtotal for N=1e9, fp32 equals 16 GB.
 Add a brief comment on each term explaining what it is, then run it on a 1B-param fp32 example to confirm the 16 GB static figure.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-05-memory-footprint/log.md</code>: for your calculator, at what <code>batch</code> does the activations term overtake the <code>16N</code> static cost? What would gradient checkpointing change?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09a-hardware-physics/day-05-memory-footprint/log.md</code>: (1) the four memory tenants and the <code>16N</code> static rule; (2) at what <code>batch</code> your calculator's activations term overtakes the <code>16N</code> static cost, and what gradient checkpointing would change; (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: report your calculator's per-term breakdown for a 1B fp32 Adam model, explain <b>why</b> the static cost is <code>16N</code> (not <code>4N</code>) and why activations scale with <code>batch × seq</code> rather than <code>N</code>, and <b>what would break</b> in production if you sized hardware by parameter count alone — a job that runs on a tiny batch, then OOMs at the real batch or later in training, with no early warning.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -686,6 +748,49 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── playground visual: training memory stack (dependency-free SVG) ── -->
+<script>
+(function(){
+  "use strict";
+  var svg=document.getElementById('mem-svg'); if(!svg) return;
+  var nS=document.getElementById('mem-n'), nL=document.getElementById('mem-n-lbl');
+  var bS=document.getElementById('mem-b'), bL=document.getElementById('mem-b-lbl');
+  var fp=document.getElementById('mem-fp32'), bf=document.getElementById('mem-bf16');
+  var ad=document.getElementById('mem-adam'), sg=document.getElementById('mem-sgd');
+  var readout=document.getElementById('mem-readout');
+  var dtype='fp32', opt='adam';
+  var BUDGET=40, MAXGB=140, x=170, barW=96, yTop=30, yBot=262;
+  function yPix(gb){ return yBot-(gb/MAXGB)*(yBot-yTop); }
+  function render(){
+    var N=parseInt(nS.value,10), batch=parseInt(bS.value,10);
+    var bpp=(dtype==='fp32')?4:2;
+    var w=N*bpp, g=N*bpp, os=(opt==='adam')?2*N*bpp:0, act=batch*bpp;
+    var total=w+g+os+act;
+    var segs=[{n:'weights '+w+'G',v:w,c:'#2563EB'},{n:'grads '+g+'G',v:g,c:'#7C5BD9'},{n:'optim '+os+'G',v:os,c:'#D97706'},{n:'activations '+act+'G',v:act,c:'#C93B3B'}];
+    var s='', yb=yBot, i;
+    s+='<line class="vlab-axis" x1="'+x+'" y1="'+yTop+'" x2="'+x+'" y2="'+yBot+'"/>';
+    [0,40,80,120].forEach(function(gb){ var yy=yPix(gb); s+='<line class="vlab-grid" x1="'+x+'" y1="'+yy+'" x2="'+(x+barW+8)+'" y2="'+yy+'"/>'; s+='<text class="vlab-lbl" x="'+(x-6)+'" y="'+(yy+3)+'" text-anchor="end">'+gb+'</text>'; });
+    s+='<text class="vlab-lbl" x="14" y="'+((yTop+yBot)/2)+'" text-anchor="middle" transform="rotate(-90 14 '+((yTop+yBot)/2)+')">memory (GB)</text>';
+    segs.forEach(function(seg){ if(seg.v<=0) return; var h=(seg.v/MAXGB)*(yBot-yTop); var yy=yb-h; s+='<rect x="'+x+'" y="'+yy.toFixed(1)+'" width="'+barW+'" height="'+h.toFixed(1)+'" fill="'+seg.c+'" stroke="#fff" stroke-width="0.7"/>'; if(h>13) s+='<text x="'+(x+barW/2)+'" y="'+(yy+h/2+3).toFixed(1)+'" text-anchor="middle" font-family="monospace" font-size="9" fill="#fff">'+seg.n+'</text>'; yb-=h; });
+    var lx=x+barW+22, ly=64;
+    segs.forEach(function(seg){ s+='<rect x="'+lx+'" y="'+ly+'" width="12" height="12" fill="'+seg.c+'"/>'; s+='<text class="vlab-lbl" x="'+(lx+17)+'" y="'+(ly+10)+'">'+seg.n+'</text>'; ly+=20; });
+    var by=yPix(BUDGET);
+    s+='<line x1="'+(x-10)+'" y1="'+by+'" x2="'+(x+barW+10)+'" y2="'+by+'" stroke="#C93B3B" stroke-width="2" stroke-dasharray="6 3"/>';
+    s+='<text class="vlab-lbl" x="'+(x+barW+14)+'" y="'+(by-4)+'" fill="#C93B3B">'+BUDGET+' GB budget</text>';
+    svg.innerHTML=s;
+    nL.textContent=N+' B'; bL.textContent=String(batch);
+    var fits=total<=BUDGET;
+    readout.innerHTML='N='+N+'B · '+dtype+' · '+(opt==='adam'?'Adam':'SGD')+' · batch '+batch+' → total <b>'+total+' GB</b> · '+(fits?'fits '+BUDGET+' GB ✓':'<span style="color:#C93B3B">OOM on '+BUDGET+' GB</span>');
+  }
+  function setDtype(d){ dtype=d; fp.classList.toggle('active',d==='fp32'); bf.classList.toggle('active',d==='bf16'); render(); }
+  function setOpt(o){ opt=o; ad.classList.toggle('active',o==='adam'); sg.classList.toggle('active',o==='sgd'); render(); }
+  nS.addEventListener('input',render); bS.addEventListener('input',render);
+  fp.addEventListener('click',function(){setDtype('fp32');}); bf.addEventListener('click',function(){setDtype('bf16');});
+  ad.addEventListener('click',function(){setOpt('adam');}); sg.addEventListener('click',function(){setOpt('sgd');});
+  render();
 })();
 </script>
 

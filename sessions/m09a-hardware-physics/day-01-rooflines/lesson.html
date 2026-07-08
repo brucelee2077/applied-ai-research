@@ -355,13 +355,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The one number: arithmetic intensity</h4>
       <p><span class="term" data-tip="The ratio of math done to data moved for an operation: FLOPs divided by bytes read from memory.">Arithmetic intensity</span> (AI) is the ratio of "math done" to "data moved" for an operation:</p>
-      <div class="callout c-info"><span class="ic">🧮</span><div><code>arithmetic intensity = FLOPs performed / bytes moved to and from memory</code><br><span style="font-size:.85rem;color:var(--text2)">"For every byte I bring in from memory, how many math operations do I get out of it?" High AI = you squeeze lots of math from each byte. Low AI = you barely compute before needing the next byte.</span></div></div>
+      <div class="callout c-info"><span class="ic">🧮</span><div><code>arithmetic intensity = FLOPs performed / bytes moved to and from memory</code><br><span style="font-size:.85rem;color:var(--ink2)">"For every byte I bring in from memory, how many math operations do I get out of it?" High AI = you squeeze lots of math from each byte. Low AI = you barely compute before needing the next byte.</span></div></div>
       <p>AI decides which ceiling you hit. The achievable speed is simply whichever limit you reach first:</p>
-      <div class="callout c-ok"><span class="ic">🧮</span><div><code>achievable performance = min( peak_FLOP/s ,  AI × bandwidth )</code><br><span style="font-size:.85rem;color:var(--text2)"><strong>Low AI</strong> → the <code>AI × bandwidth</code> term is small → <strong>memory-bound</strong> (starved for data). <strong>High AI</strong> → that term is huge → you hit the flat <code>peak_FLOP/s</code> ceiling → <strong>compute-bound</strong>. The AI where they cross is the <strong>ridge point</strong>.</span></div></div>
+      <div class="callout c-ok"><span class="ic">🧮</span><div><code>achievable performance = min( peak_FLOP/s ,  AI × bandwidth )</code><br><span style="font-size:.85rem;color:var(--ink2)"><strong>Low AI</strong> → the <code>AI × bandwidth</code> term is small → <strong>memory-bound</strong> (starved for data). <strong>High AI</strong> → that term is huge → you hit the flat <code>peak_FLOP/s</code> ceiling → <strong>compute-bound</strong>. The AI where they cross is the <strong>ridge point</strong>.</span></div></div>
 
       <h4>Why this exists</h4>
       <p>Before you spend a week optimizing, you want to know: am I fighting the math engine or the memory pipe? The answer completely changes the fix. This whole framework is called the <span class="term" data-tip="A picture that predicts a computation's top speed on a chip, using its math speed and its memory speed.">roofline model</span> — a plot with a slanted "memory roof" that rises with AI, then a flat "compute roof" once AI is high enough. You will draw one in the playground.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs (optional): <a href="https://jax-ml.github.io/scaling-book/roofline/" target="_blank" rel="noopener">How To Scale Your Model — The Roofline</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 代码一慢，大家第一反应就是"换更快的芯片"，却分不清到底是算得慢还是喂数据喂得慢 —— 而这两件事的解法正好相反。In plain terms: people treat "slow" as one problem, but a compute-bound kernel and a memory-bound kernel have <em>opposite</em> fixes — and without arithmetic intensity you can't tell which one you're fighting.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -376,6 +377,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">👨‍🍳🍲</span><h5>High AI → the chefs are the bottleneck</h5><p>One delivery feeds a huge, slow-cooked dish. The door is idle most of the time; the chefs are flat out. Now a faster door does nothing — you need more chefs. This is <strong>compute-bound</strong>.</p></div>
       </div>
       <p><strong>Arithmetic intensity is "dishes cooked per delivery."</strong> Cook a lot per delivery (high AI) and chefs are the limit. Cook barely anything per delivery (low AI) and the door is the limit — no matter how many chefs you hire.</p>
+      <p><b>直觉 / Intuition:</b> 把芯片想成一个厨房：厨师是算力，送菜的门是内存带宽 —— 哪个先"堵住"，哪个就是你的瓶颈。The technical point is that arithmetic intensity (FLOPs per byte) decides which ceiling you hit first: low AI starves you at the memory "door", high AI makes the compute "chefs" the limit.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real chip doesn't fully stop the door while cooking. Deliveries and cooking overlap. The roofline model assumes perfect overlap and gives you the <em>best case</em> — the ceiling you can approach, not always reach.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -410,7 +412,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>Achievable speed is <code>min( peak_FLOP/s , AI × bandwidth )</code>. On a roofline plot this is a slanted line (memory roof) rising until it meets a flat line (compute roof) at the ridge point.</li>
         <li>The fix depends on the side you are on. <strong>Memory-bound?</strong> Move fewer bytes — fuse operations, use smaller data types, reuse data on-chip. Faster math will not help. <strong>Compute-bound?</strong> Do fewer or cheaper FLOPs, or use faster math units. More bandwidth will not help.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>ridge_point = peak_FLOP/s / bandwidth</code><br><span style="font-size:.85rem;color:var(--text2)">For a chip at 300 TFLOP/s and 2 TB/s: ridge = 150 FLOP/byte. An op must reuse each byte at least 150 times before the chefs, not the door, become the limit.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>ridge_point = peak_FLOP/s / bandwidth</code><br><span style="font-size:.85rem;color:var(--ink2)">For a chip at 300 TFLOP/s and 2 TB/s: ridge = 150 FLOP/byte. An op must reuse each byte at least 150 times before the chefs, not the door, become the limit.</span></div></div>
 
       <h4>Why it matters so much</h4>
       <ul>
@@ -420,10 +422,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>Causal chain:</b> an op has a fixed FLOP count and byte count → their ratio is AI → AI vs. the ridge point says compute-bound or memory-bound → that verdict tells you which optimization can possibly help.</div></div>
 
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — arithmetic intensity vs. the ridge point</b>
+      <br><b>1 · In words:</b> for one operation, divide the math it does by the bytes it moves; compare that ratio to the chip's own break-even ratio.
+      <br><b>2 · The formula:</b> <code>AI = FLOPs / bytes</code>, <code>ridge = peak_FLOP/s ÷ bandwidth</code> — <code>AI</code> = arithmetic intensity (FLOPs per byte moved); <code>ridge</code> = the chip's break-even intensity. <code>AI &lt; ridge</code> → memory-bound; <code>AI &gt; ridge</code> → compute-bound.
+      <br><b>3 · Tiny numbers:</b> chip peak <code>= 300e12</code> FLOP/s, bandwidth <code>= 2e12</code> B/s → <code>ridge = 150</code> FLOP/byte. A 1024³ matmul: FLOPs <code>= 2·1024³ ≈ 2.1e9</code>, bytes <code>= 3·1024²·4 ≈ 12.6e6</code> → <code>AI ≈ 170 &gt; 150</code> → compute-bound.
+      <br><b>4 · Sanity check:</b> an elementwise add moves ~12 bytes per FLOP → <code>AI ≈ 0.08 ≪ 150</code> → memory-bound. If a <em>big matmul</em> ever comes out memory-bound, re-check your byte count — usually a wrong dtype.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>The roofline is a back-of-the-envelope model, and its danger is that its numbers always look confident even when they are wrong for the wrong reason.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): wrong dtype in the byte count.</b> Arithmetic intensity is <code>FLOPs / bytes</code>, and "bytes" depends on the data type. If you assume fp32 (4 bytes) but the kernel actually runs in bf16 (2 bytes), you count twice as many bytes as really move, so your AI comes out half its true value. Nothing crashes — you just get a number, and it wrongly labels a compute-bound op as memory-bound. You then spend days fusing memory when the fix was more math. In <b>code review</b>, a senior engineer checks that the <code>bytes</code> term uses the same dtype the kernel actually runs in, not a default assumption.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a simple ceiling you can compute on paper vs. a number the hardware may never reach.</b> The roofline gives you a fast verdict from two numbers, before you write any kernel — that is its whole value. What you give up is realism: it assumes perfect overlap of compute and memory and 100% utilization, so it reports a best-case ceiling, not the speed you will actually see. In a <b>design review</b>, you decide when this cheap estimate is enough to pick a direction, and when a workload is close enough to the ridge that you must profile the real hardware instead of trusting the paper number.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Arithmetic intensity is FLOPs per byte moved; I compare it to the chip's ridge point — <code>peak FLOP/s ÷ bandwidth</code> — and below the ridge I'm memory-bound, above it compute-bound. That verdict decides which optimization can even help: fuse/shrink-dtype for memory-bound, faster math for compute-bound. The nuance is that the byte count depends on dtype — assume fp32 when the kernel runs bf16 and you double the bytes, halve the AI, and mislabel a compute-bound op as memory-bound, then waste days fusing memory when the fix was more math."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -484,7 +493,8 @@ Create sessions/m09a-hardware-physics/day-01-rooflines/experiment.py that:
 3. Prints a readable line per case and confirms the verdicts.
 Add a brief comment on each step explaining arithmetic intensity and the ridge point, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m09a-hardware-physics/day-01-rooflines/log.md</code>: why is loading LLM weights during token-by-token decode a memory-bound operation? (Hint: how many FLOPs do you get per weight byte you load?)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 在关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m09a-hardware-physics/day-01-rooflines/log.md</code>: (1) the one sentence you'd tell a teammate about arithmetic intensity; (2) why loading LLM weights during token-by-token decode is memory-bound (how many FLOPs do you get per weight byte you load?); (3) one thing you're still unsure about.
+      <br><br><b>Explain-back (5–7 sentences)</b> in the same <code>log.md</code>: report your calculator's AI and verdict for both cases, explain <b>why</b> AI vs. the ridge point (not raw FLOPs or raw bytes) decides compute- vs memory-bound, and <b>what would break</b> in a real perf investigation if you used the wrong dtype in the byte count — a silently mislabeled kernel and days spent optimizing the wrong ceiling.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
