@@ -4,7 +4,7 @@ _Plan-first artifact for the `frontier-curriculum-refactor` Coach Layer rollout 
 
 Companion docs: [`COACH_STYLE_GUIDE.md`](./COACH_STYLE_GUIDE.md) (blocks + rules) · [`enhance_lesson_checklist.md`](./enhance_lesson_checklist.md) (per-lesson checklist) · [`lesson_audit.py`](./lesson_audit.py) (automated gate) · [`batch_1_rollout_report.md`](./batch_1_rollout_report.md) + [`batch_2_rollout_plan.md`](./batch_2_rollout_plan.md) + [`batch_2_rollout_report.md`](./batch_2_rollout_report.md) (the precedent this batch follows).
 
-> **Naming note.** This is the **Coach Layer rollout Batch 3** (`m07`/`m08`/`m09a`/`m09c`). It is a *different* batch from [`batch_3_cleanup_report.md`](./batch_3_cleanup_report.md), which was a defect-only **cleanup** pass over the inference-systems tier (`m06`/`m16a`/`m17a`/`m17b`). No module overlap; no conflict. Artifacts here are `batch_3_rollout_plan.md` (this file) and `batch_3_rollout_report.md`.
+> **Naming note (two "Batch 3" files, no overlap).** This plan drives `batch_3_rollout_report.md` — the **Coach Layer rollout** for the JAX & systems tier (`m07` / `m08` / `m09a` / `m09c`). It is unrelated to the older [`batch_3_cleanup_report.md`](./batch_3_cleanup_report.md), a **defect-only cleanup** of a *different* scope (the inference-systems tier `m06` / `m16a` / `m17a` / `m17b`) — **no module overlap**. See [`batch_3_cleanup_note.md`](./batch_3_cleanup_note.md) for the one-line disambiguation.
 
 ---
 
@@ -86,6 +86,7 @@ The parent request explicitly **named** the systems visuals it prefers (memory-m
 3. **`m09a/day-05-memory-footprint` — "Training memory stack."** Named type: *batching memory growth / memory-movement*. Sliders for batch size, N, dtype, and optimizer redraw the four-tenant stack (weights 4N + grads 4N + Adam 8N = 16N) and drag the **activations-cross-the-16N-budget** point live. The auditor called this "the strongest candidate for an interactive upgrade." Not covered by any `viz/*.html`.
 
 **Deliberately NOT given a new lab (to avoid duplication / gold-plating):**
+
 - `m09a/day-03-sharding` (device-mesh / collectives) — `viz/parallelism.html` **already** provides the interactive Device-Mesh + AllGather/ReduceScatter/AllReduce visual (used by `m09c/d01–d04`). A new mesh lab would duplicate it; the strong static SVG build + Coach prose is enough. (If ever wanted, embed `parallelism.html` — noted, not done.)
 - `m09a/day-06-checkpointing`, `m08/day-02-qkv`, `m08/day-05-pretraining` — strong static-SVG builds (score 4). Coach prose only.
 
@@ -138,18 +139,21 @@ Every lesson gets its missing Coach blocks inserted **inside `.sec-body`, before
 All three are **dependency-free inline SVG + vanilla JS** using the repo `.vlab` template proven in Batch 1/2 (the CSS block at `m10a-scaling-laws/day-01-kaplan-paradigm/lesson.html:197–224`, copied verbatim — it uses only new-shell CSS vars). **No CDN, no new fonts, offline-safe, theme-aware, keyboard-reachable sliders.** Each lab is inserted into **Section 3** (`data-sec="play"`) **above** the existing fake-terminal playground; the terminal keeps its 3 `data-demo` buttons and its **completion-gate** role (untouched). Being inline (not iframed), the `viz-iframe-autoresize-bug` concern does not apply. Each carries the 7 required cards: learning question (`.vlab-q`) · labeled axes · clear change on control move · "what you should notice" · misconception note · "where this simplifies reality" (`.vlab-note`) · frontier-lab relevance. All lab math is hand-verified in Node before shipping.
 
 ### 5.1 `m09a/day-02-tpu-architecture` — "Systolic-array beat scrubber"
+
 - **Learning question:** how does a fixed grid of multiply-accumulate cells do a whole matmul by *streaming* data through on staggered beats — and why does a batch-1 matmul waste it?
 - **One panel:** an `n×n` MXU grid (default 3×3) computing a concrete small matmul `C = A·B`. A **beat** slider (0 → 2n−1) advances the staggered wavefront: inputs enter from the left/top, each cell shows its running partial sum, and finished `C` entries light up as they emerge.
 - **Control 2:** a **utilization** toggle (full batch vs batch-1) greys the cells that sit idle when the operand is too small — the grid lights up ~`1/n` of its cells, throughput readout drops, no error. That *is* the staff-lens silent failure.
 - **Notice / misconception / simplifies:** the array reuses each loaded weight across many beats (that is the whole point); misconception = "the TPU does the matmul in one clock" (it takes ~`2n−1` beats to fill/drain); simplification = tiny integer grid, no HBM/VMEM latency, one pass.
 
 ### 5.2 `m09a/day-04-multi-device` — "All-reduce ring timeline"
+
 - **Learning question:** as you add devices, why does the *communication* to keep gradients in sync start to dominate the step, even though each device does less math?
 - **One panel, time on the x-axis:** per-device rows showing a **compute** block then a ring **all-reduce** block (`2(N−1)` steps, each moving `~data/N` bytes). A total-step-time readout splits into compute vs comm.
 - **Controls:** a **device-count `N`** slider (2 → 64) and a **link-bandwidth** slider. Raising `N` shrinks per-device compute but lengthens the ring; lowering bandwidth stretches the comm block until it dominates — the memory-movement bottleneck, made visible on a timeline.
 - **Notice / misconception / simplifies:** ring all-reduce time grows with `N` and shrinks with bandwidth, not FLOPs; misconception = "more devices always = proportionally faster" (comm overhead caps the speedup); simplification = perfect ring, no overlap of compute/comm, uniform links. (Distinct from `parallelism.html`, which shows *which* collective on a mesh, not a *time-axis* cost.)
 
 ### 5.3 `m09a/day-05-memory-footprint` — "Training memory stack"
+
 - **Learning question:** the number people quote is "weights = 4N" — so why does a 1B model OOM on a 40 GB card long before you'd expect?
 - **One panel:** a stacked memory bar — **weights (4N) + gradients (4N) + Adam state (8N) = 16N static**, then **activations** stacked on top — against a horizontal **device-RAM budget** line.
 - **Controls:** **batch-size** and **sequence-length** sliders grow the activations block until it crosses the budget line (the OOM moment); a **dtype** toggle (fp32/bf16) halves the static bytes; an **optimizer** toggle (Adam 8N ↔ SGD 0N) drops the tallest static tenant.
@@ -208,7 +212,7 @@ P0 lessons get the Coach Layer prose **and** the inline `.vlab` in the same sess
 2. jsdom headless load (`/tmp/node_modules/jsdom`, via `node /tmp/batch1_verify.js <path> [--p0]`) — no thrown error; asserts 7 sections / 7 got-it / 4 quiz / 3 demos / BUILD / tooltip controller. For the 3 P0 files, `--p0` dispatches `input`/`click` and asserts the `.vlab` SVG re-renders and readouts respond.
 3. `python3 sessions/lesson_audit.py <changed paths…>` (targeted — leaves `_recover_set.json` alone) → **OK**, with the six core COACH advisories (pain / interview / accept / log / bilingual + Staff Lens) cleared for that file (except the documented Math-Ladder skips and the 3 intentional `.md`-artifact "no experiment.py" advisories).
 4. **Duplicate-callout scan** (memory `coach-layer-duplicate-callout-defect`): after each file, check for adjacent identical `<div class="callout…>` lines (the Batch 2 double-paste defect). Ignore the legitimate 🧮 math-ladder mono-wrapper false-positive.
-5. `git diff` audit per file: additive callouts + (P0) one `.vlab` CSS block + IIFE; confirm **no** `data-quest-id` / `data-demo` / `data-sec` / `var QS|DEMOS|BUILD` / nav-`href` / `.gotit` line removed.
+5. `git diff` audit per file: additive callouts + (P0) one `.vlab` CSS block + IIFE; confirm **no** `data-quest-id` / `data-demo` / `data-sec` / `var QS / DEMOS / BUILD` / nav-`href` / `.gotit` line removed.
 
 **Definition of done for the batch:** all 22 edited lessons OK with no hard failures; each has its full missing-Coach-element set added; the 3 P0 labs render and interact; nav / quest-id / quiz / playground / build / tooltips preserved everywhere; Chinese light (2–4 touches); depth ≥ before. Then write `sessions/batch_3_rollout_report.md`.
 
