@@ -354,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ul>
       <p>Both boil the gap between "what the model said" and "the truth" down to one number. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> every GPT-style model — 10 weights or 175 billion — is trained to shrink the exact same cross-entropy loss you're about to compute today.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 大家都知道训练能让模型"变好"，却说不清到底在优化哪个东西 — people sense training "improves" the model but can't name the one thing it optimizes. In plain terms: everything in training reduces to making a single number — the loss — smaller. Pick that number and "learning" becomes concrete: slide it down.</div></div>
       <button class="gotit" type="button">Got what a loss is — let's go</button>
     </div>
 </section>
@@ -368,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> the loss is a "how wrong" score the network wants to drive toward zero.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: in golf you just record the score; here the loss also has to be <em>smooth</em> so we can compute how to improve it (that's tomorrow — gradients). A jagged score wouldn't tell us which way to adjust.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，loss 就是考卷上的"扣分" — 错得越离谱扣得越多，全对就是 0 扣分。The technical point: the loss maps (prediction, truth) to one non-negative "how wrong" number, and it's built to be smooth so tomorrow's gradients can point to which way each weight should move.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -398,6 +400,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>The two formulas</h4>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>MSE = mean( (prediction − target)² )</code> — average squared error, for numbers.<br><code>cross-entropy = − log( p_correct )</code> — for a category, where <code>p_correct</code> is the probability the model assigned to the true class.</div></div>
       <p>Why square in MSE? So positive and negative errors both count, and big misses are punished more. Why the log in cross-entropy? A confident-and-correct model (<code>p_correct</code> near 1) gives <code>−log(1) = 0</code>; a confident-and-wrong one (<code>p_correct</code> near 0) gives a huge loss. The log turns "probability" into "surprise."</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — cross-entropy, <code>−log(p_correct)</code></b>
+      <br><b>1 · In words:</b> a loss should be near 0 when the model is confident and right, and huge when it's confident and wrong. Cross-entropy measures the "surprise" of the true answer under the model.
+      <br><b>2 · The formula:</b> <code>CE = −log(p_correct)</code>, where <code>p_correct</code> = the probability the model assigned to the true class (a number in (0, 1]).
+      <br><b>3 · Tiny numbers:</b> <code>p=0.9 → −log(0.9) ≈ 0.11</code> (small); <code>p=0.6 → ≈ 0.51</code>; <code>p=0.3 → ≈ 1.20</code> (large). As the guess improves, the loss drops — exactly what you'll print in the artifact.
+      <br><b>4 · Sanity check:</b> <code>−log(1) = 0</code> (perfectly confident and correct → zero loss); as <code>p → 0</code> the loss → <code>+∞</code> (confidently wrong is punished without limit). Loss is never negative.</div></div>
 
       <h4>Why a frontier lab cares</h4>
       <p>Loss is <em>the</em> number. Training minimizes it. Every GPT-style model from the teaser above made exactly the choice you're about to see argued below: cross-entropy over MSE. It picks cross-entropy because next-token prediction is choosing a category, not a number. The famous <strong>scaling laws</strong> (M1 Day 5, and Chinchilla) plot <strong>loss vs compute</strong> — the whole game is predicting how low the loss goes as you spend more. "Lower loss = a better model" is the assumption under everything.</p>
@@ -407,6 +414,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The loss is just one number, so a wrong loss looks exactly like a right one. Two mistakes here damage training without ever throwing an error.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): feeding probabilities where logits are expected.</b> Many cross-entropy functions (like PyTorch's <code>CrossEntropyLoss</code>) expect raw scores called <span class="term" data-tip="The raw, unsquashed output scores of a model, before softmax turns them into probabilities.">logits</span> and apply the softmax themselves. If you run softmax first and pass the resulting probabilities in, softmax gets applied <em>twice</em>. The loss still computes a finite, plausible-looking number — nothing crashes — but it is the wrong number, so training is weaker and slower for no visible reason. A senior engineer catches this in <b>code review</b> by checking exactly what the loss function expects: does it want logits or probabilities, and is there a stray extra softmax before it?</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which loss you choose for the task.</b> Using <code>MSE</code> on a classification problem runs perfectly and gives a valid number, so it is tempting — but it treats class labels as plain numbers and gives weak, slow-to-move gradients when the model is confidently wrong. <code>Cross-entropy</code> punishes confident mistakes hard (<code>−log(p)</code> blows up as <code>p</code> nears 0), which trains classifiers much faster, but it needs proper probabilities and can be numerically touchy. Picking the loss that matches the task — MSE for regressing a number, cross-entropy for choosing a class — is a <b>design-review</b> decision that quietly sets how well the whole model can learn.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The loss is the single scalar training minimizes. For regression I use MSE = mean((pred−target)²); for classification, cross-entropy = −log(p_correct), because next-token prediction is picking a category and cross-entropy punishes confident-wrong predictions hard, giving strong gradients. The classic silent bug is a double softmax — passing probabilities into a loss that expects logits — which yields a finite but wrong number with no crash, so I always check whether the loss wants logits or probabilities."</div></div>
       <button class="gotit" type="button">Got why loss matters</button>
     </div>
 </section>
@@ -452,7 +460,13 @@ Create sessions/m02-the-neuron/day-04-loss/experiment.py that, with a comment on
 4. Prints cross_entropy for p_correct in [0.3, 0.6, 0.9] (expect ~1.204, 0.511, 0.105) and notes the loss falls as the model gets more confident in the correct class.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-04-loss/log.md</code>: why does squaring the error (MSE) punish big misses more than small ones?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Your <code>mse</code> prints a smaller value for a close prediction than for a far one.</li>
+        <li>Your <code>cross_entropy(p_correct)</code> on <code>p ∈ [0.3, 0.6, 0.9]</code> prints a loss that <em>drops</em> as <code>p</code> rises (≈ 1.20 → 0.51 → 0.11).</li>
+        <li>You can say in one sentence why cross-entropy, not MSE, is used for classification.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-04-loss/log.md</code>: (1) why squaring the error (MSE) punishes big misses more; (2) why <code>−log(p)</code> blows up when the model is confidently wrong; (3) when you'd pick MSE vs cross-entropy.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

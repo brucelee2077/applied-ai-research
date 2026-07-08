@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>How does it relate to what you know?</h4>
       <p>Each layer is a line you can already write: <code>h = relu(x @ W + b)</code>. A forward pass just does that repeatedly, feeding each layer's output into the next. The one rule to respect: the shapes must <strong>chain</strong> (M1 Day 4) — each layer's output width must match the next layer's expected input width. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> vLLM, TensorRT-LLM, and SGLang are real, widely used software built to do just one thing at massive scale: run the forward pass you're about to build.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "layer" 和 "forward pass" 听起来很高级，让人以为里面藏着新魔法 — the words <i>layer</i> and <i>forward pass</i> sound advanced, as if new machinery is involved. In plain terms: a layer is just yesterday's neuron math done for many neurons at once (one matmul + bias + activation), and a forward pass is only "do that layer, then feed its output into the next." The one real gotcha is keeping the widths lined up.</div></div>
       <button class="gotit" type="button">Got layer + forward pass — let's go</button>
     </div>
 </section>
@@ -364,6 +365,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> a forward pass sends the input down an assembly line of layers; the thing that comes out the end is the prediction.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real factory can't run backwards, but a network can — running <em>backwards</em> to adjust the weights is called backpropagation, and it's how the model learns (Module 3). Today is only the forward direction.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，forward pass 就是数据在流水线上"从左走到右" — 每一站（layer）把它加工一下，最后出来的就是预测。The technical point: each layer applies <code>activation(x @ W + b)</code> and hands its output to the next layer as input, so the whole network is just those transforms chained end to end.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -396,6 +398,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The shape chain</h4>
       <p>Widths must line up (M1 Day 4): input <code>(1, 3)</code> → after W₁ <code>(3, 4)</code> → hidden <code>(1, 4)</code> → after W₂ <code>(4, 2)</code> → output <code>(1, 2)</code>. Each layer's output width is the next layer's input width. Get one wrong and you get the classic matmul shape error.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the forward-pass shape chain</b>
+      <br><b>1 · In words:</b> each layer's output width must equal the next layer's input width; the widths hand off down the chain like batons.
+      <br><b>2 · The formula:</b> <code>h₁ = relu(x @ W₁ + b₁)</code>, then <code>out = h₁ @ W₂ + b₂</code>. Shapes: <code>x (1,d₀)</code>, <code>W₁ (d₀,d₁)</code>, <code>W₂ (d₁,d₂)</code>; each matmul's shared inner dim must match (M1 Day 4).
+      <br><b>3 · Tiny numbers:</b> <code>x (1,3)</code> → <code>@ W₁ (3,4)</code> → <code>h₁ (1,4)</code> → <code>@ W₂ (4,2)</code> → <code>out (1,2)</code>. The 3 and the 4 cancel in turn; only the outer widths survive.
+      <br><b>4 · Sanity check:</b> read the widths as <code>3 → 4 → 2</code>. If <code>W₂</code> were <code>(3,2)</code> instead of <code>(4,2)</code>, the second matmul's inner dims (4 vs 3) wouldn't match and it crashes — the classic shape error.</div></div>
 
       <h4>Why a frontier lab cares</h4>
       <p>The forward pass <em>is</em> <span class="term" data-tip="Running a trained model on new input to get an answer. The forward pass is inference. Serving = doing this for real users at scale.">inference</span> — running the model to get an answer. Every time you send a prompt to a model, a server runs exactly the operation you just built. The engines from the teaser above spend most of their code on exactly the batching trade-off you're about to meet below. That trade-off is how many requests to group together before running one shared forward pass. The reverse direction, which nudges the weights to make future forward passes better, is <span class="term" data-tip="Running the network backward to compute how each weight should change to reduce the error. How models learn. Covered in Module 3.">backpropagation</span> — Module 3.</p>
@@ -405,6 +412,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Chaining layers is simple to write, which is exactly why one small omission slips through unnoticed, and one serving choice always comes up.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the missing activation between layers.</b> If you write <code>h1 = x @ W1 + b1</code> and forget the <code>relu</code>, then feed <code>h1</code> straight into the next layer, the code still runs and the output shape is unchanged. But two stacked <em>linear</em> layers collapse into one: <code>(x W1) W2 = x (W1 W2)</code> (from Day 2). Your "deep" network is secretly a single linear layer, so it can only draw a straight line and quietly learns far less. Nothing crashes and the shapes all match. A senior engineer catches this in <b>code review</b> by checking that every hidden layer has a non-linear activation between it and the next matmul — not by reading the loss, which just looks disappointing.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batching the forward pass.</b> A forward pass is inference, and you can run many inputs at once by stacking them into a batch — the matmul <code>X @ W</code> handles a whole batch in one shot. Bigger batches use the hardware far more efficiently (higher <b>throughput</b>, more answers per second), but each individual request waits longer while the batch fills up (higher <b>latency</b>). How large a batch to serve is a classic <b>design-review</b> decision: it trades one user's response time against the total cost of serving everyone.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A forward pass chains layers — each is <code>activation(x @ W + b)</code> and its output feeds the next as input — which is exactly inference; every prompt to a served model runs this. Two things I watch: the shape chain (each layer's output width = the next layer's input width, or the matmul crashes) and the silent bug of a missing activation between layers, which collapses the whole stack to one linear map with no crash. At serving time the key knob is batch size — bigger batches raise throughput but hurt per-request latency."</div></div>
       <button class="gotit" type="button">Got the forward pass</button>
     </div>
 </section>
@@ -436,7 +444,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Build a tiny network's forward pass yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py</code>. Make <code>W1 (3,4)</code>, <code>b1 (4,)</code>, <code>W2 (4,2)</code>, <code>b2 (2,)</code>. Write <code>forward(x)</code> that computes <code>h = relu(x@W1+b1)</code> then <code>out = h@W2+b2</code>, printing the shape after every step for <code>x</code> of shape <code>(1,3)</code>. Confirm the output is <code>(1,2)</code>. Run with <code>python3 m02c_forward.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py</code>. Make <code>W1 (3,4)</code>, <code>b1 (4,)</code>, <code>W2 (4,2)</code>, <code>b2 (2,)</code>. Write <code>forward(x)</code> that computes <code>h = relu(x@W1+b1)</code> then <code>out = h@W2+b2</code>, printing the shape after every step for <code>x</code> of shape <code>(1,3)</code>. Confirm the output is <code>(1,2)</code>. Run with <code>python3 sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -450,7 +458,13 @@ Create sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py that, wi
 4. Runs forward on x of shape (1,3) and confirms the output shape is (1,2); prints the output vector as 'the prediction'.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-03-layers-forward-pass/log.md</code>: trace the shapes 3 → 4 → 2 in your own words — where would a wrong width break it?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Your <code>forward(x)</code> prints the shape after every step for <code>x</code> of shape <code>(1,3)</code>, ending at output <code>(1,2)</code>.</li>
+        <li>The hidden step uses a real <code>relu</code> non-linearity, not a bare matmul.</li>
+        <li>You can trace the width chain <code>3 → 4 → 2</code> aloud and say where a wrong width would crash.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-03-layers-forward-pass/log.md</code>: (1) trace the shapes 3 → 4 → 2 in your own words; (2) what a forward pass has to do with inference; (3) what breaks if you forget the activation between layers.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

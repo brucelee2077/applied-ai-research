@@ -348,6 +348,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>It is a choice, not something learned</h4>
       <p>The learning rate is a <span class="term" data-tip="A setting you pick before training, not a value the model learns: learning rate, batch size, number of epochs.">hyperparameter</span> — you pick it before training starts. The model never learns it for you. Because it multiplies every single update, it is the number that most decides whether a run works. Three cases matter: too big, too small, and just right. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> GPT-3, Chinchilla, and Llama 3 all publish their exact learning-rate warmup-and-decay schedule as a named part of how they were trained — not a minor detail, a headline decision.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> learning rate 只是一个小小的数字，很多人以为"随便设一个就行" — the learning rate is just one small number, so it's tempting to treat it as set-and-forget. In plain terms: it sets the <i>size</i> of every step, and it's the difference between a loss that slides down smoothly, one that crawls for hours, and one that explodes to infinity. It's the single most important number in a run.</div></div>
       <button class="gotit" type="button">Got it — let's tune it</button>
     </div>
 </section>
@@ -367,6 +368,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> the learning rate is your step size across the stream — too big and you overshoot into deep water, too small and you never arrive.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real stones sit at fixed spots, but the loss "ground" is curved and changes as you move. A step that is safe near the far bank can be too big at the start, which is exactly why runs often <b>shrink the learning rate over time</b> (decay, coming up in section 4).</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，learning rate 就是过河时"每一步迈多大" — 迈太大掉进深水（发散），迈太小永远走不到对岸（太慢）。The technical point: the learning rate scales the step <code>w ← w − lr·grad</code>; too large and the loss diverges, too small and it converges but painfully slowly.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -406,6 +408,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p><b>In words:</b> for a simple bowl-shaped loss, each step multiplies the distance-to-the-bottom by a fixed factor. If that factor is bigger than 1 in size, the distance grows every step instead of shrinking.</p>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>(distance to bottom) ← (1 − lr × c) × (distance to bottom)</code><br><span style="color:var(--muted)">c = curvature of the loss · you converge only while |1 − lr × c| &lt; 1</span></div></div>
       <p><b>Worked example:</b> in our toy the curvature is <code>c = 8</code>. At <code>lr = 0.1</code> the factor is <code>1 − 0.8 = 0.2</code> — each step keeps only 20% of the gap, so it shrinks fast. At <code>lr = 0.6</code> the factor is <code>1 − 4.8 = −3.8</code> — bigger than 1 in size, so the gap grows almost 4× every step. That is the explosion you saw in the playground.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — when does a learning rate converge?</b>
+      <br><b>1 · In words:</b> on a simple bowl, each step multiplies the gap to the bottom by a fixed factor; you converge only if that factor is smaller than 1 in size.
+      <br><b>2 · The formula:</b> <code>gap ← (1 − lr·c)·gap</code>, converging while <code>|1 − lr·c| &lt; 1</code>. <code>lr</code> = learning rate; <code>c</code> = curvature of the loss (here <code>c = 8</code> for the toy <code>pred=w·x</code> problem).
+      <br><b>3 · Tiny numbers:</b> <code>lr=0.005 → 1 − 0.04 = 0.96</code> (shrinks only 4% a step → crawls); <code>lr=0.1 → 0.2</code> (fast); <code>lr=0.6 → 1 − 4.8 = −3.8</code>, size <code>3.8 &gt; 1</code> → the gap grows ~4× a step and explodes.
+      <br><b>4 · Sanity check:</b> the tipping point is <code>|1 − lr·c| = 1</code>, i.e. <code>lr = 2/c = 0.25</code> here — below it converges, above it diverges, exactly the crossover you see in the playground.</div></div>
 
       <h4>Schedules: change the rate as you go (awareness)</h4>
       <p>Real runs rarely keep one fixed rate. Two ideas you will meet later:</p>
@@ -419,6 +426,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A learning rate that blows up is easy to spot. The dangerous case is the one where nothing looks wrong.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a rate high enough to hurt, but not high enough to explode.</b> A too-big rate that sends the loss to <code>NaN</code> is loud — you notice at once. The quiet failure is a rate that is a bit too high: the loss still drops fast and looks healthy, but it settles at a <em>worse</em> value than a smaller rate would have reached, because the big steps keep bouncing around the bottom of the valley instead of settling into it. Nothing errors, the curve looks fine, and you ship a model that is silently weaker than it could be. A senior engineer catches this in <b>code review</b> (or in the run logs) by comparing final loss across a few learning rates, not by trusting that "loss went down, so the rate was fine."</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: fast steps vs. stable steps.</b> A larger learning rate covers ground quickly and saves compute, but risks bouncing or diverging. A smaller rate is stable and lands in a better final spot, but crawls and burns hours of expensive GPU time. This is exactly why schedules exist — <b>warmup</b> to ease a fragile fresh model in, then <b>decay</b> to settle gently at the end. Where to set the peak rate and how to shape the schedule is a <b>design-review</b> decision that trades training speed against final quality and stability.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The learning rate scales each step, <code>w ← w − lr·grad</code>. On a quadratic bowl of curvature <code>c</code>, a step multiplies the gap-to-optimum by <code>(1 − lr·c)</code>, so you converge only while <code>|1 − lr·c| &lt; 1</code> — too small crawls, too big diverges, with a hard tipping point at <code>lr = 2/c</code>. That's why real runs use a schedule: warmup to ease a fresh, fragile model in, then decay to settle at the end. The failure I watch for is a rate that's stable early but too large once curvature rises — the loss looks fine, then suddenly spikes to NaN."</div></div>
       <button class="gotit" type="button">Got the three cases</button>
     </div>
 </section>
@@ -451,7 +459,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. See the three cases with your own eyes — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-08-learning-rate/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code> from <code>w=1.0</code>. Run the same 8-step loop three times with <code>lr = 0.005</code>, <code>0.1</code>, and <code>0.6</code>: <code>grad=2*(w*x-y)*x</code>; <code>w = w - lr*grad</code>; print step, w, loss. Confirm 0.005 crawls, 0.1 reaches <code>w ≈ 3</code>, and 0.6 blows up. Run with <code>python3 m03e_learning_rate.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-08-learning-rate/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code> from <code>w=1.0</code>. Run the same 8-step loop three times with <code>lr = 0.005</code>, <code>0.1</code>, and <code>0.6</code>: <code>grad=2*(w*x-y)*x</code>; <code>w = w - lr*grad</code>; print step, w, loss. Confirm 0.005 crawls, 0.1 reaches <code>w ≈ 3</code>, and 0.6 blows up. Run with <code>python3 sessions/m02-the-neuron/day-08-learning-rate/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -466,7 +474,13 @@ Create sessions/m02-the-neuron/day-08-learning-rate/experiment.py that, with a c
 5. Adds a comment: the loss shrinks only while |1 - lr*curvature| < 1; here the curvature is 8, so lr must stay below 0.25.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-08-learning-rate/log.md</code>: at what learning rate does this toy problem tip from converging to diverging, and why?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>The same 8-step loop runs three times from <code>w=1.0</code> at <code>lr = 0.005, 0.1, 0.6</code>, printing step, <code>w</code>, and loss.</li>
+        <li><code>0.005</code> crawls (loss barely moves), <code>0.1</code> reaches <code>w ≈ 3</code>, and <code>0.6</code> blows up (loss grows each step).</li>
+        <li>You can name roughly where this toy tips from converging to diverging (near <code>lr = 2/c = 0.25</code>) and why.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-08-learning-rate/log.md</code>: (1) what the learning rate controls, in one sentence; (2) at what lr this toy tips from converging to diverging, and why; (3) why real runs warm up and then decay the rate.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

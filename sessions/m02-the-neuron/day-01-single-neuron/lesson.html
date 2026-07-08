@@ -355,6 +355,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>How does it relate to what you know?</h4>
       <p>Step 1 is something you can already do: <code>np.dot(w, x)</code> — the weighted sum <em>is</em> a dot product. So a neuron is just <code>activation(dot(w, x) + b)</code>. Why the activation at the end? That's the secret sauce — next lesson. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> remember GPT-3's <code>(12288, 49152)</code> weight matrix from M1 Day 1? By the end of today you'll see exactly what each of its 49,152 columns really is.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人一上来就盯着 <code>w·x+b</code> 这个公式，却没问它到底在做什么 — people meet <code>w·x+b</code> and treat it as a magic formula to memorize. In plain terms: a neuron only does one human thing — "score each input by how much it matters, then decide." The formula is just the arithmetic of that one sentence, not a new idea.</div></div>
       <button class="gotit" type="button">Got what a neuron is — let's go</button>
     </div>
 </section>
@@ -369,6 +370,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> a neuron weighs its inputs, adds a bias, and squashes the result into an output.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real brain neuron is far messier, and one artificial neuron alone is weak. The power comes from <strong>many</strong> neurons in <strong>layers</strong> — which is just a matmul, as you'll see at the end.</div></div>
+      <p><b>直觉 / Intuition:</b> 把 neuron 想成一个只做一件事的小评委 — 它给每个输入打一个"重要性分数"（weight），加上自己的偏好（bias），再决定要不要"点头"（activation）。The technical point: one neuron maps many input numbers down to a single output number, and a <code>weight</code> is literally "how much this input matters to me."</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -399,6 +401,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>The formula</h4>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>output = activation( w · x + b )</code><br><span style="font-size:.85rem;color:var(--text2)"><code>w · x</code> = weighted sum (a dot product), <code>b</code> = bias (one number), <code>activation</code> = a simple squashing function like ReLU. The value <code>w · x + b</code>, <em>before</em> the activation, is called the <strong>pre-activation</strong> (often written <code>z</code>).</span></div></div>
       <p>Worked small: inputs <code>x = [2, 3]</code>, weights <code>w = [0.5, −1]</code>, bias <code>b = 1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>. Add bias → <code>−1</code>. ReLU(−1) = <code>0</code>. Output = <strong>0</strong>.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one neuron: <code>output = activation(w·x + b)</code></b>
+      <br><b>1 · In words:</b> score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.
+      <br><b>2 · The formula:</b> <code>output = activation( w·x + b )</code>. <code>x</code> = the inputs; <code>w</code> = one weight per input; <code>w·x</code> = the weighted sum (a dot product); <code>b</code> = bias (one number); <code>activation</code> = a squash like <code>ReLU = max(0, ·)</code>.
+      <br><b>3 · Tiny numbers:</b> <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>; + bias → <code>−1</code>; <code>ReLU(−1) = 0</code>. Output = <b>0</b>.
+      <br><b>4 · Sanity check:</b> <code>w</code> must hold exactly one number per input (here 2 weights for 2 inputs), and the output is a single number, not a list. A ReLU output of <code>0</code> just means the pre-activation was ≤ 0 — expected, not a bug.</div></div>
 
       <h4>Why a frontier lab cares</h4>
       <p>This is the <strong>atom</strong>. Line up many neurons that all read the same inputs, and computing them all at once is a single <strong>matmul</strong>: <code>x @ W + b</code>, then the activation — exactly M1 Day 4. Here's the answer to the teaser above: every one of that GPT-3 matrix's 49,152 columns <em>is</em> one neuron like the one you just built, wired to 12,288 inputs instead of a handful. A frontier model is billions of these neurons, stacked into layers. And the <strong>weights</strong> are precisely what training adjusts.</p>
@@ -408,6 +415,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A neuron is tiny, but two things about it are worth naming precisely — a bug that never announces itself, and a design choice you make every time you build a layer.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the dead neuron.</b> If a neuron's weights and bias make the pre-activation <code>z = w·x + b</code> come out negative for <em>every</em> input, then <code>ReLU(z)</code> is always <code>0</code>. Look at the worked example: <code>z = −1</code> gave output <code>0</code>. If that happened for all inputs, the neuron would output the same <code>0</code> forever. Nothing crashes — the code runs fine — but that neuron computes nothing and adds no value to the network, so the model quietly runs at less than full strength. A senior engineer catches this in <b>code review</b> by printing the fraction of neurons whose output is stuck at zero; a healthy layer should have many neurons that actually change with the input.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which activation you bolt on.</b> Choosing <code>ReLU</code> buys you a cheap, fast squash (just a <code>max</code>) that trains well in deep stacks. You pay for it with the dead-neuron risk above, because everything below zero is flattened to exactly zero. A different activation that never fully flattens (its output keeps moving even for negative inputs) removes that risk, but costs a little more math per neuron. Which activation to use is a <b>design-review</b> decision, not a detail — it changes how many of your neurons actually do useful work.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A neuron is <code>activation(w·x + b)</code> — a weighted sum of inputs, a bias shift, then a non-linear squash. The weighted sum is exactly a dot product, so a whole layer of neurons is one matmul <code>x @ W + b</code> followed by the activation; stack those and you have the network, and training only ever adjusts <code>w</code> and <code>b</code>. The failure mode I watch for is a dead ReLU neuron — if <code>w·x + b</code> stays negative for every input it outputs <code>0</code> forever and silently wastes capacity, so I print the fraction of neurons stuck at zero."</div></div>
       <button class="gotit" type="button">Got the formula</button>
     </div>
 </section>
@@ -453,7 +461,13 @@ Create sessions/m02-the-neuron/day-01-single-neuron/experiment.py that, with a c
 4. Runs it on x=[2,3], w=[1,1], b=0 (expect weighted sum 5, relu -> 5.0) to show a positive case.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-01-single-neuron/log.md</code>: which of the three steps was clearest, and which felt fuzzy?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Your <code>neuron(x, w, b)</code> prints three visible steps: the weighted sum, the value after adding the bias, and the final output.</li>
+        <li>On <code>x=[2,3], w=[0.5,-1], b=1</code> it outputs <code>0.0</code> (a ReLU-zeroed case); on a positive case like <code>w=[1,1], b=0</code> it outputs a positive number.</li>
+        <li>You can say in one sentence which step is the dot product, and why the activation comes last.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-01-single-neuron/log.md</code>: (1) in your own words, what the three steps of a neuron are; (2) why the weighted sum is a dot product; (3) one thing still fuzzy (why the activation goes last is fair game).</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

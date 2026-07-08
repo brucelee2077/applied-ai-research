@@ -350,6 +350,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>What is backpropagation?</h4>
       <p>A network has millions of weights. <span class="term" data-tip="The algorithm that computes the gradient of the loss for every weight, efficiently, by applying the chain rule backward from the loss to the inputs.">Backpropagation</span> is the efficient algorithm that computes the gradient for <strong>all</strong> of them in one sweep — running <em>backward</em> from the loss to the inputs, using the chain rule. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> jax.grad and torch.autograd — the exact tools frontier labs train with — are just automated versions of the chain rule you're about to run by hand.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> backprop 有个吓人的名声，好像是什么高深的黑魔法 — backprop has a scary reputation, as if it were deep black magic. In plain terms: it's just one question asked for every weight — "if I nudge you a tiny bit, does the loss go up or down, and how fast?" The gradient is the answer, and backprop is only the chain rule applied backward so you get all those answers in one sweep.</div></div>
       <button class="gotit" type="button">Got the three words — let's go</button>
     </div>
 </section>
@@ -364,6 +365,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> the gradient says which way is downhill for each weight; gradient descent takes small steps that way until the loss is low.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the loss landscape has millions of dimensions (one per weight), not two. And backprop is what lets you feel the slope in <em>all</em> those dimensions at once, cheaply — a single hiker couldn't.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，gradient 就是你脚下那块地的"坡度" — 它只告诉你哪边更低、有多陡；朝那边迈一小步，重复很多次，就走到了谷底。The technical point: the gradient is the slope of the loss with respect to each weight, and gradient descent repeatedly nudges each weight a little in the downhill direction.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -393,6 +395,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <h4>The update rule</h4>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>gradient = slope of loss w.r.t. w</code>, then <code>w ← w − learning_rate × gradient</code>. Repeat over many steps.</div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one gradient-descent step on <code>f(w)=w²</code></b>
+      <br><b>1 · In words:</b> the gradient is how fast the loss changes as <code>w</code> changes; step <code>w</code> a little against that slope to lower the loss.
+      <br><b>2 · The formula:</b> <code>gradient = df/dw</code>, then <code>w ← w − lr × gradient</code>. For <code>f(w)=w²</code>, <code>df/dw = 2w</code>; <code>lr</code> = learning rate (step size).
+      <br><b>3 · Tiny numbers:</b> at <code>w=3</code>, gradient <code>= 2·3 = 6</code>. With <code>lr=0.1</code>: <code>w ← 3 − 0.1·6 = 2.4</code>, and the loss drops from <code>9</code> to <code>5.76</code>. Step again: <code>2.4 → 1.92 → …</code> toward 0.
+      <br><b>4 · Sanity check:</b> the sign points downhill — a positive slope moves <code>w</code> left, a negative slope moves it right. Numerically, <code>(f(w+h)−f(w−h))/(2h)</code> at <code>w=3</code> with tiny <code>h</code> gives ≈ 6, matching <code>2w</code>.</div></div>
 
       <h4>Why backprop, and the chain rule</h4>
       <p>A weight deep in the network affects the loss only through everything after it. The <span class="term" data-tip="Calculus rule: to get the slope through a chain of steps, multiply the local slopes of each step together.">chain rule</span> says: the slope through a chain of steps is the <strong>product of the local slopes</strong>. Backprop starts at the loss and walks backward, multiplying local slopes layer by layer, so every weight's gradient falls out in one pass — reusing the values already computed in the forward pass.</p>
@@ -405,6 +412,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Backprop multiplies many local slopes together, and that single fact is the source of both a quiet training failure and a real memory choice.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): vanishing gradients.</b> The chain rule multiplies one local slope per layer. If those slopes are each a little below <code>1</code> (which sigmoid activations produce), then in a deep network you multiply many small numbers together and the gradient that reaches the early layers shrinks toward <code>0</code>. Those early layers then barely change, no matter how long you train. Nothing crashes — the loss just stops improving and sits there. A senior engineer catches this in <b>code review</b> by logging the size (norm) of the gradients per layer: if the early-layer gradients are orders of magnitude smaller than the late-layer ones, the signal is dying on the way back. (This is exactly why ReLU and residual connections exist.)</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: store activations or recompute them.</b> Backprop reuses the values from the forward pass, so the fast way is to keep every layer's activations in memory — but for a big model that memory is huge. The alternative, <span class="term" data-tip="Gradient checkpointing: during the backward pass, re-run parts of the forward pass to regenerate activations instead of storing them, trading extra compute for less memory.">gradient checkpointing</span>, throws most activations away and re-runs part of the forward pass during backward to get them back. You save a lot of memory but pay extra compute (more FLOPs per step). Whether to checkpoint is a <b>design-review</b> decision that trades GPU memory against training speed.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The gradient is the slope of the loss w.r.t. each weight; the update is <code>w ← w − lr × grad</code>. Backprop is the chain rule applied backward from the loss — it multiplies local slopes layer by layer and reuses forward-pass values, so all gradients come out in one backward sweep at roughly 2× a forward pass. The silent failure is vanishing gradients: multiply many sub-1 slopes (sigmoids) through a deep net and the early-layer gradients shrink to ~0 and stop learning — which is why ReLU and residual connections exist. I'd log per-layer gradient norms to catch it."</div></div>
       <button class="gotit" type="button">Got backprop</button>
     </div>
 </section>
@@ -413,7 +421,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s5" data-sec="build">
   <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Slope → step → chain rule backward — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
   <div class="sec-body">
-      <p>Here is the whole idea built one step at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <p>First, the live version. <strong>Drag the learning-rate slider</strong> and press <strong>Step</strong> or <strong>Run</strong> to roll a weight down a loss curve — watch the slope (the gradient) shrink as you near the bottom. Then <strong>scroll down slowly</strong> through the static build underneath: slope → step → chain rule backward.</p>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive gradient descent" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <p style="font-size:.85rem;color:var(--ink2)"><b>What you should notice:</b> the step you take is <em>slope × learning-rate</em>, so steps get smaller on their own as the slope flattens near the bottom. <b>Common misconception:</b> the learning rate is not the step size — a steep slope with a small lr can still move a long way. <b>Where this simplifies reality:</b> this is one weight on a smooth 1-D bowl; real loss landscapes have millions of dimensions and are bumpy.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -436,7 +446,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Roll a weight downhill yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>. For <code>f(w)=w²</code>, compute the numerical slope at <code>w=3</code> (expect ≈6). Then loop 10 times doing <code>w = w - 0.1*(2*w)</code>, printing <code>w</code> and <code>w**2</code> each step, and watch the loss fall toward 0. Run with <code>python3 m03b_gradients.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>. For <code>f(w)=w²</code>, compute the numerical slope at <code>w=3</code> (expect ≈6). Then loop 10 times doing <code>w = w - 0.1*(2*w)</code>, printing <code>w</code> and <code>w**2</code> each step, and watch the loss fall toward 0. Run with <code>python3 sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -450,7 +460,13 @@ Create sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py that, wit
 4. Confirms w marches toward 0 and the loss w**2 falls toward 0.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-05-gradients-backprop/log.md</code>: what would happen to the descent if the learning rate were 1.0 instead of 0.1?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>For <code>f(w)=w²</code> your numerical slope at <code>w=3</code> comes out ≈ 6 (matching <code>2w</code>).</li>
+        <li>Your 10-step loop with <code>w = w − 0.1·(2w)</code> prints <code>w</code> and <code>w²</code> each step, and the loss falls toward 0.</li>
+        <li>You can state in one sentence what the <em>sign</em> of the gradient tells you and what the learning rate controls.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-05-gradients-backprop/log.md</code>: (1) what a gradient is, in one sentence; (2) what would happen to the descent if the learning rate were 1.0 instead of 0.1; (3) what "vanishing gradients" means and how you'd detect it.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

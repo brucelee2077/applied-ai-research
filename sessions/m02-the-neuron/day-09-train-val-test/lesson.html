@@ -352,6 +352,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Why split at all?</h4>
       <p>If you only ever measure the loss on the data the model trained on, you cannot tell learning from memorizing. Held-out data is the only fair test. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> the Llama 3 and GPT-4-class technical reports both describe checking their training data for overlap with benchmarks like MMLU and GSM8K before trusting a score — the same held-out-data discipline you're about to learn.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 训练 loss 一直往下掉，看着像成功了，很容易就此收手 — a falling training loss feels like success, so it's tempting to stop there. In plain terms: a model can score perfectly on the data it studied and still fail on anything new. The only honest test is data it has never seen — that's the whole reason we hold some out.</div></div>
       <button class="gotit" type="button">Got the splits — let's go</button>
     </div>
 </section>
@@ -371,6 +372,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> training is your practice set, and the held-out data is the exam that tells you whether you learned or just memorized.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student memorizes on purpose, but a model does not "decide" to overfit — it simply keeps lowering its training loss, and if it has enough freedom it will fit the noise in the practice set too. You catch this by watching the <span class="term" data-tip="The gap between the loss on training data and the loss on held-out validation data; a growing gap means overfitting.">train–val gap</span>, coming up next.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，train / val / test 就是"练习题 / 模拟考 / 真正的高考" — 用练习题学，用模拟考调整，真正的分数只看那场没见过的考试。The technical point: you fit on the train split, tune choices on validation, and report the final number on a test split touched exactly once, so the score reflects generalization, not memorization.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -410,6 +412,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The moment the validation loss stops falling and starts rising is the moment overfitting begins. The growing space between the two curves is the <b>train–val gap</b>.</p>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>gap = validation_loss − training_loss</code><br><span style="color:var(--muted)">small gap → the model generalizes · large, growing gap → it is memorizing (overfitting)</span></div></div>
       <p><b>Worked example:</b> suppose at step 100 the training loss is 0.30 and the validation loss is 0.35 — a small gap of 0.05, healthy. Keep training to step 500: training loss drops to 0.02, but validation loss climbs to 0.40. The gap is now 0.38 and growing. The model memorized the training data. The best model was back near step 100, before the gap opened.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the train–val gap</b>
+      <br><b>1 · In words:</b> track the gap between validation loss and training loss as training proceeds; a small, steady gap is healthy, a growing gap means the model is memorizing.
+      <br><b>2 · The formula:</b> <code>gap = validation_loss − training_loss</code>, watched as a function of training steps (or model complexity).
+      <br><b>3 · Tiny numbers:</b> step 100 — train <code>0.30</code>, val <code>0.35</code> → gap <code>0.05</code> (healthy). Step 500 — train <code>0.02</code>, val <code>0.40</code> → gap <code>0.38</code> and rising. The best model was near step 100, before the gap opened.
+      <br><b>4 · Sanity check:</b> the training loss almost always keeps falling, so it's the rising <em>validation</em> loss (not training loss) that signals overfitting. The model you keep is the one at the validation minimum — that's early stopping.</div></div>
 
       <h4>Two rules that keep the test honest</h4>
       <ul>
@@ -423,6 +430,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The whole point of a test set is to give an honest score — which is exactly why the way it silently becomes dishonest is worth naming.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): data leakage.</b> Leakage is when information from the test set sneaks into training, so the model has secretly already seen the answers. It happens easily: the same or near-duplicate rows land in both train and test, or you compute a preprocessing step (like scaling by the mean and standard deviation) over the <em>whole</em> dataset <em>before</em> you split it, so the training data quietly absorbs facts about the test data. Nothing crashes, and the test score looks fantastic — but it is a lie, and the model does worse in the real world. A senior engineer catches this in <b>code review</b> by checking that the split happens <em>first</em>, that no example appears in two splits, and that every fit-on-data step (scalers, vocabularies) is learned from the training set only.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how much data to hold out.</b> Every example you move into validation and test is an example the model cannot learn from. A large held-out set gives a stable, trustworthy score but leaves less data to train on, which can weaken the model. A small held-out set keeps most data for training but gives a noisy, unreliable estimate you cannot trust. Picking the split (and whether to use cross-validation when data is scarce) is a <b>design-review</b> decision that trades model strength against how much you can believe your own evaluation.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "I split data into train / validation / test: fit on train, tune hyperparameters on validation, and report once on test. Overfitting shows up as a growing train–val gap — training loss keeps falling while validation loss bottoms out and rises — so I keep the model at the validation minimum (early stopping). The subtle, expensive failure is data leakage: validation or test examples (or near-duplicates) sneaking into training makes the held-out score a lie, so the first thing I verify is that the splits are truly disjoint and de-duplicated before I trust any number."</div></div>
       <button class="gotit" type="button">Got the gap</button>
     </div>
 </section>
@@ -454,7 +462,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Make overfitting appear with your own hands — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-09-train-val-test/experiment.py</code>. Make a tiny noisy dataset of 30 points, split it 20 train / 10 validation. Fit a small polynomial (say degree 9) and print the training loss and validation loss as you train. Confirm the training loss keeps falling while the validation loss bottoms out and then rises — that turning point is overfitting. Run with <code>python3 m03f_train_val_test.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-09-train-val-test/experiment.py</code>. Make a tiny noisy dataset of 30 points, split it 20 train / 10 validation. Fit a small polynomial (say degree 9) and print the training loss and validation loss as you train. Confirm the training loss keeps falling while the validation loss bottoms out and then rises — that turning point is overfitting. Run with <code>python3 sessions/m02-the-neuron/day-09-train-val-test/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -470,7 +478,13 @@ Create sessions/m02-the-neuron/day-09-train-val-test/experiment.py that, with a 
 6. Adds a comment: the best model is the degree with the lowest VALIDATION loss, not the lowest training loss.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-09-train-val-test/log.md</code>: at which model complexity did the validation loss stop improving, and why is that the model you would keep?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>You split 30 noisy points into 20 train / 10 validation (disjoint) and fit a degree-9 polynomial.</li>
+        <li>Your printout shows the training loss falling while the validation loss bottoms out and then rises — the turning point is overfitting.</li>
+        <li>You can point to the step/complexity of the validation minimum and say why that's the model to keep.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-09-train-val-test/log.md</code>: (1) why a low training loss alone doesn't prove a model learned; (2) at which complexity the validation loss stopped improving, and why that's the model you'd keep; (3) what data leakage is and why it makes a held-out score meaningless.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

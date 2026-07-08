@@ -348,6 +348,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Here's the catch that makes it essential. A weighted sum + bias is a <span class="term" data-tip="A straight-line relationship: output changes in fixed proportion to input. A matmul plus bias is linear.">linear</span> operation. And stacking linear operations gives you… another linear operation. Two layers with no activation, <code>(x @ W₁) @ W₂</code>, equal <code>x @ (W₁ @ W₂)</code> — just <strong>one</strong> layer with one combined weight matrix. So depth would buy you nothing.</p>
       <p>The activation adds <span class="term" data-tip="Not a straight line. A non-linear step between layers lets a deep network bend and combine features to learn complex patterns.">non-linearity</span> — a bend. Put a bend between each layer and the layers can no longer be squashed into one. That is the entire reason deep networks work. Two common bends: <strong>ReLU</strong> and <strong>sigmoid</strong>. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Llama's models use an activation called SwiGLU; GPT-2 and GPT-3 use one called GELU. Different frontier labs pick different bends — but every one of them exists for the exact reason you're about to see.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> activation 看起来只是"最后随手加的一个函数"，很容易被当成不重要的一步 — the activation looks like an optional extra you tack on at the end. In plain terms: without it, stacking 100 layers is mathematically the same as having <b>one</b> layer — all that depth silently collapses. The activation is the single thing that makes "deep" worth anything.</div></div>
       <button class="gotit" type="button">Got why it exists — let's go</button>
     </div>
 </section>
@@ -362,6 +363,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> an activation is a small non-linear gate; stacking linear layers without one is pointless, so the gate is what makes depth worth having.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: these are just two of many activations, and the "gate" isn't on/off — it's a smooth curve the network can differentiate (needed for training, which comes in M3).</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，activation 就是每层之间的一个"小弯" — 没有它，一堆直线接起来还是一条直线；有了它，网络才能拐弯、画出复杂形状。The technical point: a stack of linear layers is still one linear map, so a non-linear activation between layers is what lets a deep network represent curves instead of only straight lines.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -394,6 +396,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Why non-linearity is non-negotiable</h4>
       <p>A composition of linear steps is still linear: <code>(x W₁) W₂ = x (W₁ W₂)</code>. So without a bend between layers, a 100-layer network can only ever draw a straight line — useless for images, language, anything real. One non-linear activation per layer breaks that, and (loosely) lets a big enough network approximate almost any function.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — why linear ∘ linear collapses</b>
+      <br><b>1 · In words:</b> two plain matmuls back-to-back, with no bend between them, do the same job as one matmul — so the second layer bought you nothing.
+      <br><b>2 · The formula:</b> <code>(x W₁) W₂ = x (W₁ W₂)</code>. <code>x</code> = input row; <code>W₁, W₂</code> = the two weight matrices; <code>W₁ W₂</code> = one combined matrix. Insert an activation <code>a(·)</code> and <code>a(x W₁) W₂</code> can no longer be folded up.
+      <br><b>3 · Tiny numbers:</b> <code>x=[1,2]</code>, <code>W₁=[[1,0],[0,1]]</code>, <code>W₂=[[2,0],[0,2]]</code>. Then <code>(x W₁) W₂ = [2,4]</code>, and <code>x (W₁ W₂) = x·[[2,0],[0,2]] = [2,4]</code> — identical.
+      <br><b>4 · Sanity check:</b> now clip with ReLU first — <code>ReLU(x W₁) W₂</code> — and any negative entries get zeroed <em>before</em> the second matmul, producing values no single matmul can. That clip is the entire reason activations exist.</div></div>
 
       <h4>Why a frontier lab cares</h4>
       <p><strong>ReLU</strong> is the classic workhorse: it's dirt cheap (just a max) and it avoids the <span class="term" data-tip="When gradients shrink toward zero as they pass back through many layers, so early layers barely learn. Sigmoid suffers from this; ReLU largely avoids it.">vanishing-gradient</span> problem that plagues sigmoid in deep stacks (you'll meet gradients in M3). It's also why the systems from the teaser above exist. Their smoother curves are one real answer to the "dead neuron" risk you're about to meet below — a curve that never fully flattens, unlike a plain ReLU. Sigmoid and its cousin <span class="term" data-tip="Turns a vector of scores into probabilities that sum to 1. Used at the output of a classifier.">softmax</span> live mostly at the output, where you want probabilities.</p>
@@ -403,6 +410,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The activation you pick decides whether a neuron keeps learning. Both common activations have a quiet way to stop learning that throws no error.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): saturated units that stop learning.</b> A <code>sigmoid</code> squashes into <code>(0, 1)</code>; when its input is far from zero (say <code>z = 10</code> or <code>z = −10</code>), the output flattens near <code>1</code> or <code>0</code> and barely moves when the input changes. A <code>ReLU</code> that always sees a negative input outputs a flat <code>0</code> — a "dead" ReLU. In both cases the neuron's output is nearly constant, so training can no longer nudge it, and the network quietly learns less than it could. Nothing crashes; the loss just plateaus higher than expected. A senior engineer catches this in <b>code review</b> by logging activation statistics — the fraction of ReLUs stuck at zero, or how many sigmoids sit pinned near 0 or 1 — instead of only watching the loss number.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: ReLU's speed and sparsity vs. its dead-neuron risk.</b> Choosing <code>ReLU</code> buys you a cheap activation (just a <code>max</code>) that keeps gradients healthy in deep stacks and turns off many neurons at once, which is often useful. What you give up is safety at zero: any neuron pushed permanently negative dies and never comes back. Softer activations that never fully flatten (they keep a small slope for negative inputs) trade a little extra math and less sparsity for never dying. Which one to use, and where, is a <b>design-review</b> decision — commonly ReLU-family in the hidden layers, sigmoid or softmax only at the output.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "An activation is the per-layer non-linearity. Without it <code>(x W₁) W₂ = x (W₁ W₂)</code> — the whole stack collapses to one linear map, so depth adds nothing. ReLU = max(0, z) is the cheap default and dodges vanishing gradients; sigmoid and softmax live at the output for probabilities. The silent failure is saturation — dead ReLUs stuck at 0, or sigmoids pinned near 0/1 — where the unit stops learning and the loss plateaus, so I log activation statistics, not just the loss."</div></div>
       <button class="gotit" type="button">Got why depth needs a bend</button>
     </div>
 </section>
@@ -434,7 +442,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the collapse yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-02-activations/experiment.py</code>. Write <code>relu</code> and <code>sigmoid</code>; print each on <code>[-2,0,2]</code>. Then pick two weight matrices <code>W1</code>, <code>W2</code>, and show that <code>(x@W1)@W2</code> equals <code>x@(W1@W2)</code> for a random <code>x</code> (proving two linear layers = one). Run with <code>python3 m02b_activations.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-02-activations/experiment.py</code>. Write <code>relu</code> and <code>sigmoid</code>; print each on <code>[-2,0,2]</code>. Then pick two weight matrices <code>W1</code>, <code>W2</code>, and show that <code>(x@W1)@W2</code> equals <code>x@(W1@W2)</code> for a random <code>x</code> (proving two linear layers = one). Run with <code>python3 sessions/m02-the-neuron/day-02-activations/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -447,7 +455,13 @@ Create sessions/m02-the-neuron/day-02-activations/experiment.py that, with a com
 3. Then inserts relu between them: shows relu(x@W1)@W2 is NOT equal to any single x@W, i.e. the bend prevents the collapse.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-02-activations/log.md</code>: in your own words, why would a 100-layer network with no activations be useless?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Your <code>relu</code> and <code>sigmoid</code> print sensible values on <code>[-2, 0, 2]</code> (ReLU zeros the −2; sigmoid stays inside (0, 1)).</li>
+        <li>You show numerically that <code>(x@W1)@W2</code> equals <code>x@(W1@W2)</code> for a random <code>x</code> — proving two linear layers collapse to one.</li>
+        <li>You can state in one sentence why inserting an activation between the layers breaks that collapse.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-02-activations/log.md</code>: (1) why a 100-layer network with no activations is no better than one layer; (2) ReLU vs sigmoid in one line; (3) what a "dead" or "saturated" unit is and how you'd detect it.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

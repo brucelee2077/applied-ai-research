@@ -352,6 +352,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </ol>
       <p>They all move downhill. The smarter ones just choose the step more cleverly. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Microsoft's ZeRO, used inside the DeepSpeed library, exists to shard Adam's doubled memory cost across many GPUs — a direct fix for the "two extra numbers" you're about to meet.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 一看到 SGD、Momentum、Adam 三个名字，很容易以为它们是三种完全不同的算法 — three names (SGD, Momentum, Adam) make it look like three unrelated algorithms. In plain terms: all three do the same job — step the weights downhill — and each just remembers a little more about the past to steer better. Adam is momentum plus a per-weight step size, nothing more mysterious.</div></div>
       <button class="gotit" type="button">Got it — let's meet them</button>
     </div>
 </section>
@@ -371,6 +372,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> SGD walks, momentum rolls, and Adam rolls with a per-weight sense of the ground.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a rolling ball feels real gravity every instant, but an optimizer only "feels" the slope once per step, using the gradient from one <span class="term" data-tip="A small chunk of the dataset processed together in one training step.">batch</span> of data. So its speed is a stored number it updates by hand, not true physics.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，optimizer 就是一个"下山教练" — SGD 每步只看当前坡度，Momentum 记住了速度所以能冲过小坑，Adam 还给每条腿单独调步幅。The technical point: all three implement <code>w ← w − (step)</code>; they differ only in how the step is computed from the gradient history.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -413,6 +415,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p><b>In words:</b> keep two running averages for each weight — one of the gradient (<code>m</code>), one of the gradient squared (<code>v</code>). Divide the step by the square root of <code>v</code>, so weights with big, noisy gradients take smaller steps and quiet ones take bigger steps.</p>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>m ← β₁ m + (1−β₁) g</code><br><code>v ← β₂ v + (1−β₂) g²</code><br><code>w ← w − lr × m / (√v + ε)</code><br><span style="color:var(--muted)">m = average gradient · v = average of gradient² · ε = tiny number so you never divide by 0</span></div></div>
       <p>You do not need to compute Adam by hand today. The idea to keep: it stores <b>two</b> extra numbers per weight, <code>m</code> and <code>v</code>.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — SGD vs momentum, one step on <code>pred=w·x</code></b>
+      <br><b>1 · In words:</b> SGD steps by the current slope; momentum first blends the new slope into a running speed, then steps by that speed, so repeated downhill pushes build up.
+      <br><b>2 · The formula:</b> SGD: <code>w ← w − lr·g</code>. Momentum: <code>v ← β·v + g</code>, then <code>w ← w − lr·v</code>. Here <code>x=2, y=6</code>, <code>w=1</code>, <code>lr=0.05</code>, <code>β=0.9</code>, start <code>v=0</code>, <code>g = 2(w·x − y)·x</code>.
+      <br><b>3 · Tiny numbers:</b> step 1 both see <code>g = 2(2−6)(2) = −16</code>. SGD → <code>w = 1.8</code>; momentum <code>v = 0.9·0 + (−16) = −16</code> → same <code>w = 1.8</code>. But on step 2 momentum's <code>v</code> still carries the old −16, so it moves <em>further</em> than SGD and pulls ahead.
+      <br><b>4 · Sanity check:</b> with <code>β=0</code>, <code>v = g</code> and momentum becomes exactly SGD. Bigger <code>β</code> keeps more past speed; too big and it overshoots the bottom before slowing.</div></div>
 
       <h4>Why a frontier lab cares about that "two extra numbers"</h4>
       <p>Adam keeps <code>m</code> and <code>v</code> for <em>every</em> weight. So the <span class="term" data-tip="The extra numbers an optimizer stores per weight; for Adam that is m and v, roughly doubling the memory beyond the weights themselves.">optimizer state</span> is about <b>2× the size of the model's weights</b> — extra memory a frontier lab must pay for on every accelerator. That's exactly the "two extra numbers" cost ZeRO/DeepSpeed from the teaser above was built to fix. When you reach the memory and parallelism modules (Module 10), this "Adam doubles your state" fact is a big reason huge models are split across many chips.</p>
@@ -422,6 +429,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Adam's power comes from the two extra numbers it stores per weight — and those numbers are also where a quiet bug and a real memory bill both come from.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): resuming training without the optimizer state.</b> When you save and reload a model, the weights are the obvious thing to save — but Adam's smart step depends on its running averages <code>m</code> and <code>v</code> for every weight. If you reload only the weights and let the optimizer start fresh, <code>m</code> and <code>v</code> reset to zero. Training resumes with no error, but Adam has forgotten every per-weight step size it learned, so the first steps after resume are crude and can quietly slow or destabilize training. A senior engineer catches this in <b>code review</b> by confirming the checkpoint saves and restores the optimizer state, not just the model weights.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast convergence vs. its memory bill.</b> Adam usually trains faster and needs less learning-rate tuning than plain SGD, because its per-weight step adapts automatically. You pay for that with memory: storing <code>m</code> and <code>v</code> roughly doubles the optimizer state beyond the weights themselves. At frontier scale that extra memory decides how a model must be split across chips. Choosing Adam versus a lighter optimizer is a <b>design-review</b> decision that trades convergence speed against memory footprint.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Every optimizer does <code>w ← w − step</code>; they differ in how the step uses gradient history. SGD uses the raw gradient; momentum keeps a running velocity <code>v ← βv + g</code> to roll through noise and small bumps; Adam adds a per-weight adaptive step by tracking running averages of the gradient and its square. Adam usually converges faster with less lr tuning, but it stores <code>m</code> and <code>v</code> per weight — roughly 2× the model's weights in optimizer state — which is exactly why memory-sharding like ZeRO exists at scale."</div></div>
       <button class="gotit" type="button">Got the three rules</button>
     </div>
 </section>
@@ -454,7 +462,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Race SGD against momentum on the same tiny problem and watch momentum win — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 m03d_optimizers.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -469,7 +477,13 @@ Create sessions/m02-the-neuron/day-07-optimizers/experiment.py that, with a comm
 5. Adds a comment noting that Adam keeps two extra numbers (m and v) per weight, so its optimizer state is about 2x the model weights.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-07-optimizers/log.md</code>: on which step did momentum first pull ahead of plain SGD, and why?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Both loops (SGD and momentum) print step, <code>w</code>, and <code>loss</code> from <code>w=1.0</code> on the <code>x=2, y=6</code> problem.</li>
+        <li>Momentum reaches <code>w ≈ 3</code> in <em>fewer</em> steps than plain SGD — you can point to the step where it pulls ahead.</li>
+        <li>You can explain in one sentence what the velocity <code>v</code> adds over plain SGD.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-07-optimizers/log.md</code>: (1) what all three optimizers have in common; (2) on which step momentum first pulled ahead of SGD, and why; (3) why Adam costs ~2× the weights in memory.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>

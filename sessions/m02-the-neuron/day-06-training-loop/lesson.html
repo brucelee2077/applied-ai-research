@@ -354,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>Two words you'll see</h4>
       <p>An <span class="term" data-tip="One full pass over the entire training dataset.">epoch</span> is one full pass over all the training data. A <span class="term" data-tip="A small chunk of the dataset processed together in one step, so you update weights often without loading everything at once.">batch</span> is a chunk processed in one step. Real training loops over batches, and over epochs. Keep going 👇</p>
       <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Meta has reported training Llama 3's biggest model on more than 15 trillion tokens — the exact loop you're about to run, just repeated an enormous number of times.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 前几天学了 forward、loss、gradient，但很多人还是不知道它们怎么"合"成训练 — you've met the forward pass, loss, and gradients, yet it's easy to still not see how they fit together. In plain terms: the training loop is just those pieces in a cycle — predict, score, find the slope, nudge the weights — run over and over. There is no hidden fifth step.</div></div>
       <button class="gotit" type="button">Got the loop — let's go</button>
     </div>
 </section>
@@ -368,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
       <p><strong>In one line:</strong> the training loop is shoot-check-adjust for weights, repeated until the loss is low.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a network can "memorize" the practice set and still miss new shots — that's <span class="term" data-tip="When a model fits the training data well but fails on new, unseen data. Checked by evaluating on held-out data.">overfitting</span>. So we also check the loss on data the model has not trained on. More on that in the evaluation modules.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，training loop 就是"投篮 → 看偏了多少 → 调整 → 再投"，一遍遍重复直到稳定。The technical point: each iteration runs forward → loss → backprop → weight update, and repeating it drives the loss down — the whole of "training" is this one cycle, scaled up.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -397,6 +399,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <h4>The loop, in plain code</h4>
       <div class="callout c-ok"><span class="ic">🧮</span><div><code>for epoch in range(E):</code><br>&nbsp;&nbsp;<code>for batch in data:</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>pred = forward(batch.x)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>loss = loss_fn(pred, batch.y)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>grads = backprop(loss)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>weights = weights − lr × grads</code></div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one training step of <code>pred = w·x</code></b>
+      <br><b>1 · In words:</b> predict, measure how wrong, find the slope of the loss w.r.t. <code>w</code>, then nudge <code>w</code> against that slope. Repeat.
+      <br><b>2 · The formula:</b> <code>pred = w·x</code>; <code>loss = (pred − y)²</code>; <code>grad = 2(pred − y)·x</code>; <code>w ← w − lr·grad</code>. Here <code>x=2, y=6</code>, start <code>w=1</code>, <code>lr=0.05</code>.
+      <br><b>3 · Tiny numbers:</b> step 1 — <code>pred = 2</code>, <code>loss = (2−6)² = 16</code>, <code>grad = 2(−4)(2) = −16</code>, <code>w ← 1 − 0.05(−16) = 1.8</code>. Next step the loss is smaller and <code>w</code> keeps climbing toward the true answer <code>3</code>.
+      <br><b>4 · Sanity check:</b> at <code>w=3</code>, <code>pred = 6 = y</code>, so <code>loss = 0</code> and <code>grad = 0</code> — the update stops moving. A loss that <em>rises</em> instead means <code>lr</code> is too big.</div></div>
 
       <h4>A sanity check you'll use forever</h4>
       <p>Before training for real, run the loop on a <strong>single batch</strong> until the loss hits ~0. If it can't, your gradients aren't flowing (a bug). "Overfit one batch" is the first thing engineers do to prove a new model can learn at all — you'll see it in the JAX modules.</p>
@@ -409,6 +416,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The loop is only four lines, and a missing fifth one is the most common quiet bug in all of training.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to reset the gradients each step.</b> In common frameworks (like PyTorch), gradients <em>add up</em> across steps by default — each backward pass piles its gradient on top of the last one instead of replacing it. If you forget the reset (in PyTorch, <code>optimizer.zero_grad()</code>) at the top of the loop, the update uses a growing sum of gradients from every past batch. The loop still runs and the loss still changes, so nothing crashes — but training behaves strangely and learns poorly for no obvious reason. A senior engineer catches this in <b>code review</b> by checking that the loop clears the gradients before each backward pass.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how big to make each batch.</b> A <span class="term" data-tip="The number of examples processed together in one training step before the weights are updated.">batch</span> is how many examples you process before one weight update. Big batches give a smoother, more reliable gradient estimate and use the hardware efficiently, but need much more memory and sometimes generalize slightly worse. Small batches are noisy and slower per example on the hardware, but use little memory and the noise can even help the model escape bad spots. Choosing the batch size is a <b>design-review</b> decision that trades memory and hardware efficiency against gradient quality.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The training loop is four steps repeated over batches and epochs: forward pass → loss → backprop for gradients → weight update <code>w ← w − lr·grad</code>. That cycle, scaled to a datacenter, is how every model is trained. My first move on any new model is 'overfit one batch' — run the loop on a single batch until the loss hits ~0; if it can't, gradients aren't flowing and there's a bug. The main knob is batch size, trading gradient quality and hardware efficiency against memory."</div></div>
       <button class="gotit" type="button">Got the loop</button>
     </div>
 </section>
@@ -440,7 +448,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Train a tiny model with the full loop yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-06-training-loop/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Start <code>w=1.0</code>; loop 20 steps doing: <code>pred=w*x</code>; <code>loss=(pred-y)**2</code>; <code>grad=2*(pred-y)*x</code>; <code>w=w-0.05*grad</code>; print step, w, loss. Confirm <code>w → 3</code> and <code>loss → 0</code>. Run with <code>python3 m03c_training_loop.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-06-training-loop/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Start <code>w=1.0</code>; loop 20 steps doing: <code>pred=w*x</code>; <code>loss=(pred-y)**2</code>; <code>grad=2*(pred-y)*x</code>; <code>w=w-0.05*grad</code>; print step, w, loss. Confirm <code>w → 3</code> and <code>loss → 0</code>. Run with <code>python3 sessions/m02-the-neuron/day-06-training-loop/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
       <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
@@ -454,7 +462,13 @@ Create sessions/m02-the-neuron/day-06-training-loop/experiment.py that, with a c
 4. Adds a comment explaining that scaling this loop to many weights, batches, and chips is how real models train.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m02-the-neuron/day-06-training-loop/log.md</code>: which of the four loop steps maps to which earlier lesson (M2, D1, D2)?</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Your loop prints step, <code>w</code>, and <code>loss</code> each iteration for the <code>pred=w·x</code>, <code>x=2, y=6</code> problem.</li>
+        <li>Over ~20 steps <code>w → 3</code> and <code>loss → 0</code>, with the loss decreasing (no blow-up).</li>
+        <li>You can name which of the four loop steps maps to which earlier lesson (forward, loss, backprop, update).</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-06-training-loop/log.md</code>: (1) the four steps of the loop in order; (2) what "overfit one batch" proves and why you'd run it first; (3) what happens to the loss if the learning rate is too big.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
