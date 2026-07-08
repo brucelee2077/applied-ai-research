@@ -107,6 +107,7 @@ Every lesson gets the missing Coach blocks inserted **inside `.sec-body`, before
 **Totals to add:** pain-point ×19 · Math Ladder ×16 (skip the 3 non-formula lessons) · interview ×17 (2 already present, re-verify) · Acceptance criteria ×19 · research log ×19 · bilingual scaffold ×19 · **7 P0 inline `.vlab` labs**. **Staff Lens: 0 new** — all 19 already have one (preserve intact).
 
 **Notes / guardrails:**
+
 - **Math Ladder only for a genuine single core formula.** The 3 skips (m04/day-05 PyTorch API map, m04/day-06 why-PyTorch comparison, m05a/day-06 encoder-vs-decoder contrast) have no single central equation; forcing a ladder would be noise. `lesson_audit.py`'s math-ladder advisory will persist on those by design — noted in the report, not "fixed".
 - **Produce artifact — do NOT fabricate.** Every lesson already references `experiment.py` (no advisory fired). Keep the existing artifact and file path; only add the missing `<h4>Acceptance criteria</h4>` list.
 - **Interview + Staff Lens.** Staff Lens exists on all 19 (preserve). Interview: add a real 🎤 block to the 17 that lack one; for day-05-positional and day-06-encoder-vs-decoder, re-read first and only add if the existing marker is not already a real spoken-answer block (avoid duplication).
@@ -119,42 +120,49 @@ Every lesson gets the missing Coach blocks inserted **inside `.sec-body`, before
 All seven are **dependency-free inline SVG + vanilla JS** using the repo `.vlab` template proven in Batch 1 (`m10a/day-01`, `m13/day-04`) — the CSS block at `m10a-scaling-laws/day-01-kaplan-paradigm/lesson.html:197–224` is copied verbatim (it uses only new-shell CSS vars: `--line2`, `--panel2`, `--accent`, `--ok-soft`, `--warn-soft`, …). **No CDN, no new fonts, offline-safe, theme-aware, keyboard-reachable sliders.** Each lab is inserted into **Section 3** (`data-sec="play"`) **above** the existing fake-terminal playground; the terminal keeps its 3 `data-demo` buttons and its **completion-gate** role (untouched). Every lab carries the 7 required cards: learning question (`.vlab-q`) · labeled axes · clear change on control move · "what you should notice" · misconception note · "where this simplifies reality" (`.vlab-note`) · frontier-lab relevance.
 
 ### 5.1 m03 · day-02 · qkv — "Projection fan"
+
 - **Learning question:** why turn one embedding into three different vectors, and what does each one do?
 - **Control:** a 2-token toggle picks which token is the *query*; a slider scrubs a shared "projection strength" so you see Q/K/V move together.
 - **Two panels:** (left) one embedding row → three labeled arrows (`W_Q`/`W_K`/`W_V`) → Q, K, V boxes; (right) the chosen query·each-key dot product as a small bar, with the max highlighted ("this is who it attends to").
 - **Notice / misconception / simplifies:** Q and K play *asymmetric* roles (query asks, key answers); misconception = "Q, K, V are the same vector" — they are three *learned* projections; simplification = tiny `d`, integer weights, no softmax yet (that is day-03).
 
 ### 5.2 m03 · day-05 · positional — "PE waves & fingerprint"
+
 - **Learning question:** self-attention sees a *set*, not a *sequence* — how does adding a fixed pattern restore order?
 - **Two panels:** (left) an `(N positions × d dims)` PE grid colored blue→red by value; (right) the sine/cosine wave for the currently selected dimension column.
 - **Controls:** a `dim` slider highlights one column and redraws its wave (slow low-`i` vs fast high-`i` frequency); a `pos` slider highlights one row to show its unique fingerprint vector.
 - **Notice / misconception / simplifies:** each position gets a distinct, smooth code; misconception = "positions are just 0,1,2,… added on" (they are multi-frequency sinusoids so relative offsets are learnable); simplification = 8×8 grid, `10000` base fixed, no learned/RoPE variants.
 
 ### 5.3 m04 · day-02 · backward-pass — "Blame flows backward"
+
 - **Learning question:** how does one loss number become a gradient for every weight?
 - **One panel, two passes:** the chain `x → z1 → h → logits → loss` drawn as nodes. A **Forward** toggle animates left→right (activations light up); a **Backward** toggle sends gradient arrows right→left, each node labeled with its local gradient, and the ReLU gate visibly zeroing the units where `z1<0`.
 - **Control:** a slider scrubs the chain-rule product one hop at a time so you watch `probs−y` propagate back into `dW2`, then `dh`, then `dW1`.
 - **Notice / misconception / simplifies:** the ReLU gate kills gradient on dead units (`z1≤0`); misconception = "backprop is a different algorithm from forward" (it is the same graph, reversed, reusing cached activations); simplification = one sample, tiny widths, no batching.
 
 ### 5.4 m05a · day-01 · residual-connections — "Two roads for the gradient"
+
 - **Learning question:** why does adding `x` back (`y=F(x)+x`) let 96-layer stacks train at all?
 - **Control:** a **depth `N`** slider (2→96) and a **skip on/off** toggle.
 - **Two bars / one panel:** the gradient reaching layer 1 after `N` layers, plotted for *plain* (`≈r^N`, vanishes) vs *residual* (`≈(r+1)^N`-ish, survives) — with the lesson's own `1.2^10≈6.2` vs `0.2^10≈1e-7` numbers as anchors. Skip-off collapses the residual bar onto the plain one.
 - **Notice / misconception / simplifies:** the `+1` gives the gradient a road that never multiplies to zero; misconception = "skip connections add capacity" (their job is gradient flow / identity preservation); simplification = single scalar gain per layer, no LN interaction.
 
 ### 5.5 m05a · day-02 · layer-norm — "Recenter & rescale"
+
 - **Learning question:** what does LayerNorm actually do to one token's numbers, and why per-token?
 - **Two dot-strips on a shared number line:** (top) the raw feature values (e.g. wild `[5, 500, 5000]`); (bottom) the normalized values after `(x−μ)/(σ+ε)`.
 - **Control:** a slider (or a couple of presets) reshapes the raw spread; μ and σ print live and both strips re-plot, showing the normalized strip always lands at mean 0 / std 1.
 - **Notice / misconception / simplifies:** normalization is **per token across features**, not per batch (that is BatchNorm); misconception = "LN removes information" (γ,β can restore any scale it needs); simplification = γ=1,β=0, `ε` shown but tiny.
 
 ### 5.6 m05a · day-05 · causal-masking — "Who can see whom"
+
 - **Learning question:** how does one triangle of `−inf` stop a token from reading its own future?
 - **One panel:** an `N×N` attention grid. Hovering / clicking row `i` highlights the allowed cells `0..i` green and the future cells red.
 - **Control:** a **diagonal-offset** toggle switches the boundary between correct (`j≤i`) and the classic off-by-one bug (`j≤i+1`) so a *leaked-future* cell lights up; a second toggle shows scores → `+M` → post-softmax (future weights become exactly 0).
 - **Notice / misconception / simplifies:** the mask is added **before** softmax (so `e^{−inf}=0`); misconception = "just zero the weights after softmax" (that breaks the normalization); simplification = small `N`, integer scores, single head.
 
 ### 5.7 m05a · day-07 · text-generation — "Temperature dial"
+
 - **Learning question:** the model outputs one fixed logit vector — so where does variety come from?
 - **One panel:** a bar chart of 4–5 candidate-word probabilities.
 - **Controls:** a **temperature** slider (0.1→3.0) recomputes `softmax(logits/T)` and re-heights the bars live (low T → one tall spike / greedy; high T → flat / random); a **top-p** line greys out the dropped tail as `p` changes.

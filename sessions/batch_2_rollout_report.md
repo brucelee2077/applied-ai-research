@@ -105,6 +105,7 @@ TOTAL lessons audited: 19
 **jsdom render + JS-syntax gate:** 19/19 render clean, 0 runtime errors, 0 syntax errors; structural counts (7 sec / 7 got-it / 3 demos / 4 quiz / BUILD / tooltip) intact on all. The 7 P0 labs re-render on simulated `input`/`click`.
 
 **Remaining soft COACH advisories (all expected, none a failure):**
+
 - `math-heavy but no Math Ladder` ×3 — the intentional non-formula skips: `m04/day-05-pytorch-version` (API/idiom lesson), `m04/day-06-why-pytorch` (comparison finale), `m05a/day-06-encoder-vs-decoder` (contrast lesson — the difference is one `+causal_mask` line, not a single equation). Correct by design.
 
 No other advisories fire (analogy, Staff Lens, `experiment.py`, pain-point, interview, acceptance, research log, bilingual all cleared on all 19).
