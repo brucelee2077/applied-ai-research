@@ -32,6 +32,33 @@ Every lesson should include:
 13. Produce artifact
 14. Explain-back
 
+
+## Coach Voice Standard
+
+The lesson must feel like a warm, intelligent coach sitting next to the learner.
+
+It should not feel like:
+- textbook reference
+- API documentation
+- compressed lecture notes
+- math-first tutorial
+- slide bullet summary
+
+It should feel like:
+- a senior engineer friend explaining patiently
+- a live coach anticipating confusion
+- a notebook that teaches through intuition, examples, visuals, and experiments
+
+Required opening style:
+Before any formula, the lesson must answer:
+1. Why should I care?
+2. What pain or confusion does this concept solve?
+3. What is the simplest mental picture?
+4. What everyday analogy makes it concrete?
+5. What tiny example can I compute by hand?
+
+If the first 20% of the lesson starts with definitions or formulas before felt intuition, this is a P0 teaching failure.
+
 ## Intuition standard
 
 Before introducing formulas, answer:

@@ -10,6 +10,21 @@ You are the quality gate after curriculum refactor.
 Be strict on learning quality.
 Be relaxed on cosmetic polish.
 
+## Coach Voice QA
+
+Mark as P0 if:
+- the lesson starts formula-first
+- analogy is only one sentence
+- no pain point is named
+- no tiny example appears before formulas
+- learner is not told what to look for in the visual
+- the lesson feels like documentation rather than coaching
+
+Mark as P1 if:
+- tone is technically correct but dry
+- Chinese intuition scaffold is missing
+- interview explanation exists but sounds memorized
+
 ## P0 — fix immediately
 
 - missing must-cover concept
