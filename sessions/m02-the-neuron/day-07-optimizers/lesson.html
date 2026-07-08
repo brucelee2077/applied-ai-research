@@ -331,8 +331,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section id="home" class="hero">
       <span class="kicker">Module 2 · Train · Day 7</span>
       <h1>Optimizers: SGD → Momentum → Adam<span class="sub">Smarter ways to step downhill</span></h1>
-      <p class="lede">You know the update step: <code>w ← w − lr × grad</code>. That plain version is called <strong>SGD</strong>. Today you meet two smarter step-takers. <strong>Momentum</strong> adds a running speed so the weight rolls through small bumps. <strong>Adam</strong> gives every weight its own step size. All three do the same job — move downhill — but the smarter ones get there faster and more steadily.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> write the SGD, momentum, and Adam update rules, run one SGD step and one momentum step by hand on the same weight, and explain why Adam uses about twice the optimizer memory.</div></div>
+      <p class="lede">You already know how to step downhill — but a plain step is slow and shaky. Today three step-takers race for the same valley floor: <strong>SGD</strong> walks one careful step at a time, <strong>Momentum</strong> rolls like a real ball that coasts through bumps, and <strong>Adam</strong> rolls with a per-weight sense of the ground. Same destination — very different speed getting there.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, you'll be able to write the SGD, momentum, and Adam update rules, step SGD and momentum by hand on the same weight to see momentum pull ahead, and say why Adam costs about twice the optimizer memory.</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
@@ -340,6 +340,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">The rule that decides how to step</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the training loop (Day 6), gradients and gradient descent (Day 5). Today we only change <b>step 4 — the update</b>. <b>Nothing new needed.</b></div></div>
+
+      <h4>First, the picture — hold this before the rules</h4>
+      <p>Picture the loss as a hilly valley you're trying to reach the bottom of. You could inch down one careful step at a time — or you could let a ball roll and coast through the little dips instead of stopping at each one. That is the whole story of today: three ways of moving downhill, from a careful walk to a smart rolling ball. Keep that picture; the definitions below just give each mover its name.</p>
 
       <h4>What is an optimizer?</h4>
       <p>An <span class="term" data-tip="The rule that turns gradients into a weight change each step: SGD, momentum, and Adam are the common ones.">optimizer</span> is the rule that decides how to change the weights once you have the gradients. The forward pass, the loss, and backprop stay the same. Only the last step — the update — is what an optimizer controls.</p>
@@ -361,7 +364,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s2" data-sec="intuition">
   <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Rolling a ball downhill, three ways</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
-      <p>Picture the loss as a hilly valley. You want to reach the bottom. Each optimizer is a different way of moving down.</p>
+      <p>You already have the rolling-ball picture from Section 1 — here are the three movers side by side, each a different way down the same valley:</p>
       <div class="relate">
         <div class="card"><span class="big">🐾</span><h5>SGD — tiny careful steps</h5><p>You take one small step in the steepest downhill direction, stop, look again, step again. Safe, but slow, and you stall in every little dip.</p></div>
         <div class="card"><span class="big">⚽</span><h5>Momentum — a real ball</h5><p>Now let a ball roll. It builds up speed in the downhill direction, so a tiny bump does not stop it — it coasts right over.</p></div>
@@ -427,7 +430,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>Adam's power comes from the two extra numbers it stores per weight — and those numbers are also where a quiet bug and a real memory bill both come from.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): resuming training without the optimizer state.</b> When you save and reload a model, the weights are the obvious thing to save — but Adam's smart step depends on its running averages <code>m</code> and <code>v</code> for every weight. If you reload only the weights and let the optimizer start fresh, <code>m</code> and <code>v</code> reset to zero. Training resumes with no error, but Adam has forgotten every per-weight step size it learned, so the first steps after resume are crude and can quietly slow or destabilize training. A senior engineer catches this in <b>code review</b> by confirming the checkpoint saves and restores the optimizer state, not just the model weights.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): resuming training without the optimizer state.</b> When you save and reload a model, the weights are the obvious thing to save — but Adam's smart step depends on its running averages <code>m</code> and <code>v</code> for every weight. If you reload only the weights and let the optimizer start fresh, <code>m</code> and <code>v</code> reset to zero — like carrying the ball back to the same spot but forgetting all the speed it had built up, so it starts rolling from a dead stop. Training resumes with no error, but Adam has forgotten every per-weight step size it learned, so the first steps after resume are crude and can quietly slow or destabilize training. A senior engineer catches this in <b>code review</b> by confirming the checkpoint saves and restores the optimizer state, not just the model weights.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast convergence vs. its memory bill.</b> Adam usually trains faster and needs less learning-rate tuning than plain SGD, because its per-weight step adapts automatically. You pay for that with memory: storing <code>m</code> and <code>v</code> roughly doubles the optimizer state beyond the weights themselves. At frontier scale that extra memory decides how a model must be split across chips. Choosing Adam versus a lighter optimizer is a <b>design-review</b> decision that trades convergence speed against memory footprint.</div></div>
       <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Every optimizer does <code>w ← w − step</code>; they differ in how the step uses gradient history. SGD uses the raw gradient; momentum keeps a running velocity <code>v ← βv + g</code> to roll through noise and small bumps; Adam adds a per-weight adaptive step by tracking running averages of the gradient and its square. Adam usually converges faster with less lr tuning, but it stores <code>m</code> and <code>v</code> per weight — roughly 2× the model's weights in optimizer state — which is exactly why memory-sharding like ZeRO exists at scale."</div></div>
       <button class="gotit" type="button">Got the three rules</button>
@@ -458,9 +461,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Watch momentum overtake SGD</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Race SGD against momentum on the same tiny problem and watch momentum win — that's what makes the day count. Pick one:</p>
+      <p>Here's the race worth watching. <b>Before you run it, predict:</b> SGD and momentum take the <em>same</em> first step (both land at <code>w=1.8</code>) — so when does momentum pull ahead? Run both on the same tiny problem and watch step 2: momentum's stored speed hits <code>v = −24.0</code> and it covers <b>2.5× the ground</b> SGD does, then reaches the bottom first. That head start is the whole point of keeping a velocity. Pick one path:</p>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -477,7 +480,7 @@ Create sessions/m02-the-neuron/day-07-optimizers/experiment.py that, with a comm
 5. Adds a comment noting that Adam keeps two extra numbers (m and v) per weight, so its optimizer state is about 2x the model weights.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <h4>Acceptance criteria</h4>
+      <h4>What you should see (check your prediction)</h4>
       <ul>
         <li>Both loops (SGD and momentum) print step, <code>w</code>, and <code>loss</code> from <code>w=1.0</code> on the <code>x=2, y=6</code> problem.</li>
         <li>Momentum reaches <code>w ≈ 3</code> in <em>fewer</em> steps than plain SGD — you can point to the step where it pulls ahead.</li>

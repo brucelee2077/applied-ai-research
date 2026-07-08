@@ -141,8 +141,12 @@ def classify(path):
         coach.append("no Staff / Research Engineer Lens (silent failure + trade-off)")
     if 'interview' not in low and '🎤' not in t:
         coach.append("no interview-ready explanation")
-    if 'acceptance criteria' not in low:
-        coach.append("no explicit Acceptance criteria in Produce")
+    # v7.6 Learning-Experience gate reframes Produce as discovery ("what you should
+    # see" / "predict then run") instead of a homework-register "Acceptance criteria".
+    # Accept either register so the discovery reframe does not false-fire this advisory.
+    if not any(k in low for k in ('acceptance criteria', 'what you should see',
+                                  'what you should expect', 'check your prediction')):
+        coach.append("no explicit success criteria in Produce (acceptance criteria / 'what you should see')")
     if not any(k in t for k in ('容易卡住', 'Why this trips', '😕')):
         coach.append("no pain-point block (why this is confusing)")
     if 'research log' not in low and '📓' not in t:

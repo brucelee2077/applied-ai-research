@@ -331,8 +331,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section id="home" class="hero">
       <span class="kicker">Module 2 · Train · Day 4</span>
       <h1>Loss Functions<span class="sub">Giving the Network a Score to Beat</span></h1>
-      <p class="lede">Your network can make a prediction (Day 3's forward pass). But is it any good? To improve, it first needs a way to measure how <strong>wrong</strong> it is — a single number called the <strong>loss</strong>. Lower is better. Everything about training is "make this number smaller."</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> say what a loss measures, compute mean-squared-error by hand, and explain why classification uses cross-entropy (which quietly reuses the log from M1 Day 5).</div></div>
+      <p class="lede">Here is the entire goal of training a model, in one sentence: <strong>make one number smaller</strong>. That number is the <strong>loss</strong> — a score for how <strong>wrong</strong> the model's prediction is, where lower is better and 0 is perfect. Your network can already make a prediction (Day 3). Today you give it the score it spends the rest of its life trying to beat.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, "training" will just mean "push the loss down": you'll say what a loss measures, compute mean-squared-error by hand, and see why classification uses cross-entropy (the same log from M1 Day 5).</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
@@ -340,6 +340,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">What a loss function is</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
       <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 3 (a forward pass produces a prediction) and M1 Day 5 (logs). <b>Nothing new needed</b> — today we just score the prediction.</div></div>
+
+      <h4>First, the picture — hold this before any definition</h4>
+      <p>Think of a round of golf. Your score is the number of strokes, and lower is always better — a perfect hole is a low number, and the whole game is trying to shoot lower next time. A network's <strong>loss</strong> is exactly that golf score: one number saying how far off its prediction landed, and training is just "shoot a lower score every round." Keep that picture; the term below — <em>loss function</em> — is only the rule that hands you the score.</p>
 
       <h4>What is a loss function?</h4>
       <p>A <span class="term" data-tip="A single number measuring how wrong a prediction is, by comparing it to the true answer. Lower = better. Training minimizes it.">loss function</span> takes the model's prediction and the true answer, and returns <strong>one number</strong>: how wrong the prediction is. Lower is better; a perfect prediction gives a loss near 0.</p>
@@ -363,6 +366,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s2" data-sec="intuition">
   <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">A golf score</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
+      <p>You already have the golf picture from Section 1 — here it is as two cards, one for the score itself and one for how MSE measures it:</p>
       <div class="relate">
         <div class="card"><span class="big">⛳</span><h5>Loss = strokes in golf</h5><p>Lower is better; 0 is perfect. Each prediction is a shot, and the loss says how far from the hole you landed. Training tries to shoot a lower score every round.</p></div>
         <div class="card"><span class="big">📏</span><h5>MSE = distance, squared</h5><p>Measure how far off each guess is, square it (so misses in either direction count, and big misses hurt a lot), then average. One tidy number for the whole batch.</p></div>
@@ -429,7 +433,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>The staff lens — one silent failure, one trade-off</h4>
       <p>The loss is just one number, so a wrong loss looks exactly like a right one. Two mistakes here damage training without ever throwing an error.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): feeding probabilities where logits are expected.</b> Many cross-entropy functions (like PyTorch's <code>CrossEntropyLoss</code>) expect raw scores called <span class="term" data-tip="The raw, unsquashed output scores of a model, before softmax turns them into probabilities.">logits</span> and apply the softmax themselves. If you run softmax first and pass the resulting probabilities in, softmax gets applied <em>twice</em>. The loss still computes a finite, plausible-looking number — nothing crashes — but it is the wrong number, so training is weaker and slower for no visible reason. A senior engineer catches this in <b>code review</b> by checking exactly what the loss function expects: does it want logits or probabilities, and is there a stray extra softmax before it?</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which loss you choose for the task.</b> Using <code>MSE</code> on a classification problem runs perfectly and gives a valid number, so it is tempting — but it treats class labels as plain numbers and gives weak, slow-to-move gradients when the model is confidently wrong. <code>Cross-entropy</code> punishes confident mistakes hard (<code>−log(p)</code> blows up as <code>p</code> nears 0), which trains classifiers much faster, but it needs proper probabilities and can be numerically touchy. Picking the loss that matches the task — MSE for regressing a number, cross-entropy for choosing a class — is a <b>design-review</b> decision that quietly sets how well the whole model can learn.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which loss you choose for the task.</b> It's really a choice of scorecard — match it to the game you're actually playing, or you drive down a number that doesn't mean what you think. Using <code>MSE</code> on a classification problem runs perfectly and gives a valid number, so it is tempting — but it treats class labels as plain numbers and gives weak, slow-to-move gradients when the model is confidently wrong. <code>Cross-entropy</code> punishes confident mistakes hard (<code>−log(p)</code> blows up as <code>p</code> nears 0), which trains classifiers much faster, but it needs proper probabilities and can be numerically touchy. Picking the loss that matches the task — MSE for regressing a number, cross-entropy for choosing a class — is a <b>design-review</b> decision that quietly sets how well the whole model can learn.</div></div>
       <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The loss is the single scalar training minimizes. For regression I use MSE = mean((pred−target)²); for classification, cross-entropy = −log(p_correct), because next-token prediction is picking a category and cross-entropy punishes confident-wrong predictions hard, giving strong gradients. The classic silent bug is a double softmax — passing probabilities into a loss that expects logits — which yields a finite but wrong number with no crash, so I always check whether the loss wants logits or probabilities."</div></div>
       <button class="gotit" type="button">Got why loss matters</button>
     </div>
@@ -458,9 +462,9 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">See your score drop, round by round</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Compute a loss yourself and watch it fall — that's what makes the day count. Pick one:</p>
+      <p>Here's the fun part. <b>Before you run anything, predict:</b> is <code>−log(0.3)</code> bigger or smaller than <code>−log(0.9)</code>? Jot your guess. Then compute cross-entropy for <code>p = 0.3, 0.6, 0.9</code> and watch the three numbers <code>1.204 → 0.511 → 0.105</code> fall as the model grows more confident — the golf score dropping as your aim improves. Pick one path:</p>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m02-the-neuron/day-04-loss/experiment.py</code>. Write <code>mse(pred, target) = np.mean((pred-target)**2)</code> and <code>cross_entropy(p_correct) = -np.log(p_correct)</code>. Print MSE for a close prediction vs a far one, and cross-entropy for <code>p_correct</code> in <code>[0.3, 0.6, 0.9]</code> — confirm the loss drops as the guess improves. Run with <code>python3 sessions/m02-the-neuron/day-04-loss/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -476,10 +480,10 @@ Create sessions/m02-the-neuron/day-04-loss/experiment.py that, with a comment on
 4. Prints cross_entropy for p_correct in [0.3, 0.6, 0.9] (expect ~1.204, 0.511, 0.105) and notes the loss falls as the model gets more confident in the correct class.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <h4>Acceptance criteria</h4>
+      <h4>What you should see (check your prediction)</h4>
       <ul>
-        <li>Your <code>mse</code> prints a smaller value for a close prediction than for a far one.</li>
-        <li>Your <code>cross_entropy(p_correct)</code> on <code>p ∈ [0.3, 0.6, 0.9]</code> prints a loss that <em>drops</em> as <code>p</code> rises (≈ 1.204 → 0.511 → 0.105).</li>
+        <li>Your <code>mse</code> prints a smaller value for a close prediction than for a far one — the golf score is lower when your aim is better.</li>
+        <li>Your <code>cross_entropy(p_correct)</code> on <code>p ∈ [0.3, 0.6, 0.9]</code> prints a loss that <em>drops</em> as <code>p</code> rises (≈ 1.204 → 0.511 → 0.105) — exactly the order you predicted.</li>
         <li>You can say in one sentence why cross-entropy, not MSE, is used for classification.</li>
       </ul>
       <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-04-loss/log.md</code>: (1) why squaring the error (MSE) punishes big misses more; (2) why <code>−log(p)</code> blows up when the model is confidently wrong; (3) when you'd pick MSE vs cross-entropy.</div></div>
