@@ -358,6 +358,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         out = floor( (W − K + 2P) / S ) + 1
       </div></div>
       <p><span class="term" data-tip="Rounding a number DOWN to the nearest whole number. floor(2.7) = 2. It appears because a filter can only make a whole number of stops.">floor</span> just means round down to a whole number — you cannot make half a filter stop. Height uses the exact same formula. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 公式里有四个字母 (W, K, S, P)，很多人死记硬背，一旦题目换了设置就懵了。In plain terms: people memorize <code>(W−K+2P)/S+1</code> as a magic string and then freeze when the numbers change, because they never connected it to the simple act of <i>counting how many times the filter can stop</i>. Once you see it as counting stops, the formula stops being scary.</div></div>
       <button class="gotit" type="button">Got the formula — let's go</button>
     </div>
 </section>
@@ -371,6 +372,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">👣</span><h5>Step size changes the count</h5><p>If you step 1 pixel at a time (S = 1) you get many stops. If you jump 2 at a time (S = 2) you get about half as many. Padding adds fake pixels at the ends so the flashlight can start right at the edge.</p></div>
       </div>
       <p><strong>In one line:</strong> the output size is just "how many times can the filter stop as it walks across", and the formula is the tidy way to count that.</p>
+      <p><b>直觉 / Intuition:</b> 别背公式，先想"探照灯能停几次"——停几次，输出就多宽。<b>In code terms:</b> it is the length of the loop <code>for start in range(0, W+2P-K+1, S)</code> — the output width is exactly how many valid start positions that loop visits, which is why <code>+1</code> counts the very first stop.</p>
       <p>Think of a 5-pixel row and a 3-wide filter, stepping 1 at a time. The filter can start at position 1, 2, or 3 — then it would hang off the edge. That is 3 stops, so the output is 3 wide. The formula gives the same 3 without you drawing it.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real flashlight can stop anywhere. A filter can only stop where a whole patch still fits inside the (padded) image. That "must fit fully" rule is exactly why we round down with floor.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -426,6 +428,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         out = <span class="hl">4</span>   <span class="dim"># a 7-wide input becomes 4-wide</span>
       </div></div>
       <p>So a 7×7 image, run through this convolution, comes out 4×4. Change one knob and the answer changes: with stride 1 and the same padding, the output would stay 7×7.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — convolution output size</b>
+      <br><b>1 · In words:</b> pad the ends, see how many whole filter-stops fit as you step by <code>S</code>, and add one for the first stop.
+      <br><b>2 · The formula:</b> <code>out = ⌊(W − K + 2P)/S⌋ + 1</code> — <code>W</code> = input width; <code>K</code> = kernel size; <code>P</code> = padding per side; <code>S</code> = stride; <code>⌊·⌋</code> = floor (the last partial stop is dropped).
+      <br><b>3 · Tiny numbers:</b> <code>W=7, K=3, S=2, P=1</code> → <code>⌊(7−3+2)/2⌋+1 = ⌊6/2⌋+1 = 4</code>.
+      <br><b>4 · Sanity check:</b> set <code>K=1, S=1, P=0</code> and you must get <code>out = W</code> (a 1×1 filter changes nothing); set <code>P=(K−1)/2, S=1</code> ("same" padding) and <code>out = W</code> too. If your formula ever returns a number larger than <code>W+2P</code>, it is wrong.</div></div>
 
       <h4>Why the parts are there</h4>
       <ul>
@@ -439,6 +446,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The <code>floor</code> in this formula is where the quiet bug lives, and the stride knob is a genuine design choice, not a free win.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the floor throws away edge pixels with no warning.</b> When <code>(W − K + 2P)</code> does not divide evenly by the stride <code>S</code>, <code>floor</code> rounds down and the filter simply never visits the last strip of the input. Say <code>W = 10, K = 3, P = 0, S = 2</code>: you get <code>floor(7/2)+1 = 4</code>, and the rightmost column of pixels is silently dropped. Nothing crashes — the tensor shape is still valid — you just quietly lost information from the edge of every image. A senior engineer, in <b>code review</b>, checks whether <code>(W − K + 2P)</code> is a clean multiple of <code>S</code> and adds padding when it is not, so no input strip goes unseen.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: a bigger stride saves compute but discards detail.</b> Raising <code>S</code> shrinks the output, which means fewer positions to compute and less memory — a real speed-up. But every step you skip is spatial detail you never look at again, and downstream layers can never recover it. Choosing the stride (and how much to downsample overall) is a <b>design-review</b> decision: you are trading feature-map resolution and small-object sensitivity for speed and memory.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Output size is <code>⌊(W−K+2P)/S⌋+1</code> — it just counts how many times a K-wide filter can stop as it steps by S across a W+2P-wide padded input. Stride shrinks it fastest, padding grows it back; 'same' padding is <code>P=(K−1)/2</code> at stride 1. The nuance is the floor: when <code>(W−K+2P)</code> isn't a clean multiple of S, the last input strip is silently dropped — no crash, just lost edge pixels — so I check divisibility or add padding before trusting a downsampling layer."</div></div>
       <button class="gotit" type="button">Got the arithmetic</button>
     </div>
 </section>
@@ -469,6 +477,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Write the size calculator (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Turn the formula into a tiny function and test it. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A function <code>conv_out(W, K, S, P)</code> returning <code>(W − K + 2*P)//S + 1</code>, printed for at least three cases including <code>(W=7,K=3,S=2,P=1) → 4</code>.</li>
+        <li>For each case, a real <code>torch.nn.Conv2d</code> with the same settings is run on a dummy image and its output height is asserted equal to <code>conv_out(...)</code>.</li>
+        <li>Input and output shapes printed for every case so the shrink is visible.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> which knob shrank the output most and why, why the floor can silently drop an edge strip (give a case where <code>(W−K+2P)</code> is not a multiple of <code>S</code>), what "same" padding is, and what would break in a real CNN if a layer's output shape didn't match the next layer's expected input.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment.py</code>. Write a function <code>conv_out(W, K, S, P)</code> that returns <code>(W - K + 2*P)//S + 1</code>. Print the answer for a few cases: (W=7,K=3,S=1,P=0), (W=7,K=3,S=2,P=1), (W=28,K=5,S=1,P=0). Then build a real <code>torch.nn.Conv2d</code> with the same settings, push a dummy image through it, and check the output shape matches your function. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -483,7 +498,7 @@ Create sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment
 3. Prints the input shape and output shape for every case so the shrinking is visible.
 Then run it and paste the printed shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/log.md</code>: which knob shrank the output the most, and did your formula match PyTorch every time?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/log.md</code>: (1) the formula in your own words; (2) which knob shrank the output most and whether your function matched PyTorch every time; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 3</button>
     </div>
 </section>

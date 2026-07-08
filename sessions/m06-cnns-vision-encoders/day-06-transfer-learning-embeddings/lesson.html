@@ -211,6 +211,20 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
 .build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-fig{margin:0}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}.vlab-note b{color:var(--ink2)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+
 /* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
 .q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
@@ -352,6 +366,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The penultimate layer is an embedding</h4>
       <p>Just before the head sits the <span class="term" data-tip="The layer right before the final head. Its output is a fixed-length list of numbers that summarizes the whole image.">penultimate layer</span>. Its output is a fixed-length list of numbers — an <span class="term" data-tip="A fixed-length list of numbers that captures the meaning or content of an input. Similar images have similar embeddings.">embedding</span> — that captures what the image looks like. Similar images give similar embeddings. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "相似的图片会靠得近"——近在哪？很多人以为 embedding 的每个数字都有具体含义。In plain terms: the whole idea is <i>distance in a space</i>, but people try to read meaning into each number ("what does dimension 3 mean?"). There is no named meaning — only relative position: two cats land near each other, a car lands far away. Once you think in distances, not individual numbers, embeddings click.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -365,6 +380,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">📝</span><h5>You only need the summary</h5><p>Their summary — "furry, four legs, pointed ears, small" — captures the important parts in a few words. You can compare summaries to find similar animals, or feed the summary to a tiny helper who decides the exact species. That summary is the embedding.</p></div>
       </div>
       <p><strong>In one line:</strong> the pretrained network is the expert; the penultimate layer is its short written summary of the image; you build only the small final decision on top.</p>
+      <p><b>直觉 / Intuition:</b> 相似的东西"住得近"，不相似的"住得远"——embedding 就是把每张图安置在一个空间里的坐标。<b>In code terms:</b> the backbone is a frozen function <code>image → vector</code>; you cache those vectors once and do everything downstream (search, cluster, a tiny classifier) with plain distance math on the vectors, not on pixels.</p>
       <p>Because the expensive part (the expert's years of study) is already done, you get strong results from just a few hundred of your own examples.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a human expert can reason about a photo they have never seen a category for. The network's summary only reflects patterns it met during its original training. If your images look very different from that training data (say, medical scans vs. everyday photos), the summary may be a poor fit and you may need to retrain more of the network.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -376,6 +392,21 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Chop the head, read the embedding, compare</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>Below is a simulated Python terminal. Load a pretrained network, remove its head to read the embedding, then compare two images by embedding distance. <strong>Click all three</strong> to finish this section.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">🔬 Move a query point through embedding space</span>
+          <span class="vlab-readout" id="emblab-read">move the sliders →</span>
+        </div>
+        <div class="vlab-q">Learning question: why is "similar images sit close together" a claim about <em>distance in a space</em>, not about the pixels? Drag the orange "you" point and watch its 3 nearest neighbours (and the predicted class) change.</div>
+        <figure class="vlab-fig">
+          <svg id="emblab-svg" class="vlab-svg" viewBox="0 0 470 210" role="img" aria-label="A 2D scatter of cat, dog and car embedding points; a movable query point highlights its three nearest neighbours"></svg>
+        </figure>
+        <div class="vlab-controls">
+          <label>query ←→ <input type="range" id="emblab-x" min="0" max="100" value="50" step="1"></label>
+          <label>query ↕ <input type="range" id="emblab-y" min="0" max="100" value="50" step="1"></label>
+        </div>
+        <p class="vlab-note"><b>What to notice:</b> drag the query into the green cluster and its nearest neighbours (and the vote) flip to "cat" — the numbers never change meaning, only <em>position</em> does. <b>Misconception:</b> the two axes have no named meaning; a 2D view of a 512-D space just shows who is near whom. <b>Where this simplifies reality:</b> a toy 2D layout with 9 fixed points; a real embedding is a 512-D vector from a frozen backbone. <b>Why labs care:</b> image search, dedup, retrieval, and zero-shot all reduce to "embed, then compare by distance" — the same trick CLIP uses tomorrow to compare a photo to a sentence.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="load" type="button">① load &amp; chop the head</button>
@@ -414,6 +445,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         dist(cat_A, car)   = sqrt(.64+.64+.01) = sqrt(1.29) ≈ <span class="hl">1.14</span>
       </div></div>
       <p>The two cats sit close (0.17) and the car sits far (1.14). Without ever training a cat-vs-car classifier, the borrowed embeddings already separate them. That is the power you are reusing.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — comparing two embeddings</b>
+      <br><b>1 · In words:</b> similarity is just "how far apart are the two lists of numbers" — small distance means the images look alike to the network.
+      <br><b>2 · The formula:</b> <code>distance(a,b) = √( Σᵢ (a[i] − b[i])² )</code> — <code>a,b</code> = two embeddings; <code>a[i],b[i]</code> = the i-th number in each; <code>Σ</code> = sum over all positions (Euclidean distance).
+      <br><b>3 · Tiny numbers:</b> <code>cat_A=[.9,.1,.4]</code>, <code>cat_B=[.8,.2,.5]</code> → <code>√(.01+.01+.01) ≈ 0.17</code>; vs <code>car=[.1,.9,.3]</code> → <code>√(.64+.64+.01) ≈ 1.14</code>.
+      <br><b>4 · Sanity check:</b> <code>distance(a,a)=0</code> (an image is identical to itself), distance is never negative, and the two cats (0.17) must be closer than cat-vs-car (1.14) — if they aren't, your embeddings or preprocessing are wrong.</div></div>
 
       <h4>Two ways to use it</h4>
       <ul>
@@ -427,6 +463,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>A borrowed network only gives good embeddings if you feed it the way it was trained, and choosing to freeze it or keep training it is a real decision.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): feeding the pretrained network the wrong input preprocessing.</b> A borrowed model was trained on images prepared a specific way — a fixed input size, a fixed channel order (RGB vs BGR), and normalized by a specific mean and standard deviation. If you hand it images normalized differently (say pixels in 0–255 instead of the expected scaled-and-normalized range, or the mean it never saw), the model still runs and still returns an embedding of the right length. But that embedding is now degraded, so your distances are unreliable and your accuracy quietly sits below what the pretrained weights should deliver. A senior engineer, in <b>code review</b>, checks that the exact preprocessing (size, channel order, mean and std) matches what the pretrained model documents.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: freeze for speed and small data, fine-tune for a fit to your task.</b> Feature extraction freezes the borrowed weights: it is fast, needs little data, and cannot overfit the backbone — but it is stuck with whatever the original model learned. Fine-tuning unfreezes layers so they adapt to your images: it can reach higher accuracy on an unusual task, but it needs more data and a careful (usually small) learning rate, or it will wash away the useful pretrained features. Which side to pick — how much of the network to unfreeze given your data size — is the <b>design-review</b> decision.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Transfer learning reuses a pretrained backbone: chop the classification head and read the penultimate layer as a fixed-length embedding, where similar images land close under a distance like Euclidean or cosine. From there I either freeze it and train a tiny head (fast, little data) or fine-tune the last layers with a small LR (more data, unusual task). The nuance is preprocessing: the backbone only gives good embeddings if I feed it the exact input size, channel order, and normalization it was trained on — get that wrong and it still returns a 512-vector, but the distances silently degrade."</div></div>
       <button class="gotit" type="button">Got the embedding idea</button>
     </div>
 </section>
@@ -457,6 +494,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Extract embeddings and compare (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Chop a real network's head, read embeddings, and compare them. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A pretrained model loaded (e.g. <code>resnet18(weights="DEFAULT")</code>), its <code>fc</code> replaced with <code>nn.Identity()</code>, put in <code>eval()</code> mode; the embedding length printed (512 for resnet18).</li>
+        <li>Three <code>(1,3,224,224)</code> inputs — two near-copies and one different — embedded; Euclidean distances printed, asserting the similar pair is closer.</li>
+        <li>A graceful fallback to a randomly-initialized model if weights can't be downloaded, printing which path it took.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> what the penultimate layer gives you, why "close = similar" is about distance not pixels, why freezing vs fine-tuning is a data-size decision, why matching the pretrained preprocessing matters, and what silently degrades if you feed the wrong normalization.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py</code>. Load a small pretrained model (for example <code>torchvision.models.resnet18(weights="DEFAULT")</code>). Replace its final <code>fc</code> layer with <code>nn.Identity()</code> so it outputs the penultimate features. Put it in eval mode. Feed two similar dummy images and one different one, get their embeddings, and print the Euclidean distances — the similar pair should be closer. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -472,7 +516,7 @@ Create sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/exp
 4. Falls back to a randomly-initialized model if weights cannot be downloaded, and prints which path it took.
 Then run it and paste the embedding length and the two distances at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/log.md</code>: how long was the embedding, and was the similar pair really closer than the different pair?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/log.md</code>: (1) what an embedding is, in one sentence; (2) how long the embedding was and whether the similar pair was really closer than the different pair; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 7</button>
     </div>
 </section>
@@ -710,6 +754,53 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── vlab: embedding-space explorer ── -->
+<script>
+(function(){
+  "use strict";
+  var svg = document.getElementById('emblab-svg');
+  if(!svg) return;
+  var xEl = document.getElementById('emblab-x');
+  var yEl = document.getElementById('emblab-y');
+  var readEl = document.getElementById('emblab-read');
+  var PTS = [[20,22,'cat'],[28,30,'cat'],[24,15,'cat'],[74,26,'dog'],[82,34,'dog'],[78,18,'dog'],[48,74,'car'],[58,80,'car'],[44,66,'car']];
+  var COL = {cat:'#2D8B55', dog:'#7C6DAA', car:'#C99A12'};
+  function sx(x){ return 40 + x*3; }
+  function sy(y){ return 18 + y*1.72; }
+  function build(qx, qy){
+    var d = PTS.map(function(p,i){ return {i:i, c:p[2], dist:Math.hypot(p[0]-qx, p[1]-qy)}; });
+    d.sort(function(a,b){ return a.dist-b.dist; });
+    var near = d.slice(0,3).map(function(o){ return o.i; });
+    var classes = near.map(function(i){ return PTS[i][2]; });
+    var counts = {}; classes.forEach(function(c){ counts[c]=(counts[c]||0)+1; });
+    var best = Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; })[0];
+    var s = [];
+    near.forEach(function(i){ var p=PTS[i]; s.push("<line x1='"+sx(qx)+"' y1='"+sy(qy)+"' x2='"+sx(p[0])+"' y2='"+sy(p[1])+"' stroke='#9AA6B4' stroke-width='1' stroke-dasharray='3 3'/>"); });
+    PTS.forEach(function(p,i){
+      var isN = near.indexOf(i)>=0;
+      s.push("<circle cx='"+sx(p[0])+"' cy='"+sy(p[1])+"' r='"+(isN?8:6)+"' fill='"+COL[p[2]]+"' stroke='"+(isN?'#111827':'#FFFFFF')+"' stroke-width='"+(isN?2:1)+"'/>");
+    });
+    s.push("<circle cx='"+sx(qx)+"' cy='"+sy(qy)+"' r='7' fill='#F8FAFC' stroke='#E7853A' stroke-width='3'/>");
+    s.push("<text x='"+sx(qx)+"' y='"+(sy(qy)-11)+"' text-anchor='middle' font-family='monospace' font-size='10' fill='#E7853A'>you</text>");
+    var lx=372, ly=40;
+    [['cat','cats'],['dog','dogs'],['car','cars']].forEach(function(pr,k){
+      s.push("<circle cx='"+lx+"' cy='"+(ly+k*24)+"' r='6' fill='"+COL[pr[0]]+"'/>");
+      s.push("<text x='"+(lx+13)+"' y='"+(ly+k*24+4)+"' font-family='monospace' font-size='11' fill='#6B645E'>"+pr[1]+"</text>");
+    });
+    return {svg:s.join(''), classes:classes, best:best};
+  }
+  function render(){
+    var qx=parseInt(xEl.value,10)||0, qy=parseInt(yEl.value,10)||0;
+    var r=build(qx,qy);
+    svg.innerHTML=r.svg;
+    if(readEl) readEl.innerHTML="nearest 3: "+r.classes.join(", ")+" → predict <b>"+r.best.toUpperCase()+"</b>";
+  }
+  xEl.addEventListener('input', render);
+  yEl.addEventListener('input', render);
+  render();
 })();
 </script>
 

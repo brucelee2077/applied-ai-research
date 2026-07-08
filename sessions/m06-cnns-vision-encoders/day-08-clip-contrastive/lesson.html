@@ -211,6 +211,20 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
 .build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-fig{margin:0}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}.vlab-note b{color:var(--ink2)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+
 /* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
 .q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
@@ -349,6 +363,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>What you get</h4>
       <p>After training on hundreds of millions of pairs, a photo and its true caption sit close; a photo and a wrong caption sit far. Now you can compare any image to any text directly. This unlocks <span class="term" data-tip="Classifying an image into categories the model was never explicitly trained on, by comparing the image's embedding to the text embeddings of the category names.">zero-shot classification</span> — labeling images using only text descriptions of the classes. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> CLIP 不是"看懂图片"，而是训练两个编码器让配对的图和文字在同一个空间里靠近。In plain terms: people expect CLIP to <i>classify</i> images, but it never learns fixed labels — it learns to <i>align</i> an image encoder and a text encoder so a photo and its caption land nearby. Zero-shot classification is a <i>consequence</i> of that shared space, not the training goal. That reframe — alignment, not labeling — is the hard part.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -362,6 +377,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🧲</span><h5>Pull matches, push mismatches</h5><p>CLIP plays this game with millions of cards. Each round it pulls the right photo-caption pairs closer in embedding space and pushes every wrong pairing apart. Over time, matching things become magnets and mismatches repel.</p></div>
       </div>
       <p><strong>In one line:</strong> CLIP learns to win a giant matching game — line up each image with its caption — and in doing so builds one shared space where meaning is measured by closeness.</p>
+      <p><b>直觉 / Intuition:</b> 把配对的图片和文字当成磁铁互相吸引，不配对的互相排斥，训练久了就成了一张共享的"意义地图"。<b>In code terms:</b> each step scores every image against every caption in an <code>N×N</code> grid, then the loss pushes the diagonal (true pairs) up and everything off-diagonal (wrong pairs) down — contrastive learning is just "make the right match win its row and column."</p>
       <p>Because it learned from natural captions, not fixed labels, it can later match a photo to <i>any</i> phrase you write — even categories it never saw as training labels. That is where zero-shot comes from.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: in a card game you truly understand each picture. CLIP does not understand a dog — it only learned that dog photos and the word "dog" tend to produce nearby embeddings. It is pattern-matching at huge scale, not real understanding.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -373,6 +389,20 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Encode both, match the grid, classify with words</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>Below is a simulated Python terminal. Encode an image and some texts, see the similarity grid where the diagonal should win, then classify a new image using only text. <strong>Click all three</strong> to finish this section.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">🔬 Train CLIP: watch the diagonal light up</span>
+          <span class="vlab-readout" id="cliplab-read">drag training progress →</span>
+        </div>
+        <div class="vlab-q">Learning question: what does contrastive training actually <em>do</em> to the image and text vectors, and why does the similarity grid end up bright on the diagonal? Drag <b>training progress</b> and watch matched pairs pull together while the grid's diagonal wins.</div>
+        <figure class="vlab-fig">
+          <svg id="cliplab-svg" class="vlab-svg" viewBox="0 0 470 250" role="img" aria-label="Left: a 4 by 4 image-text cosine-similarity grid whose diagonal brightens with training. Right: matched image and text vectors on a circle pulling together as training progresses"></svg>
+        </figure>
+        <div class="vlab-controls">
+          <label>training progress <input type="range" id="cliplab-p" min="0" max="100" value="0" step="1"></label>
+        </div>
+        <p class="vlab-note"><b>What to notice:</b> as training rises, the grid's diagonal (true image↔caption pairs) goes green while off-diagonal cells fade/redden, and on the circle each matched image (blue) and text (orange) dot pulls onto the same spoke while different pairs spread apart. <b>Misconception:</b> CLIP does not "classify" — it <em>aligns</em> two encoders; the bright diagonal is the whole objective. <b>Where this simplifies reality:</b> a toy 2D space with a fixed pull/push rule, not a real InfoNCE gradient over 512-D embeddings and hundreds of millions of pairs. <b>Why labs care:</b> this shared space is what powers zero-shot classification, text-to-image search, and the vision half of multimodal models.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="encode" type="button">① encode image + text</button>
@@ -411,6 +441,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         cos(img, "a car") = (1·0   + 0·1)   / (1 · 1) = <span class="hl">0.0</span>
       </div></div>
       <p>(Both caption vectors have length 1 here.) The image scores 0.8 with "a dog" and 0.0 with "a car". So the model reads this image as a dog — the higher score wins. That is the whole matching decision.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — cosine similarity, the matching score</b>
+      <br><b>1 · In words:</b> score two embeddings by the <em>angle</em> between them — same direction = strong match, perpendicular = unrelated.
+      <br><b>2 · The formula:</b> <code>cos(a,b) = (a·b) / (|a|·|b|)</code> — <code>a·b</code> = dot product (multiply matching entries, add); <code>|a|</code> = length of <code>a</code>; dividing by both lengths removes magnitude so only direction counts. Range −1…1.
+      <br><b>3 · Tiny numbers:</b> <code>img=[1,0]</code>, <code>"a dog"=[0.8,0.6]</code> → <code>(0.8+0)/(1·1) = 0.8</code>; <code>"a car"=[0,1]</code> → <code>0/1 = 0</code> → dog wins.
+      <br><b>4 · Sanity check:</b> a vector with itself gives <code>cos = 1</code>; if you forget to normalize and rank by raw <code>a·b</code>, a merely <em>longer</em> vector can win — so both encoders' outputs must be L2-normalized before comparison.</div></div>
 
       <h4>Why a shared space is powerful</h4>
       <ul>
@@ -424,6 +459,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Cosine only works if you normalize the vectors first, and the contrastive objective quietly depends on a large batch to give a strong signal.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): comparing with a raw dot product instead of cosine.</b> Cosine similarity divides the dot product by both vectors' lengths, so it measures only direction. If you skip the normalization and rank matches by the plain dot product <code>a · b</code>, longer embeddings score higher just for being long — a caption whose vector happens to be large can beat the truly matching one. The code runs and returns scores, so nothing errors; the ranking is just quietly wrong, and zero-shot accuracy drops. A senior engineer, in <b>code review</b>, checks that both image and text embeddings are L2-normalized (unit length) before any dot product, so magnitude cannot leak into the score.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: contrastive learning gets sharper with a bigger batch, which costs memory.</b> The training signal comes from the N×N grid: for each image, the one matching caption is the positive and the other N−1 captions are negatives to push away. A larger batch means more negatives per step, which gives a stronger, cleaner signal and is a big reason CLIP trained on huge batches. What you pay is memory and hardware — the grid and its gradients grow with the batch. How large a batch to run (and whether to use tricks that gather negatives across devices) is the <b>design-review</b> decision.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "CLIP trains an image encoder and a text encoder into one shared space by contrastive learning: score every image against every caption in an N×N grid of cosine similarities, then maximize the diagonal (true pairs) and suppress off-diagonal (wrong pairs). Because it learns from natural captions, not fixed labels, you get zero-shot classification for free — embed the class names as text and pick the highest cosine. Two nuances separate a Hire: you must L2-normalize before the dot product or magnitude leaks into the ranking, and the contrastive signal scales with batch size, since more in-batch negatives sharpen it — which is why CLIP used very large batches and cross-device negative gathering."</div></div>
       <button class="gotit" type="button">Got the CLIP idea</button>
     </div>
 </section>
@@ -454,6 +490,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Match images to text with CLIP (module capstone)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the shared space to yourself — the finale of the whole module. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>If a small CLIP can load (<code>open_clip</code>/<code>transformers</code>): encode one image + a few text prompts ("a photo of a cat/dog/car"), L2-normalize, compute cosine similarities, print the winning label.</li>
+        <li>A pure-NumPy fallback: 3 fake image + 3 fake matching text embeddings, normalized, a 3×3 cosine grid computed, asserting the diagonal (matching pairs) is the row-max — the contrastive objective in miniature.</li>
+        <li>The similarity grid printed, and which path (real CLIP vs NumPy fallback) ran clearly stated.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> why CLIP <em>aligns</em> two encoders rather than classifying, why the diagonal should win, why L2-normalization is required before cosine, why bigger batches sharpen the signal, and what zero-shot classification reuses from the shared space.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py</code>. If you can install <code>open_clip</code> or <code>transformers</code>, load a small CLIP, encode one image and a few text labels ("a photo of a cat", "a photo of a dog", "a photo of a car"), compute cosine similarities, and print which label wins. If you cannot download a model, do a tiny NumPy version: make small fake image and text embeddings, normalize them, and compute the cosine-similarity grid by hand. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -468,7 +511,7 @@ Create sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py t
 3. Prints the similarity grid and clearly states which path (real CLIP or NumPy fallback) ran.
 Then run it and paste the winning label (or the grid) at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/log.md</code>: did the matching pair get the highest cosine score, and what surprised you about labeling an image with only text?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/log.md</code>: (1) what CLIP's training goal is, in one sentence; (2) whether the matching pair got the highest cosine score and what surprised you about labeling an image with only text; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — finish the module</button>
     </div>
 </section>
@@ -707,6 +750,70 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── vlab: CLIP grid + contrastive pull/push ── -->
+<script>
+(function(){
+  "use strict";
+  var svg = document.getElementById('cliplab-svg');
+  if(!svg) return;
+  var pEl = document.getElementById('cliplab-p');
+  var readEl = document.getElementById('cliplab-read');
+  var N=4;
+  var A=[45,135,225,315];                    // per-pair target angle (deg)
+  var offI=[60,-50,40,-70], offT=[-45,65,-60,55];
+  function rad(d){ return d*Math.PI/180; }
+  function angles(p){
+    var im=[], tx=[];
+    for(var i=0;i<N;i++){ im.push(A[i]+offI[i]*(1-p)); tx.push(A[i]+offT[i]*(1-p)); }
+    return {im:im, tx:tx};
+  }
+  function cellFill(v){
+    if(v>=0) return 'rgba(45,139,85,'+(0.10+0.82*v).toFixed(3)+')';   // green, stronger with v
+    return 'rgba(201,59,59,'+(0.10+0.62*(-v)).toFixed(3)+')';          // red for negative
+  }
+  var IMGC='#1F6280', TXTC='#C99A12';
+  function build(p){
+    var a=angles(p), s=[];
+    // ---- Panel A: similarity grid ----
+    var gx=66, gy=54, cs=27;
+    s.push("<text x='"+(gx+2*cs)+"' y='24' text-anchor='middle' font-family='monospace' font-size='11' fill='#6B645E'>similarity grid (image × text)</text>");
+    var dg=0, og=0, ogn=0;
+    for(var i=0;i<N;i++){
+      s.push("<text x='"+(gx-7)+"' y='"+(gy+i*cs+cs/2+4)+"' text-anchor='end' font-family='monospace' font-size='9' fill='"+IMGC+"'>img"+(i+1)+"</text>");
+      s.push("<text x='"+(gx+i*cs+cs/2)+"' y='"+(gy-5)+"' text-anchor='middle' font-family='monospace' font-size='9' fill='"+TXTC+"'>txt"+(i+1)+"</text>");
+      for(var j=0;j<N;j++){
+        var v=Math.cos(rad(a.im[i]-a.tx[j]));
+        if(i===j) dg+=v; else { og+=v; ogn++; }
+        s.push("<rect x='"+(gx+j*cs)+"' y='"+(gy+i*cs)+"' width='"+cs+"' height='"+cs+"' fill='"+cellFill(v)+"' stroke='"+(i===j?'#111827':'#D8D0C4')+"' stroke-width='"+(i===j?2:1)+"'/>");
+        s.push("<text x='"+(gx+j*cs+cs/2)+"' y='"+(gy+i*cs+cs/2+4)+"' text-anchor='middle' font-family='monospace' font-size='10' fill='#2C2A28'>"+v.toFixed(1)+"</text>");
+      }
+    }
+    // ---- Panel B: contrastive circle ----
+    var cx=352, cy=132, r=66;
+    s.push("<text x='"+cx+"' y='42' text-anchor='middle' font-family='monospace' font-size='11' fill='#6B645E'>shared space</text>");
+    s.push("<circle cx='"+cx+"' cy='"+cy+"' r='"+r+"' fill='none' stroke='#D8D0C4' stroke-width='1'/>");
+    for(var k=0;k<N;k++){
+      var ix=cx+r*Math.cos(rad(a.im[k])), iy=cy-r*Math.sin(rad(a.im[k]));
+      var txx=cx+r*Math.cos(rad(a.tx[k])), tyy=cy-r*Math.sin(rad(a.tx[k]));
+      s.push("<line x1='"+ix.toFixed(1)+"' y1='"+iy.toFixed(1)+"' x2='"+txx.toFixed(1)+"' y2='"+tyy.toFixed(1)+"' stroke='#9AA6B4' stroke-width='1' stroke-dasharray='2 2'/>");
+      s.push("<circle cx='"+ix.toFixed(1)+"' cy='"+iy.toFixed(1)+"' r='5' fill='"+IMGC+"'/>");
+      s.push("<circle cx='"+txx.toFixed(1)+"' cy='"+tyy.toFixed(1)+"' r='5' fill='"+TXTC+"'/>");
+    }
+    s.push("<circle cx='"+(cx-40)+"' cy='"+(cy+r+22)+"' r='5' fill='"+IMGC+"'/><text x='"+(cx-31)+"' y='"+(cy+r+26)+"' font-family='monospace' font-size='9' fill='#6B645E'>image</text>");
+    s.push("<circle cx='"+(cx+18)+"' cy='"+(cy+r+22)+"' r='5' fill='"+TXTC+"'/><text x='"+(cx+27)+"' y='"+(cy+r+26)+"' font-family='monospace' font-size='9' fill='#6B645E'>text</text>");
+    return {svg:s.join(''), diag:(dg/N), off:(og/ogn)};
+  }
+  function render(){
+    var p=(parseInt(pEl.value,10)||0)/100;
+    var r=build(p);
+    svg.innerHTML=r.svg;
+    if(readEl) readEl.innerHTML="progress "+Math.round(p*100)+"% · diagonal avg <b>"+r.diag.toFixed(2)+"</b> · off-diag avg "+r.off.toFixed(2);
+  }
+  pEl.addEventListener('input', render);
+  render();
 })();
 </script>
 

@@ -211,6 +211,23 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
 .build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}.vlab-note b{color:var(--ink2)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+
 /* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
 .q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
@@ -352,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Then: pooling shrinks it</h4>
       <p>After a convolution you get a grid of "how strongly did the pattern match here" numbers, called a <span class="term" data-tip="The grid of numbers a filter produces after sliding over the image. Each number says how strongly the filter's pattern matched at that spot.">feature map</span>. <span class="term" data-tip="Shrinking a feature map by summarizing small blocks into one number. Max pooling keeps the largest value in each block.">Pooling</span> shrinks that map by keeping only the strongest value in each small block. Smaller map, same important signal. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人把 filter 当成一张"图片模板"，其实它是一小组会滑动、并到处复用的<i>权重</i>。In plain terms: people picture the filter as a stamp that must match a whole object, so a tiny 3×3 grid seems useless — but the trick is that the <i>same</i> nine numbers slide to every position and fire wherever the pattern appears. That "one small detector, reused everywhere" idea is what feels strange at first.</div></div>
       <button class="gotit" type="button">Got the filter idea — let's go</button>
     </div>
 </section>
@@ -365,6 +383,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🔎</span><h5>Looking for one thing</h5><p>Now say you are only looking for one shape — a corner. At each patch you ask "is there a corner here?" and write down how sure you are. Do this at every spot and you get a map of where corners are. That map is the feature map.</p></div>
       </div>
       <p><strong>In one line:</strong> a convolution is a small pattern-detector (the flashlight) dragged over the whole image, writing down "how much did I find my pattern here" at each spot.</p>
+      <p><b>直觉 / Intuition:</b> 把 filter 想成一个只认一种图案的小探照灯，你把它在整张图上滑一遍，每处记下"像不像"。<b>In code terms:</b> a convolution is a <code>for</code> loop that calls the <em>same</em> tiny weight array on every window — one reusable function applied to each slice, not a fresh set of weights per position. That reuse is exactly what "weight sharing" means.</p>
       <p>Pooling then walks over that map of matches and, in each little block, keeps only the strongest one. It is like reading a page and keeping only the loudest word from each paragraph — the map gets smaller but the signal survives.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a real flashlight only reveals what is already there. A filter also carries its own numbers (weights), so it does not just show the patch — it reacts more strongly to some shapes than others, and those numbers are learned during training.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -376,6 +395,21 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Slide the filter, then pool the result</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>Below is a simulated Python terminal. Watch one filter position multiply-and-add, then slide across the row, then shrink the map with max pooling. <strong>Click all three</strong> to finish this section.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">🔬 Slide the kernel, watch the feature map fill</span>
+          <span class="vlab-readout" id="cnnlab-read">move the slider →</span>
+        </div>
+        <div class="vlab-q">Learning question: how does one small filter, reused at every position, turn a 6×6 image into a 4×4 feature map — and what does 2×2 max-pooling then throw away?</div>
+        <figure class="vlab-fig">
+          <svg id="cnnlab-svg" class="vlab-svg" viewBox="0 0 470 210" role="img" aria-label="A 3 by 3 filter slides over a 6 by 6 image to fill a 4 by 4 feature map; a 2 by 2 max pool then shrinks it to 2 by 2"></svg>
+        </figure>
+        <div class="vlab-controls">
+          <label>Filter position <input type="range" id="cnnlab-pos" min="0" max="15" value="0" step="1"></label>
+          <button type="button" class="vlab-btn" id="cnnlab-pool" aria-pressed="false">Max-pool 2×2</button>
+        </div>
+        <p class="vlab-note"><b>What to notice:</b> the same 9 filter weights (the orange box) are reused at every stop — that is weight sharing; drag right and the 4×4 map fills in one cell per stop. <b>Misconception:</b> each output cell does <i>not</i> get its own filter — one filter makes the whole map. <b>Where this simplifies reality:</b> one channel, integer weights, stride 1, no padding or activation; a real conv layer stacks many filters over many channels. <b>Why labs care:</b> every vision encoder (ResNet, a ViT-hybrid's CNN stem, CLIP's image tower) is millions of these multiply-adds — sliding-window reuse is what makes "looking at an image" cheap enough to train.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="onestop" type="button">① one filter stop</button>
@@ -414,6 +448,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         out = <span class="hl">6</span>   <span class="dim"># one number for this patch</span>
       </div></div>
       <p>Only the plus-shaped cells count (the filter is 1 there, 0 elsewhere). Adding the four kept numbers 2 + 0 + 3 + 1 gives <code>6</code>. That <code>6</code> is how strongly the "plus" pattern showed up in this patch. Slide the filter to the next patch and you get the next output number.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one convolution output</b>
+      <br><b>1 · In words:</b> lay the filter on a patch, multiply cell-by-cell, add it all into one number (Steps 1–3 above walk this).
+      <br><b>2 · The formula:</b> <code>out = Σᵢⱼ patch[i][j] × filter[i][j]</code> — <code>patch[i][j]</code> = the image value under the filter; <code>filter[i][j]</code> = the learned weight at that spot; <code>Σ</code> = add over all K×K cells.
+      <br><b>3 · Tiny numbers:</b> the plus-filter keeps 4 cells → <code>2 + 0 + 3 + 1 = 6</code>.
+      <br><b>4 · Sanity check:</b> an all-zero patch must give <code>0</code>, and a patch that exactly matches the filter's non-zero pattern gives the largest sum — so a bigger output really does mean "stronger match here." And a 5×5 image with a 3×3 filter at stride 1 yields a 3×3 map (<code>5−3+1=3</code>), never bigger than the input.</div></div>
 
       <h4>Why this is a big deal</h4>
       <ul>
@@ -427,6 +466,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The "slide, multiply, add" rule is simple, but two things about it bite quietly: whether the filter is flipped, and what pooling throws away.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): it is cross-correlation, not textbook convolution.</b> The rule above lays the filter on the patch and multiplies straight across — it never flips the filter. True mathematical convolution flips the filter first (top-to-bottom and left-to-right). Deep-learning libraries all use the no-flip version but still call it "convolution". If you copy a filter straight from a signal-processing textbook (say an edge or blur kernel), it runs fine and gives an image — just mirrored from what you expected, so your detected edges point the wrong way and nothing crashes. A senior engineer, in <b>code review</b>, checks that any hand-derived kernel is either symmetric or pre-flipped before trusting the direction of its output.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: pooling buys speed and shift-robustness by throwing away location.</b> Max pooling keeps only the strongest value in each block, so the map gets smaller (faster) and small shifts of the object stop mattering. What you pay is exact position: after several pooling layers the network knows a "plus shape" is present but not precisely where. For whole-image classification that is a good deal; for a task that needs pixel-accurate location, that lost detail is the <b>design-review</b> question — you may pool less, or use learnable strided convolutions instead.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A convolution is a small shared-weight filter slid over the image; each stop is a dot product between the filter and the patch under it, so one 3×3 filter with 9 weights scans the whole image instead of a fully-connected layer's millions. That weight sharing plus locality is why CNNs are parameter-efficient and translation-robust. The nuance is that framework 'conv' is really cross-correlation — it never flips the filter — and that pooling trades exact spatial location for speed and shift-invariance, which is why detection and segmentation stacks pool less or use strided, learnable downsampling."</div></div>
       <button class="gotit" type="button">Got how one value is computed</button>
     </div>
 </section>
@@ -457,6 +497,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Prove it with a tiny convolution (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Prove the slide-and-add to yourself on a tiny grid. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A 5×5 (or larger) integer image and a 3×3 filter as NumPy arrays, both printed with their shapes.</li>
+        <li>Two nested loops slide the filter (stride 1, no padding); the full feature map is printed with its shape (a 5×5 image → a 3×3 map).</li>
+        <li>A 2×2 max-pool over the feature map, printed with its shape, keeping the largest value in each block.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> what the feature map's biggest number means, why the output is smaller than the input (the <code>W−K+1</code> shrink), why weight sharing makes this cheap, what pooling throws away, and one thing that would break in a real vision model if you ignored it (e.g. copying an unflipped textbook kernel, or pooling away location a detector needs).</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py</code>. Make a small 5×5 image and a 3×3 filter as NumPy arrays. Write two loops that slide the filter over the image, and at each stop compute the multiply-and-add sum. Print the feature map. Then do a 2×2 max pooling on that map (keep the biggest value in each 2×2 block) and print the smaller map. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -472,7 +519,7 @@ Create sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.p
 4. Prints the shapes at every step (image, filter, feature map, pooled map).
 Then run it and paste the feature map and pooled map at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/log.md</code>: what did the feature map's biggest number tell you, and how much smaller did pooling make the map?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/log.md</code>: (1) the one sentence you'd tell a teammate about what a convolution does; (2) what the feature map's biggest number told you and how much smaller pooling made the map; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 2</button>
     </div>
 </section>
@@ -714,6 +761,79 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── vlab: sliding kernel + pooling ── -->
+<script>
+(function(){
+  "use strict";
+  var svg = document.getElementById('cnnlab-svg');
+  if(!svg) return;
+  var posEl = document.getElementById('cnnlab-pos');
+  var poolEl = document.getElementById('cnnlab-pool');
+  var readEl = document.getElementById('cnnlab-read');
+  var IMG = [[1,2,0,1,3,0],[0,1,3,2,0,1],[2,1,0,1,2,3],[1,0,2,3,1,0],[0,2,1,0,3,2],[3,1,0,2,1,1]];
+  var FILT = [[0,1,0],[1,0,1],[0,1,0]];            // plus-shape detector (shared weights)
+  var N=6, K=3, O=N-K+1;                             // 6x6 image, 3x3 filter -> 4x4 map
+  function conv(){
+    var m=[]; for(var r=0;r<O;r++){ m[r]=[]; for(var c=0;c<O;c++){
+      var s=0; for(var i=0;i<K;i++) for(var j=0;j<K;j++) s+=IMG[r+i][c+j]*FILT[i][j];
+      m[r][c]=s; } } return m;
+  }
+  function pool(m){ var p=[]; for(var r=0;r<2;r++){ p[r]=[]; for(var c=0;c<2;c++){
+      p[r][c]=Math.max(m[2*r][2*c],m[2*r][2*c+1],m[2*r+1][2*c],m[2*r+1][2*c+1]); } } return p; }
+  var FMAP=conv(), POOL=pool(FMAP);
+  function rc(x){ return {r:Math.floor(x/O), c:x%O}; }
+  function build(pos, pooled){
+    var w=rc(pos), r=w.r, c=w.c, s=[];
+    var ix=16, iy=40, cs=25;
+    s.push("<text x='"+(ix+N*cs/2)+"' y='30' text-anchor='middle' font-family='monospace' font-size='11' fill='#6B645E'>input 6×6</text>");
+    for(var i=0;i<N;i++) for(var j=0;j<N;j++){
+      var inWin=(i>=r&&i<r+K&&j>=c&&j<c+K);
+      s.push("<rect x='"+(ix+j*cs)+"' y='"+(iy+i*cs)+"' width='"+cs+"' height='"+cs+"' fill='"+(inWin?'#FCE9C8':'#E4F2F7')+"' stroke='#8FB8CC' stroke-width='1'/>");
+      s.push("<text x='"+(ix+j*cs+cs/2)+"' y='"+(iy+i*cs+cs/2+4)+"' text-anchor='middle' font-family='monospace' font-size='11' fill='#1F6280'>"+IMG[i][j]+"</text>");
+    }
+    s.push("<rect x='"+(ix+c*cs)+"' y='"+(iy+r*cs)+"' width='"+(K*cs)+"' height='"+(K*cs)+"' fill='none' stroke='#E7853A' stroke-width='3' rx='3'/>");
+    s.push("<text x='"+(ix+N*cs+14)+"' y='"+(iy+N*cs/2)+"' font-family='monospace' font-size='18' fill='#6B645E'>→</text>");
+    var fx=ix+N*cs+34, fcs=27, fy=iy+(N*cs-O*fcs)/2;
+    s.push("<text x='"+(fx+O*fcs/2)+"' y='30' text-anchor='middle' font-family='monospace' font-size='11' fill='#6B645E'>feature map 4×4</text>");
+    for(var i2=0;i2<O;i2++) for(var j2=0;j2<O;j2++){
+      var idx=i2*O+j2, done=idx<=pos, cur=idx===pos;
+      var fill=cur?'#FCF3DC':(done?'#E8F5EE':'#F1F0EC'), st=cur?'#C99A12':(done?'#2D8B55':'#D8D0C4');
+      s.push("<rect x='"+(fx+j2*fcs)+"' y='"+(fy+i2*fcs)+"' width='"+fcs+"' height='"+fcs+"' fill='"+fill+"' stroke='"+st+"' stroke-width='"+(cur?2:1)+"'/>");
+      if(done) s.push("<text x='"+(fx+j2*fcs+fcs/2)+"' y='"+(fy+i2*fcs+fcs/2+4)+"' text-anchor='middle' font-family='monospace' font-size='12' fill='#1a5c38'>"+FMAP[i2][j2]+"</text>");
+    }
+    if(pooled){
+      var px=fx+O*fcs+32, pcs=29, py=fy+ (O*fcs-2*pcs)/2;
+      s.push("<text x='"+(fx+O*fcs+14)+"' y='"+(fy+O*fcs/2)+"' font-family='monospace' font-size='16' fill='#6B645E'>→</text>");
+      s.push("<text x='"+(px+pcs)+"' y='30' text-anchor='middle' font-family='monospace' font-size='11' fill='#6B645E'>pooled 2×2</text>");
+      for(var i3=0;i3<2;i3++) for(var j3=0;j3<2;j3++){
+        s.push("<rect x='"+(px+j3*pcs)+"' y='"+(py+i3*pcs)+"' width='"+pcs+"' height='"+pcs+"' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='1.5'/>");
+        s.push("<text x='"+(px+j3*pcs+pcs/2)+"' y='"+(py+i3*pcs+pcs/2+4)+"' text-anchor='middle' font-family='monospace' font-size='13' fill='#5E5191'>"+POOL[i3][j3]+"</text>");
+      }
+    }
+    return s.join('');
+  }
+  function readout(pos){
+    var w=rc(pos), terms=[];
+    for(var i=0;i<K;i++) for(var j=0;j<K;j++){ if(FILT[i][j]!==0) terms.push(IMG[w.r+i][w.c+j]+'·'+FILT[i][j]); }
+    return "window ("+w.r+","+w.c+"): "+terms.join(' + ')+" = <b>"+FMAP[w.r][w.c]+"</b>";
+  }
+  function render(){
+    var pos=parseInt(posEl.value,10)||0;
+    var pooled=poolEl.getAttribute('aria-pressed')==='true';
+    svg.innerHTML=build(pos,pooled);
+    if(readEl) readEl.innerHTML=readout(pos)+" &nbsp;·&nbsp; 6×6 → 4×4"+(pooled?" → 2×2":"");
+  }
+  posEl.addEventListener('input', render);
+  poolEl.addEventListener('click', function(){
+    var on=poolEl.getAttribute('aria-pressed')==='true';
+    poolEl.setAttribute('aria-pressed', on?'false':'true');
+    poolEl.classList.toggle('active', !on);
+    render();
+  });
+  render();
 })();
 </script>
 

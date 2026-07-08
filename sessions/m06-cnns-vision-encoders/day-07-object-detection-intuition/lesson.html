@@ -358,6 +358,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>A <span class="term" data-tip="A detector that predicts boxes and labels directly across the whole image in a single pass, without a separate proposal step. Faster, great for real time. Example: YOLO.">one-stage detector</span> predicts boxes and labels in one pass over the image. Faster, great for real time.</li>
       </ul>
       <p>Both reuse a CNN backbone — the feature extractor from Day 6 — as their starting point. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 分类只答"是什么"，检测还要答"在哪"——多出来的"框"就是难点。In plain terms: people are comfortable with "what is this?" but detection adds "where, and how many?" — every object needs its own box plus a score, and the model must consider many candidate boxes and then clean up the overlaps. That jump from one answer to a variable list of located answers is what feels new.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -371,6 +372,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">✏️</span><h5>Circling (detection)</h5><p>A detector takes a pen and circles each animal, writing its name next to the circle: "cow", "duck", "dog". Now you know what is there AND where. That is the jump from classification to detection.</p></div>
       </div>
       <p><strong>In one line:</strong> classification names the whole picture; detection circles and names every object inside it.</p>
+      <p><b>直觉 / Intuition:</b> 分类是给整张图贴一个标签，检测是把每个东西都圈出来再命名。<b>In systems terms:</b> detection adds a "where" head on top of the same CNN backbone from Day 6, then a cleanup pass (non-max suppression) drops overlapping and low-confidence boxes — so it's classification plus geometry plus filtering.</p>
       <p>The two detector styles are two ways to do the circling. A two-stage detector first sketches rough circles where something might be, then checks each carefully. A one-stage detector circles and names everything in a single sweep — faster, which is why real-time systems like a car's camera use it.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: you circle only what catches your eye. A detector must consider many possible boxes everywhere, then throw away the overlapping and low-confidence ones (a cleanup step called non-max suppression). It is more systematic and less selective than a human with a pen.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -418,12 +420,17 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         IoU     = 40 / 160 = <span class="hl">0.25</span>
       </div></div>
       <p>IoU = 0.25 is below a 0.5 threshold, so this box would be judged a poor match. If the boxes lined up better — say overlap 90 — the IoU would rise to 90/(100+100−90) = 90/110 ≈ 0.82, a good match.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — Intersection over Union</b>
+      <br><b>1 · In words:</b> grade a predicted box by how much it overlaps the true box, relative to the total area the two cover together.
+      <br><b>2 · The formula:</b> <code>IoU = area(overlap) / area(union)</code> — <code>overlap</code> = area where both boxes agree; <code>union = areaA + areaB − overlap</code> (subtract the shared part once so it isn't double-counted). Range 0…1.
+      <br><b>3 · Tiny numbers:</b> both boxes area 100, overlap 40 → <code>union = 100+100−40 = 160</code> → <code>IoU = 40/160 = 0.25</code>.
+      <br><b>4 · Sanity check:</b> identical boxes give <code>IoU = 1</code>, non-touching boxes give <code>0</code>, and IoU can never exceed 1 — if your code returns more than 1, you forgot to subtract the overlap from the union.</div></div>
 
       <h4>One-stage vs two-stage — the trade-off</h4>
       <table style="width:100%;border-collapse:collapse;font-size:.86rem;margin:.6rem 0">
-        <tr style="background:var(--surface2)"><th style="text-align:left;padding:.5rem;border:1px solid var(--border)">Design</th><th style="text-align:left;padding:.5rem;border:1px solid var(--border)">How</th><th style="text-align:left;padding:.5rem;border:1px solid var(--border)">Trade-off</th></tr>
-        <tr><td style="padding:.5rem;border:1px solid var(--border)"><b>Two-stage</b> (e.g. Faster R-CNN)</td><td style="padding:.5rem;border:1px solid var(--border)">propose regions, then classify each</td><td style="padding:.5rem;border:1px solid var(--border)">often more accurate, slower</td></tr>
-        <tr><td style="padding:.5rem;border:1px solid var(--border)"><b>One-stage</b> (e.g. YOLO)</td><td style="padding:.5rem;border:1px solid var(--border)">predict boxes + labels in one pass</td><td style="padding:.5rem;border:1px solid var(--border)">faster, great for real time</td></tr>
+        <tr style="background:var(--panel2)"><th style="text-align:left;padding:.5rem;border:1px solid var(--line2)">Design</th><th style="text-align:left;padding:.5rem;border:1px solid var(--line2)">How</th><th style="text-align:left;padding:.5rem;border:1px solid var(--line2)">Trade-off</th></tr>
+        <tr><td style="padding:.5rem;border:1px solid var(--line2)"><b>Two-stage</b> (e.g. Faster R-CNN)</td><td style="padding:.5rem;border:1px solid var(--line2)">propose regions, then classify each</td><td style="padding:.5rem;border:1px solid var(--line2)">often more accurate, slower</td></tr>
+        <tr><td style="padding:.5rem;border:1px solid var(--line2)"><b>One-stage</b> (e.g. YOLO)</td><td style="padding:.5rem;border:1px solid var(--line2)">predict boxes + labels in one pass</td><td style="padding:.5rem;border:1px solid var(--line2)">faster, great for real time</td></tr>
       </table>
       <div class="callout c-info"><span class="ic">🔗</span><div><b>The big picture:</b> detection reuses the CNN backbone you already understand and adds a "where" head on top. This is awareness-level — you do not need the full loss math, just the shape of the problem and the two families.</div></div>
 
@@ -431,6 +438,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Even the simple IoU score has a quiet trap in how boxes are written down, and the one-stage vs two-stage choice is a real design decision.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): mixing up the box coordinate format.</b> A box can be written as <code>(x1, y1, x2, y2)</code> — two opposite corners — or as <code>(center_x, center_y, width, height)</code>. Both are four numbers. If your IoU code assumes corners but the boxes arrive as center-and-size (or the other way round), the math still returns a number between 0 and 1, so nothing errors. But it is the overlap of the <em>wrong</em> rectangles, so good predictions get scored as misses and your reported accuracy is quietly wrong. A senior engineer, in <b>code review</b>, checks that every box entering an IoU or loss function is in the one agreed format, and converts explicitly at each boundary.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: one-stage detectors buy speed, two-stage buy accuracy.</b> A one-stage detector (like YOLO) predicts boxes and labels in a single pass, which is fast enough for real-time video but tends to be weaker on small or crowded objects. A two-stage detector (like Faster R-CNN) first proposes regions and then classifies each, which is more accurate but slower and heavier. Which family fits — real-time speed versus top accuracy under a latency and hardware budget — is the <b>design-review</b> decision.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Detection is classification plus localization: for each object predict a box (center x/y, width, height) and a class with a confidence, then non-max suppression drops overlapping duplicates. Boxes are graded by IoU = overlap/union, and a detection counts at IoU above a threshold like 0.5. The family choice is the trade-off — one-stage (YOLO) is fast for real time, two-stage (Faster R-CNN) is more accurate on small/crowded objects. The classic silent bug is coordinate format: corners vs center-size are both four numbers, so a mismatch quietly scores the overlap of the wrong rectangles."</div></div>
       <button class="gotit" type="button">Got the detection picture</button>
     </div>
 </section>
@@ -461,6 +469,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Run a real detector, or compute IoU (recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>This is an awareness day, so keep it light. Pick one small thing to make the idea concrete:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A function <code>iou(boxA, boxB)</code> with boxes as <code>(x1,y1,x2,y2)</code>: intersection width/height clamped at 0, intersection area, union area, ratio returned.</li>
+        <li>Tested on: partial overlap (asserts the hand-computed value, e.g. the 40/160 = 0.25 case), identical boxes (IoU = 1.0), and non-touching boxes (IoU = 0.0).</li>
+        <li>A one-line note on why IoU above ~0.5 usually counts as a correct detection.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> what detection adds over classification, what IoU measures and why union subtracts the overlap once, what the 0.5 threshold means, why the coordinate format (corners vs center-size) is a silent-bug risk, and when you'd choose one-stage vs two-stage.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py</code>. Write a function <code>iou(boxA, boxB)</code> where each box is <code>(x1, y1, x2, y2)</code>. Compute the intersection area, the union area, and their ratio. Test it on two overlapping boxes and confirm the number matches your hand calculation (for example the 40/160 = 0.25 case from the lesson). Run with <code>python3 sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -475,7 +490,7 @@ Create sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/exper
 3. Prints a one-line explanation of why IoU above ~0.5 usually counts as a correct detection.
 Then run it and paste the three IoU values at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/log.md</code>: what IoU did two identical boxes give, and in one sentence, what does object detection add over classification?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/log.md</code>: (1) what detection adds over classification, in one sentence; (2) what IoU two identical boxes gave and what the 0.5 threshold means; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to the finale</button>
     </div>
 </section>

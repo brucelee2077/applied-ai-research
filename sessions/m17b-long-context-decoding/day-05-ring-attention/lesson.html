@@ -211,6 +211,20 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
 .build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-fig{margin:0}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}.vlab-note b{color:var(--ink2)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+
 /* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
 .q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
@@ -355,6 +369,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h4>So what's today's catch?</h4>
       <p>The catch is bookkeeping: each device only ever sees one key/value block at a time, but the softmax denominator needs a sum over the <em>entire</em> row of scores before any single score can be normalized. Getting this right without ever materializing the full row is exactly the blockwise online-softmax mechanism you'll trace step by step today.</p>
       <div class="callout c-info"><span class="ic">📚</span><div>Official papers/repos (optional): <a href="https://arxiv.org/abs/2310.01889" target="_blank" rel="noopener">Liu, Zaharia, Abbeel — Ring Attention with Blockwise Transformers for Near-Infinite Context (arXiv:2310.01889)</a> · <a href="https://github.com/haoliuhl/ringattention" target="_blank" rel="noopener">haoliuhl/ringattention (reference implementation)</a></div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "把序列切开分给多台设备" 听着像近似，其实每个 query 仍然看到了<i>全部</i> key/value——只是分批、在时间上错开地看。In plain terms: people assume splitting the sequence across devices must approximate attention. It doesn't — the online-softmax running max/sum make it algebraically <i>exact</i>. The whole trick is motion: blocks rotate around the ring while each device computes, so the network transfer hides behind the math. You have to <i>see the rotation</i> to get it.</div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
 </section>
@@ -369,6 +384,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🔄🪑🔄</span><h5>Pass notes around the ring</h5><p>Instead, each student keeps their own notes and passes them to their neighbor on a fixed rhythm. Everyone updates their running answer to their own question a little more each time a new stack of notes reaches them — and while they read the current stack, the next stack is already being handed over.</p></div>
       </div>
       <p><strong>In one line:</strong> nobody ever holds the whole room's notes; the notes circulate, and reading the current batch happens at the same time as receiving the next one.</p>
+      <p><b>直觉 / Intuition:</b> 一圈同学各拿自己的问题，笔记按固定节奏一份份传下去；读手上这份的同时，下一份已经在递过来——转 N 圈，人人都看过了全部笔记。<b>In systems terms:</b> each device holds only <code>O(block)</code> of K/V at a time, so context scales with device count, not per-chip HBM, and the ring transfer overlaps with compute.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a student "updating their running answer a little more" sounds approximate, like a rough draft that improves over time — but the math is exact. The <span class="term" data-tip="A trick to compute softmax over a long row while seeing only one small piece at a time, keeping a running max and sum.">online softmax</span> running totals are algebraically identical to computing the full softmax at the end; nothing is approximated. Also, real students can get confused about how much of the answer they've seen so far — the online-softmax bookkeeping (a running max and a running sum) removes that ambiguity completely and always gives the exact same answer as if all notes had been read at once.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -379,6 +395,21 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Click through three numeric demos of the trick</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>A simulated terminal with three worked calculations: the memory-formula comparison across vanilla, blockwise, and ring attention, the online-softmax running-total update, and the communication-hiding arithmetic that makes the ring "free." <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">🔬 Ring-rotation stepper</span>
+          <span class="vlab-readout" id="ringlab-read">drag the step →</span>
+        </div>
+        <div class="vlab-q">Learning question: how do N devices compute <em>exact</em> full attention over a sequence too long for any one chip, by rotating K/V blocks around a ring? Drag <b>step</b> to rotate the blocks; watch every device see every block after N−1 steps while its own memory stays flat.</div>
+        <figure class="vlab-fig">
+          <svg id="ringlab-svg" class="vlab-svg" viewBox="0 0 470 240" role="img" aria-label="Left: N devices on a ring, each holding a fixed query block and a rotating key/value block. Right: an N by N coverage grid filling in as blocks rotate."></svg>
+        </figure>
+        <div class="vlab-controls">
+          <label>step <input type="range" id="ringlab-step" min="0" max="3" value="0" step="1"></label>
+          <label>devices N <input type="range" id="ringlab-n" min="2" max="8" value="4" step="1"></label>
+        </div>
+        <p class="vlab-note"><b>What to notice:</b> each device keeps its own query block (fixed) and only <em>one</em> K/V block at a time; after N−1 steps the coverage grid is full — every query has seen every key/value, exactly once. <b>Misconception:</b> this is not sparse/approximate attention — every pair is computed, just spread across devices and time. <b>Where this simplifies reality:</b> a toy ring with instant, perfectly-overlapped transfers and no online-softmax arithmetic shown; the real win is that block transfer hides behind compute. <b>Why labs care:</b> context length now scales with device count, not per-chip HBM — this is how million-token context is served.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="memory" type="button">① memory: vanilla vs. BPT vs. ring</button>
@@ -404,7 +435,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li>After exactly <code>N</code> steps, every device's query block has attended to every key/value block in the sequence exactly once, and its running statistics are finalized into the exact softmax output — no approximation, no block ever skipped or double-counted.</li>
         <li>The communication (sending/receiving one block) and the computation (attention on the current block) are scheduled to <strong>overlap</strong>: as long as one block's worth of compute takes at least as long as one block's worth of network transfer, the ring's added wall-clock cost is close to zero.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>m_i ← max(m_i, m_new); l_i ← l_i · exp(m_i_old − m_i) + l_new · exp(m_new − m_i)</code><br><span style="font-size:.85rem;color:var(--text2)">"Keep a running maximum score and a running (rescaled) sum so far. Every time a new block of keys/values arrives, fold its contribution into the running totals using the same rescale-and-merge trick as FlashAttention." This is what lets each device see only one block at a time yet still produce the exact answer.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>m_i ← max(m_i, m_new); l_i ← l_i · exp(m_i_old − m_i) + l_new · exp(m_new − m_i)</code><br><span style="font-size:.85rem;color:var(--ink2)">"Keep a running maximum score and a running (rescaled) sum so far. Every time a new block of keys/values arrives, fold its contribution into the running totals using the same rescale-and-merge trick as FlashAttention." This is what lets each device see only one block at a time yet still produce the exact answer.</span></div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — per-device memory vs sequence length</b>
+      <br><b>1 · In words:</b> split the sequence into N blocks, give one to each device, and rotate K/V around the ring — so a device only ever stores one block's worth of K/V, no matter how long the whole sequence is.
+      <br><b>2 · The formula:</b> block size <code>c = s/N</code>; per-device K/V memory ≈ <code>O(c) = O(s/N)</code> (one block), vs vanilla <code>O(s²)</code> and single-device Flash <code>O(s)</code>; total context = <code>N · c</code>. Ring finishes in exactly <code>N</code> steps.
+      <br><b>3 · Tiny numbers:</b> <code>s = 1M</code> tokens, <code>N = 8</code> devices → each holds <code>c = 125k</code> tokens of K/V, not 1M; add devices and <code>c</code> shrinks, so context scales with N, not per-chip HBM.
+      <br><b>4 · Sanity check:</b> after N steps every query block has met every K/V block exactly once (no skip, no double-count), and the online-softmax result is bit-for-bit the single-device answer — if it isn't, a running-total rescale was skipped.</div></div>
 
       <h4>Why it's a superpower</h4>
       <ul>
@@ -418,6 +454,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Ring Attention claims to give the <em>exact</em> full-attention answer, and the two things that quietly threaten that are the running-max rescale and the overlap assumption behind its speed.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to rescale the running totals when the max jumps.</b> Online softmax keeps a running max <code>m_i</code>, a running denominator <code>l_i</code>, and a running output <code>O_i</code>. When a newly arrived block contains a larger score than any seen so far, <code>m_i</code> increases, and <b>both</b> the old <code>l_i</code> and the old <code>O_i</code> must be multiplied by <code>exp(m_old − m_new)</code> before the new block is folded in. Skip that rescale and nothing crashes — the shapes are right, the loop finishes, and the output looks like a normal attention result. It is just wrong: earlier blocks are weighted incorrectly, so the attention output silently deviates from true softmax, worst on the blocks that arrive first. A senior engineer catches this in <b>code review</b> by testing the ring output against a plain single-device attention on a short sequence and asserting they match to floating-point tolerance — a missing rescale fails that check immediately.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: block size (device count) vs. hidden communication.</b> The ring only runs "for free" when the time to compute attention on one block is at least the time to send one block to the next device. Splitting a sequence across more devices makes each block smaller, which shrinks compute-per-block faster than it shrinks the transfer, until the network transfer no longer hides behind useful work and the ring becomes communication-bound. Choosing how many devices to spread a given context across — enough to fit the memory, not so many that communication stalls compute — is the <b>design-review</b> decision, and it depends on your interconnect bandwidth, not just the sequence length.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Ring Attention scales context past one chip's HBM: split the sequence into N blocks across N devices in a ring, each device keeps its fixed query block and rotates K/V blocks around the ring, folding each into a running online-softmax (max + rescaled sum). After N steps every query has attended to every key/value — exactly, no approximation — while each device only ever holds <code>O(s/N)</code> of K/V, so context scales with device count. The transfer overlaps with compute, so it's ~free while compute-per-block ≥ transfer-per-block. Two things bite: skipping the running-total rescale when the max jumps silently corrupts the output (I test it matches single-device attention to tolerance), and too many devices makes blocks so small the ring goes communication-bound."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -470,7 +507,7 @@ Create sessions/m17b-long-context-decoding/day-05-ring-attention/ring_attention/
 4. A short README.md stating in 2-3 sentences what was verified and linking back to arXiv:2310.01889.
 The script must run without error on CPU-simulated devices (jax.devices() count >= 2, e.g. via XLA_FLAGS=--xla_force_host_platform_device_count=4) and exit 0. Add a brief comment on each step explaining the ring-attention rule being implemented, then run it to confirm it works.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m17b-long-context-decoding/day-05-ring-attention/log.md</code>: why does the ring's added communication cost approach zero even though every block still has to travel to every device? (Hint: look at what "overlap" means for wall-clock time, not total bytes moved.)</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m17b-long-context-decoding/day-05-ring-attention/log.md</code>: (1) why per-device memory stays flat as the sequence grows; (2) that your ring output matched single-device attention to tolerance (and what breaks it if you skip the rescale); (3) why the ring's added communication cost approaches zero even though every block still travels to every device (overlap = wall-clock, not total bytes).</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -702,6 +739,49 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── vlab: ring-rotation stepper ── -->
+<script>
+(function(){
+  "use strict";
+  var svg=document.getElementById('ringlab-svg'); if(!svg) return;
+  var stepEl=document.getElementById('ringlab-step'), nEl=document.getElementById('ringlab-n'), readEl=document.getElementById('ringlab-read');
+  function build(N, step){
+    var s=[], cx=120, cy=128, R=78, nr=Math.min(17, 150/N);
+    s.push("<circle cx='"+cx+"' cy='"+cy+"' r='"+R+"' fill='none' stroke='#D8D0C4' stroke-width='1' stroke-dasharray='4 4'/>");
+    s.push("<text x='"+cx+"' y='24' text-anchor='middle' font-family='monospace' font-size='10' fill='#6B645E'>ring of "+N+" devices</text>");
+    var pos=[];
+    for(var k=0;k<N;k++){ var a=(-90 + k*360/N)*Math.PI/180; pos.push([cx+R*Math.cos(a), cy+R*Math.sin(a)]); }
+    for(var k2=0;k2<N;k2++){ var p0=pos[k2], q0=pos[(k2+1)%N], mx=(p0[0]+q0[0])/2, my=(p0[1]+q0[1])/2; s.push("<text x='"+mx.toFixed(1)+"' y='"+(my+3).toFixed(1)+"' text-anchor='middle' font-family='monospace' font-size='11' fill='#9AA6B4'>&#8635;</text>"); }
+    for(var k=0;k<N;k++){
+      var held=((k-step)%N+N)%N, p=pos[k];
+      s.push("<circle cx='"+p[0].toFixed(1)+"' cy='"+p[1].toFixed(1)+"' r='"+nr.toFixed(1)+"' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/>");
+      s.push("<text x='"+p[0].toFixed(1)+"' y='"+(p[1]-1).toFixed(1)+"' text-anchor='middle' font-family='monospace' font-size='"+Math.min(11,nr*0.72).toFixed(1)+"' fill='#1F6280'>Q"+k+"</text>");
+      s.push("<text x='"+p[0].toFixed(1)+"' y='"+(p[1]+nr*0.62).toFixed(1)+"' text-anchor='middle' font-family='monospace' font-size='"+Math.min(10,nr*0.62).toFixed(1)+"' fill='#9A7208'>K"+held+"</text>");
+    }
+    var cs=Math.min(20, 150/N), gx=290, gy=cy - N*cs/2;
+    s.push("<text x='"+(gx+N*cs/2)+"' y='24' text-anchor='middle' font-family='monospace' font-size='10' fill='#6B645E'>coverage: device × block</text>");
+    for(var i=0;i<N;i++) for(var j=0;j<N;j++){
+      var d=((i-j)%N+N)%N, seen=d<=step, cur=d===step;
+      var fill=cur?'#FCF3DC':(seen?'#E8F5EE':'#F1F0EC'), st=cur?'#C99A12':(seen?'#2D8B55':'#D8D0C4');
+      s.push("<rect x='"+(gx+j*cs).toFixed(1)+"' y='"+(gy+i*cs).toFixed(1)+"' width='"+cs.toFixed(1)+"' height='"+cs.toFixed(1)+"' fill='"+fill+"' stroke='"+st+"' stroke-width='"+(cur?1.5:0.8)+"'/>");
+    }
+    s.push("<text x='"+(gx+N*cs/2)+"' y='"+(gy+N*cs+13)+"' text-anchor='middle' font-family='monospace' font-size='9' fill='#96A0AF'>blocks →</text>");
+    return s.join('');
+  }
+  function render(){
+    var N=parseInt(nEl.value,10)||4;
+    stepEl.max=N-1; if((parseInt(stepEl.value,10)||0)>N-1) stepEl.value=N-1;
+    var step=parseInt(stepEl.value,10)||0;
+    svg.innerHTML=build(N,step);
+    var done=step===N-1;
+    if(readEl) readEl.innerHTML="step "+step+"/"+(N-1)+" · each device has seen <b>"+(step+1)+"/"+N+"</b> blocks · per-device mem = O(1 block)"+(done?" · ✓ every query saw every block":"");
+  }
+  stepEl.addEventListener('input', render);
+  nEl.addEventListener('input', render);
+  render();
 })();
 </script>
 

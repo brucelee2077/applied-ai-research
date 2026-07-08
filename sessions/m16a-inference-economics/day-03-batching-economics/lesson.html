@@ -211,6 +211,23 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
 .build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
 
+/* ---------- vlab (interactive SVG lab) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-fig{margin:0}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}.vlab-note b{color:var(--ink2)}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+
 /* ---------- quiz ---------- */
 .q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
 .q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
@@ -349,10 +366,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>The answer: <code>batching</code></h4>
       <p><span class="term" data-tip="Running several users' requests through the model together in one big math step, instead of one at a time.">Batching</span> means processing several independent requests' tokens through the model in the <strong>same</strong> forward pass — as one bigger matrix multiply — instead of one request at a time. The trick that makes this powerful: the weights only need to be loaded from HBM <strong>once per step</strong>, no matter how many sequences you cram into that step. So if you stack <code>B</code> sequences together, you pay the identical weight-loading cost but walk away with <code>B</code> tokens of useful work. This is called <strong>amortizing</strong> the weight-loading penalty — spreading one fixed cost over more output.</p>
-      <div class="callout c-info"><span class="ic">📦</span><div>Same weight-load trip, more tokens out the door: <code>batch=1</code> → 1 token per trip. <code>batch=128</code> → 128 tokens per <em>the same</em> trip.<br><span style="font-size:.85rem;color:var(--text2)">This ratio of useful work done per byte loaded has a name: <b>arithmetic intensity</b>. Bigger batches raise it — up to a point. That "up to a point" is today's second half.</span></div></div>
+      <div class="callout c-info"><span class="ic">📦</span><div>Same weight-load trip, more tokens out the door: <code>batch=1</code> → 1 token per trip. <code>batch=128</code> → 128 tokens per <em>the same</em> trip.<br><span style="font-size:.85rem;color:var(--ink2)">This ratio of useful work done per byte loaded has a name: <b>arithmetic intensity</b>. Bigger batches raise it — up to a point. That "up to a point" is today's second half.</span></div></div>
 
       <h4>The catch: batching is not free</h4>
       <p>Every sequence in the batch needs its own memory of what it has attended to so far — a <span class="term" data-tip="Stored Keys and Values from earlier tokens, so the model does not recompute them for every new token.">KV cache</span> (short for Key/Value cache), which we define fully in the walkthrough. That cache grows with batch size <em>and</em> with how long the conversation gets, and it competes for the exact same HBM the weights live in. Batching helps throughput, but it eats memory. Today you'll compute exactly where the trade-off breaks, using the same roofline idea from Pope et al. (2022) that you met this week.</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> batching 明明是"免费加吞吐"，为什么不能一直加大？因为同一个旋钮 (batch size B) 同时拉动三件事——吞吐、延迟、显存。In plain terms: people learn "batch to fix the memory wall" and expect one clean win, but the batch dial moves three things at once: throughput up, per-user latency up, and KV-cache memory up. Often the KV cache OOMs you <i>before</i> you even reach the roofline sweet spot — so "just make B bigger" quietly breaks.</div></div>
       <div class="callout c-info"><span class="ic">📚</span><div>Official docs / papers (optional): <a href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">Scaling Book — Inference</a> · <a href="https://arxiv.org/abs/2211.05102" target="_blank" rel="noopener">Pope et al. 2022, Efficiently Scaling Transformer Inference</a> · <a href="https://arxiv.org/abs/1911.02150" target="_blank" rel="noopener">Shazeer 2019, Multi-Query Attention</a> · <a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noopener">Ainslie et al. 2023, GQA</a> · <a href="https://jax-ml.github.io/scaling-book/transformers/" target="_blank" rel="noopener">Scaling Book — Transformers</a> · <a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook" target="_blank" rel="noopener">Ultrascale Playbook</a> · <a href="https://docs.jax.dev/en/latest/gradient-checkpointing.html" target="_blank" rel="noopener">JAX Gradient Checkpointing</a></div></div>
       <button class="gotit" type="button">Got it — let's go</button>
     </div>
@@ -368,6 +386,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🚶‍♀️🍔🍔🍔</span><h5>batch=20 = a tray per trip</h5><p>One 5-minute walk, she hauls back a big tray, and cooks 20 burgers from that single haul. Same walk, 20x the burgers — her burgers-per-minute skyrockets.</p></div>
       </div>
       <p><strong>In one line:</strong> the walk is the fixed weight-loading cost; batching means cooking more burgers per trip, spreading that one fixed cost over more useful output.</p>
+      <p><b>直觉 / Intuition:</b> 走一趟拿的料越多，"每个汉堡分摊的走路时间"就越小——但每张订单的便签也在占台面（就是 KV cache 抢显存）。<b>In systems terms:</b> below the ridge point <code>B*</code>, adding batch is nearly free throughput (same weight-load, more tokens); the KV cache is the counter space, and it can run out before you reach <code>B*</code>.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>But here's the part the analogy needs to carry: each of those 20 orders has its own sticky note of "modifications so far" (no onions, extra cheese, hold for table 4...) taped to her station, re-read before every flip. Twenty orders means twenty growing sticky notes eating up counter space — and if the orders sit a long time (long conversations), the notes get longer too. Eventually the notes cover so much counter that there's no room left for the ingredient tray. <b>That counter crunch is the KV cache eating into the same memory the weights need.</b> Where the analogy fully breaks: real hardware has a hard capacity wall — there's no asking for a bigger counter mid-shift, so you plan batch size and context length in advance.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
@@ -378,6 +397,25 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Click through three worked numeric scenarios</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
       <p>A simulated terminal. We use a 7B-param model in bf16 (2 bytes/param), HBM bandwidth 1.2 TB/s, peak compute 200 TFLOP/s — and, for the KV cache, PaLM-540B's own shape (118 layers, 48 heads, head_dim 256). <strong>Click all three</strong> to finish.</p>
+      <div class="vlab">
+        <div class="vlab-head">
+          <span class="vlab-title">🔬 Batching & KV-budget lab</span>
+          <span class="vlab-readout" id="batlab-read">drag batch size →</span>
+        </div>
+        <div class="vlab-q">Learning question: raise the decode batch size and watch three things move at once — step time bends up past the ridge <code>B*</code>, throughput rises then flattens, and the KV cache eats into the HBM budget. Which wall do you hit first?</div>
+        <figure class="vlab-fig">
+          <svg id="batlab-svg" class="vlab-svg" viewBox="0 0 470 220" role="img" aria-label="Left: step-time-per-token vs batch size, flat until the ridge point then rising. Right: an HBM budget bar with weights plus a growing KV cache block."></svg>
+        </figure>
+        <div class="vlab-controls">
+          <label>batch size B <input type="range" id="batlab-b" min="1" max="256" value="1" step="1"></label>
+          <span class="vlab-toggle" role="group" aria-label="attention type">
+            <button type="button" class="vlab-btn active" data-kv="mha">MHA</button>
+            <button type="button" class="vlab-btn" data-kv="gqa">GQA</button>
+            <button type="button" class="vlab-btn" data-kv="mqa">MQA</button>
+          </span>
+        </div>
+        <p class="vlab-note"><b>What to notice:</b> below <code>B*≈167</code> the step time is flat (memory-bound) so batching is nearly free throughput; above it, step time (and per-user latency) climbs. But with MHA the KV cache OOMs around B≈62 — you hit the <em>memory</em> wall before the roofline. Switch to GQA/MQA and the OOM point slides right, letting you reach <code>B*</code>. <b>Misconception:</b> "just make B bigger" — no; latency and KV memory both fight back. <b>Where this simplifies reality:</b> one layer's arithmetic, fixed 2048 context, no continuous batching or paging (that's a later lesson). <b>Why labs care:</b> this single dial sets cost-per-token and tail latency for every production LLM serving stack.</p>
+      </div>
       <div class="play">
         <div class="play-btns">
           <button class="play-btn" data-demo="roofline" type="button">① roofline crossover (7B model)</button>
@@ -402,7 +440,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><code>t_compute = 2 × params × B / peak_FLOPs</code> grows <strong>linearly</strong> with <code>B</code> — more sequences, more matrix-multiply work.</li>
         <li>The crossover <code>B*</code> — where <code>t_compute</code> catches up to <code>t_load</code> — is the hardware's own <strong>ridge point</strong>: <code>peak_FLOPs / HBM_bandwidth</code>. Below it, batching is free throughput; above it, batching costs latency.</li>
       </ul>
-      <div class="callout c-ok"><span class="ic">✅</span><div><code>B* = weight_bytes × peak_FLOPs / (HBM_bandwidth × 2 × params)</code><br><span style="font-size:.85rem;color:var(--text2)">For a 7B bf16 model at 1.2 TB/s / 200 TFLOP/s: <code>B* ≈ 167</code>. Below batch 167, more batching is nearly free. Above it, step time starts climbing again.</span></div></div>
+      <div class="callout c-ok"><span class="ic">✅</span><div><code>B* = weight_bytes × peak_FLOPs / (HBM_bandwidth × 2 × params)</code><br><span style="font-size:.85rem;color:var(--ink2)">For a 7B bf16 model at 1.2 TB/s / 200 TFLOP/s: <code>B* ≈ 167</code>. Below batch 167, more batching is nearly free. Above it, step time starts climbing again.</span></div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the crossover batch size B*</b>
+      <br><b>1 · In words:</b> step time is whichever is slower, loading the weights (fixed) or doing the math (grows with B); <code>B*</code> is the batch where the math finally catches up to the load.
+      <br><b>2 · The formula:</b> <code>t_load = weight_bytes/BW</code> (fixed); <code>t_compute = 2·params·B/peak_FLOPs</code>; set equal → <code>B* = peak_FLOPs/BW × (weight_bytes/(2·params)) = peak_FLOPs/BW × bytes_per_param</code>.
+      <br><b>3 · Tiny numbers:</b> 7B bf16, 1.2 TB/s, 200 TFLOP/s → <code>t_load = 14e9/1.2e12 ≈ 11.7 ms</code>; <code>t_compute = 14e9·B/200e12 = 0.07·B ms</code>; equal at <code>B* = 11.7/0.07 ≈ 167</code>.
+      <br><b>4 · Sanity check:</b> below <code>B*</code> throughput rises ~linearly at flat latency (free); above it latency rises while throughput plateaus. Note <code>B*</code> is a <em>compute-vs-bandwidth</em> ceiling — the KV-cache <em>memory</em> ceiling is separate and can bind first (MHA OOMs near B≈62 here).</div></div>
 
       <h4>Why the KV cache fights back</h4>
       <ul>
@@ -416,6 +459,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Batching turns one dial (batch size <code>B</code>) that quietly pulls two levers in opposite directions — throughput up, per-user latency down. The two things below are what a staff engineer watches for once batching goes into a real serving loop.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a continuous-batching stall from one slow request.</b> Production servers use <span class="term" data-tip="A serving loop that adds new requests to and removes finished ones from the running batch every step, instead of waiting for a whole fixed batch to finish.">continuous batching</span> — new requests join the running batch every step, finished ones leave. Because every sequence in the batch must step together, the batch can only advance as fast as its slowest member. Nothing errors: if one request is generating a very long answer, or a large new prompt arrives and its <em>prefill</em> is scheduled into the same step, every other user's decode freezes for that step. Your average tokens/sec still looks healthy while the <span class="term" data-tip="The 95th/99th percentile of latency — the slow tail that a small fraction of users actually feel.">tail latency</span> (p95/p99) quietly blows past the target. In <b>code review</b>, a senior engineer asks whether prefill and decode share the same batch step, and whether the scheduler chunks or separates long prefills so one request cannot stall the whole batch.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batch size trades per-user latency for total throughput.</b> Raising <code>B</code> toward the ridge point <code>B*</code> amortizes the weight load over more tokens, so total tokens/sec (and cost-per-token) improves — but every user now waits for a bigger batch to assemble and to step forward together, so each user's time-to-first-token and time-per-token get worse, and the bigger <code>B</code> also enlarges the KV cache that competes for HBM. In a <b>design review</b> this is the central dial: an interactive chat product caps <code>B</code> (and reserves KV headroom) to protect latency, while an offline bulk-generation job pushes <code>B</code> up to <code>B*</code> to minimize cost. Same model, opposite settings.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Batching amortizes the fixed per-step weight load across B sequences, so below the ridge <code>B* = peak_FLOPs/BW × bytes_per_param</code> (~167 for a 7B bf16 model) you get nearly free throughput at flat latency; above it you're compute-bound and latency climbs. The catch is the KV cache: it scales with B × context and competes for the same HBM, so with MHA it can OOM before you ever reach <code>B*</code> — which is exactly why GQA/MQA exist, to shrink <code>n_kv_heads</code> and push the memory wall out. The production nuance is continuous batching: because the whole batch steps together, one long prefill or slow request stalls everyone, so p99 latency blows up while average tok/s still looks fine."</div></div>
       <button class="gotit" type="button">Got the rules</button>
     </div>
 </section>
@@ -467,7 +511,7 @@ Create sessions/m16a-inference-economics/day-03-batching-economics/experiment.py
 4. Prints a summary table: batch size, step time, tokens/sec throughput, KV cache size, and whether memory- or compute-bound.
 Add a brief comment on each step explaining the roofline logic, then run it to confirm the plots and printed B* match the closed-form formulas.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m16a-inference-economics/day-03-batching-economics/log.md</code>: for a GQA/MQA model like Llama-2-70B, why would plugging in the query-head count instead of <code>num_key_value_heads</code> into the KV cache formula overestimate the cache size — and by how much?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m16a-inference-economics/day-03-batching-economics/log.md</code>: (1) why batching below <code>B*</code> is nearly free throughput; (2) the <code>B*</code> you computed and whether the KV cache or the roofline bound you first; (3) why, for a GQA/MQA model like Llama-2-70B, plugging the query-head count instead of <code>num_key_value_heads</code> into the KV formula overestimates the cache — and by how much.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -680,6 +724,72 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
 refresh();
+})();
+</script>
+
+<!-- ── vlab: batching & KV-budget ── -->
+<script>
+(function(){
+  "use strict";
+  var svg=document.getElementById('batlab-svg'); if(!svg) return;
+  var bEl=document.getElementById('batlab-b');
+  var readEl=document.getElementById('batlab-read');
+  var btns=Array.prototype.slice.call(document.querySelectorAll('#s3 .vlab-btn[data-kv]'));
+  var W_GB=14, BW=1.2e12, PK=200e12, params=7e9, budget=80;
+  var tload=params*2/BW*1000;              // 11.67 ms (fixed)
+  var tcomp=2*params/PK*1000;              // 0.07 ms per unit batch
+  var Bstar=tload/tcomp;                   // ~167
+  var KV={mha:1.07, gqa:0.268, mqa:0.0335};// GB of KV per sequence @2048 ctx
+  var type='mha';
+  function tstep(B){ return Math.max(tload, tcomp*B); }
+  // left panel scales
+  function px(B){ return 46 + B/256*180; }
+  function py(t){ return 175 - Math.min(t,20)/20*135; }
+  // right panel
+  var barX=304, barW=40, baseY=200, sc=1.35; // px per GB
+  function gy(gb){ return baseY - gb*sc; }
+  function build(B){
+    var kvGB=KV[type]*B, used=W_GB+kvGB, oom=used>budget, s=[];
+    // ---- left: roofline step-time curve ----
+    s.push("<text x='136' y='24' text-anchor='middle' font-family='monospace' font-size='10' fill='#6B645E'>step time / token vs batch</text>");
+    s.push("<line x1='46' y1='175' x2='232' y2='175' stroke='#C2C9D4' stroke-width='1'/>");
+    s.push("<line x1='46' y1='40' x2='46' y2='175' stroke='#C2C9D4' stroke-width='1'/>");
+    // curve: flat at tload to Bstar, then linear
+    s.push("<polyline points='"+px(0)+","+py(tload)+" "+px(Bstar)+","+py(tload)+" "+px(256)+","+py(tstep(256))+"' fill='none' stroke='#1F6280' stroke-width='2'/>");
+    // ridge marker
+    s.push("<line x1='"+px(Bstar)+"' y1='40' x2='"+px(Bstar)+"' y2='175' stroke='#C99A12' stroke-width='1' stroke-dasharray='4 3'/>");
+    s.push("<text x='"+px(Bstar)+"' y='36' text-anchor='middle' font-family='monospace' font-size='9' fill='#9A7208'>B*≈167</text>");
+    // current point
+    s.push("<circle cx='"+px(B).toFixed(1)+"' cy='"+py(tstep(B)).toFixed(1)+"' r='5' fill='#E7853A' stroke='#fff' stroke-width='1.5'/>");
+    s.push("<text x='136' y='192' text-anchor='middle' font-family='monospace' font-size='9' fill='#96A0AF'>batch size B →</text>");
+    // ---- right: HBM budget bar ----
+    s.push("<text x='"+(barX+barW/2)+"' y='24' text-anchor='middle' font-family='monospace' font-size='10' fill='#6B645E'>HBM budget</text>");
+    // weights block
+    s.push("<rect x='"+barX+"' y='"+gy(W_GB).toFixed(1)+"' width='"+barW+"' height='"+(W_GB*sc).toFixed(1)+"' fill='#1F6280'/>");
+    s.push("<text x='"+(barX+barW+6)+"' y='"+(baseY-W_GB*sc/2+3).toFixed(1)+"' font-family='monospace' font-size='9' fill='#1F6280'>weights 14</text>");
+    // KV block (clamp drawn top so it stays in view)
+    var kvTop=Math.max(gy(used), 44), kvH=(gy(W_GB)-kvTop);
+    s.push("<rect x='"+barX+"' y='"+kvTop.toFixed(1)+"' width='"+barW+"' height='"+kvH.toFixed(1)+"' fill='"+(oom?'#C93B3B':'#2D8B55')+"'/>");
+    s.push("<text x='"+(barX+barW+6)+"' y='"+(kvTop+kvH/2+3).toFixed(1)+"' font-family='monospace' font-size='9' fill='"+(oom?'#C93B3B':'#2D8B55')+"'>KV "+kvGB.toFixed(0)+"</text>");
+    // budget line
+    s.push("<line x1='"+(barX-8)+"' y1='"+gy(budget)+"' x2='"+(barX+barW+64)+"' y2='"+gy(budget)+"' stroke='#6B645E' stroke-width='1' stroke-dasharray='4 3'/>");
+    s.push("<text x='"+(barX-8)+"' y='"+(gy(budget)-4)+"' font-family='monospace' font-size='9' fill='#6B645E'>80 GB</text>");
+    if(oom) s.push("<text x='"+(barX+barW/2)+"' y='"+(baseY+14)+"' text-anchor='middle' font-family='monospace' font-size='11' font-weight='700' fill='#C93B3B'>OOM!</text>");
+    return {svg:s.join(''), used:used, oom:oom, kvGB:kvGB};
+  }
+  function render(){
+    var B=parseInt(bEl.value,10)||1;
+    var r=build(B), t=tstep(B), toks=B/(t/1000);
+    svg.innerHTML=r.svg;
+    if(readEl) readEl.innerHTML="B="+B+" "+type.toUpperCase()+" · t_step "+t.toFixed(1)+"ms · "+Math.round(toks)+" tok/s · HBM "+r.used.toFixed(0)+"/80 GB"+(r.oom?" — <b>OOM</b>":"");
+  }
+  btns.forEach(function(b){ b.addEventListener('click', function(){
+    type=b.getAttribute('data-kv');
+    btns.forEach(function(o){ o.classList.toggle('active', o===b); });
+    render();
+  }); });
+  bEl.addEventListener('input', render);
+  render();
 })();
 </script>
 

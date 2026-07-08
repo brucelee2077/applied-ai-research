@@ -354,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><span class="term" data-tip="Randomly nudging brightness, contrast, and color a little, so the model does not depend on exact lighting.">Color jitter</span> — nudge brightness and color a little.</li>
       </ul>
       <p>Each change is small and honest — it keeps the label true. The <span class="term" data-tip="The number of distinct-looking training examples the model actually sees. Augmentation multiplies it far beyond the number of real images you collected.">effective dataset</span> grows many times over. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> augmentation 听起来"免费加数据"，但很多人忘了它有两条铁律。In plain terms: it sounds like free extra data, so people forget the two rules that make it work or break it — the change must keep the label true (flipping a "6" makes a "9"), and it must run on the <i>training</i> set only. Get either wrong and nothing crashes; your numbers just quietly lie.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -367,6 +368,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🔄</span><h5>See them many ways</h5><p>But you have seen your friend from many angles, in many lights. So you know them anywhere. Augmentation shows the model each object flipped, cropped, and re-lit — so it learns the object, not one exact snapshot.</p></div>
       </div>
       <p><strong>In one line:</strong> augmentation teaches the model the thing itself, by showing it many honest versions of the same thing — so it recognizes new photos, not just the training ones.</p>
+      <p><b>直觉 / Intuition:</b> 你从很多角度、很多光线见过朋友，所以在哪儿都认得出——augmentation 就是给模型这种"见多识广"。<b>In code terms:</b> each training image goes through a random transform pipeline every epoch, so one file behaves like dozens of distinct samples — you multiply the dataset with code, not with new labels.</p>
       <p>This directly fights overfitting: a model that has seen 20 variants of each cat cannot memorize a single set of pixels, so it must learn what actually makes a cat a cat.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: you naturally understand which changes are fair. A model does not. If you flip a photo of the digit "6" it becomes something like a "9" — a wrong label. So you must pick augmentations that keep the label true for your task.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -416,6 +418,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         flipped = <span class="hl">[40, 30, 20, 10]</span>   <span class="dim"># same row, mirrored</span>
       </div></div>
       <p>The row reversed. Do this to every row and the whole image is mirrored left-to-right. The cat still looks like a cat, so the label is unchanged — but to the network it is a brand-new picture.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — a horizontal flip</b>
+      <br><b>1 · In words:</b> a flip is just reading each row backwards — the new left edge is the old right edge.
+      <br><b>2 · The formula:</b> <code>flipped[row][col] = image[row][W − 1 − col]</code> — <code>W</code> = width; <code>col</code> = the output column; <code>W − 1 − col</code> = its mirror source column.
+      <br><b>3 · Tiny numbers:</b> row <code>[10,20,30,40]</code>, <code>W=4</code> → col 0 ← index 3 (40), col 1 ← 2 (30), … → <code>[40,30,20,10]</code>.
+      <br><b>4 · Sanity check:</b> flipping twice must return the original (<code>W−1−(W−1−col)=col</code>), and the label is unchanged — so it's a valid augmentation. But note the label-preserving test is task-specific: the same flip turns a "6" into a "9", so it's <i>not</i> valid there.</div></div>
 
       <h4>Why the dataset "grows"</h4>
       <ul>
@@ -429,6 +436,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Augmentation belongs on training data only, and it can be turned up so far that it hurts — both go wrong quietly.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): augmenting the validation or test set too.</b> Augmentation is a training trick. If you wire the same random flips, crops, and color jitter into the validation or test pipeline, everything still runs and you still get an accuracy number — but that number is now measured on distorted images, not on the clean data you will actually face. Your reported score no longer reflects real-world performance, and you may pick the wrong model or ship one that looks better than it is. A senior engineer, in <b>code review</b>, checks that random augmentation lives in the <em>train</em> transform only, and that validation and test use a fixed, deterministic transform (resize and normalize, nothing random).</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: stronger augmentation guards against overfitting but can wash out the real signal.</b> Heavier transforms (big random crops, strong color shifts, heavy rotation) make the training images harder and force the model to learn the true pattern instead of memorizing pixels. Push too far and the images drift away from the distribution the model will actually see, so it underfits and learns a task that is harder than the real one. How strong to make augmentation is a <b>design-review</b> decision, tuned to how much data you have and how far the transforms can go while still keeping the label true.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Augmentation applies random label-preserving transforms — flips, crops, color jitter — to each training image every epoch, so a small set behaves like a much larger one and the model learns the object instead of memorizing pixels. Two things separate a Hire here: it must be label-preserving for the task (a horizontal flip is fine for cats, wrong for digits where 6↔9), and it belongs in the <em>train</em> transform only — augmenting val/test silently measures accuracy on distorted images and picks the wrong model. The tuning knob is strength: too much drifts off-distribution and the model underfits."</div></div>
       <button class="gotit" type="button">Got why augmentation works</button>
     </div>
 </section>
@@ -459,6 +467,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Augment an image and see the variety (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Apply real augmentations and watch one image become many. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A small NumPy image; a horizontal flip (reverse the last axis) and a crop (slice), with one row printed before and after so the mirror is visible.</li>
+        <li>A <code>torchvision.transforms</code> pipeline (RandomHorizontalFlip, RandomResizedCrop, ColorJitter) applied to the same image 3×, asserting the outputs are not all identical (randomness works).</li>
+        <li>A tiny CNN trained twice — with and without augmentation — printing train vs validation accuracy so the overfitting gap is visibly smaller with augmentation.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> why augmentation grows the effective dataset, why it fights overfitting, why it must keep the label true (give a case where a flip breaks the label), why it must run on train only, and what would break if you augmented the validation set.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py</code>. Make a small image as a NumPy array. Write a horizontal-flip by reversing the column axis, and a crop by slicing a smaller window. Print the shapes and a few pixels before and after so you can see the change. Then build a <code>torchvision.transforms</code> pipeline (RandomHorizontalFlip, RandomCrop, ColorJitter) and apply it a few times to confirm you get different outputs each run. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -473,7 +488,7 @@ Create sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py 
 3. Trains a tiny CNN on a small subset twice — once with augmentation, once without — for a few epochs and prints train vs validation accuracy, showing the gap (overfitting) is smaller with augmentation.
 Then run it and paste the before/after row and the two train-vs-val accuracy gaps at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-05-data-augmentation/log.md</code>: did the flip reverse the row as expected, and was the train-vs-validation gap smaller with augmentation?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-05-data-augmentation/log.md</code>: (1) what augmentation does, in one sentence; (2) whether the flip reversed the row and whether the train-vs-validation gap shrank with augmentation; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 6</button>
     </div>
 </section>

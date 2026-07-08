@@ -354,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
       <h4>Channels grow as size shrinks</h4>
       <p>A <span class="term" data-tip="One 2D feature map inside a layer. An image starts with 3 color channels (red, green, blue); a conv layer can output many more, one per filter.">channel</span> is one feature map. As the picture gets smaller (pooling), the number of channels usually grows — few big maps become many small maps, each spotting a different pattern. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 一个张量同时有"高、宽、通道数"三个维度在变，很容易跟丢。In plain terms: two things move in opposite directions at once — height and width <i>shrink</i> while the channel count <i>grows</i> — so people lose track of the shape and can't say why <code>16×7×7</code> feeds a dense layer. The fix is to trace the shape out loud after every block, not to memorize the final number.</div></div>
       <button class="gotit" type="button">Got the recipe — let's go</button>
     </div>
 </section>
@@ -367,6 +368,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">🐱</span><h5>Zoom out to objects</h5><p>Each pool step steps back, and the next conv combines the small pieces into bigger ones: edges become an ear, curves become an eye. By the last block, whole objects show up. The dense layer then names it.</p></div>
       </div>
       <p><strong>In one line:</strong> a CNN builds understanding from the ground up — tiny features first, then bigger features, then a decision — like zooming out from brush strokes to the whole painting.</p>
+      <p><b>直觉 / Intuition:</b> 前面几层"看细节"，越往后"看整体"，最后一层才拍板说这是什么。<b>In code terms:</b> it is a pipeline — <code>conv → pool → conv → pool → flatten → dense</code> — where each stage's output shape is the next stage's input shape, exactly like chaining functions whose types must line up.</p>
       <p>This is why depth helps. One layer only sees edges. Stack many, and later layers see combinations of combinations — enough to tell a cat from a car.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: zooming out with your eyes just makes things smaller. A CNN does more — at each step it also learns new filters that actively combine the earlier pieces into new, more meaningful ones. It is not only shrinking; it is building.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -420,6 +422,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         dense 784→10: (10)          <span class="dim"># one score per digit 0–9</span>
       </div></div>
       <p>The picture went from 28×28 down to 7×7, while channels grew 1 → 8 → 16. Flatten turns the final <code>16×7×7</code> grid into a row of <code>784</code> numbers, and one dense layer turns that into <code>10</code> class scores.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — trace the shape end to end</b>
+      <br><b>1 · In words:</b> each layer takes a shape in and hands a shape out; conv (same-padding) keeps H,W but sets channels, pool halves H,W, flatten multiplies what's left into one row.
+      <br><b>2 · The rules:</b> conv → <code>out = ⌊(W−K+2P)/S⌋+1</code> (channels = #filters); <code>pool2×2</code> → <code>W//2</code>; <code>flatten</code> → <code>C×H×W</code>; <code>dense</code> → one score per class.
+      <br><b>3 · Tiny numbers:</b> <code>(1,28,28) → conv8 → (8,28,28) → pool → (8,14,14) → conv16 → (16,14,14) → pool → (16,7,7) → flatten → 784 → dense → 10</code>.
+      <br><b>4 · Sanity check:</b> the flatten length must equal <code>C×H×W</code> exactly (<code>16·7·7 = 784</code>) — if the dense layer's <code>in_features</code> doesn't match this product, the model errors immediately, so the shape trace is your pre-flight check.</div></div>
 
       <h4>Why this order works</h4>
       <ul>
@@ -433,6 +440,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>The flatten step is where the trickiest quiet bug hides, and how deep to stack conv-pool blocks is a real design choice.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): flattening the feature map in the wrong axis order.</b> Flatten just reads the <code>(C, H, W)</code> grid out into one long row. If you reshape or permute it in a different order than the layer expects — for example reading it channel-last when the dense layer was wired for channel-first — the row has the exact same length (<code>16×7×7 = 784</code> either way), so no shape error is raised and training still runs. But the 784 numbers now sit in scrambled positions, so the dense layer learns from a jumbled feature order and lands at lower accuracy for no obvious reason. A senior engineer, in <b>code review</b>, checks that any manual <code>reshape</code>/<code>permute</code> before the dense layer matches the tensor's real memory layout, and prefers the framework's own flatten over a hand-written one.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more conv-pool blocks give a wider view but cost resolution.</b> Each pooling step halves height and width, which lets later filters see a bigger area of the original image (a larger receptive field) and keeps compute low. What you give up is fine spatial detail and the ability to place small objects precisely — by <code>7×7</code> the network sees only a coarse summary. How deep to stack these blocks is a <b>design-review</b> decision that balances a wide receptive field and cheap compute against keeping enough resolution for the task.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A small CNN is <code>conv → pool → conv → pool → flatten → dense</code>: conv-pool blocks shrink H,W while growing channels, turning pixels into a small stack of rich feature maps, then flatten + one dense layer make the call. I keep conv before dense so neighbor information survives, and I trace shapes — <code>(1,28,28) → … → (16,7,7) → 784 → 10</code> — before running. The nuance is the flatten: a wrong axis order keeps the same length (784) so nothing errors, but scrambles the feature positions and quietly lowers accuracy, so I trust the framework's flatten over a hand-rolled reshape."</div></div>
       <button class="gotit" type="button">Got the shape flow</button>
     </div>
 </section>
@@ -463,6 +471,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Build the CNN and print each shape (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Build the small CNN in PyTorch and watch the shape flow. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>An <code>nn.Sequential</code>: Conv2d(1→8,k3,p1) → ReLU → MaxPool2d(2) → Conv2d(8→16,k3,p1) → ReLU → MaxPool2d(2) → Flatten → Linear(16·7·7→10).</li>
+        <li>A dummy <code>(1,1,28,28)</code> tensor pushed through, printing the shape after <em>every</em> layer so the H,W shrink and channel growth are visible; final shape asserted to be <code>(1,10)</code>.</li>
+        <li>The total parameter count printed.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> the shape right before flatten and why <code>16×7×7 = 784</code>, why conv comes before dense, what a wrong flatten axis order would do (same length, scrambled features, silent accuracy drop), and what breaks if the dense layer's <code>in_features</code> doesn't match the flattened length.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py</code>. Build an <code>nn.Sequential</code> with: Conv2d(1→8, k=3, p=1), ReLU, MaxPool2d(2), Conv2d(8→16, k=3, p=1), ReLU, MaxPool2d(2), Flatten, Linear(16·7·7 → 10). Push a dummy tensor of shape (1,1,28,28) through it, printing the shape after every layer. Confirm the last shape is (1,10). Run with <code>python3 sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -478,7 +493,7 @@ Create sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/experiment.py tha
 4. Prints the total parameter count.
 Then run it and paste the sequence of shapes at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/log.md</code>: what was the shape right before flatten, and did 16×7×7 equal the flattened length you expected?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/log.md</code>: (1) the recipe in your own words; (2) the shape right before flatten and whether <code>16×7×7</code> matched the flattened length; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 4</button>
     </div>
 </section>

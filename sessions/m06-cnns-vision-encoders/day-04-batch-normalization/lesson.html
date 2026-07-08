@@ -353,6 +353,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <li><strong>Scale and shift:</strong> multiply by a learned number and add another learned number, so the network can undo the normalization if it turns out to be better.</li>
       </ul>
       <p>The result: clean, steady inputs to every layer, so training moves faster and does not wobble. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> batchnorm 在训练和测试时"行为不一样"，而且一张图的输出竟然依赖同批次里的别的图——这两点最反直觉。In plain terms: people expect a layer to treat each input independently, but batchnorm normalizes using the <i>whole batch's</i> mean and variance, and it uses batch stats while training but saved running averages at test time. That "same image, different answer depending on its batch-mates" behaviour is what feels wrong until you see the two modes.</div></div>
       <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
@@ -366,6 +367,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         <div class="card"><span class="big">⚖️</span><h5>Re-center each time</h5><p>So the teacher re-centers every quiz: shift so the average is 0, and rescale so the spread is the same each day. Now scores are comparable, and real progress shows through. Batchnorm does this to each channel, every batch.</p></div>
       </div>
       <p><strong>In one line:</strong> batchnorm keeps the numbers between layers on a steady scale, so each layer always sees a familiar range instead of a moving target.</p>
+      <p><b>直觉 / Intuition:</b> 就像每次考试都按"平均分归零、分差统一"来打分，让进步看得出来。<b>In systems terms:</b> it is auto-gain-control on the signal between layers — a normalize step re-centers and re-scales the values, then two learned knobs (<code>γ, β</code>) let the network turn that adjustment back up or down if it wants.</p>
       <p>Because the inputs stay steady, you can safely use a bigger learning rate and train in fewer steps. That is the speed-up.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a teacher re-centers using every student's score at once. Batchnorm only sees one mini-batch at a time, so its mean and spread are estimates. That is why, at test time, it uses a saved running average instead of a single batch — and why very tiny batches make batchnorm noisy.</div></div>
       <button class="gotit" type="button">Got the picture</button>
@@ -421,6 +423,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
         y = 1·x_norm + 0 = same   <span class="dim"># mean 0, spread 1</span>
       </div></div>
       <p>The messy <code>[2, 4, 6, 8]</code> became a tidy set centered at 0 with a standard spread. Gamma and beta start at 1 and 0, so at first batchnorm just normalizes; during training the network learns better values if it needs them.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — batch normalization</b>
+      <br><b>1 · In words:</b> center each channel at 0, rescale to a standard spread, then let two learned knobs re-scale and re-shift.
+      <br><b>2 · The formula:</b> <code>x_norm = (x − μ)/√(σ² + ε)</code>, then <code>y = γ·x_norm + β</code> — <code>μ,σ²</code> = this channel's mean/variance over the batch; <code>ε</code> = tiny anti-divide-by-zero; <code>γ,β</code> = learned scale/shift.
+      <br><b>3 · Tiny numbers:</b> <code>[2,4,6,8]</code> → <code>μ=5, σ²=5, √σ²≈2.236</code> → <code>x_norm=[−1.34,−0.45,0.45,1.34]</code>; with <code>γ=1,β=0</code>, <code>y=x_norm</code>.
+      <br><b>4 · Sanity check:</b> after normalizing, the channel's mean must be ≈0 and its std ≈1 (before <code>γ,β</code>); and setting <code>γ=√σ², β=μ</code> recovers the original <code>x</code> exactly — so the network can always undo the normalization if that's better.</div></div>
 
       <h4>Why it helps</h4>
       <ul>
@@ -434,6 +441,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Batchnorm behaves differently in training and evaluation, and it quietly makes every image in a batch depend on the others — both bite when you are not watching.</p>
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): running inference without switching to eval mode.</b> If you forget to put the model in eval mode (<code>model.eval()</code>) before testing or serving, batchnorm keeps using the <em>current batch's</em> mean and variance instead of the saved running averages. Nothing crashes. But now a prediction depends on whatever other images happen to share the batch, so the same image gets different answers in different batches, and a batch of size 1 normalizes against itself and comes out near zero. Your training curves looked great, so the accuracy drop at serving time is a mystery. A senior engineer, in <b>code review</b>, checks that <code>eval()</code> is called (and gradients disabled) on every inference and validation path.</div></div>
       <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: batchnorm's speed-up costs you a dependence on batch size.</b> The stable, well-scaled inputs that let you train faster come from statistics computed <em>across the batch</em> — so each example's output now depends on its batch-mates. With a healthy batch that noise is mild and even helps regularize. With a tiny batch (say 2–4 images, common when the model or images are large) the mean and variance are so noisy that training destabilizes. Whether to accept that coupling — or switch to a batch-independent normalizer like GroupNorm or LayerNorm — is the <b>design-review</b> decision when batch size is forced small.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Batchnorm normalizes each channel across the batch — <code>(x−μ)/√(σ²+ε)</code> — then applies a learned scale and shift <code>γ,β</code>, so every layer sees a steady input range and you can train with a bigger learning rate. The nuance is the train/eval split and the batch coupling: at test time it must use saved running averages (forgetting <code>model.eval()</code> makes one image's prediction depend on its batch-mates, silently), and with tiny batches the stats are too noisy — that's when I reach for GroupNorm or LayerNorm instead."</div></div>
       <button class="gotit" type="button">Got the batchnorm math</button>
     </div>
 </section>
@@ -464,6 +472,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Normalize a batch and check the numbers (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
       <p>Understanding ≠ being able to write it. Compute batchnorm by hand and confirm PyTorch agrees. Pick one:</p>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>A small batch (e.g. one channel <code>[2,4,6,8]</code>); NumPy computes mean, variance, and <code>x_norm = (x − mean)/√(var + 1e-5)</code>, printed and asserted to have mean ≈0, std ≈1.</li>
+        <li>The same values run through <code>torch.nn.BatchNorm1d</code> in train mode and compared to the by-hand result (matches at <code>γ=1, β=0</code>).</li>
+        <li>A tiny model trained twice — with and without a BatchNorm layer — printing the loss after a few steps to show batchnorm trains faster/more stably.</li>
+        <li><b>Explain-back (5–7 sentences in <code>log.md</code>):</b> what normalizing does to the mean/spread, why <code>γ,β</code> exist, why batchnorm speeds training, what goes wrong if you forget <code>model.eval()</code> at test time, and when you'd pick GroupNorm/LayerNorm instead.</li>
+      </ul>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py</code>. Make a small batch, for example one channel with values <code>[2,4,6,8]</code>. Compute mean, variance, and <code>x_norm = (x - mean)/sqrt(var + 1e-5)</code> in NumPy. Print the normalized values and confirm the mean is near 0 and the spread near 1. Then run the same numbers through <code>torch.nn.BatchNorm1d</code> and compare. Run with <code>python3 sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
@@ -478,7 +493,7 @@ Create sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.p
 3. Trains a tiny model on random data twice — once with a BatchNorm layer and once without — and prints the loss after a few steps to show batchnorm trains faster/more stably.
 Then run it and paste the by-hand vs torch values and the two loss numbers at the bottom as a comment.</pre>
       </div>
-      <div class="callout c-info"><span class="ic">📝</span><div>After running it, write one line in <code>sessions/m06-cnns-vision-encoders/day-04-batch-normalization/log.md</code>: did your by-hand normalized mean come out near 0, and did the batchnorm model reach a lower loss faster?</div></div>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话在 <code>log.md</code> 写三行 — before you close the tab, write three lines in <code>sessions/m06-cnns-vision-encoders/day-04-batch-normalization/log.md</code>: (1) what batchnorm does, in one sentence; (2) whether your by-hand normalized mean came out near 0 and whether the batchnorm model reached a lower loss faster; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done — on to Day 5</button>
     </div>
 </section>
