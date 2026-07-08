@@ -15,15 +15,17 @@ Behavioral concepts require plotted or live-recomputed evidence.
 
 Examples:
 
-- activation curve behavior,
-- derivative behavior,
-- decision boundary movement,
-- learning-rate path,
-- loss curve,
-- softmax temperature,
-- gradient flow.
+- attention score heatmap
+- softmax distribution changes
+- Q/K/V projection fan
+- token-to-token relevance
+- activation curve behavior
+- derivative behavior
+- decision boundary movement
+- learning-rate path
+- loss curve
 
-A static SVG or prose table is not enough for P0 behavioral concepts unless explicitly scoped as a static intuition only.
+A static SVG or prose table is not enough for P0 behavioral concepts unless explicitly scoped as static intuition only.
 
 ## Simulated vs runnable rule
 
@@ -40,15 +42,6 @@ It only counts if:
 
 If a failure mode is taught, show the broken behavior visually or through runnable artifact.
 
-Examples:
-
-- softmax overflow -> `[nan nan nan]`
-- stable softmax -> valid probabilities
-- learning rate too high -> loss explodes
-- dead ReLU -> dead-unit fraction
-- leakage -> suspiciously high test result
-- XOR -> single-neuron failure
-
 ## Numeric readout rule
 
 Every quantitative visual must show the derived number it teaches.
@@ -56,17 +49,6 @@ Every quantitative visual must show the derived number it teaches.
 ## Artifact reproducibility rule
 
 If a playground demonstrates a behavior, the Produce artifact must reproduce it or clearly explain why it is only illustrative.
-
-## Workflow usage
-
-In dynamic workflows, visual/evidence subagents should report:
-
-- P0 visuals/evidence missing,
-- simulated-only evidence,
-- behavioral concepts lacking plotted/live evidence,
-- artifact reproducibility gaps,
-- numeric readout gaps,
-- broken or misleading visuals.
 
 ## Manifest update behavior
 

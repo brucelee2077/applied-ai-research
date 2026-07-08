@@ -45,21 +45,9 @@ Every lesson should include:
 15. Produce artifact
 16. Explain-back
 
-## Neural Foundation Rule
-
-Neural-network foundation lessons must include:
-
-- biological inspiration,
-- caveat: artificial neurons are math functions, not biological neurons,
-- mapping table,
-- where the analogy breaks,
-- transition to math function.
-
 ## Function Family Rule
 
 For mechanism families, include representative variants, comparison table, failure modes, and modern context.
-
-Activations should include sigmoid, tanh, ReLU, Leaky ReLU, softmax, derivative intuition, saturation, vanishing gradient, dying ReLU, and GELU/SwiGLU context unless out of scope.
 
 ## Capability Limit Rule
 
@@ -69,12 +57,6 @@ If a mechanism has an important limitation, teach it with:
 - visual or runnable evidence,
 - where the limitation matters,
 - how later modules relax the limit.
-
-Example:
-
-```text
-A single neuron draws one line. XOR needs two bends / a hidden layer.
-```
 
 ## Evidence-first failure mode
 
