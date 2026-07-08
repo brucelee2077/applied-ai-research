@@ -1,18 +1,36 @@
 ---
 name: frontier-refactor-qa
-description: Use after curriculum edits to validate coverage, coach voice, foundation framing, function family coverage, visual/evidence, artifacts, anchor consistency, legacy skill references, and goal-loop completion.
+description: Use after curriculum edits to validate coverage, coach voice, foundation framing, function family coverage, visual/evidence, artifacts, anchor consistency, legacy skill references, manifest state, and goal-loop completion.
 ---
 
 # Frontier Refactor QA
 
 You are the strict quality gate.
 
+Use the module manifest as the durable source of truth, and update it after QA/eval/fix loops.
+
+## Manifest Update Gate
+
+After QA, held-out eval, or skill patch:
+
+- update `sessions/<module>/_refactor/manifest.yaml`,
+- every P0/P1/P2 finding must map to a backlog item,
+- every coverage finding must map to coverage_items,
+- every visual/evidence finding must map to visual_evidence_items,
+- every artifact finding must map to artifact_items,
+- every systemic skill gap must map to skill_gap_candidates,
+- report files must be recorded in loop_history.
+
+Do not leave findings only in prose reports.
+
 ## Goal-loop role
 
-When `/goal` is active, your job is to produce evidence in the transcript that the goal is or is not satisfied.
+When `/goal` is active, produce evidence that the goal is or is not satisfied.
 
 Do not claim the goal is met without:
 
+- manifest status,
+- open P0 backlog count,
 - report files created,
 - P0 count shown,
 - gate results shown,
@@ -21,15 +39,16 @@ Do not claim the goal is met without:
 
 ## Dynamic workflow pattern
 
-For substantial QA, use dynamic workflow with subagents:
+For substantial QA, use subagents:
 
 1. Coverage Traceability Agent
 2. Coach Voice/Foundation Framing Agent
 3. Function Family Agent
 4. Visual/Evidence Agent
 5. Artifact/Anchor Consistency Agent
-6. Legacy Skill Agent
-7. Integrator/Adversarial Critic
+6. Manifest Consistency Agent
+7. Legacy Skill Agent
+8. Integrator/Adversarial Critic
 
 The integrator must deduplicate and rank findings.
 
@@ -40,6 +59,7 @@ The integrator must deduplicate and rank findings.
 - generic analogy substituted for required foundation framing
 - formula-first opening
 - P0 visual/evidence missing
+- behavioral P0 concept lacks plotted/live evidence
 - failure mode without evidence/artifact
 - simulated output counted as evidence without reproducible artifact
 - anchor inconsistency that teaches conflicting model
@@ -47,35 +67,8 @@ The integrator must deduplicate and rank findings.
 - Produce path mismatch
 - legacy skill reference to uninstalled skill
 - broken JS/nav/completion
-
-## Names-it-is-not-covers-it rule
-
-A concept that is only **named** (mentioned in a callout, trade-off, or list) but never **shown** — no
-formula + curve, no worked numbers, no runnable/plotted evidence — is a **coverage gap, not coverage**.
-Grade it PARTIAL at best. "We mention softmax / Leaky ReLU / the decision boundary" does not clear a
-must-cover row; the row needs the concept landed at its stated depth.
-
-## Prose-for-behavioral rule
-
-When a claim is **behavioral** (a derivative flattening, a curve bending, a boundary rotating/shifting, a
-gradient vanishing/exploding, a loss diverging), evidence stated **only in prose or a table cell** is a
-**visual gap**. The behavioral claim must be plotted or run (see visual-evidence "behavioral vs structural"
-rule). Flag "asserts a shape it never shows."
-
-## Held-out yardstick step
-
-Before signing off any foundation module, ask of each core topic: *"Would a canonical treatment (a standard
-notebook or textbook) SHOW something here that this lesson only TELLS?"* — a plotted derivative, a plotted
-boundary, an executed benchmark, a run failure demo. If yes, that is a visual/evidence gap even if every
-gate above passes. Do not let staff-lens polish, themed shell, or frontier framing offset weak beginner
-evidence.
-
-## Dead-escape-hatch flag
-
-If a Produce "Option B" (or any auto-build path) routes to an **uninstalled** skill, flag it. Distinguish
-this from a sanctioned curriculum-wide legacy reference: even when the legacy reference is waived, note that
-the module's only auto-build+run path is dead, so the learner's sole shipped runnable evidence is a
-guided stub. Report as at least P1 (not silently waved through).
+- manifest missing during a refactor loop
+- QA findings not reflected in manifest
 
 ## Coverage traceability table
 
@@ -86,6 +79,8 @@ For every must-cover concept:
 
 Result: PASS / PARTIAL / FAIL.
 
+Named is not covered. A concept is covered only if the lesson explains it at the required depth and provides required evidence/artifact.
+
 ## Foundation Framing Gate
 
 For neural-network foundations, require brain-inspired intuition, artificial-neuron caveat, mapping table, where analogy breaks, and transition to math function.
@@ -93,6 +88,15 @@ For neural-network foundations, require brain-inspired intuition, artificial-neu
 ## Function Family Gate
 
 For activations, expect sigmoid, tanh, ReLU, Leaky ReLU, softmax, derivative intuition, saturation, vanishing gradient, dying ReLU, and GELU/SwiGLU context unless out of scope.
+
+## Visual/Evidence Gate
+
+Mark P0 if:
+
+- P0 behavioral concept has no plotted/live evidence,
+- P0 failure mode has no evidence/artifact,
+- simulated output is counted as evidence without reproducible artifact,
+- quantitative visual lacks required numeric readout.
 
 ## Anchor Consistency Gate
 
@@ -104,11 +108,18 @@ Only run held-out eval when user asks.
 
 Held-out eval must include adversarial sections and must not over-credit Staff Lens or frontier relevance when beginner coverage, intuition, visuals, or runnable experiments are weak.
 
+Held-out eval must update:
+
+- heldout_eval_findings
+- backlog
+- skill_gap_candidates
+
 ## Reports
 
 Create reports with:
 
 - Scope
+- Manifest status
 - Coverage traceability table
 - Coach Voice Gate
 - Foundation Framing Gate
@@ -116,6 +127,7 @@ Create reports with:
 - Visual/Evidence Gate
 - Anchor Consistency Gate
 - Artifact Gate
+- Manifest Update Gate
 - P0/P1/P2 findings
 - Fixes applied if any
 - Merge recommendation

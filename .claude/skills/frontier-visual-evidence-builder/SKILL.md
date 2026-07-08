@@ -1,11 +1,29 @@
 ---
 name: frontier-visual-evidence-builder
-description: Use to design notebook-grade visuals and runnable evidence. Enforces simulated-vs-runnable rules, failure demos, benchmarks, numeric readouts, and artifact reproducibility.
+description: Use to design notebook-grade visuals and runnable evidence from the module manifest. Enforces simulated-vs-runnable rules, failure demos, benchmarks, numeric readouts, behavioral visuals, and artifact reproducibility.
 ---
 
 # Frontier Visual Evidence Builder
 
 You make concepts visible and testable.
+
+Use the module manifest visual_evidence_items as the source of truth for module-specific visual/evidence backlog.
+
+## Behavioral visual rule
+
+Behavioral concepts require plotted or live-recomputed evidence.
+
+Examples:
+
+- activation curve behavior,
+- derivative behavior,
+- decision boundary movement,
+- learning-rate path,
+- loss curve,
+- softmax temperature,
+- gradient flow.
+
+A static SVG or prose table is not enough for P0 behavioral concepts unless explicitly scoped as a static intuition only.
 
 ## Simulated vs runnable rule
 
@@ -18,32 +36,9 @@ It only counts if:
 3. acceptance criteria require the learner to run it,
 4. expected output is specified.
 
-## Behavioral vs structural visual rule
-
-Split every P0 visual into two kinds and hold them to different bars:
-
-- **Structural** — a fixed relationship or wiring (a neuron's `w·x+b` assembly, a layer's shape chain, a
-  loop cycle). A hand-authored static SVG with labeled numbers is acceptable here.
-- **Behavioral** — the concept IS a quantity *moving over a range*: a curve bending, a **derivative going
-  flat** (saturation / vanishing gradient), a **decision boundary rotating/shifting**, a loss falling, a
-  step overshooting, a gradient exploding. For a behavioral concept a static SVG with baked-in numbers, or a
-  prose/table readout ("slope near 0 ≈ 0.25"), **does NOT satisfy the P0 visual** — it *tells* what must be
-  *shown*. Require a **plotted or live-recomputed** viz that renders the quantity across its range (a real
-  plot, or the existing `build-embed` iframe → a `viz/*.html` that recomputes on input change).
-
-Litmus test: *if changing a parameter should change the picture, the picture must actually recompute.* A
-"fake terminal" whose outputs are literal strings, or an SVG whose numbers are frozen, fails this for any
-behavioral concept. If the lesson's medium cannot host a live plot, the **runnable artifact must plot it**
-and the lesson must point to that output — the behavioral claim may not rest on prose alone.
-
-When the taught idea is a function's **derivative** or **geometry**, the required visual is the plotted
-derivative / the plotted boundary — not a table cell describing it.
-
 ## Show-the-failure rule
 
-If a failure mode is taught, show the broken behavior visually or through runnable artifact. For a failure
-whose signature is a *shape* (a derivative flattening, a loss curve diverging), showing it means the plotted
-or run curve — not a sentence asserting it happened.
+If a failure mode is taught, show the broken behavior visually or through runnable artifact.
 
 Examples:
 
@@ -52,11 +47,15 @@ Examples:
 - learning rate too high -> loss explodes
 - dead ReLU -> dead-unit fraction
 - leakage -> suspiciously high test result
-- saturation / vanishing gradient -> the plotted derivative visibly collapses toward 0 in the tails
+- XOR -> single-neuron failure
 
 ## Numeric readout rule
 
 Every quantitative visual must show the derived number it teaches.
+
+## Artifact reproducibility rule
+
+If a playground demonstrates a behavior, the Produce artifact must reproduce it or clearly explain why it is only illustrative.
 
 ## Workflow usage
 
@@ -64,10 +63,18 @@ In dynamic workflows, visual/evidence subagents should report:
 
 - P0 visuals/evidence missing,
 - simulated-only evidence,
-- behavioral concept shown only via static SVG / prose table (not plotted or live-recomputed),
+- behavioral concepts lacking plotted/live evidence,
 - artifact reproducibility gaps,
 - numeric readout gaps,
 - broken or misleading visuals.
+
+## Manifest update behavior
+
+After visual/evidence QA:
+
+- update visual_evidence_items current_state,
+- add missing visuals to backlog,
+- link each item to the report that found it.
 
 ## Done
 

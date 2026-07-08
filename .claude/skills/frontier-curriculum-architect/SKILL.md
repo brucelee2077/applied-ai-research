@@ -1,6 +1,6 @@
 ---
 name: frontier-curriculum-architect
-description: Use to design/refactor Frontier Lab curriculum modules from first principles, create contracts, and orchestrate goal-driven/dynamic workflow refactor loops.
+description: Use to design/refactor Frontier Lab curriculum modules from first principles, create/update module refactor manifests, and orchestrate goal-driven/dynamic workflow loops.
 ---
 
 # Frontier Curriculum Architect
@@ -11,12 +11,50 @@ You design complete learning experiences from first principles while preserving 
 
 Do not read old notebooks or prior courseware unless the user explicitly asks. Existing sessions are shell constraints and rough drafts.
 
+## Module Refactor Manifest Rule
+
+Every module refactor must maintain:
+
+```text
+sessions/<module>/_refactor/manifest.yaml
+```
+
+The manifest is the durable module source of truth for:
+
+- constraints
+- quality gates
+- coverage items
+- visual/evidence items
+- artifact items
+- backlog
+- held-out eval findings
+- skill-gap candidates
+- loop history
+
+Before each loop:
+
+1. read the manifest if it exists,
+2. create it if missing,
+3. use it to plan the loop.
+
+After each loop:
+
+1. update quality gate status,
+2. update coverage / visual / artifact item states,
+3. add or update backlog items,
+4. add report paths,
+5. mark fixed / partial / blocked / waived items,
+6. add skill-gap candidates when systemic issues appear.
+
+Do not leave findings only in prose reports.
+
 ## Goal-driven orchestration
 
 For substantial refactors, prefer a `/goal` loop with a measurable completion condition.
 
 A good goal condition must specify:
 
+- manifest path,
 - target report files,
 - required P0 count,
 - required gate results,
@@ -24,41 +62,36 @@ A good goal condition must specify:
 - stop-after turn bound,
 - what to do if blocked.
 
-Example:
-
-```text
-/goal Module 2 reaches Pass or Pass with P1: sessions/m02_v7_2_qa_report.md reports 0 P0 findings, lesson_audit.py passes, nav/jsdom checks pass if available, and sessions/m02_v7_2_fix_report.md summarizes remaining P1/P2 only; stop after 8 turns if not met.
-```
-
 ## Dynamic workflow rule
 
-Use a dynamic workflow when a task benefits from parallel subagents:
+Assume dynamic workflow is enabled if the user says so.
 
-- one subagent per lesson,
-- one for coverage,
-- one for coach voice,
-- one for visual/evidence,
-- one for artifacts,
-- one adversarial critic,
-- one integrator.
+Use subagents for:
 
-Do not use workflow for tiny single-file fixes.
+- coverage traceability
+- coach voice / foundation framing
+- function family coverage
+- visual/evidence
+- artifacts / anchor consistency
+- held-out eval
+- adversarial integration
 
 ## Required protocol
 
 Before editing a module:
 
 ```text
-1. Structural audit
-2. Coverage discovery
-3. Coverage contract
-4. Coach voice contract
-5. Visual/evidence contract
-6. Artifact contract
-7. Refactor plan
+1. Read/create manifest
+2. Structural audit
+3. Coverage discovery
+4. Update manifest coverage items
+5. Update manifest visual/evidence items
+6. Update manifest artifact items
+7. Update manifest backlog
+8. Refactor plan
 ```
 
-Then edit, QA, and loop until the active goal condition is satisfied or blocked.
+Then edit, QA, update manifest, and loop until the active goal condition is satisfied or blocked.
 
 ## Coverage Engine
 
@@ -73,25 +106,7 @@ Derive coverage using:
 7. Systems / Research Relevance Lens
 8. Interview Readiness Lens
 9. Anchor Consistency Lens
-10. Capability-Limits & Geometry Lens
-
-## Capability-Limits & Geometry Lens
-
-A coverage contract must not enumerate only what a mechanism *does* (its forward formula). For every core
-mechanism it must also require:
-
-- **Capability limit** — the defining thing the mechanism *cannot* do, taught as a must-cover or
-  should-cover with evidence. (A single neuron cannot solve XOR / is limited to a linear boundary; one
-  linear layer buys no expressivity; a small LR crawls forever.) The limit is often the whole reason the
-  *next* concept exists — omitting it leaves the learner without the motivation for what follows.
-- **Geometric interpretation** — what the parameters *do to a picture*, required as a **plotted/behavioral**
-  visual (not prose): `w` orients a boundary, `b` shifts/thresholds it, an activation bends a line, a loss
-  is a surface. If the contract names geometry, it must pair it with a plotted-boundary / plotted-curve
-  visual requirement (coordinate with the visual contract's behavioral-visual rule), never prose-only.
-
-When you write the coverage contract, add a row for the limit and a row (or visual-contract entry) for the
-geometry. A contract that lists `output = f(w·x+b)` but not "what it can't do" and not "what w/b do to the
-boundary" is incomplete.
+10. Capability Limits & Geometry Lens
 
 ## Foundation Framing Lens
 
@@ -111,10 +126,32 @@ For mechanism families, require representative variants, comparison table, when-
 
 For activations, expect sigmoid, tanh, ReLU, Leaky ReLU, softmax, derivative intuition, saturation, vanishing gradient, dying ReLU, and GELU/SwiGLU context unless explicitly out of scope.
 
+## Capability Limits & Geometry Lens
+
+Contracts must enumerate:
+
+- what the mechanism can express,
+- what it cannot express,
+- the simplest counterexample,
+- the geometry when relevant,
+- the visual/evidence needed to see the limit.
+
+Examples:
+
+- a single neuron creates a linear boundary,
+- a single neuron cannot solve XOR,
+- stacking nonlinear layers changes the expressivity.
+
 ## Anchor Consistency Lens
 
 Track step counts, seeds, split ratios, learning rates, dataset sizes, sequence lengths, batch sizes, parameter values, metric definitions, and model dimensions across prose, visuals, playgrounds, quiz, Produce, and acceptance criteria.
 
 ## Done
 
-A refactor passes when the active goal condition is met, not when the lesson merely looks better.
+A refactor passes when:
+
+- active goal condition is met,
+- manifest status is pass or pass_with_p1,
+- open P0 backlog is empty,
+- audit/test evidence is reported,
+- module findings are reflected in the manifest.
