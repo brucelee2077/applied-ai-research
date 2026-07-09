@@ -169,9 +169,9 @@ var DEMOS = {
     '<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">1.0</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">4</span>):\n'+
     '<span class="dim">...</span>     grad = <span class="num">2</span>*(w*x-y)*x; w = w - lr*grad\n'+
-    '<span class="dim">...</span>     print(step, round(w,<span class="num">2</span>), round((w*x-y)**<span class="num">2</span>,<span class="num">2</span>))\n'+
+    '<span class="dim">...</span>     print(step, round(w,<span class="num">3</span>), round((w*x-y)**<span class="num">2</span>,<span class="num">3</span>))\n'+
     '<span class="bad">0 10.6    231.04</span>\n<span class="bad">1 -25.88  3336.22</span>\n<span class="bad">2 112.74  48174.98</span>\n<span class="bad">3 -414.03 695646.74</span>',
-    take:'<b>③  Too big — it explodes.</b> Each step jumps past the bottom to a worse point on the far side. w bounces to bigger and bigger numbers and the loss grows without limit. Training has diverged.'}
+    take:'<b>③  Too big — it explodes.</b> Each step jumps past the bottom to a worse point on the far side. w bounces to bigger and bigger numbers and the loss grows without limit. Training has diverged. (This preview stops at 4 steps because it has already blown up; your Produce run does the full 8 steps for all three rates — you just see more of the same explosion here.)'}
 };
 @@@ region name=BUILD
 var BUILD=[

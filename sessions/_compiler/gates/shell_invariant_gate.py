@@ -26,6 +26,14 @@ def _shell_regions(html):
     return (css.group(0) if css else None), scripts
 
 
+def _mask_data(s):
+    """Blank out the DEMOS/BUILD/QS data blocks so the JS *engine* can be compared to
+    the donor while the authored playground/build/quiz DATA is allowed to change."""
+    for name in ('DEMOS', 'BUILD', 'QS'):
+        s = re.sub(v8lib.REGION_PATTERNS[name], '__%s__' % name, s, flags=re.DOTALL)
+    return s
+
+
 def run(html, meta, donor=None):
     msgs, ok = [], [True]
     def chk(cond, label):
@@ -63,7 +71,8 @@ def run(html, meta, donor=None):
         chk(dc == hc, 'CSS block byte-identical to donor')
         chk(len(ds) == len(hs), 'same number of <script> blocks (%d)' % len(hs))
         for i, (a, b) in enumerate(zip(ds, hs)):
-            chk(a == b, 'script #%d byte-identical to donor' % i)
+            # compare the JS engine, masking DEMOS/BUILD/QS (editable data lives inside script #1)
+            chk(_mask_data(a) == _mask_data(b), 'script #%d engine byte-identical to donor (data masked)' % i)
     return ok[0], msgs
 
 
