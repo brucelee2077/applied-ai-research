@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
-<title>Module 2 · Day 1 — A Single Neuron</title>
+<title>Module 2 · Day 5 — Gradients &amp; Backpropagation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -272,7 +272,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 </style>
 </head>
 
-<body data-quest-id="wf2-d01-neuron">
+<body data-quest-id="wf3-d02-backprop">
 
 <div id="progress-track" aria-hidden="true"><div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div></div>
 <button id="nav-toggle" type="button" aria-label="Toggle sections" aria-expanded="false">☰ Sections</button>
@@ -285,7 +285,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <div class="sidebar-scroll">
     <div class="brand">
       <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
-      <div class="brand-sub">Foundations · M2 Day 1</div>
+      <div class="brand-sub">Foundations · M2 Day 5</div>
       <div class="nav-count" id="count"><b>0</b>/7 sections done</div>
     </div>
 
@@ -319,8 +319,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     </div><!-- /.sidebar-scroll -->
 
     <div class="side-nav">
-      <a class="lnav prev" href="../../m01-shape-of-data/review.html"><span class="d">← Prev</span><span class="t">M1 · Review Gate</span></a>
-      <a class="lnav next" href="../day-02-activations/lesson.html"><span class="d">Next →</span><span class="t">Activation Functions</span></a>
+      <a class="lnav prev" href="../day-04-loss/lesson.html"><span class="d">← Prev</span><span class="t">Loss Functions</span></a>
+      <a class="lnav next" href="../day-06-training-loop/lesson.html"><span class="d">Next →</span><span class="t">The Training Loop</span></a>
       <a class="lnav-hub" href="../../index.html"><span class="d">▦ Map</span><span class="t">Back to curriculum</span></a>
     </div>
   </aside>
@@ -329,98 +329,111 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <main id="content">
 
     <section id="home" class="hero">
-      <span class="kicker">Module 2 · Train · Day 1</span>
-      <h1>A Single Neuron<span class="sub">The Smallest Piece of a Learning Machine</span></h1>
-      <p class="lede">Right now, without even trying, your brain is soaking up thousands of tiny signals — the shapes on this screen, the sounds around you — and quietly deciding which ones matter and which to ignore. That one habit, <em>weigh things, then decide</em>, is the whole idea behind a <strong>neural network</strong>. Its smallest piece is called a <strong>neuron</strong>, and a neuron does just one very human job: it looks at some numbers, decides how much each one matters, adds them up, and gives a verdict. Today you'll build one by hand — and once this little piece clicks, everything bigger turns out to be just <em>many of these</em>.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, one neuron will feel obvious: you'll walk through its three steps — <strong>weigh the inputs → add a bias → decide with an activation</strong> — and compute one by hand.</div></div>
+      <span class="kicker">Module 2 · Train · Day 5</span>
+      <h1>Gradients &amp; Backpropagation<span class="sub">Which Way Is Downhill?</span></h1>
+      <p class="lede">You have a loss — one number saying how wrong the model is. Now the key question: which way should each weight move to make that number smaller? The answer is the <strong>gradient</strong> (the slope), and <strong>backpropagation</strong> is the clever trick that computes it for every weight at once.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> say what a gradient is, do one gradient-descent step by hand, and describe backprop as the chain rule run backward through the network.</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
     <section class="module-section" id="s1" data-sec="what">
-  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">What a neuron is (and what a network is made of)</span><span class="sec-tag">What is it</span></div>
+  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">Gradient, gradient descent, backprop</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><strong>What this assumes:</strong> Module 1 — arrays, the dot product / matmul (Day 4), and broadcasting. <strong>No neural-network background needed</strong> — this is the first piece.</div></div>
-      <h4>First, the picture — hold this before any words</h4>
-      <p>Picture one brain cell for a moment. It is listening to lots of little signals coming in at once, but it does not treat them all the same — some incoming connections are strong and some are weak, so some signals count for more. The cell <strong>adds everything up</strong>, and if the total is strong enough it <strong>fires</strong>; if not, it stays quiet. That is the entire idea of a neuron: <strong>weigh each input by how much it matters, add them up, then decide.</strong> Hold on to that one picture. Every word in the rest of this section is just a name for one part of that single sentence — not a new thing to be scared of.</p>
-      <h4>The words you'll meet today — plain English first</h4>
-      <p>Before any formula, here is every term you'll run into today, said in plain words. You don't need to memorize these — just glance down the list so no word feels new when it shows up.</p>
-      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">neuron</td><td style="padding:.4rem .6rem;color:var(--ink2)">The smallest piece of a neural network. It does three tiny steps: weigh the inputs, add a bias, then decide with an activation.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">weight</td><td style="padding:.4rem .6rem;color:var(--ink2)">A number that says how much one input matters to this neuron. Training is the process of adjusting these.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">bias</td><td style="padding:.4rem .6rem;color:var(--ink2)">One extra number added after the weighted sum. It nudges the result up or down before the decision.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">weighted sum</td><td style="padding:.4rem .6rem;color:var(--ink2)">Multiply each input by its weight and add them all up. This is exactly a <strong>dot product</strong> from Module 1.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">activation</td><td style="padding:.4rem .6rem;color:var(--ink2)">A simple decision step at the very end (like ReLU = keep positives, zero out negatives) that turns the total into the output.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">neural network</td><td style="padding:.4rem .6rem;color:var(--ink2)">Many neurons wired together in layers, tuned by training to turn inputs into useful answers.</td></tr></tbody></table>
-      <h4>What is a neural network?</h4>
-      <p>A <span class="term" data-tip="A machine that learns patterns from examples by adjusting a big set of numbers called weights. Built from many small units (neurons) arranged in layers.">neural network</span> is a machine that learns patterns from examples by tuning a big pile of numbers called <strong>weights</strong>. It is built from many tiny repeated units — <strong>neurons</strong> — stacked into layers. Today we zoom all the way in to one neuron.</p>
-      <h4>What is a neuron?</h4>
-      <p>A <span class="term" data-tip="The basic unit of a neural network. It does three steps: weighted sum of inputs, add a bias, then apply an activation function.">neuron</span> is a tiny function with exactly three steps:</p>
-      <ol><li><strong>Weighted sum</strong> — multiply each input by its <span class="term" data-tip="A number that says how much one input matters to this neuron. Weights are what training adjusts.">weight</span> and add them up. (This is exactly a <strong>dot product</strong> from M1 Day 4.)</li><li><strong>Add a bias</strong> — add one extra number, the <span class="term" data-tip="A single number added after the weighted sum. It shifts the result up or down before the activation.">bias</span>, that shifts the result.</li><li><strong>Activation</strong> — pass that result through a simple function (an <span class="term" data-tip="A simple function applied at the end of a neuron, e.g. ReLU = max(0, x). It adds the non-linearity that lets networks learn complex patterns.">activation function</span>) to get the output.</li></ol>
-      <h4>How does it relate to what you already know?</h4>
-      <p>Step 1 is something you can already do: <code>np.dot(w, x)</code> — the weighted sum <em>is</em> a dot product. So a neuron is just <code>activation(dot(w, x) + b)</code>. Why the activation at the end? That's the secret sauce — next lesson. Keep going 👇</p>
-      <div class="callout c-warn"><span class="ic">😕</span><div><strong>为什么这里容易卡住 · Why this trips people up:</strong> 很多人一上来就盯着 <code>w·x+b</code> 这个公式，却没问它到底在做什么 — people meet <code>w·x+b</code> and treat it as a magic formula to memorize. In plain terms: a neuron only does one human thing — "score each input by how much it matters, then decide." The formula is just the arithmetic of that one sentence, not a new idea.</div></div>
-      <button class="gotit" type="button">Got what a neuron is — let's go</button>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 4 (the loss), Day 3 (the forward pass), and the idea of a slope. <b>No heavy calculus</b> — we keep it to "slope = steepness."</div></div>
+
+      <h4>First, the picture — hold this before any formula</h4>
+      <p>Imagine you are standing on a foggy hillside and you want to reach the bottom of the valley. You can't see far, but you <em>can</em> feel which way the ground tilts most steeply downward under your feet. So you take a small step that way, feel again, and step again — and little by little you walk down to the low ground. That downhill feeling under your feet is the <strong>gradient</strong>, and walking down by small steps is <strong>gradient descent</strong>. Hold that picture; the three terms below are just names for the feeling and the walk.</p>
+
+      <h4>What is a gradient?</h4>
+      <p>A <span class="term" data-tip="The slope of the loss with respect to a weight: how much the loss changes if you nudge that weight. It points in the direction the loss increases fastest.">gradient</span> is the <strong>slope</strong> of the loss as you wiggle one weight — how much the loss goes up (or down) if you increase that weight a little. A positive gradient means "increasing this weight raises the loss," so to <em>lower</em> the loss you move the other way.</p>
+
+      <h4>What is gradient descent?</h4>
+      <p><span class="term" data-tip="The rule for improving weights: subtract a small fraction of the gradient. w = w - learning_rate * gradient. Repeated, it walks the loss downhill.">Gradient descent</span> is the rule for using that slope: take a small step in the <em>downhill</em> direction — against the gradient — then feel the slope again and step again, so the loss drops a little each time. The <span class="term" data-tip="The step size in gradient descent. Too big overshoots; too small learns slowly.">learning rate</span> is how big each step is. (The exact one-line update rule, with a worked step, is in Section 4.)</p>
+
+      <h4>What is backpropagation?</h4>
+      <p>A network has millions of weights. <span class="term" data-tip="The algorithm that computes the gradient of the loss for every weight, efficiently, by applying the chain rule backward from the loss to the inputs.">Backpropagation</span> is the efficient algorithm that computes the gradient for <strong>all</strong> of them in one sweep — running <em>backward</em> from the loss to the inputs, using the chain rule. Keep going 👇</p>
+      <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> jax.grad and torch.autograd — the exact tools frontier labs train with — are just automated versions of the chain rule you're about to run by hand.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> backprop 有个吓人的名声，好像是什么高深的黑魔法 — backprop has a scary reputation, as if it were deep black magic. In plain terms: it's just one question asked for every weight — "if I nudge you a tiny bit, does the loss go up or down, and how fast?" The gradient is the answer, and backprop is only the chain rule applied backward so you get all those answers in one sweep.</div></div>
+      <button class="gotit" type="button">Got the three words — let's go</button>
     </div>
 </section>
 
     <!-- ===== 2. INTUITION ===== -->
     <section class="module-section" id="s2" data-sec="intuition">
-  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">From a brain cell to a math function</span><span class="sec-tag">Intuition</span></div>
+  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">A hiker in the fog</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
-      <h4>Now make that picture exact</h4>
-      <p>You already have the picture from Section 1 — a cell that weighs its inputs, adds them up, and decides. Because the word "neuron" is borrowed from the brain, let's line the two up piece by piece so the picture becomes something you can compute. A real <strong>brain neuron</strong> collects tiny electrical signals from many neighbors through branches called <span class="term" data-tip="The branches of a brain neuron that receive incoming signals from other neurons.">dendrites</span>. Some of those connections are strong and some are weak, so some signals count for more than others. The cell body <strong>adds all the signals up</strong>, and if the total is strong enough to cross a <strong>firing threshold</strong>, the neuron "fires" — sending its own signal out along a long wire called the <span class="term" data-tip="The output wire of a brain neuron that carries its signal onward to other neurons.">axon</span>. If the total is too weak, it stays quiet.</p>
-      <p>An <strong>artificial neuron</strong> keeps that exact shape — take in many signals, weigh them, add them up, then decide one output — but turns each piece into arithmetic you can compute by hand. Here is the piece-by-piece mapping:</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:.88rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.5rem .6rem;color:var(--k)">Brain neuron</th><th style="padding:.5rem .6rem;color:var(--q)">Artificial neuron</th><th style="padding:.5rem .6rem;color:var(--muted)">What it is</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Dendrites taking in signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the inputs <code>x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">the numbers coming in</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Synapse strength (some connections matter more)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weights <code>w</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">how much each input counts</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Cell body summing the signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weighted sum <code>w·x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">add up the weighted inputs</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Firing threshold (fire only if strong enough)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the bias <code>b</code> + activation</td><td style="padding:.5rem .6rem;color:var(--ink2)">shift the total, then decide the output</td></tr><tr><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Axon carrying the signal onward</td><td style="padding:.5rem .6rem;color:var(--ink2)">the neuron's output</td><td style="padding:.5rem .6rem;color:var(--ink2)">the one number passed to the next layer</td></tr></tbody></table>
-      <p>Read straight down the middle column and you get the whole formula, in order: take the inputs <code>x</code>, weigh them with <code>w</code>, sum to <code>w·x</code>, shift by the bias <code>b</code>, then let the activation decide the output — exactly <code>output = activation(w·x + b)</code>, which Section 4 works out with real numbers.</p>
-      <h4>A second, everyday picture (optional)</h4>
-      <p>If the brain feels too abstract, here is the same three steps as one judge scoring a contestant:</p>
-      <div class="relate"><div class="card"><span class="big">⚖️</span><h5>Inputs × weights = a judge's score</h5><p>Each input (talent, stage presence…) gets a <strong>weight</strong> — how much this judge cares about it. The judge multiplies and adds them into one score.</p></div><div class="card"><span class="big">🎚️</span><h5>Bias + activation = the verdict</h5><p>The judge has a personal <strong>bias</strong> (a grumpy judge starts lower), then squashes the total into a clean verdict with an <strong>activation</strong>.</p></div></div>
-      <p><strong>In one line:</strong> a neuron weighs its inputs, adds a bias, and squashes the result into an output — the same three steps whether you picture a brain cell or a judge.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the brain analogy breaks: it is an <em>inspiration</em>, not a copy. A real neuron fires as electrical spikes spread over time and slowly rewires itself through chemistry; an artificial neuron is a single clean equation whose <strong>weights are learned by gradient descent</strong> (Day 5), not by biology — there is no biological "backprop" in your head. And one artificial neuron alone is weak: the power comes from <strong>many</strong> neurons in <strong>layers</strong>, which is just a matmul, as you'll see at the end.</div></div>
-      <p><strong>直觉 / Intuition:</strong> "neuron" 这个词来自大脑 — 一个脑神经元把很多输入信号按强弱加起来，够强就"点火"输出，否则保持安静。人工神经元照搬了这个结构：输入 <code>x</code>、权重 <code>w</code>（每个输入有多重要）、加权求和 <code>w·x</code>、再用偏置 <code>b</code> 加激活函数决定输出。The technical point: one neuron maps many input numbers down to a single output number, and a <strong>weight</strong> is literally "how much this input matters to me."</p>
+      <p>You already have the foggy-hill picture from Section 1 — here it is as two cards, one for the slope underfoot and one for the walk downhill:</p>
+      <div class="relate">
+        <div class="card"><span class="big">🥾</span><h5>Gradient = the slope underfoot</h5><p>You're on a foggy hill (the loss). You can't see the bottom, but you can feel which way is steepest down. That feeling is the gradient. Step that way.</p></div>
+        <div class="card"><span class="big">🔁</span><h5>Descent = many small steps</h5><p>Take a small step downhill, feel the slope again, step again. Repeat. You gradually reach a low point — a model with small loss. Step size = learning rate.</p></div>
+      </div>
+      <p><strong>In one line:</strong> the gradient says which way is downhill for each weight; gradient descent takes small steps that way until the loss is low.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: the loss landscape has millions of dimensions (one per weight), not two. And backprop is what lets you feel the slope in <em>all</em> those dimensions at once, cheaply — a single hiker couldn't.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，gradient 就是你脚下那块地的"坡度" — 它只告诉你哪边更低、有多陡；朝那边迈一小步，重复很多次，就走到了谷底。The technical point: the gradient is the slope of the loss with respect to each weight, and gradient descent repeatedly nudges each weight a little in the downhill direction.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
 
     <!-- ===== 3. PLAYGROUND ===== -->
     <section class="module-section" id="s3" data-sec="play">
-  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Run one neuron, one step at a time</span><span class="sec-tag">Playground</span></div>
+  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Measure a slope, then roll downhill</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
-      <p>Below is a simulated Python terminal. Click each button to do one step of the neuron. <strong>Click all three</strong> to finish this section.</p>
+      <p>Below is a simulated Python terminal. We use the simple loss <code>f(w) = w²</code> (a bowl). <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="wsum" type="button">① weighted sum (w·x)</button>
-          <button class="play-btn" data-demo="bias" type="button">② + bias</button>
-          <button class="play-btn" data-demo="act" type="button">③ activation → output</button>
+          <button class="play-btn" data-demo="slope" type="button">① the gradient (slope) at w=3</button>
+          <button class="play-btn" data-demo="step" type="button">② one gradient-descent step</button>
+          <button class="play-btn" data-demo="descend" type="button">③ repeat → roll to the bottom</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>np.dot(w, x)</code> is the weighted sum from M1 Day 4. <code>ReLU(z) = max(0, z)</code> keeps positives and zeroes negatives.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: for <code>f(w)=w²</code> the slope is <code>2w</code>. At w=3 that's 6 — so nudging w up raises the loss 6× as fast; go the other way.</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
 </section>
 
     <!-- ===== 4. MECHANISM & WHY ===== -->
     <section class="module-section" id="s4" data-sec="why">
-  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The formula — and why one neuron scales to billions</span><span class="sec-tag">Mechanism &amp; why</span></div>
+  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The chain rule, backward — and why it runs all of AI</span><span class="sec-tag">Mechanism &amp; why</span></div>
   <div class="sec-body">
-      <h4>The formula</h4>
-      <div class="callout c-ok"><span class="ic">🧮</span><div><code>output = activation( w · x + b )</code><br><span style="font-size:.85rem;color:var(--text2)"><code>w · x</code> = weighted sum (a dot product), <code>b</code> = bias (one number), <code>activation</code> = a simple squashing function like ReLU. The value <code>w · x + b</code>, <em>before</em> the activation, is called the <strong>pre-activation</strong> (often written <code>z</code>).</span></div></div>
-      <p>Worked small: inputs <code>x = [2, 3]</code>, weights <code>w = [0.5, −1]</code>, bias <code>b = 1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>. Add bias → <code>−1</code>. ReLU(−1) = <code>0</code>. Output = <strong>0</strong>.</p>
-      <div class="callout c-info"><span class="ic">💡</span><div><strong>Why the bias is not optional.</strong> The weighted sum <code>w·x</code> on its own can only <em>rotate</em> the line that separates "high output" from "low output" — and that line is stuck passing through the origin (all-zero input always scores zero). The bias <code>b</code> <em>shifts</em> that line away from the origin. Drop it and the neuron loses the ability to lean "fire" or "don't fire" independent of the inputs — that is a real loss of what it can express, not a minor knob.</div></div>
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one neuron: <code>output = activation(w·x + b)</code></b><br><b>1 · In words:</b> score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.<br><b>2 · The formula:</b> <code>output = activation( w·x + b )</code>. <code>x</code> = the inputs; <code>w</code> = one weight per input; <code>w·x</code> = the weighted sum (a dot product); <code>b</code> = bias (one number); <code>activation</code> = a squash like <code>ReLU = max(0, ·)</code>.<br><b>3 · Tiny numbers:</b> <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>; + bias → <code>−1</code>; <code>ReLU(−1) = 0</code>. Output = <strong>0</strong>.<br><b>4 · Sanity check:</b> <code>w</code> must hold exactly one number per input (here 2 weights for 2 inputs), and the output is a single number, not a list. A ReLU output of <code>0</code> just means the pre-activation was ≤ 0 — expected, not a bug.</div></div>
+      <h4>The update rule</h4>
+      <div class="callout c-ok"><span class="ic">🧮</span><div><code>gradient = slope of loss w.r.t. w</code>, then <code>w ← w − learning_rate × gradient</code>. Repeat over many steps.</div></div>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one gradient-descent step on <code>f(w)=w²</code></b>
+      <br><b>1 · In words:</b> the gradient is how fast the loss changes as <code>w</code> changes; step <code>w</code> a little against that slope to lower the loss.
+      <br><b>2 · The formula:</b> <code>gradient = df/dw</code>, then <code>w ← w − lr × gradient</code>. For <code>f(w)=w²</code>, <code>df/dw = 2w</code>; <code>lr</code> = learning rate (step size).
+      <br><b>3 · Tiny numbers:</b> at <code>w=3</code>, gradient <code>= 2·3 = 6</code>. With <code>lr=0.1</code>: <code>w ← 3 − 0.1·6 = 2.4</code>, and the loss drops from <code>9</code> to <code>5.76</code>. Step again: <code>2.4 → 1.92 → …</code> toward 0.
+      <br><b>4 · Sanity check:</b> the sign points downhill — a positive slope moves <code>w</code> left, a negative slope moves it right. Numerically, <code>(f(w+h)−f(w−h))/(2h)</code> at <code>w=3</code> with tiny <code>h</code> gives ≈ 6, matching <code>2w</code>.</div></div>
+
+      <h4>Why backprop, and the chain rule</h4>
+      <p>A weight deep in the network affects the loss only through everything after it. The <span class="term" data-tip="Calculus rule: to get the slope through a chain of steps, multiply the local slopes of each step together.">chain rule</span> says: the slope through a chain of steps is the <strong>product of the local slopes</strong>. Backprop starts at the loss and walks backward, multiplying local slopes layer by layer, so every weight's gradient falls out in one pass — reusing the values already computed in the forward pass.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the chain rule with real numbers (one path).</b> Take a tiny neuron with a sigmoid output and a squared-error loss: <code>z = w·x + b</code>, <code>a = sigmoid(z)</code>, <code>L = (a − y)²</code>. The chain rule stacks three local slopes: <code>dL/dw = dL/da · da/dz · dz/dw</code>.
+      <br><b>1 · Forward first:</b> with <code>x=2, w=0.5, b=0, y=1</code>: <code>z = 1</code>, <code>a = sigmoid(1) ≈ 0.731</code>, <code>L ≈ 0.072</code>.
+      <br><b>2 · Then multiply backward:</b> <code>dL/da = 2(a−y) ≈ −0.538</code>; <code>da/dz = a(1−a) ≈ 0.197</code>; <code>dz/dw = x = 2</code>.
+      <br><b>3 · Product:</b> <code>dL/dw ≈ −0.538 · 0.197 · 2 ≈ −0.212</code>. Negative → nudging <code>w</code> <em>up</em> lowers the loss. That single number is exactly what backprop produces for every weight at once.
+      <br><b>4 · Note:</b> this is a from-scratch illustration of the mechanics — we pair sigmoid with squared error only to get a non-trivial middle slope <code>a(1−a)</code>; for real classification you'd use cross-entropy (Day 4), not MSE.</div></div>
+
       <h4>Why a frontier lab cares</h4>
-      <p>This is the <strong>atom</strong>. Line up many neurons that all read the same inputs, and computing them all at once is a single <strong>matmul</strong>: <code>x @ W + b</code>, then the activation — exactly M1 Day 4. Here is the payoff worth waiting for: GPT-3 has a weight matrix with <strong>49,152 columns</strong>, and every one of those columns <em>is</em> one neuron exactly like the one you just built, wired to 12,288 inputs instead of a handful. A frontier model is billions of these neurons, stacked into layers. And the <strong>weights</strong> are precisely what training adjusts.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><strong>Remember this chain:</strong> a neuron = weighted sum + bias + activation → many neurons at once = a matmul (a layer) → stacked layers = a network → training tunes the weights. Everything later is scale on top of this.</div></div>
+      <p>Backprop is how <strong>every</strong> neural network learns. It's the reverse of the forward pass and costs about twice as much (so a training step ≈ 3× a forward pass — one forward, two forward-equivalents backward — which is exactly where the "6" in Kaplan et al.'s <code>C ≈ 6ND</code> compute formula comes from). This is exactly what the tools from the teaser above compute automatically (<span class="term" data-tip="Automatic differentiation: the framework computes gradients for you, e.g. jax.grad. You will meet it in the JAX modules.">autodiff</span>). Knowing it's just "chain rule, backward" demystifies the whole thing.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> loss → gradient (slope for each weight) → step downhill (w − lr·grad) → backprop computes all gradients in one backward sweep → repeat = training. That plain rule <code>w ← w − lr·grad</code> is <b>vanilla gradient descent</b> — the baseline every optimizer on Day 7 (momentum, Adam) builds on. Tomorrow we assemble it into the training loop.</div></div>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>One honest caveat: the hill is bumpy.</b> Our <code>f(w)=w²</code> bowl has a single lowest point, but the real loss over millions of weights is <b>non-convex</b> — full of local dips, flat plateaus, and saddle points. Gradient descent does <em>not</em> find the global minimum; it settles into <em>a</em> good-enough valley. That is usually fine (many valleys give low loss), and it's exactly why the tricks on Days 7–8 — momentum, the noise from small batches, learning-rate schedules — exist: to move well on a bumpy surface, not to guarantee the deepest point.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
-      <p>A neuron is tiny, but two things about it are worth naming precisely — a bug that never announces itself, and a design choice you make the moment you create weights.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><strong>Failure mode (silent): symmetric initialization.</strong> The weights start as <em>random</em> numbers — they are not values you set by hand. Here is the trap: if you start every weight at the <em>same</em> value (all zeros is the classic mistake), then in a layer every neuron computes the same output <em>and</em> later gets the same update, so they never become different from one another. A 512-neuron layer then has the power of a single neuron. Nothing crashes — the loss even drops a little. A senior engineer catches this in <strong>code review</strong> by spotting <code>np.zeros(...)</code> used for weights, and confirms it by printing the row-to-row variance of a weight matrix after a few steps: if every row is identical, symmetry never broke. (You will feel the full force of this once we have layers on Day 3 and updates on Day 5.)</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><strong>Trade-off: the scale of the random start.</strong> Random breaks the symmetry, but <em>how big</em> those random numbers are is a real decision. Too large and the pre-activation <code>z = w·x + b</code> comes out huge, pushing the neuron to an extreme before learning even begins; too small and the signal shrinks toward zero as it passes through many layers. The fix is to scale the spread to the number of inputs (the "fan-in") — you will meet the named recipes (Xavier for smooth activations, He for ReLU) on Day 6. Today's point: weights are random <em>with a chosen scale</em>, not arbitrary.</div></div>
-      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A neuron is <code>activation(w·x + b)</code> — a weighted sum of inputs, a bias that shifts the decision boundary off the origin, then a non-linear squash. The weighted sum is exactly a dot product, so a whole layer of neurons is one matmul <code>x @ W + b</code> followed by the activation; stack those and you have the network, and training only ever adjusts <code>w</code> and <code>b</code>. The failure juniors miss is symmetric initialization — if all weights start equal, every unit in a layer receives the same gradient and the layer collapses to one effective neuron, so weights are drawn randomly and scaled to fan-in while biases can safely start at zero."</div></div>
-      <button class="gotit" type="button">Got the formula</button>
+      <p>Backprop multiplies many local slopes together, and that single fact is the source of both a quiet training failure and a real memory choice.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): vanishing gradients.</b> The chain rule multiplies one local slope per layer. If those slopes are each a little below <code>1</code> (which sigmoid activations produce), then in a deep network you multiply many small numbers together and the gradient that reaches the early layers shrinks toward <code>0</code>. Those early layers then barely change, no matter how long you train. Nothing crashes — the loss just stops improving and sits there. A senior engineer catches this in <b>code review</b> by logging the size (norm) of the gradients per layer: if the early-layer gradients are orders of magnitude smaller than the late-layer ones, the signal is dying on the way back. The mirror failure is <b>exploding gradients</b>: if the local slopes are mostly above <code>1</code>, the product blows up and the gradients (and the loss) shoot to <code>inf</code>/<code>NaN</code> — the fix there is gradient clipping (Day 8). (Vanishing is exactly why ReLU and residual connections exist.)</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: store activations or recompute them.</b> Backprop reuses the values from the forward pass, so the fast way is to keep every layer's activations in memory — but for a big model that memory is huge. The alternative, <span class="term" data-tip="Gradient checkpointing: during the backward pass, re-run parts of the forward pass to regenerate activations instead of storing them, trading extra compute for less memory.">gradient checkpointing</span>, throws most activations away and re-runs part of the forward pass during backward to get them back. You save a lot of memory but pay extra compute (more FLOPs per step). Whether to checkpoint is a <b>design-review</b> decision that trades GPU memory against training speed.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The gradient is the slope of the loss w.r.t. each weight; the update is <code>w ← w − lr × grad</code>. Backprop is the chain rule applied backward from the loss — it multiplies local slopes layer by layer and reuses forward-pass values, so all gradients come out in one backward sweep at roughly 2× a forward pass. The silent failure is vanishing gradients: multiply many sub-1 slopes (sigmoids) through a deep net and the early-layer gradients shrink to ~0 and stop learning — which is why ReLU and residual connections exist. I'd log per-layer gradient norms to catch it."</div></div>
+      <button class="gotit" type="button">Got backprop</button>
     </div>
 </section>
 
     <!-- ===== 5. BUILD IT UP ===== -->
     <section class="module-section" id="s5" data-sec="build">
-  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Assemble one neuron, then a whole layer — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
+  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Slope → step → chain rule backward — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
   <div class="sec-body">
-      <p>Here is a neuron built one step at a time, then widened into a layer. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <p>First, the live version. <strong>Drag the learning-rate slider</strong> and press <strong>Step</strong> or <strong>Run</strong> to roll a weight down a loss curve — watch the slope (the gradient) shrink as you near the bottom. Then <strong>scroll down slowly</strong> through the static build underneath: slope → step → chain rule backward.</p>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive gradient descent" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <p style="font-size:.85rem;color:var(--ink2)"><b>What you should notice:</b> the step you take is <em>slope × learning-rate</em>, so steps get smaller on their own as the slope flattens near the bottom. <b>Common misconception:</b> the learning rate is not the step size — a steep slope with a small lr can still move a long way. <b>Where this simplifies reality:</b> this is one weight on a smooth 1-D bowl; real loss landscapes have millions of dimensions and are bumpy.</p>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -439,35 +452,45 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Predict the output, then run it — watch ReLU decide</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Roll a weight downhill, then prove backprop is just the chain rule</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Here's the fun part. <strong>Before you write any code, predict the answer:</strong> for <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>, will the neuron's output come out positive, negative, or exactly <strong>zero</strong>? Jot the guess down. Then build the neuron in three lines and find out whether ReLU zeroed it — that little "I was right / oh, I was wrong" moment is what makes the day stick. Pick one path:</p>
+      <p>Here's the payoff you can watch happen. Roll a weight down the <code>f(w)=w²</code> bowl and see the loss fall <code>9 → 5.76 → …</code> toward 0. Then the real "aha": compute one neuron's gradient <em>by hand</em> with the chain rule (<code>dL/dw ≈ −0.212</code>) and check it against a finite-difference estimate — they agree to better than <code>1e-6</code>. That match is proof that backprop is nothing more than the chain rule computed exactly. Pick one path:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-01-single-neuron/experiment.py</code>. Write <code>def neuron(x, w, b): return float(np.maximum(0.0, np.dot(w, x) + b))</code>, then run it on <code>x=[2,3]</code>, <code>w=[0.5,-1]</code>, <code>b=1</code> (expect 0.0) and on a case that stays positive (expect a positive number). Print each step. Run with <code>python3 sessions/m02-the-neuron/day-01-single-neuron/experiment.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>, in two parts.<br>
+      <b>Part (a) — gradient descent.</b> For <code>f(w)=w²</code>, compute the numerical slope at <code>w=3</code> (expect ≈6). Then loop 10 times doing <code>w = w − 0.1·(2·w)</code>, printing <code>w</code> and <code>w²</code> each step, and watch the loss fall toward 0.<br>
+      <b>Part (b) — backprop by hand.</b> Take one sigmoid neuron with squared-error loss: <code>z=w·x+b</code>, <code>a=sigmoid(z)</code>, <code>L=(a−y)²</code>, using the Math-Ladder anchors <code>x=2, w=0.5, b=0, y=1</code>. Compute the three chain pieces <code>dL/da=2(a−y)</code>, <code>da/dz=a(1−a)</code>, <code>dz/dw=x</code> (and <code>dz/db=1</code>), print them, and print their products <code>dL/dw ≈ −0.212</code> and <code>dL/db ≈ −0.106</code>. Then verify each analytic gradient against a central finite difference <code>(L(θ+h)−L(θ−h))/(2h)</code> with <code>h=1e-5</code> and confirm they agree to better than <code>1e-6</code>. Run with <code>python3 sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
-      <p>Copy the prompt below back into Claude Code. It triggers the <strong>frontier-experiment-lab</strong> skill, which creates the file, writes the code, and runs it for you.</p>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 1 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 5 artifact.
 
-Create sessions/m02-the-neuron/day-01-single-neuron/experiment.py that, with a comment on each step:
-1. Defines relu(z) = np.maximum(0, z).
-2. Defines neuron(x, w, b) = relu(np.dot(w, x) + b), printing the weighted sum, the value after bias, and the final output.
-3. Runs it on x=[2,3], w=[0.5,-1], b=1 (expect weighted sum -2, +bias -1, relu -> 0.0).
-4. Runs it on x=[2,3], w=[1,1], b=0 (expect weighted sum 5, relu -> 5.0) to show a positive case.
+Create sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py that, with a comment on each step:
+1. Defines f(w)=w**2 (a simple loss bowl).
+2. Computes a numerical gradient at w=3 via (f(w+h)-f(w-h))/(2h) with h=1e-5; prints it (expect ~6.0) and notes the exact slope is 2w.
+3. Runs gradient descent: w=3.0; for 10 steps do grad=2*w; w = w - 0.1*grad; print round(w,3), round(w**2,3).
+4. Confirms w marches toward 0 and the loss w**2 falls toward 0.
+5. Part (b): verify backprop by hand on one sigmoid neuron with squared error — z=w*x+b, a=sigmoid(z), L=(a-y)**2, with x=2, w=0.5, b=0, y=1.
+6. Prints the chain pieces dL/da=2*(a-y), da/dz=a*(1-a), dz/dw=x, dz/db=1; then dL/dw = dL/da*da/dz*dz/dw (expect about -0.212) and dL/db = dL/da*da/dz*dz/db (expect about -0.106).
+7. Checks both analytic gradients against central finite differences (L(theta+h)-L(theta-h))/(2h) with h=1e-5 and asserts they agree to < 1e-6.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
       <h4>What you should see (check your prediction)</h4>
-      <ul><li>Your <code>neuron(x, w, b)</code> prints three visible steps: the weighted sum, the value after adding the bias, and the final output.</li><li>On <code>x=[2,3], w=[0.5,-1], b=1</code> the pre-activation lands at <code>−1</code>, so ReLU squashes it to <code>0.0</code> — the "don't fire" case. On a positive case like <code>w=[1,1], b=0</code> the total passes straight through as a positive number — the "fire" case.</li><li>The thing worth noticing: nothing crashed and no error appeared, yet a negative pre-activation quietly turned into <code>0</code>. That silent zero is ReLU doing its one job — and you predicted it before the computer told you.</li></ul>
-      <div class="callout c-info"><span class="ic">📓</span><div><strong>5-minute research log · 5 分钟研究笔记:</strong> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-01-single-neuron/log.md</code>: (1) in your own words, what the three steps of a neuron are; (2) why the weighted sum is a dot product; (3) one thing still fuzzy (why the activation goes last is fair game).</div></div>
+      <ul>
+        <li>For <code>f(w)=w²</code> your numerical slope at <code>w=3</code> comes out ≈ 6 (matching <code>2w</code>), and your 10-step loop with <code>w = w − 0.1·(2w)</code> drives <code>w</code> and the loss <code>w²</code> toward 0.</li>
+        <li><b>Backprop check:</b> for the sigmoid neuron with <code>x=2, w=0.5, b=0, y=1</code>, your printed chain pieces multiply to <code>dL/dw ≈ −0.212</code> and <code>dL/db ≈ −0.106</code> — the same numbers as the Math Ladder above.</li>
+        <li><b>Finite-difference proof:</b> the analytic <code>dL/dw</code> and <code>dL/db</code> each match a central finite-difference estimate to better than <code>1e-6</code>, showing backprop is just the chain rule computed exactly.</li>
+        <li>You can state in one sentence what the <em>sign</em> of the gradient tells you and what the learning rate controls.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-05-gradients-backprop/log.md</code>: (1) why backprop is "just the chain rule run backward"; (2) what the finite-difference check proves about a gradient you derived by hand; (3) what "vanishing gradients" means and how you'd detect it.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
 
     <div class="fin" id="fin" role="status" aria-hidden="true">
       <span class="em" aria-hidden="true">🎉</span>
-      <h3>Module 2 · Day 1 complete! 🏆</h3>
-      <p>Nice work — you've completed <b>A Single Neuron</b>.<br>Next up: <b>Activation Functions</b>.</p>
+      <h3>Module 2 · Day 5 complete! 🏆</h3>
+      <p>Nice work — you've completed <b>Gradients &amp; Backpropagation</b>.<br>Next up: <b>The Training Loop</b>.</p>
     </div>
 
     <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -577,21 +600,24 @@ if(scrim) scrim.addEventListener('click', closeSidebar);
 
 /* ===== PLAYGROUND ===== */
 var DEMOS = {
-  wsum:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([<span class="num">2</span>, <span class="num">3</span>])      <span class="dim"># two inputs</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> w = np.array([<span class="num">0.5</span>, <span class="num">-1.0</span>])  <span class="dim"># one weight per input</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> np.dot(w, x)          <span class="dim"># weighted sum = a dot product</span>\n'+
-    '<span class="hl">-2.0</span>',
-    take:'<b>①  Step 1 — weighted sum.</b> Multiply each input by its weight and add: 2·0.5 + 3·(−1) = −2. This is exactly the dot product from M1 Day 4.'},
-  bias:{html:'<span class="prompt">&gt;&gt;&gt;</span> b = <span class="num">1.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> z = np.dot(w, x) + b   <span class="dim"># add the bias</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> z\n<span class="hl">-1.0</span>',
-    take:'<b>②  Step 2 — add the bias.</b> One number shifts the result: z = −2 + 1 = −1. This z is the "pre-activation" value.'},
-  act:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">relu</span>(v): <span class="kw">return</span> np.maximum(<span class="num">0</span>, v)\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> relu(z)              <span class="dim"># step 3: squash the pre-activation</span>\n'+
-    '<span class="ok">0.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> relu(np.array([<span class="num">-1</span>, <span class="num">0</span>, <span class="num">3</span>]))  <span class="dim"># zeroes negatives, keeps positives</span>\n'+
-    '<span class="ok">array([0, 0, 3])</span>',
-    take:'<b>③  Step 3 — activation.</b> ReLU = max(0, z) squashes z into the output: relu(−1) = 0. The neuron\'s final output is <b>0</b>. Full neuron: relu(w·x + b).'}
+  slope:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">f</span>(w): <span class="kw">return</span> w**<span class="num">2</span>     <span class="dim"># a simple loss (a bowl)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w, h = <span class="num">3.0</span>, <span class="num">1e-5</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> (f(w+h) - f(w-h)) / (<span class="num">2</span>*h)   <span class="dim"># slope = gradient at w=3</span>\n'+
+    '<span class="hl">6.0000000...</span>',
+    take:'<b>①  The gradient is the slope.</b> For f(w)=w², the slope at w=3 is 6 (exactly 2w). It says the loss rises 6× as fast as w — so to lower the loss, move w the OTHER way.'},
+  step:{html:'<span class="prompt">&gt;&gt;&gt;</span> w, lr, grad = <span class="num">3.0</span>, <span class="num">0.1</span>, <span class="num">6.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = w - lr * grad     <span class="dim"># gradient-descent step: go downhill</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w\n<span class="hl">2.4</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="num">3.0</span>**<span class="num">2</span>, <span class="num">2.4</span>**<span class="num">2</span>   <span class="dim"># loss before vs after</span>\n'+
+    '<span class="ok">(9.0, 5.76)</span>',
+    take:'<b>②  One step downhill.</b> Subtract lr×gradient: w goes 3.0 → 2.4, and the loss falls 9.0 → 5.76. The learning rate (0.1) is how big a step you take.'},
+  descend:{html:'<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">3.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="num">5</span>):\n'+
+    '<span class="dim">...</span>     grad = <span class="num">2</span>*w\n'+
+    '<span class="dim">...</span>     w = w - <span class="num">0.1</span>*grad\n'+
+    '<span class="dim">...</span>     print(round(w,<span class="num">3</span>), round(w**<span class="num">2</span>,<span class="num">3</span>))\n'+
+    '<span class="ok">2.4   5.76</span>\n<span class="ok">1.92  3.686</span>\n<span class="ok">1.536 2.359</span>\n<span class="ok">1.229 1.51</span>\n<span class="ok">0.983 0.966</span>',
+    take:'<b>③  Repeat → roll to the bottom.</b> Each step re-measures the slope and moves downhill; w marches toward 0, where the loss is smallest. That is training: many small gradient-guided steps.'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -604,18 +630,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* ===== BUILD — scroll-reveal ===== */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Two inputs feeding a neuron'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='60' y='30' width='60' height='34' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='90' y='53' fill='#1F6280'>x₁ = 2</text><rect x='60' y='72' width='60' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='90' y='93' fill='#1F6280'>x₂ = 3</text><text x='260' y='70' fill='#6B645E' font-size='12'>two inputs going into one neuron</text></g></svg>",
-  note:"<b>Start with the inputs.</b> A neuron receives a list of numbers — here <code>x = [2, 3]</code>. These could be pixel values, word features, anything. The neuron will turn them into one output."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Each input multiplied by its weight'><g font-family='monospace' font-size='13' text-anchor='middle'><text x='80' y='45' fill='#1F6280'>x₁·w₁ = 2·0.5</text><text x='80' y='70' fill='#1F6280'>= 1.0</text><text x='80' y='100' fill='#9A7208'>x₂·w₂ = 3·(−1)</text><text x='260' y='72' fill='#6B645E'>weights say how much each input matters</text></g></svg>",
-  note:"<b>Multiply by weights.</b> Each input gets a <b>weight</b> — how much this neuron cares about it. <code>2·0.5 = 1.0</code> and <code>3·(−1) = −3</code>. Weights are the numbers training will learn."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Sum the weighted inputs into z equals minus 2'><g font-family='monospace' font-size='15' text-anchor='middle'><text x='150' y='55' fill='#2C2A28'>1.0 + (−3.0)</text><text x='300' y='55' fill='#6B645E'>=</text><rect x='335' y='36' width='60' height='34' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='365' y='59' fill='#5E5191' font-weight='bold'>−2.0</text><text x='260' y='92' fill='#6B645E' font-size='12'>the weighted sum (a dot product) → z</text></g></svg>",
-  note:"<b>Add them up — the weighted sum.</b> <code>1.0 + (−3.0) = −2.0</code>. This single number is exactly <code>np.dot(w, x)</code>, the dot product you learned in M1 Day 4."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Add the bias to get z equals minus 1'><g font-family='monospace' font-size='15' text-anchor='middle'><text x='150' y='55' fill='#2C2A28'>−2.0 + 1.0</text><text x='280' y='55' fill='#6B645E'>=</text><rect x='315' y='36' width='60' height='34' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='59' fill='#9A7208' font-weight='bold'>−1.0</text><text x='260' y='92' fill='#6B645E' font-size='12'>+ bias b = 1 → the pre-activation z</text></g></svg>",
-  note:"<b>Add the bias.</b> One extra number shifts the result: <code>−2 + 1 = −1</code>. The bias lets a neuron lean toward firing or not, independent of the inputs."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='ReLU activation turns z equals minus 1 into output 0'><g font-family='monospace'><line x1='60' y1='95' x2='300' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='180' y1='30' x2='180' y2='110' stroke='#E5DFD6' stroke-width='1'/><path d='M80 95 L180 95 L280 45' fill='none' stroke='#2D8B55' stroke-width='2.5'/><text x='170' y='125' font-size='11' fill='#6B645E' text-anchor='middle'>ReLU: flat for z&lt;0, rising for z&gt;0</text><circle cx='140' cy='95' r='4' fill='#C93B3B'/><text x='140' y='84' font-size='11' fill='#C93B3B' text-anchor='middle'>z=−1</text><text x='420' y='70' font-size='14' font-family='monospace' fill='#1a5c38' font-weight='bold' text-anchor='middle'>output = 0</text></g></svg>",
-  note:"<b>Squash with the activation.</b> ReLU = max(0, z). Our z = −1 is negative, so the output is <code>0</code>. A positive z would pass through unchanged. That's the full neuron: <code>relu(w·x + b)</code>."},
- {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='Many neurons side by side form a layer computed as x @ W + b'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='55' width='60' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='70' y='75' fill='#1F6280'>x (1,3)</text><text x='115' y='75' fill='#6B645E'>@</text><rect x='135' y='45' width='80' height='50' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='175' y='74' fill='#5E5191'>W (3,4)</text><text x='230' y='75' fill='#6B645E'>+ b →</text><rect x='300' y='55' width='70' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='335' y='75' fill='#1a5c38' font-weight='bold'>4 neurons</text><text x='400' y='75' fill='#6B645E'>→ act</text><text x='260' y='120' fill='#2C2A28' font-size='12'>a LAYER = many neurons at once = x @ W + b, then activation</text><text x='260' y='140' fill='#6B645E' font-size='11'>stack layers → a network · billions of these = a frontier model</text></g></svg>",
-  note:"<b>Widen to a layer.</b> Put four neurons side by side, each with its own weights, and computing them all at once is one matmul: <code>x @ W + b</code>, then the activation — exactly M1 Day 4. (This picture uses a 3-input example just to show a wider layer — same idea as our 2-input neuron, only broader.) Stack layers and you have a network. A neuron is the atom; scale is the whole story from here."}
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The loss as a bowl-shaped curve over one weight'><g font-family='monospace'><line x1='60' y1='110' x2='460' y2='110' stroke='#E5DFD6' stroke-width='1.5'/><path d='M90 40 Q 260 160 430 40' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><text x='260' y='125' font-size='11' fill='#6B645E' text-anchor='middle'>weight w →</text><text x='40' y='70' font-size='11' fill='#6B645E' text-anchor='middle' transform='rotate(-90 40 70)'>loss</text><circle cx='260' cy='108' r='4' fill='#2D8B55'/><text x='260' y='100' font-size='10' fill='#2D8B55' text-anchor='middle'>lowest loss</text></g></svg>",
+  note:"<b>Picture the loss over one weight.</b> Change the weight and the loss traces a curve — here a bowl. Training wants to reach the bottom. But the network can't see the whole curve; it only stands at one point."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='The slope of the loss at the current weight is the gradient'><g font-family='monospace'><line x1='60' y1='110' x2='460' y2='110' stroke='#E5DFD6' stroke-width='1.5'/><path d='M90 40 Q 260 160 430 40' fill='none' stroke='#2A7B9B' stroke-width='2'/><circle cx='350' cy='83' r='5' fill='#C93B3B'/><line x1='300' y1='108' x2='400' y2='58' stroke='#C93B3B' stroke-width='2.5'/><text x='360' y='45' font-size='11' fill='#C93B3B'>slope here = gradient</text><text x='350' y='104' font-size='10' fill='#6B645E' text-anchor='middle'>current w</text></g></svg>",
+  note:"<b>Measure the slope where you stand: the gradient.</b> It tells you the loss is rising to the right here — so downhill is to the <b>left</b>. The gradient is just this slope, per weight."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Gradient descent update rule: new weight equals old weight minus learning rate times gradient'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='90' y='34' width='340' height='34' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='260' y='56' fill='#1a5c38' font-weight='bold'>w ← w − learning_rate × gradient</text><text x='260' y='90' font-size='11' fill='#6B645E'>subtract a little of the slope → move downhill</text></g></svg>",
+  note:"<b>Step downhill.</b> The update rule: <code>w = w − lr × gradient</code>. Subtracting the gradient moves against the uphill direction, i.e. downhill. The learning rate <code>lr</code> sets how far you step."},
+ {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Repeated steps roll the weight down to the bottom of the bowl'><g font-family='monospace'><line x1='60' y1='110' x2='460' y2='110' stroke='#E5DFD6' stroke-width='1.5'/><path d='M90 40 Q 260 160 430 40' fill='none' stroke='#2A7B9B' stroke-width='2'/><circle cx='350' cy='83' r='4' fill='#C99A12'/><circle cx='315' cy='98' r='4' fill='#C99A12'/><circle cx='288' cy='105' r='4' fill='#C99A12'/><circle cx='262' cy='108' r='5' fill='#2D8B55'/><text x='300' y='60' font-size='11' fill='#9A7208'>step, step, step…</text><text x='262' y='100' font-size='10' fill='#2D8B55' text-anchor='middle'>bottom</text></g></svg>",
+  note:"<b>Repeat and you roll to the bottom.</b> Each step re-measures the slope and moves again. After many small steps the weight settles near the lowest loss. That is gradient descent."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The chain rule multiplies local slopes backward through the layers'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='40' width='70' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='75' y='60' fill='#1F6280'>layer 1</text><rect x='150' y='40' width='70' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='185' y='60' fill='#1F6280'>layer 2</text><rect x='260' y='40' width='70' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='295' y='60' fill='#C93B3B'>loss</text><path d='M330 78 L150 78' stroke='#9A7208' stroke-width='2' marker-end='url(#ar)'/><text x='240' y='96' fill='#9A7208' font-size='11'>multiply local slopes, going backward</text><defs><marker id='ar' markerWidth='7' markerHeight='7' refX='5' refY='3' orient='auto'><path d='M0 0 L6 3 L0 6 z' fill='#9A7208'/></marker></defs></g></svg>",
+  note:"<b>The chain rule, backward.</b> A deep weight touches the loss only through the layers after it. The chain rule multiplies each step's local slope together — and backprop does this from the loss backward, so every weight's gradient falls out in one sweep."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Training = forward pass then backward pass, repeated'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='30' y='40' width='150' height='32' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='105' y='61' fill='#1F6280'>forward → loss</text><rect x='200' y='40' width='170' height='32' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='285' y='61' fill='#9A7208'>backward → gradients</text><rect x='390' y='40' width='110' height='32' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='445' y='61' fill='#1a5c38'>update w</text><text x='260' y='96' fill='#6B645E'>…then repeat. This loop is training.</text></g></svg>",
+  note:"<b>Why it runs all of AI.</b> Every training step is: forward pass → loss → backprop (gradients) → update the weights → repeat. Backprop costs roughly twice a forward pass, so one training step is ~3× a forward pass (one forward + two-forward-equivalents backward). Frameworks automate it (<code>jax.grad</code>), but it's just chain-rule-backward. Tomorrow we wrap it in the training loop."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 BUILD.forEach(function(item,i){
@@ -650,18 +676,18 @@ else {
 
 /* ===== QUIZ ===== */
 var QS=[
- {q:'1. What are the three steps a neuron does, in order?',
-  opts:['Add bias, activation, weighted sum','Weighted sum, add bias, activation','Activation, weighted sum, add bias','Matmul, softmax, slice'],
-  ans:1, fb:'Right. Weighted sum (w·x) → add the bias b → apply the activation. output = activation(w·x + b).'},
- {q:'2. The "weighted sum" of inputs and weights is which operation from Module 1?',
-  opts:['Broadcasting','The dot product (part of matmul)','Slicing','Reshaping'],
-  ans:1, fb:'Right. Multiply pairwise and add = a dot product, exactly np.dot(w, x) from M1 Day 4.'},
- {q:'3. What is the bias\'s job in a neuron?',
-  opts:['It sets the number of inputs','It shifts the pre-activation value up or down','It is the activation function','It stores the output'],
-  ans:1, fb:'Right. The bias is one number added after the weighted sum; it lets the neuron lean higher or lower independent of the inputs.'},
- {q:'4. You build a layer of many neurons and start every weight at <code>0</code>. Training runs, no error is thrown, but the whole layer behaves as if it were a single neuron. Why?',
-  opts:['A zero start is illegal and should have crashed','With identical starting weights, every neuron in the layer computes the same output and receives the same update, so they never become different — the layer has the power of one unit','Zero weights make the dot product undefined','The bias grew too large and saturated every neuron'],
-  ans:1, fb:'Right. Identical weights → identical outputs → identical gradients → the neurons stay copies of each other forever. This is why weights start <b>random</b> (with a sensible scale), never all-equal. Nothing crashes — the failure is silent, so you catch it by checking that a weight matrix\'s rows actually differ.'}
+ {q:'1. A gradient tells you:',
+  opts:['how many layers the model has','the slope of the loss w.r.t. a weight — which way (and how much) to change it to cut the loss','the batch size','the final prediction'],
+  ans:1, fb:'Right. The gradient is the loss\'s slope for a weight; it points uphill, so you move the opposite way to reduce the loss.'},
+ {q:'2. Gradient descent updates a weight by:',
+  opts:['w = w + gradient','w = w − learning_rate × gradient','w = gradient','w = w × learning_rate'],
+  ans:1, fb:'Right. Subtract a small fraction (the learning rate) of the gradient — a step downhill.'},
+ {q:'3. Backpropagation is based on which calculus rule?',
+  opts:['the product rule','the chain rule','the quotient rule','the power rule'],
+  ans:1, fb:'Right. The chain rule multiplies local slopes along the path; backprop applies it backward from the loss.'},
+ {q:'4. You train a deep network with sigmoid activations. It runs with no error, but the loss barely moves and the early layers\' weights hardly change while the last layers do learn. You log the gradient size at each layer and see the early-layer gradients are tiny. What is happening, and why?',
+  opts:['The learning rate is exactly zero, which is the only way weights stop changing','Vanishing gradients: the chain rule multiplies many small (<1) local slopes together, so the gradient shrinks toward 0 by the time it reaches the early layers, and they barely update','The batch size is too large, which always freezes the early layers','Early layers are supposed to never change, so this is normal'],
+  ans:1, fb:'Right. Backprop multiplies one local slope per layer. Sigmoid slopes are less than 1, so a product of many of them collapses toward 0 for the early layers — vanishing gradients. Training stalls with no crash. You look at per-layer gradient norms, which is exactly why ReLU and residual connections were introduced.'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

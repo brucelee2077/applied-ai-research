@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
-<title>Module 2 · Day 1 — A Single Neuron</title>
+<title>Module 2 · Day 7 — Optimizers: SGD → Momentum → Adam</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -272,7 +272,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 </style>
 </head>
 
-<body data-quest-id="wf2-d01-neuron">
+<body data-quest-id="wf3-d04-optimizers">
 
 <div id="progress-track" aria-hidden="true"><div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div></div>
 <button id="nav-toggle" type="button" aria-label="Toggle sections" aria-expanded="false">☰ Sections</button>
@@ -285,7 +285,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <div class="sidebar-scroll">
     <div class="brand">
       <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
-      <div class="brand-sub">Foundations · M2 Day 1</div>
+      <div class="brand-sub">Foundations · M2 Day 7</div>
       <div class="nav-count" id="count"><b>0</b>/7 sections done</div>
     </div>
 
@@ -319,8 +319,8 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     </div><!-- /.sidebar-scroll -->
 
     <div class="side-nav">
-      <a class="lnav prev" href="../../m01-shape-of-data/review.html"><span class="d">← Prev</span><span class="t">M1 · Review Gate</span></a>
-      <a class="lnav next" href="../day-02-activations/lesson.html"><span class="d">Next →</span><span class="t">Activation Functions</span></a>
+      <a class="lnav prev" href="../day-06-training-loop/lesson.html"><span class="d">← Prev</span><span class="t">The Training Loop</span></a>
+      <a class="lnav next" href="../day-08-learning-rate/lesson.html"><span class="d">Next →</span><span class="t">Learning-Rate Intuition</span></a>
       <a class="lnav-hub" href="../../index.html"><span class="d">▦ Map</span><span class="t">Back to curriculum</span></a>
     </div>
   </aside>
@@ -329,98 +329,120 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <main id="content">
 
     <section id="home" class="hero">
-      <span class="kicker">Module 2 · Train · Day 1</span>
-      <h1>A Single Neuron<span class="sub">The Smallest Piece of a Learning Machine</span></h1>
-      <p class="lede">Right now, without even trying, your brain is soaking up thousands of tiny signals — the shapes on this screen, the sounds around you — and quietly deciding which ones matter and which to ignore. That one habit, <em>weigh things, then decide</em>, is the whole idea behind a <strong>neural network</strong>. Its smallest piece is called a <strong>neuron</strong>, and a neuron does just one very human job: it looks at some numbers, decides how much each one matters, adds them up, and gives a verdict. Today you'll build one by hand — and once this little piece clicks, everything bigger turns out to be just <em>many of these</em>.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, one neuron will feel obvious: you'll walk through its three steps — <strong>weigh the inputs → add a bias → decide with an activation</strong> — and compute one by hand.</div></div>
+      <span class="kicker">Module 2 · Train · Day 7</span>
+      <h1>Optimizers: SGD → Momentum → Adam<span class="sub">Smarter ways to step downhill</span></h1>
+      <p class="lede">You already know how to step downhill — but a plain step is slow and shaky. Today three step-takers race for the same valley floor: <strong>SGD</strong> walks one careful step at a time, <strong>Momentum</strong> rolls like a real ball that coasts through bumps, and <strong>Adam</strong> rolls with a per-weight sense of the ground. Same destination — very different speed getting there.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, you'll be able to write the SGD, momentum, and Adam update rules, step SGD and momentum by hand on the same weight to see momentum pull ahead, and say why Adam costs about twice the optimizer memory.</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
     <section class="module-section" id="s1" data-sec="what">
-  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">What a neuron is (and what a network is made of)</span><span class="sec-tag">What is it</span></div>
+  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">The rule that decides how to step</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><strong>What this assumes:</strong> Module 1 — arrays, the dot product / matmul (Day 4), and broadcasting. <strong>No neural-network background needed</strong> — this is the first piece.</div></div>
-      <h4>First, the picture — hold this before any words</h4>
-      <p>Picture one brain cell for a moment. It is listening to lots of little signals coming in at once, but it does not treat them all the same — some incoming connections are strong and some are weak, so some signals count for more. The cell <strong>adds everything up</strong>, and if the total is strong enough it <strong>fires</strong>; if not, it stays quiet. That is the entire idea of a neuron: <strong>weigh each input by how much it matters, add them up, then decide.</strong> Hold on to that one picture. Every word in the rest of this section is just a name for one part of that single sentence — not a new thing to be scared of.</p>
-      <h4>The words you'll meet today — plain English first</h4>
-      <p>Before any formula, here is every term you'll run into today, said in plain words. You don't need to memorize these — just glance down the list so no word feels new when it shows up.</p>
-      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">neuron</td><td style="padding:.4rem .6rem;color:var(--ink2)">The smallest piece of a neural network. It does three tiny steps: weigh the inputs, add a bias, then decide with an activation.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">weight</td><td style="padding:.4rem .6rem;color:var(--ink2)">A number that says how much one input matters to this neuron. Training is the process of adjusting these.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">bias</td><td style="padding:.4rem .6rem;color:var(--ink2)">One extra number added after the weighted sum. It nudges the result up or down before the decision.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">weighted sum</td><td style="padding:.4rem .6rem;color:var(--ink2)">Multiply each input by its weight and add them all up. This is exactly a <strong>dot product</strong> from Module 1.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">activation</td><td style="padding:.4rem .6rem;color:var(--ink2)">A simple decision step at the very end (like ReLU = keep positives, zero out negatives) that turns the total into the output.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">neural network</td><td style="padding:.4rem .6rem;color:var(--ink2)">Many neurons wired together in layers, tuned by training to turn inputs into useful answers.</td></tr></tbody></table>
-      <h4>What is a neural network?</h4>
-      <p>A <span class="term" data-tip="A machine that learns patterns from examples by adjusting a big set of numbers called weights. Built from many small units (neurons) arranged in layers.">neural network</span> is a machine that learns patterns from examples by tuning a big pile of numbers called <strong>weights</strong>. It is built from many tiny repeated units — <strong>neurons</strong> — stacked into layers. Today we zoom all the way in to one neuron.</p>
-      <h4>What is a neuron?</h4>
-      <p>A <span class="term" data-tip="The basic unit of a neural network. It does three steps: weighted sum of inputs, add a bias, then apply an activation function.">neuron</span> is a tiny function with exactly three steps:</p>
-      <ol><li><strong>Weighted sum</strong> — multiply each input by its <span class="term" data-tip="A number that says how much one input matters to this neuron. Weights are what training adjusts.">weight</span> and add them up. (This is exactly a <strong>dot product</strong> from M1 Day 4.)</li><li><strong>Add a bias</strong> — add one extra number, the <span class="term" data-tip="A single number added after the weighted sum. It shifts the result up or down before the activation.">bias</span>, that shifts the result.</li><li><strong>Activation</strong> — pass that result through a simple function (an <span class="term" data-tip="A simple function applied at the end of a neuron, e.g. ReLU = max(0, x). It adds the non-linearity that lets networks learn complex patterns.">activation function</span>) to get the output.</li></ol>
-      <h4>How does it relate to what you already know?</h4>
-      <p>Step 1 is something you can already do: <code>np.dot(w, x)</code> — the weighted sum <em>is</em> a dot product. So a neuron is just <code>activation(dot(w, x) + b)</code>. Why the activation at the end? That's the secret sauce — next lesson. Keep going 👇</p>
-      <div class="callout c-warn"><span class="ic">😕</span><div><strong>为什么这里容易卡住 · Why this trips people up:</strong> 很多人一上来就盯着 <code>w·x+b</code> 这个公式，却没问它到底在做什么 — people meet <code>w·x+b</code> and treat it as a magic formula to memorize. In plain terms: a neuron only does one human thing — "score each input by how much it matters, then decide." The formula is just the arithmetic of that one sentence, not a new idea.</div></div>
-      <button class="gotit" type="button">Got what a neuron is — let's go</button>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the training loop (Day 6), gradients and gradient descent (Day 5). Today we only change <b>step 4 — the update</b>. <b>Nothing new needed.</b></div></div>
+
+      <h4>First, the picture — hold this before the rules</h4>
+      <p>Picture the loss as a hilly valley you're trying to reach the bottom of. You could inch down one careful step at a time — or you could let a ball roll and coast through the little dips instead of stopping at each one. That is the whole story of today: three ways of moving downhill, from a careful walk to a smart rolling ball. Keep that picture; the definitions below just give each mover its name.</p>
+
+      <h4>What is an optimizer?</h4>
+      <p>An <span class="term" data-tip="The rule that turns gradients into a weight change each step: SGD, momentum, and Adam are the common ones.">optimizer</span> is the rule that decides how to change the weights once you have the gradients. The forward pass, the loss, and backprop stay the same. Only the last step — the update — is what an optimizer controls.</p>
+
+      <h4>Three optimizers, from simple to smart</h4>
+      <ol>
+        <li><strong><span class="term" data-tip="Stochastic Gradient Descent: the plain update rule w ← w − lr × grad, using the gradient from one batch.">SGD</span></strong> — step straight downhill by <code>lr × grad</code>. Simple and honest, but it can be slow and shaky.</li>
+        <li><strong><span class="term" data-tip="An optimizer that keeps a running velocity: it adds a fraction of the last step to the new one, so the weight rolls through small bumps.">Momentum</span></strong> — keep a running speed (velocity). Add a bit of the last step to the new one, so the weight builds up speed in a steady direction.</li>
+        <li><strong><span class="term" data-tip="Adaptive Moment Estimation: an optimizer that keeps a running average of the gradient (m) and of the gradient squared (v), giving each weight its own step size.">Adam</span></strong> — give every weight its own step size, using running averages of the gradient and of the gradient squared.</li>
+      </ol>
+      <p>They all move downhill. The smarter ones just choose the step more cleverly. Keep going 👇</p>
+      <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Microsoft's ZeRO, used inside the DeepSpeed library, exists to shard Adam's doubled memory cost across many GPUs — a direct fix for the "two extra numbers" you're about to meet.</div></div>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 一看到 SGD、Momentum、Adam 三个名字，很容易以为它们是三种完全不同的算法 — three names (SGD, Momentum, Adam) make it look like three unrelated algorithms. In plain terms: all three do the same job — step the weights downhill — and each just remembers a little more about the past to steer better. Adam is momentum plus a per-weight step size, nothing more mysterious.</div></div>
+      <button class="gotit" type="button">Got it — let's meet them</button>
     </div>
 </section>
 
     <!-- ===== 2. INTUITION ===== -->
     <section class="module-section" id="s2" data-sec="intuition">
-  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">From a brain cell to a math function</span><span class="sec-tag">Intuition</span></div>
+  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Rolling a ball downhill, three ways</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
-      <h4>Now make that picture exact</h4>
-      <p>You already have the picture from Section 1 — a cell that weighs its inputs, adds them up, and decides. Because the word "neuron" is borrowed from the brain, let's line the two up piece by piece so the picture becomes something you can compute. A real <strong>brain neuron</strong> collects tiny electrical signals from many neighbors through branches called <span class="term" data-tip="The branches of a brain neuron that receive incoming signals from other neurons.">dendrites</span>. Some of those connections are strong and some are weak, so some signals count for more than others. The cell body <strong>adds all the signals up</strong>, and if the total is strong enough to cross a <strong>firing threshold</strong>, the neuron "fires" — sending its own signal out along a long wire called the <span class="term" data-tip="The output wire of a brain neuron that carries its signal onward to other neurons.">axon</span>. If the total is too weak, it stays quiet.</p>
-      <p>An <strong>artificial neuron</strong> keeps that exact shape — take in many signals, weigh them, add them up, then decide one output — but turns each piece into arithmetic you can compute by hand. Here is the piece-by-piece mapping:</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:.88rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.5rem .6rem;color:var(--k)">Brain neuron</th><th style="padding:.5rem .6rem;color:var(--q)">Artificial neuron</th><th style="padding:.5rem .6rem;color:var(--muted)">What it is</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Dendrites taking in signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the inputs <code>x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">the numbers coming in</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Synapse strength (some connections matter more)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weights <code>w</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">how much each input counts</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Cell body summing the signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weighted sum <code>w·x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">add up the weighted inputs</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Firing threshold (fire only if strong enough)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the bias <code>b</code> + activation</td><td style="padding:.5rem .6rem;color:var(--ink2)">shift the total, then decide the output</td></tr><tr><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Axon carrying the signal onward</td><td style="padding:.5rem .6rem;color:var(--ink2)">the neuron's output</td><td style="padding:.5rem .6rem;color:var(--ink2)">the one number passed to the next layer</td></tr></tbody></table>
-      <p>Read straight down the middle column and you get the whole formula, in order: take the inputs <code>x</code>, weigh them with <code>w</code>, sum to <code>w·x</code>, shift by the bias <code>b</code>, then let the activation decide the output — exactly <code>output = activation(w·x + b)</code>, which Section 4 works out with real numbers.</p>
-      <h4>A second, everyday picture (optional)</h4>
-      <p>If the brain feels too abstract, here is the same three steps as one judge scoring a contestant:</p>
-      <div class="relate"><div class="card"><span class="big">⚖️</span><h5>Inputs × weights = a judge's score</h5><p>Each input (talent, stage presence…) gets a <strong>weight</strong> — how much this judge cares about it. The judge multiplies and adds them into one score.</p></div><div class="card"><span class="big">🎚️</span><h5>Bias + activation = the verdict</h5><p>The judge has a personal <strong>bias</strong> (a grumpy judge starts lower), then squashes the total into a clean verdict with an <strong>activation</strong>.</p></div></div>
-      <p><strong>In one line:</strong> a neuron weighs its inputs, adds a bias, and squashes the result into an output — the same three steps whether you picture a brain cell or a judge.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the brain analogy breaks: it is an <em>inspiration</em>, not a copy. A real neuron fires as electrical spikes spread over time and slowly rewires itself through chemistry; an artificial neuron is a single clean equation whose <strong>weights are learned by gradient descent</strong> (Day 5), not by biology — there is no biological "backprop" in your head. And one artificial neuron alone is weak: the power comes from <strong>many</strong> neurons in <strong>layers</strong>, which is just a matmul, as you'll see at the end.</div></div>
-      <p><strong>直觉 / Intuition:</strong> "neuron" 这个词来自大脑 — 一个脑神经元把很多输入信号按强弱加起来，够强就"点火"输出，否则保持安静。人工神经元照搬了这个结构：输入 <code>x</code>、权重 <code>w</code>（每个输入有多重要）、加权求和 <code>w·x</code>、再用偏置 <code>b</code> 加激活函数决定输出。The technical point: one neuron maps many input numbers down to a single output number, and a <strong>weight</strong> is literally "how much this input matters to me."</p>
+      <p>You already have the rolling-ball picture from Section 1 — here are the three movers side by side, each a different way down the same valley:</p>
+      <div class="relate">
+        <div class="card"><span class="big">🐾</span><h5>SGD — tiny careful steps</h5><p>You take one small step in the steepest downhill direction, stop, look again, step again. Safe, but slow, and you stall in every little dip.</p></div>
+        <div class="card"><span class="big">⚽</span><h5>Momentum — a real ball</h5><p>Now let a ball roll. It builds up speed in the downhill direction, so a tiny bump does not stop it — it coasts right over.</p></div>
+      </div>
+      <div class="relate">
+        <div class="card"><span class="big">🤖</span><h5>Adam — a smart ball</h5><p>The ball watches the ground. Where the slope has been steady, it takes bigger, confident steps. Where the slope keeps flipping, it takes smaller, careful ones.</p></div>
+        <div class="card"><span class="big">🎯</span><h5>Same goal, better path</h5><p>All three head for the same valley bottom. Momentum and Adam just pick smarter step sizes, so they usually get there faster and with less shaking.</p></div>
+      </div>
+      <p><strong>In one line:</strong> SGD walks, momentum rolls, and Adam rolls with a per-weight sense of the ground.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a rolling ball feels real gravity every instant, but an optimizer only "feels" the slope once per step, using the gradient from one <span class="term" data-tip="A small chunk of the dataset processed together in one training step.">batch</span> of data. So its speed is a stored number it updates by hand, not true physics.</div></div>
+      <p><b>直觉 / Intuition:</b> 直觉上，optimizer 就是一个"下山教练" — SGD 每步只看当前坡度，Momentum 记住了速度所以能冲过小坑，Adam 还给每条腿单独调步幅。The technical point: all three implement <code>w ← w − (step)</code>; they differ only in how the step is computed from the gradient history.</p>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
 
     <!-- ===== 3. PLAYGROUND ===== -->
     <section class="module-section" id="s3" data-sec="play">
-  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Run one neuron, one step at a time</span><span class="sec-tag">Playground</span></div>
+  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">SGD step vs momentum step on the same weight</span><span class="sec-tag">Playground</span></div>
   <div class="sec-body">
-      <p>Below is a simulated Python terminal. Click each button to do one step of the neuron. <strong>Click all three</strong> to finish this section.</p>
+      <p>A simulated Python terminal. Same tiny setup as Day 6: <code>pred = w·x</code>, we want <code>6</code> when <code>x = 2</code> (ideal <code>w</code> is 3), starting <code>w = 1.0</code>, learning rate <code>0.05</code>. <strong>Click all three</strong> to finish this section.</p>
       <div class="play">
         <div class="play-btns">
-          <button class="play-btn" data-demo="wsum" type="button">① weighted sum (w·x)</button>
-          <button class="play-btn" data-demo="bias" type="button">② + bias</button>
-          <button class="play-btn" data-demo="act" type="button">③ activation → output</button>
+          <button class="play-btn" data-demo="sgd" type="button">① one SGD step</button>
+          <button class="play-btn" data-demo="momentum" type="button">② one momentum step</button>
+          <button class="play-btn" data-demo="adam" type="button">③ what Adam stores</button>
         </div>
         <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
         <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
       </div>
-      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>np.dot(w, x)</code> is the weighted sum from M1 Day 4. <code>ReLU(z) = max(0, z)</code> keeps positives and zeroes negatives.</p>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: for loss <code>(w·x − y)²</code>, the gradient w.r.t. <code>w</code> is <code>2·(w·x − y)·x</code> — the chain rule from Day 5. Here that first gradient is <code>−16</code>.</p>
       <button class="gotit" type="button" disabled>try all three first</button>
     </div>
 </section>
 
     <!-- ===== 4. MECHANISM & WHY ===== -->
     <section class="module-section" id="s4" data-sec="why">
-  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The formula — and why one neuron scales to billions</span><span class="sec-tag">Mechanism &amp; why</span></div>
+  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The three update rules, with real numbers</span><span class="sec-tag">Mechanism &amp; why</span></div>
   <div class="sec-body">
-      <h4>The formula</h4>
-      <div class="callout c-ok"><span class="ic">🧮</span><div><code>output = activation( w · x + b )</code><br><span style="font-size:.85rem;color:var(--text2)"><code>w · x</code> = weighted sum (a dot product), <code>b</code> = bias (one number), <code>activation</code> = a simple squashing function like ReLU. The value <code>w · x + b</code>, <em>before</em> the activation, is called the <strong>pre-activation</strong> (often written <code>z</code>).</span></div></div>
-      <p>Worked small: inputs <code>x = [2, 3]</code>, weights <code>w = [0.5, −1]</code>, bias <code>b = 1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>. Add bias → <code>−1</code>. ReLU(−1) = <code>0</code>. Output = <strong>0</strong>.</p>
-      <div class="callout c-info"><span class="ic">💡</span><div><strong>Why the bias is not optional.</strong> The weighted sum <code>w·x</code> on its own can only <em>rotate</em> the line that separates "high output" from "low output" — and that line is stuck passing through the origin (all-zero input always scores zero). The bias <code>b</code> <em>shifts</em> that line away from the origin. Drop it and the neuron loses the ability to lean "fire" or "don't fire" independent of the inputs — that is a real loss of what it can express, not a minor knob.</div></div>
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one neuron: <code>output = activation(w·x + b)</code></b><br><b>1 · In words:</b> score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.<br><b>2 · The formula:</b> <code>output = activation( w·x + b )</code>. <code>x</code> = the inputs; <code>w</code> = one weight per input; <code>w·x</code> = the weighted sum (a dot product); <code>b</code> = bias (one number); <code>activation</code> = a squash like <code>ReLU = max(0, ·)</code>.<br><b>3 · Tiny numbers:</b> <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>; + bias → <code>−1</code>; <code>ReLU(−1) = 0</code>. Output = <strong>0</strong>.<br><b>4 · Sanity check:</b> <code>w</code> must hold exactly one number per input (here 2 weights for 2 inputs), and the output is a single number, not a list. A ReLU output of <code>0</code> just means the pre-activation was ≤ 0 — expected, not a bug.</div></div>
-      <h4>Why a frontier lab cares</h4>
-      <p>This is the <strong>atom</strong>. Line up many neurons that all read the same inputs, and computing them all at once is a single <strong>matmul</strong>: <code>x @ W + b</code>, then the activation — exactly M1 Day 4. Here is the payoff worth waiting for: GPT-3 has a weight matrix with <strong>49,152 columns</strong>, and every one of those columns <em>is</em> one neuron exactly like the one you just built, wired to 12,288 inputs instead of a handful. A frontier model is billions of these neurons, stacked into layers. And the <strong>weights</strong> are precisely what training adjusts.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><strong>Remember this chain:</strong> a neuron = weighted sum + bias + activation → many neurons at once = a matmul (a layer) → stacked layers = a network → training tunes the weights. Everything later is scale on top of this.</div></div>
+      <h4>1 · SGD — step straight downhill</h4>
+      <p><b>In words:</b> move the weight by the learning rate times the gradient, in the downhill direction.</p>
+      <div class="callout c-ok"><span class="ic">🧮</span><div><code>w ← w − lr × g</code><br><span style="color:var(--muted)">w = weight · lr = learning rate (step size) · g = gradient (slope of the loss)</span></div></div>
+      <p><b>Worked example:</b> start <code>w = 1.0</code>, gradient <code>g = −16</code>, <code>lr = 0.05</code>. Step = <code>0.05 × (−16) = −0.8</code>. New <code>w = 1.0 − (−0.8) = 1.8</code>. That single move fits the data a little better. This <em>is</em> the vanilla gradient descent you named on Day 5 — the baseline the next two rules build on.</p>
+
+      <h4>2 · Momentum — add a running velocity</h4>
+      <p><b>In words:</b> keep a stored speed <code>v</code>. Each step, keep most of the old speed and add the new gradient. Then move by that speed. This lets the weight coast in a steady direction.</p>
+      <div class="callout c-ok"><span class="ic">🧮</span><div><code>v ← β × v + g</code>&nbsp;&nbsp;then&nbsp;&nbsp;<code>w ← w − lr × v</code><br><span style="color:var(--muted)">v = velocity (running speed) · β = momentum, e.g. 0.9 (how much old speed to keep) · g = gradient</span></div></div>
+      <p><b>Worked example (same first step):</b> start <code>v = 0</code>, <code>g = −16</code>, <code>β = 0.9</code>. New <code>v = 0.9 × 0 + (−16) = −16</code>. Then <code>w = 1.0 − 0.05 × (−16) = 1.8</code>. The <b>first</b> step matches SGD exactly, because there is no speed built up yet.</p>
+      <div class="callout c-info"><span class="ic">🔎</span><div><b>The difference shows up on step two.</b> At <code>w=1.8</code> the next gradient is <code>−9.6</code>. Momentum keeps its stored speed: <code>v = 0.9 × (−16) + (−9.6) = −24.0</code>, so it moves <code>0.05 × 24.0 = 1.2</code>. Plain SGD, with no memory, only moves <code>0.05 × 9.6 = 0.48</code>. The stored speed makes momentum cover <b>2.5× the ground</b> — it is picking up speed. (These are the exact numbers your 15-step artifact prints.)</div></div>
+
+      <h4>3 · Adam — a per-weight step size</h4>
+      <p><b>In words:</b> keep two running averages for each weight — one of the gradient (<code>m</code>), one of the gradient squared (<code>v</code>). Divide the step by the square root of <code>v</code>, so weights with big, noisy gradients take smaller steps and quiet ones take bigger steps.</p>
+      <div class="callout c-ok"><span class="ic">🧮</span><div><code>m ← β₁ m + (1−β₁) g</code><br><code>v ← β₂ v + (1−β₂) g²</code><br><code>w ← w − lr × m̂ / (√v̂ + ε)</code><br><span style="color:var(--muted)">m = average gradient · v = average of gradient² · m̂,v̂ = bias-corrected (divide by 1−βᵗ so the cold start toward 0 is fixed) · typical β₁=0.9, β₂=0.999, ε=1e-8</span></div></div>
+      <p>You do not need to compute Adam by hand today. The idea to keep: it stores <b>two</b> extra numbers per weight, <code>m</code> and <code>v</code>. Adam is really <b>RMSProp</b> (the per-weight <code>/√v</code> scaling) plus <b>momentum</b> (the running <code>m</code>) — its ancestors are AdaGrad and RMSProp.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — SGD vs momentum, one step on <code>pred=w·x</code></b>
+      <br><b>1 · In words:</b> SGD steps by the current slope; momentum first blends the new slope into a running speed, then steps by that speed, so repeated downhill pushes build up.
+      <br><b>2 · The formula:</b> SGD: <code>w ← w − lr·g</code>. Momentum: <code>v ← β·v + g</code>, then <code>w ← w − lr·v</code>. Here <code>x=2, y=6</code>, <code>w=1</code>, <code>lr=0.05</code>, <code>β=0.9</code>, start <code>v=0</code>, <code>g = 2(w·x − y)·x</code>.
+      <br><b>3 · Tiny numbers:</b> step 1 both see <code>g = 2(2−6)(2) = −16</code>. SGD → <code>w = 1.8</code>; momentum <code>v = 0.9·0 + (−16) = −16</code> → same <code>w = 1.8</code>. But on step 2 momentum's <code>v</code> still carries the old −16, so it moves <em>further</em> than SGD and pulls ahead.
+      <br><b>4 · Sanity check:</b> with <code>β=0</code>, <code>v = g</code> and momentum becomes exactly SGD. Bigger <code>β</code> keeps more past speed; too big and it overshoots the bottom before slowing.</div></div>
+
+      <h4>Why a frontier lab cares about that "two extra numbers"</h4>
+      <p>Adam keeps <code>m</code> and <code>v</code> for <em>every</em> weight. So the <span class="term" data-tip="The extra numbers an optimizer stores per weight; for Adam that is m and v, roughly doubling the memory beyond the weights themselves.">optimizer state</span> is about <b>2× the size of the model's weights</b> — extra memory a frontier lab must pay for on every accelerator. That's exactly the "two extra numbers" cost ZeRO/DeepSpeed from the teaser above was built to fix. When you reach the memory and parallelism modules (Module 10), this "Adam doubles your state" fact is a big reason huge models are split across many chips.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> SGD steps by <code>lr × g</code>; momentum stores a speed so it rolls through bumps; Adam stores <code>m</code> and <code>v</code> per weight for a smart per-weight step — at the cost of ~2× optimizer memory.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
-      <p>A neuron is tiny, but two things about it are worth naming precisely — a bug that never announces itself, and a design choice you make the moment you create weights.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><strong>Failure mode (silent): symmetric initialization.</strong> The weights start as <em>random</em> numbers — they are not values you set by hand. Here is the trap: if you start every weight at the <em>same</em> value (all zeros is the classic mistake), then in a layer every neuron computes the same output <em>and</em> later gets the same update, so they never become different from one another. A 512-neuron layer then has the power of a single neuron. Nothing crashes — the loss even drops a little. A senior engineer catches this in <strong>code review</strong> by spotting <code>np.zeros(...)</code> used for weights, and confirms it by printing the row-to-row variance of a weight matrix after a few steps: if every row is identical, symmetry never broke. (You will feel the full force of this once we have layers on Day 3 and updates on Day 5.)</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><strong>Trade-off: the scale of the random start.</strong> Random breaks the symmetry, but <em>how big</em> those random numbers are is a real decision. Too large and the pre-activation <code>z = w·x + b</code> comes out huge, pushing the neuron to an extreme before learning even begins; too small and the signal shrinks toward zero as it passes through many layers. The fix is to scale the spread to the number of inputs (the "fan-in") — you will meet the named recipes (Xavier for smooth activations, He for ReLU) on Day 6. Today's point: weights are random <em>with a chosen scale</em>, not arbitrary.</div></div>
-      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "A neuron is <code>activation(w·x + b)</code> — a weighted sum of inputs, a bias that shifts the decision boundary off the origin, then a non-linear squash. The weighted sum is exactly a dot product, so a whole layer of neurons is one matmul <code>x @ W + b</code> followed by the activation; stack those and you have the network, and training only ever adjusts <code>w</code> and <code>b</code>. The failure juniors miss is symmetric initialization — if all weights start equal, every unit in a layer receives the same gradient and the layer collapses to one effective neuron, so weights are drawn randomly and scaled to fan-in while biases can safely start at zero."</div></div>
-      <button class="gotit" type="button">Got the formula</button>
+      <p>Adam's power comes from the two extra numbers it stores per weight — and those numbers are also where a quiet bug and a real memory bill both come from.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): resuming training without the optimizer state.</b> When you save and reload a model, the weights are the obvious thing to save — but Adam's smart step depends on its running averages <code>m</code> and <code>v</code> for every weight. If you reload only the weights and let the optimizer start fresh, <code>m</code> and <code>v</code> reset to zero — like carrying the ball back to the same spot but forgetting all the speed it had built up, so it starts rolling from a dead stop. Training resumes with no error, but Adam has forgotten every per-weight step size it learned, so the first steps after resume are crude and can quietly slow or destabilize training. A senior engineer catches this in <b>code review</b> by confirming the checkpoint saves and restores the optimizer state, not just the model weights.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: Adam's fast convergence vs. its memory bill.</b> Adam usually trains faster and needs less learning-rate tuning than plain SGD, because its per-weight step adapts automatically. You pay for that with memory: storing <code>m</code> and <code>v</code> roughly doubles the optimizer state beyond the weights themselves. At frontier scale that extra memory decides how a model must be split across chips. Choosing Adam versus a lighter optimizer is a <b>design-review</b> decision that trades convergence speed against memory footprint.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Every optimizer does <code>w ← w − step</code>; they differ in how the step uses gradient history. SGD uses the raw gradient; momentum keeps a running velocity <code>v ← βv + g</code> to roll through noise and small bumps; Adam adds a per-weight adaptive step by tracking running averages of the gradient and its square. Adam usually converges faster with less lr tuning, but it stores <code>m</code> and <code>v</code> per weight — roughly 2× the model's weights in optimizer state — which is exactly why memory-sharding like ZeRO exists at scale."</div></div>
+      <button class="gotit" type="button">Got the three rules</button>
     </div>
 </section>
 
     <!-- ===== 5. BUILD IT UP ===== -->
     <section class="module-section" id="s5" data-sec="build">
-  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Assemble one neuron, then a whole layer — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
+  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Play with the ball, then watch the three optimizers build up</span><span class="sec-tag">Build it up</span></div>
   <div class="sec-body">
-      <p>Here is a neuron built one step at a time, then widened into a layer. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <p>First, the live version. Drag the learning-rate slider and press <strong>Step</strong> or <strong>Run</strong> to roll a weight down a loss curve. Then <strong>scroll</strong> through the static build underneath — SGD, then momentum, then Adam.</p>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive gradient descent" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
       <div class="build-hint">↓ scroll to reveal each piece ↓</div>
       <div class="build" id="build"></div>
       <button class="gotit" type="button" disabled>scroll through the build first</button>
@@ -439,35 +461,40 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Predict the output, then run it — watch ReLU decide</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Watch momentum overtake SGD</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Here's the fun part. <strong>Before you write any code, predict the answer:</strong> for <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>, will the neuron's output come out positive, negative, or exactly <strong>zero</strong>? Jot the guess down. Then build the neuron in three lines and find out whether ReLU zeroed it — that little "I was right / oh, I was wrong" moment is what makes the day stick. Pick one path:</p>
+      <p>Here's the race worth watching. <b>Before you run it, predict:</b> SGD and momentum take the <em>same</em> first step (both land at <code>w=1.8</code>) — so when does momentum pull ahead? Run both on the same tiny problem and watch step 2: momentum's stored speed hits <code>v = −24.0</code> and it covers <b>2.5× the ground</b> SGD does, then reaches the bottom first. That head start is the whole point of keeping a velocity. Pick one path:</p>
       <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-01-single-neuron/experiment.py</code>. Write <code>def neuron(x, w, b): return float(np.maximum(0.0, np.dot(w, x) + b))</code>, then run it on <code>x=[2,3]</code>, <code>w=[0.5,-1]</code>, <code>b=1</code> (expect 0.0) and on a case that stays positive (expect a positive number). Print each step. Run with <code>python3 sessions/m02-the-neuron/day-01-single-neuron/experiment.py</code>.</p>
+      <p>Create <code>sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Run two loops of 15 steps from <code>w=1.0</code>, <code>lr=0.05</code>: one plain SGD (<code>w = w − lr*grad</code>), one momentum (<code>v = 0.9*v + grad</code>; <code>w = w − lr*v</code>, start <code>v=0</code>). Print step, w, and loss for each. Confirm momentum reaches <code>w ≈ 3</code> in fewer steps. Run with <code>python3 sessions/m02-the-neuron/day-07-optimizers/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
-      <p>Copy the prompt below back into Claude Code. It triggers the <strong>frontier-experiment-lab</strong> skill, which creates the file, writes the code, and runs it for you.</p>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 1 artifact.
+        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 7 artifact.
 
-Create sessions/m02-the-neuron/day-01-single-neuron/experiment.py that, with a comment on each step:
-1. Defines relu(z) = np.maximum(0, z).
-2. Defines neuron(x, w, b) = relu(np.dot(w, x) + b), printing the weighted sum, the value after bias, and the final output.
-3. Runs it on x=[2,3], w=[0.5,-1], b=1 (expect weighted sum -2, +bias -1, relu -> 0.0).
-4. Runs it on x=[2,3], w=[1,1], b=0 (expect weighted sum 5, relu -> 5.0) to show a positive case.
+Create sessions/m02-the-neuron/day-07-optimizers/experiment.py that, with a comment on each step:
+1. Sets a tiny model pred = w*x, with x=2.0, target y=6.0 (ideal w=3), lr=0.05.
+2. Runs plain SGD from w=1.0 for 15 steps: pred=w*x; grad=2*(pred-y)*x; w = w - lr*grad; print step, round(w,4), round((w*x-y)**2,4).
+3. Runs momentum from w=1.0, v=0.0, beta=0.9 for 15 steps: grad=2*(w*x-y)*x; v = beta*v + grad; w = w - lr*v; print step, round(w,4), round(loss,4).
+4. Prints how many steps each needed to get loss below 0.01, showing momentum converges faster.
+5. Adds a comment noting that Adam keeps two extra numbers (m and v) per weight, so its optimizer state is about 2x the model weights.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
       <h4>What you should see (check your prediction)</h4>
-      <ul><li>Your <code>neuron(x, w, b)</code> prints three visible steps: the weighted sum, the value after adding the bias, and the final output.</li><li>On <code>x=[2,3], w=[0.5,-1], b=1</code> the pre-activation lands at <code>−1</code>, so ReLU squashes it to <code>0.0</code> — the "don't fire" case. On a positive case like <code>w=[1,1], b=0</code> the total passes straight through as a positive number — the "fire" case.</li><li>The thing worth noticing: nothing crashed and no error appeared, yet a negative pre-activation quietly turned into <code>0</code>. That silent zero is ReLU doing its one job — and you predicted it before the computer told you.</li></ul>
-      <div class="callout c-info"><span class="ic">📓</span><div><strong>5-minute research log · 5 分钟研究笔记:</strong> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-01-single-neuron/log.md</code>: (1) in your own words, what the three steps of a neuron are; (2) why the weighted sum is a dot product; (3) one thing still fuzzy (why the activation goes last is fair game).</div></div>
+      <ul>
+        <li>Both loops (SGD and momentum) print step, <code>w</code>, and <code>loss</code> from <code>w=1.0</code> on the <code>x=2, y=6</code> problem.</li>
+        <li>Momentum reaches <code>w ≈ 3</code> in <em>fewer</em> steps than plain SGD — you can point to the step where it pulls ahead.</li>
+        <li>You can explain in one sentence what the velocity <code>v</code> adds over plain SGD.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-07-optimizers/log.md</code>: (1) what all three optimizers have in common; (2) on which step momentum first pulled ahead of SGD, and why; (3) why Adam costs ~2× the weights in memory.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
 
     <div class="fin" id="fin" role="status" aria-hidden="true">
       <span class="em" aria-hidden="true">🎉</span>
-      <h3>Module 2 · Day 1 complete! 🏆</h3>
-      <p>Nice work — you've completed <b>A Single Neuron</b>.<br>Next up: <b>Activation Functions</b>.</p>
+      <h3>Module 2 · Day 7 complete! 🏆</h3>
+      <p>Nice work — you've completed <b>Optimizers: SGD → Momentum → Adam</b>.<br>Next up: <b>Learning-Rate Intuition</b>.</p>
     </div>
 
     <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
@@ -577,21 +604,31 @@ if(scrim) scrim.addEventListener('click', closeSidebar);
 
 /* ===== PLAYGROUND ===== */
 var DEMOS = {
-  wsum:{html:'<span class="prompt">&gt;&gt;&gt;</span> x = np.array([<span class="num">2</span>, <span class="num">3</span>])      <span class="dim"># two inputs</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> w = np.array([<span class="num">0.5</span>, <span class="num">-1.0</span>])  <span class="dim"># one weight per input</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> np.dot(w, x)          <span class="dim"># weighted sum = a dot product</span>\n'+
-    '<span class="hl">-2.0</span>',
-    take:'<b>①  Step 1 — weighted sum.</b> Multiply each input by its weight and add: 2·0.5 + 3·(−1) = −2. This is exactly the dot product from M1 Day 4.'},
-  bias:{html:'<span class="prompt">&gt;&gt;&gt;</span> b = <span class="num">1.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> z = np.dot(w, x) + b   <span class="dim"># add the bias</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> z\n<span class="hl">-1.0</span>',
-    take:'<b>②  Step 2 — add the bias.</b> One number shifts the result: z = −2 + 1 = −1. This z is the "pre-activation" value.'},
-  act:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">relu</span>(v): <span class="kw">return</span> np.maximum(<span class="num">0</span>, v)\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> relu(z)              <span class="dim"># step 3: squash the pre-activation</span>\n'+
-    '<span class="ok">0.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> relu(np.array([<span class="num">-1</span>, <span class="num">0</span>, <span class="num">3</span>]))  <span class="dim"># zeroes negatives, keeps positives</span>\n'+
-    '<span class="ok">array([0, 0, 3])</span>',
-    take:'<b>③  Step 3 — activation.</b> ReLU = max(0, z) squashes z into the output: relu(−1) = 0. The neuron\'s final output is <b>0</b>. Full neuron: relu(w·x + b).'}
+  sgd:{html:'<span class="prompt">&gt;&gt;&gt;</span> x, y, lr = <span class="num">2.0</span>, <span class="num">6.0</span>, <span class="num">0.05</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">1.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> pred = w * x            <span class="dim"># forward → 2.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> grad = <span class="num">2</span>*(pred - y)*x     <span class="dim"># gradient → -16.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = w - lr*grad          <span class="dim"># SGD update: w - 0.05*(-16)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w\n'+
+    '<span class="ok">1.8</span>',
+    take:'<b>①  Plain SGD.</b> Step straight downhill by lr × grad: 0.05 × (−16) = −0.8, so w goes 1.0 → 1.8. Honest and simple. No memory of past steps.'},
+  momentum:{html:'<span class="prompt">&gt;&gt;&gt;</span> w, v, beta = <span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.9</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> grad = <span class="num">2</span>*(w*x - y)*x     <span class="dim"># gradient → -16.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> v = beta*v + grad        <span class="dim"># 0.9*0 + (-16) = -16.0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = w - lr*v             <span class="dim"># same as SGD on step 1</span>\n'+
+    '<span class="hl"># --- step 2, next grad = -9.6 (at w=1.8) ---</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> v = <span class="num">0.9</span>*(-<span class="num">16</span>) + (-<span class="num">9.6</span>)   <span class="dim"># v = -24.0  (speed builds up)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> move = lr*v              <span class="dim"># 0.05*24.0 = 1.2  vs SGD 0.48</span>\n'+
+    '<span class="ok">momentum moves 1.2, SGD moves 0.48</span>',
+    take:'<b>②  Momentum builds speed.</b> Step 1 matches SGD (no speed yet). By step 2 the stored velocity makes it move 1.2 vs SGD\'s 0.48 — 2.5× as far, in the same steady direction.'},
+  adam:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># Adam keeps TWO running averages per weight</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> m = beta1*m + (<span class="num">1</span>-beta1)*grad     <span class="dim"># average gradient</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> v = beta2*v + (<span class="num">1</span>-beta2)*grad**<span class="num">2</span>  <span class="dim"># average of grad squared</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> w = w - lr * m / (v**<span class="num">0.5</span> + eps) <span class="dim"># per-weight step size</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># memory cost, per weight:</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> stored = {<span class="str">"w"</span>: <span class="num">1</span>, <span class="str">"m"</span>: <span class="num">1</span>, <span class="str">"v"</span>: <span class="num">1</span>}\n'+
+    '<span class="ok"># 2 optimizer numbers (m, v) per weight ≈ 2× the weights in optimizer state</span>',
+    take:'<b>③  Adam stores m and v.</b> Each weight gets its own step size from the running gradient (m) and gradient-squared (v). Cost: 2 extra numbers per weight → about 2× optimizer-state memory (bridge to Module 10).'}
 };
 var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
 var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
@@ -604,18 +641,18 @@ playBtns.forEach(function(b){ b.addEventListener('click', function(){
 
 /* ===== BUILD — scroll-reveal ===== */
 var BUILD=[
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Two inputs feeding a neuron'><g font-family='monospace' font-size='14' text-anchor='middle'><rect x='60' y='30' width='60' height='34' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='90' y='53' fill='#1F6280'>x₁ = 2</text><rect x='60' y='72' width='60' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='90' y='93' fill='#1F6280'>x₂ = 3</text><text x='260' y='70' fill='#6B645E' font-size='12'>two inputs going into one neuron</text></g></svg>",
-  note:"<b>Start with the inputs.</b> A neuron receives a list of numbers — here <code>x = [2, 3]</code>. These could be pixel values, word features, anything. The neuron will turn them into one output."},
- {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Each input multiplied by its weight'><g font-family='monospace' font-size='13' text-anchor='middle'><text x='80' y='45' fill='#1F6280'>x₁·w₁ = 2·0.5</text><text x='80' y='70' fill='#1F6280'>= 1.0</text><text x='80' y='100' fill='#9A7208'>x₂·w₂ = 3·(−1)</text><text x='260' y='72' fill='#6B645E'>weights say how much each input matters</text></g></svg>",
-  note:"<b>Multiply by weights.</b> Each input gets a <b>weight</b> — how much this neuron cares about it. <code>2·0.5 = 1.0</code> and <code>3·(−1) = −3</code>. Weights are the numbers training will learn."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Sum the weighted inputs into z equals minus 2'><g font-family='monospace' font-size='15' text-anchor='middle'><text x='150' y='55' fill='#2C2A28'>1.0 + (−3.0)</text><text x='300' y='55' fill='#6B645E'>=</text><rect x='335' y='36' width='60' height='34' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='365' y='59' fill='#5E5191' font-weight='bold'>−2.0</text><text x='260' y='92' fill='#6B645E' font-size='12'>the weighted sum (a dot product) → z</text></g></svg>",
-  note:"<b>Add them up — the weighted sum.</b> <code>1.0 + (−3.0) = −2.0</code>. This single number is exactly <code>np.dot(w, x)</code>, the dot product you learned in M1 Day 4."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Add the bias to get z equals minus 1'><g font-family='monospace' font-size='15' text-anchor='middle'><text x='150' y='55' fill='#2C2A28'>−2.0 + 1.0</text><text x='280' y='55' fill='#6B645E'>=</text><rect x='315' y='36' width='60' height='34' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='345' y='59' fill='#9A7208' font-weight='bold'>−1.0</text><text x='260' y='92' fill='#6B645E' font-size='12'>+ bias b = 1 → the pre-activation z</text></g></svg>",
-  note:"<b>Add the bias.</b> One extra number shifts the result: <code>−2 + 1 = −1</code>. The bias lets a neuron lean toward firing or not, independent of the inputs."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='ReLU activation turns z equals minus 1 into output 0'><g font-family='monospace'><line x1='60' y1='95' x2='300' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='180' y1='30' x2='180' y2='110' stroke='#E5DFD6' stroke-width='1'/><path d='M80 95 L180 95 L280 45' fill='none' stroke='#2D8B55' stroke-width='2.5'/><text x='170' y='125' font-size='11' fill='#6B645E' text-anchor='middle'>ReLU: flat for z&lt;0, rising for z&gt;0</text><circle cx='140' cy='95' r='4' fill='#C93B3B'/><text x='140' y='84' font-size='11' fill='#C93B3B' text-anchor='middle'>z=−1</text><text x='420' y='70' font-size='14' font-family='monospace' fill='#1a5c38' font-weight='bold' text-anchor='middle'>output = 0</text></g></svg>",
-  note:"<b>Squash with the activation.</b> ReLU = max(0, z). Our z = −1 is negative, so the output is <code>0</code>. A positive z would pass through unchanged. That's the full neuron: <code>relu(w·x + b)</code>."},
- {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='Many neurons side by side form a layer computed as x @ W + b'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='55' width='60' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='70' y='75' fill='#1F6280'>x (1,3)</text><text x='115' y='75' fill='#6B645E'>@</text><rect x='135' y='45' width='80' height='50' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='175' y='74' fill='#5E5191'>W (3,4)</text><text x='230' y='75' fill='#6B645E'>+ b →</text><rect x='300' y='55' width='70' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='335' y='75' fill='#1a5c38' font-weight='bold'>4 neurons</text><text x='400' y='75' fill='#6B645E'>→ act</text><text x='260' y='120' fill='#2C2A28' font-size='12'>a LAYER = many neurons at once = x @ W + b, then activation</text><text x='260' y='140' fill='#6B645E' font-size='11'>stack layers → a network · billions of these = a frontier model</text></g></svg>",
-  note:"<b>Widen to a layer.</b> Put four neurons side by side, each with its own weights, and computing them all at once is one matmul: <code>x @ W + b</code>, then the activation — exactly M1 Day 4. (This picture uses a 3-input example just to show a wider layer — same idea as our 2-input neuron, only broader.) Stack layers and you have a network. A neuron is the atom; scale is the whole story from here."}
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='The optimizer only changes step four of the training loop'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='20' y='44' width='96' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='68' y='63' fill='#1F6280'>forward</text><rect x='140' y='44' width='80' height='30' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='180' y='63' fill='#C93B3B'>loss</text><rect x='244' y='44' width='100' height='30' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='294' y='63' fill='#9A7208'>backprop</text><rect x='368' y='44' width='132' height='30' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='3'/><text x='434' y='63' fill='#1a5c38'>UPDATE ← here</text><text x='434' y='96' font-size='10' fill='#6B645E'>the optimizer lives here</text></g></svg>",
+  note:"<b>Only the update changes.</b> Forward, loss, and backprop stay exactly as in Day 6. The optimizer is just a smarter <b>step 4</b> — how to turn gradients into a weight change."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='SGD steps straight downhill by learning rate times gradient'><g font-family='monospace' font-size='12' text-anchor='middle'><path d='M40 90 Q 260 -10 480 90' fill='none' stroke='#2A7B9B' stroke-width='2'/><circle cx='80' cy='78' r='8' fill='#C99A12' stroke='#7a5a08' stroke-width='1.5'/><circle cx='150' cy='55' r='8' fill='#C99A12' stroke='#7a5a08' stroke-width='1.5' opacity='0.55'/><path d='M92 76 L138 58' stroke='#6B645E' stroke-width='1.3' stroke-dasharray='3 3' marker-end='url(#a2)'/><text x='260' y='108' fill='#2C2A28'>w ← w − lr × g   (one small step)</text><defs><marker id='a2' markerWidth='7' markerHeight='7' refX='5' refY='3' orient='auto'><path d='M0 0 L6 3 L0 6 z' fill='#6B645E'/></marker></defs></g></svg>",
+  note:"<b>1 · SGD — walk downhill.</b> Move by <b>lr × gradient</b>, one small step at a time. From w = 1.0 with grad −16 and lr 0.05, the step is 0.8, so w → 1.8. Simple, but it can be slow and shaky."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Momentum stores a velocity that grows over steps'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='42' width='150' height='30' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='115' y='62' fill='#5E5191'>v ← β·v + g</text><text x='210' y='62' fill='#6B645E'>then</text><rect x='250' y='42' width='150' height='30' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='325' y='62' fill='#1a5c38'>w ← w − lr·v</text><text x='260' y='100' fill='#2C2A28'>step 2: v = 0.9·(−16) + (−9.6) = −24.0</text></g></svg>",
+  note:"<b>2 · Momentum — add a running speed.</b> Keep most of the old velocity (β = 0.9) and add the new gradient. Step 1 matches SGD, but by step 2 the stored speed makes it move <b>more than twice as far</b> in the steady downhill direction."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Momentum rolls straight through a small bump that stops SGD'><g font-family='monospace' font-size='12'><path d='M30 80 C 140 80, 180 55, 220 80 C 260 100, 340 30, 490 30' fill='none' stroke='#2A7B9B' stroke-width='2'/><circle cx='170' cy='63' r='8' fill='#9399B2' stroke='#555' stroke-width='1.5'/><text x='150' y='105' font-size='10' fill='#C93B3B'>SGD stalls at the bump</text><circle cx='430' cy='36' r='8' fill='#C99A12' stroke='#7a5a08' stroke-width='1.5'/><text x='360' y='20' font-size='10' fill='#1a5c38'>momentum coasts over</text></g></svg>",
+  note:"<b>Why the speed helps.</b> A tiny bump or flat spot can stop plain SGD. Momentum arrives with built-up speed, so it <b>coasts over the bump</b> and keeps heading for the valley. That is the whole point of storing a velocity."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Adam gives each weight its own step size from two running averages'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='16' width='200' height='26' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='130' y='33' fill='#1F6280'>m ← avg of gradient</text><rect x='30' y='50' width='200' height='26' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='130' y='67' fill='#9A7208'>v ← avg of gradient²</text><text x='300' y='38' fill='#6B645E'>→</text><rect x='330' y='33' width='170' height='30' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='415' y='53' fill='#1a5c38'>w − lr·m/√v</text><text x='260' y='104' fill='#2C2A28'>steady slope → big step · noisy slope → small step</text></g></svg>",
+  note:"<b>3 · Adam — a per-weight step size.</b> It keeps a running average of the gradient (m) and of the gradient squared (v) for every weight. Dividing by √v makes noisy weights take small steps and steady ones take big steps."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Adam roughly doubles memory because it stores m and v per weight'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='60' y='44' width='90' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='105' y='64' fill='#1F6280'>weights</text><text x='168' y='64' fill='#6B645E'>+</text><rect x='190' y='44' width='60' height='30' rx='6' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='220' y='64' fill='#5E5191'>m</text><rect x='258' y='44' width='60' height='30' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='288' y='64' fill='#9A7208'>v</text><text x='340' y='64' fill='#6B645E'>≈</text><rect x='368' y='44' width='120' height='30' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='428' y='64' fill='#C93B3B'>2× extra state</text><text x='260' y='104' fill='#2C2A28'>a real memory cost on every chip → Module 10</text></g></svg>",
+  note:"<b>Why a frontier lab cares.</b> Adam stores <b>m</b> and <b>v</b> for every weight, so the optimizer state is about <b>2× the model's weights</b> — extra memory on every accelerator. ZeRO/DeepSpeed exists to shard that state across GPUs instead. That is a big reason huge models are split across many chips (Module 10). You now know how the step is chosen."}
 ];
 var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
 BUILD.forEach(function(item,i){
@@ -650,18 +687,18 @@ else {
 
 /* ===== QUIZ ===== */
 var QS=[
- {q:'1. What are the three steps a neuron does, in order?',
-  opts:['Add bias, activation, weighted sum','Weighted sum, add bias, activation','Activation, weighted sum, add bias','Matmul, softmax, slice'],
-  ans:1, fb:'Right. Weighted sum (w·x) → add the bias b → apply the activation. output = activation(w·x + b).'},
- {q:'2. The "weighted sum" of inputs and weights is which operation from Module 1?',
-  opts:['Broadcasting','The dot product (part of matmul)','Slicing','Reshaping'],
-  ans:1, fb:'Right. Multiply pairwise and add = a dot product, exactly np.dot(w, x) from M1 Day 4.'},
- {q:'3. What is the bias\'s job in a neuron?',
-  opts:['It sets the number of inputs','It shifts the pre-activation value up or down','It is the activation function','It stores the output'],
-  ans:1, fb:'Right. The bias is one number added after the weighted sum; it lets the neuron lean higher or lower independent of the inputs.'},
- {q:'4. You build a layer of many neurons and start every weight at <code>0</code>. Training runs, no error is thrown, but the whole layer behaves as if it were a single neuron. Why?',
-  opts:['A zero start is illegal and should have crashed','With identical starting weights, every neuron in the layer computes the same output and receives the same update, so they never become different — the layer has the power of one unit','Zero weights make the dot product undefined','The bias grew too large and saturated every neuron'],
-  ans:1, fb:'Right. Identical weights → identical outputs → identical gradients → the neurons stay copies of each other forever. This is why weights start <b>random</b> (with a sensible scale), never all-equal. Nothing crashes — the failure is silent, so you catch it by checking that a weight matrix\'s rows actually differ.'}
+ {q:'1. Which part of the training loop does an optimizer control?',
+  opts:['the forward pass','the update step (how gradients change the weights)','the loss function','the data loading'],
+  ans:1, fb:'Right. Forward, loss, and backprop stay the same. The optimizer only decides step 4 — how to turn gradients into a weight change.'},
+ {q:'2. You stop a training run and resume it later. You load the saved model weights, but your code creates a brand-new Adam optimizer instead of restoring the saved one. Training resumes with no error, yet the loss briefly gets worse right after resuming. Where do you look first, and why?',
+  opts:['The dataset changed, which is the only thing that can raise the loss on resume','A fresh Adam optimizer has its running averages m and v reset to zero, so it has forgotten every per-weight step size it had learned — the first steps after resume are crude and can bump the loss up','The learning rate doubled itself on resume, which always happens','A loss bump on resume is impossible and must be a display glitch'],
+  ans:1, fb:'Right. Adam\'s smart step depends on m and v per weight. Restoring only the model weights and starting the optimizer fresh throws that state away, so Adam behaves crudely for the first steps. Nothing crashes — you check that the checkpoint saves and restores the optimizer state, not just the weights.'},
+ {q:'3. Starting w=1.0 with gradient −16 and lr=0.05, what is w after one SGD step?',
+  opts:['1.8','−0.8','16.8','0.2'],
+  ans:0, fb:'Right. Step = lr × grad = 0.05 × (−16) = −0.8, so w = 1.0 − (−0.8) = 1.8. The first momentum step gives the same 1.8 (no speed built up yet).'},
+ {q:'4. Why does Adam use about twice the optimizer memory of SGD?',
+  opts:['it trains for twice as long','it stores two extra numbers per weight (m and v)','it uses two GPUs','it doubles the learning rate'],
+  ans:1, fb:'Right. Adam keeps a running average of the gradient (m) and of the gradient squared (v) for every weight — about 2× extra state, which matters at frontier scale (Module 10).'}
 ];
 var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
 QS.forEach(function(item,qi){

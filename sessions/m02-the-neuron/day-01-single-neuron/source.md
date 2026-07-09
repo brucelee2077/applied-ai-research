@@ -78,30 +78,24 @@ You already have the picture from Section 1 — a cell that weighs its inputs, a
 
 An **artificial neuron** keeps that exact shape — take in many signals, weigh them, add them up, then decide one output — but turns each piece into arithmetic you can compute by hand. Here is the piece-by-piece mapping:
 
-~~~html
-<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:.88rem">
-        <thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.5rem .6rem;color:var(--k)">Brain neuron</th><th style="padding:.5rem .6rem;color:var(--q)">Artificial neuron</th><th style="padding:.5rem .6rem;color:var(--muted)">What it is</th></tr></thead>
-        <tbody>
-          <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Dendrites taking in signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the inputs <code>x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">the numbers coming in</td></tr>
-          <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Synapse strength (some connections matter more)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weights <code>w</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">how much each input counts</td></tr>
-          <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Cell body summing the signals</td><td style="padding:.5rem .6rem;color:var(--ink2)">the weighted sum <code>w·x</code></td><td style="padding:.5rem .6rem;color:var(--ink2)">add up the weighted inputs</td></tr>
-          <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Firing threshold (fire only if strong enough)</td><td style="padding:.5rem .6rem;color:var(--ink2)">the bias <code>b</code> + activation</td><td style="padding:.5rem .6rem;color:var(--ink2)">shift the total, then decide the output</td></tr>
-          <tr><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Axon carrying the signal onward</td><td style="padding:.5rem .6rem;color:var(--ink2)">the neuron's output</td><td style="padding:.5rem .6rem;color:var(--ink2)">the one number passed to the next layer</td></tr>
-        </tbody>
-      </table>
-~~~
+%%% table
+Brain neuron :: Artificial neuron :: What it is
+Dendrites taking in signals :: the inputs `x` :: the numbers coming in
+Synapse strength (some connections matter more) :: the weights `w` :: how much each input counts
+Cell body summing the signals :: the weighted sum `w·x` :: add up the weighted inputs
+Firing threshold (fire only if strong enough) :: the bias `b` + activation :: shift the total, then decide the output
+Axon carrying the signal onward :: the neuron's output :: the one number passed to the next layer
+%%%
 
 Read straight down the middle column and you get the whole formula, in order: take the inputs `x`, weigh them with `w`, sum to `w·x`, shift by the bias `b`, then let the activation decide the output — exactly `output = activation(w·x + b)`, which Section 4 works out with real numbers.
 
 #### A second, everyday picture (optional)
 If the brain feels too abstract, here is the same three steps as one judge scoring a contestant:
 
-~~~html
-<div class="relate">
-        <div class="card"><span class="big">⚖️</span><h5>Inputs × weights = a judge's score</h5><p>Each input (talent, stage presence…) gets a <strong>weight</strong> — how much this judge cares about it. The judge multiplies and adds them into one score.</p></div>
-        <div class="card"><span class="big">🎚️</span><h5>Bias + activation = the verdict</h5><p>The judge has a personal <strong>bias</strong> (a grumpy judge starts lower), then squashes the total into a clean verdict with an <strong>activation</strong>.</p></div>
-      </div>
-~~~
+%%% cards
+⚖️ | Inputs × weights = a judge's score | Each input (talent, stage presence…) gets a **weight** — how much this judge cares about it. The judge multiplies and adds them into one score.
+🎚️ | Bias + activation = the verdict | The judge has a personal **bias** (a grumpy judge starts lower), then squashes the total into a clean verdict with an **activation**.
+%%%
 
 **In one line:** a neuron weighs its inputs, adds a bias, and squashes the result into an output — the same three steps whether you picture a brain cell or a judge.
 
@@ -114,9 +108,10 @@ Where the brain analogy breaks: it is an *inspiration*, not a copy. A real neuro
 @@@ section id=s4 num=4 numclass=s-study data_sec=why tag="Mechanism &amp; why" title="The formula — and why one neuron scales to billions" gotit="Got the formula"
 #### The formula
 
-~~~html
-<div class="callout c-ok"><span class="ic">🧮</span><div><code>output = activation( w · x + b )</code><br><span style="font-size:.85rem;color:var(--text2)"><code>w · x</code> = weighted sum (a dot product), <code>b</code> = bias (one number), <code>activation</code> = a simple squashing function like ReLU. The value <code>w · x + b</code>, <em>before</em> the activation, is called the <strong>pre-activation</strong> (often written <code>z</code>).</span></div></div>
-~~~
+%%% formula
+expr: output = activation( w · x + b )
+note: `w · x` = weighted sum (a dot product), `b` = bias (one number), `activation` = a simple squashing function like ReLU. The value `w · x + b`, *before* the activation, is called the **pre-activation** (often written `z`).
+%%%
 
 Worked small: inputs `x = [2, 3]`, weights `w = [0.5, −1]`, bias `b = 1`. Weighted sum = `2·0.5 + 3·(−1) = −2`. Add bias → `−1`. ReLU(−1) = `0`. Output = **0**.
 
@@ -124,13 +119,13 @@ Worked small: inputs `x = [2, 3]`, weights `w = [0.5, −1]`, bias `b = 1`. Weig
 **Why the bias is not optional.** The weighted sum `w·x` on its own can only *rotate* the line that separates "high output" from "low output" — and that line is stuck passing through the origin (all-zero input always scores zero). The bias `b` *shifts* that line away from the origin. Drop it and the neuron loses the ability to lean "fire" or "don't fire" independent of the inputs — that is a real loss of what it can express, not a minor knob.
 !!!
 
-~~~html
-<div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one neuron: <code>output = activation(w·x + b)</code></b>
-      <br><b>1 · In words:</b> score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.
-      <br><b>2 · The formula:</b> <code>output = activation( w·x + b )</code>. <code>x</code> = the inputs; <code>w</code> = one weight per input; <code>w·x</code> = the weighted sum (a dot product); <code>b</code> = bias (one number); <code>activation</code> = a squash like <code>ReLU = max(0, ·)</code>.
-      <br><b>3 · Tiny numbers:</b> <code>x=[2,3]</code>, <code>w=[0.5,−1]</code>, <code>b=1</code>. Weighted sum = <code>2·0.5 + 3·(−1) = −2</code>; + bias → <code>−1</code>; <code>ReLU(−1) = 0</code>. Output = <b>0</b>.
-      <br><b>4 · Sanity check:</b> <code>w</code> must hold exactly one number per input (here 2 weights for 2 inputs), and the output is a single number, not a list. A ReLU output of <code>0</code> just means the pre-activation was ≤ 0 — expected, not a bug.</div></div>
-~~~
+%%% mathladder
+title: one neuron: `output = activation(w·x + b)`
+words: score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.
+formula: `output = activation( w·x + b )`. `x` = the inputs; `w` = one weight per input; `w·x` = the weighted sum (a dot product); `b` = bias (one number); `activation` = a squash like `ReLU = max(0, ·)`.
+numbers: `x=[2,3]`, `w=[0.5,−1]`, `b=1`. Weighted sum = `2·0.5 + 3·(−1) = −2`; + bias → `−1`; `ReLU(−1) = 0`. Output = **0**.
+sanity: `w` must hold exactly one number per input (here 2 weights for 2 inputs), and the output is a single number, not a list. A ReLU output of `0` just means the pre-activation was ≤ 0 — expected, not a bug.
+%%%
 
 #### Why a frontier lab cares
 This is the **atom**. Line up many neurons that all read the same inputs, and computing them all at once is a single **matmul**: `x @ W + b`, then the activation — exactly M1 Day 4. Here is the payoff worth waiting for: GPT-3 has a weight matrix with **49,152 columns**, and every one of those columns *is* one neuron exactly like the one you just built, wired to 12,288 inputs instead of a handful. A frontier model is billions of these neurons, stacked into layers. And the **weights** are precisely what training adjusts.
@@ -163,19 +158,16 @@ Create `sessions/m02-the-neuron/day-01-single-neuron/experiment.py`. Write `def 
 #### Option B · let Claude build it, then read it
 Copy the prompt below back into Claude Code. It triggers the **frontier-experiment-lab** skill, which creates the file, writes the code, and runs it for you.
 
-~~~html
-<div class="prompt">
-        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 1 artifact.
+%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
+Use /frontier-experiment-lab to build my Module 2 Day 1 artifact.
 
 Create sessions/m02-the-neuron/day-01-single-neuron/experiment.py that, with a comment on each step:
 1. Defines relu(z) = np.maximum(0, z).
 2. Defines neuron(x, w, b) = relu(np.dot(w, x) + b), printing the weighted sum, the value after bias, and the final output.
 3. Runs it on x=[2,3], w=[0.5,-1], b=1 (expect weighted sum -2, +bias -1, relu -> 0.0).
 4. Runs it on x=[2,3], w=[1,1], b=0 (expect weighted sum 5, relu -> 5.0) to show a positive case.
-Then run it and paste the output at the bottom as a comment.</pre>
-      </div>
-~~~
+Then run it and paste the output at the bottom as a comment.
+%%%
 
 #### What you should see (check your prediction)
 - Your `neuron(x, w, b)` prints three visible steps: the weighted sum, the value after adding the bias, and the final output.
