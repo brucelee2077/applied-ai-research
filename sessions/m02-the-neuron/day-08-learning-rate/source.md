@@ -166,7 +166,7 @@ var DEMOS = {
     '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">5</span>):\n'+
     '<span class="dim">...</span>     grad = <span class="num">2</span>*(w*x-y)*x; w = w - lr*grad\n'+
     '<span class="dim">...</span>     print(step, round(w,<span class="num">3</span>), round((w*x-y)**<span class="num">2</span>,<span class="num">3</span>))\n'+
-    '<span class="dim">0 1.08  14.746</span>\n<span class="dim">1 1.157 13.589</span>\n<span class="dim">2 1.231 12.524</span>\n<span class="dim">3 1.301 11.542</span>\n<span class="dim">4 1.369 10.637</span>',
+    '<span class="dim">0 1.08  14.746</span>\n<span class="dim">1 1.157 13.59</span>\n<span class="dim">2 1.231 12.524</span>\n<span class="dim">3 1.301 11.542</span>\n<span class="dim">4 1.369 10.637</span>',
     take:'<b>①  Too small — it crawls.</b> After 5 steps w has barely moved from 1.0 to 1.37 and the loss is still 10.6. Right direction, but you would need hundreds of steps. Wasted compute.'},
   justright:{html:'<span class="prompt">&gt;&gt;&gt;</span> lr = <span class="num">0.1</span>                     <span class="dim"># a healthy step</span>\n'+
     '<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">1.0</span>\n'+
@@ -180,7 +180,7 @@ var DEMOS = {
     '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">4</span>):\n'+
     '<span class="dim">...</span>     grad = <span class="num">2</span>*(w*x-y)*x; w = w - lr*grad\n'+
     '<span class="dim">...</span>     print(step, round(w,<span class="num">3</span>), round((w*x-y)**<span class="num">2</span>,<span class="num">3</span>))\n'+
-    '<span class="bad">0 10.6    231.04</span>\n<span class="bad">1 -25.88  3336.22</span>\n<span class="bad">2 112.74  48174.98</span>\n<span class="bad">3 -414.03 695646.74</span>',
+    '<span class="bad">0 10.6     231.04</span>\n<span class="bad">1 -25.88   3336.218</span>\n<span class="bad">2 112.744  48174.982</span>\n<span class="bad">3 -414.027 695646.742</span>',
     take:'<b>③  Too big — it explodes.</b> Each step jumps past the bottom to a worse point on the far side. w bounces to bigger and bigger numbers and the loss grows without limit. Training has diverged. (This preview stops at 4 steps because it has already blown up; your Produce run does the full 8 steps for all three rates — you just see more of the same explosion here.)'}
 };
 @@@ region name=BUILD

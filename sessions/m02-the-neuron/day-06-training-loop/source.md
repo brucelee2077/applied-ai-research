@@ -143,8 +143,7 @@ Then run it and paste the output at the bottom as a comment.</pre>
       </div>
       <h4>What you should see (check your prediction)</h4>
       <ul>
-        <li>Your loop prints <b>labeled stages</b> — the step number, <code>w</code>, and <code>loss</code> — at every iteration, so each of the four loop steps (forward → loss → backprop → update) is visible in the output.</li>
-        <li>Your loop prints step, <code>w</code>, and <code>loss</code> each iteration for the <code>pred=w·x</code>, <code>x=2, y=6</code> problem.</li>
+        <li>Your loop prints <b>labeled columns</b> — the step number, <code>w</code>, and <code>loss</code> — at every iteration for the <code>pred=w·x</code>, <code>x=2, y=6</code> problem, so you can watch the loop run rather than just its final answer.</li>
         <li>Over ~20 steps <code>w → 3</code> and <code>loss → 0</code>, with the loss decreasing (no blow-up).</li>
         <li>You can name which of the four loop steps maps to which earlier lesson (forward, loss, backprop, update).</li>
       </ul>
