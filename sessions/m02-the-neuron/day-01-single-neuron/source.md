@@ -119,6 +119,11 @@ Worked small: inputs `x = [2, 3]`, weights `w = [0.5, −1]`, bias `b = 1`. Weig
 **Why the bias is not optional.** The weighted sum `w·x` on its own can only *rotate* the line that separates "high output" from "low output" — and that line is stuck passing through the origin (all-zero input always scores zero). The bias `b` *shifts* that line away from the origin. Drop it and the neuron loses the ability to lean "fire" or "don't fire" independent of the inputs — that is a real loss of what it can express, not a minor knob.
 !!!
 
+#### See the boundary move
+Don't take the "rotate" and "shift" words on faith — watch them. Drag the weights and the dividing line **rotates**; drag the bias and the whole line **slides**. Set the bias to **0** and notice the line is pinned to the origin, no matter how you turn the weights.
+
+%%% viz src="../../viz/neuron-boundary.html" title="interactive: a neuron's decision boundary" caption="interactive — drag w₁, w₂, and b; watch the line rotate and shift."
+
 %%% mathladder
 title: one neuron: `output = activation(w·x + b)`
 words: score each input by its weight and add them up, nudge the total with a bias, then squash the result through an activation.

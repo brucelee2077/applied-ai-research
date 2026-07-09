@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Neuron's Decision Boundary — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.35rem}
+.preset-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.4rem .75rem;cursor:pointer;transition:background .15s,transform .1s}
+.preset-btn:hover{background:#d4e9f0}.preset-btn:active{transform:translateY(1px)}
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.fire{color:var(--ok)}.ro-v.quiet{color:var(--bad)}
+@media(max-width:560px){.readouts{grid-template-columns:repeat(3,1fr)}}
+.figwrap{width:100%}
+svg#fig{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.axis path,.axis line{stroke:var(--border);stroke-width:1}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.axis-title{fill:var(--text2);font-family:var(--body);font-size:12px;font-weight:600}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">A Neuron's Decision Boundary</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Single neuron &middot; geometry</span>
+    <h1>Where a neuron draws its line</h1>
+    <p><b>What am I looking at?</b> A neuron computes <b>z = w&middot;x + b</b> and fires when z &gt; 0. On a 2-input
+    plane that "fires vs. quiet" split is exactly a <b>straight line</b>. Move the weights and watch the line
+    <b>rotate</b>; move the bias and watch it <b>slide</b>. Notice what happens to the line when the bias is 0.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">w&#8321; <span class="ctrl-hint">(weight on x&#8321;)</span></span><span class="ctrl-val" id="val-w1">1.0</span></div>
+        <input type="range" id="w1" min="-3" max="3" step="0.1" value="1" aria-label="weight w1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">w&#8322; <span class="ctrl-hint">(weight on x&#8322;)</span></span><span class="ctrl-val" id="val-w2">1.0</span></div>
+        <input type="range" id="w2" min="-3" max="3" step="0.1" value="1" aria-label="weight w2">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">b <span class="ctrl-hint">(bias &mdash; shifts the line)</span></span><span class="ctrl-val" id="val-b">0.0</span></div>
+        <input type="range" id="b" min="-4" max="4" step="0.1" value="0" aria-label="bias b">
+      </div>
+      <div class="presets">
+        <span style="font-size:.78rem;color:var(--muted);align-self:center;margin-right:.15rem">Try:</span>
+        <button class="preset-btn" data-p="origin">b = 0 &middot; stuck on the origin</button>
+        <button class="preset-btn" data-p="rotate">rotate with w</button>
+        <button class="preset-btn" data-p="shift">shift with b</button>
+      </div>
+      <div class="readouts">
+        <div class="ro"><div class="ro-k">Boundary line</div><div class="ro-v" id="ro-eq" style="font-size:.82rem">&mdash;</div></div>
+        <div class="ro"><div class="ro-k">Sample x = (1, 1)</div><div class="ro-v" id="ro-z">&mdash;</div></div>
+        <div class="ro"><div class="ro-k">Verdict</div><div class="ro-v" id="ro-fire">&mdash;</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Input space (x&#8321;, x&#8322;)</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="fig" viewBox="0 0 640 460" role="img"
+           aria-label="A 2D plane of inputs x1 and x2. The plane is split by a straight line into a 'fires' region where the neuron output is positive and a 'quiet' region where it is negative. Moving the weights rotates the line; moving the bias slides it away from the origin."></svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>The weights <b>w</b> set the line's <b>orientation</b> (they point straight into the "fires" side). Change w&#8321; or w&#8322; and the line <b>rotates</b>.</li>
+      <li>The bias <b>b</b> <b>slides the whole line</b> toward or away from the origin. It is the only control that moves the line <b>off</b> the origin.</li>
+      <li>Set <b>b = 0</b> and the line is <b>pinned through the origin</b> forever &mdash; no rotation can move it away. That is why a neuron without a bias loses the freedom to lean "fire" or "quiet" independent of the inputs.</li>
+    </ul>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var svgEl = document.getElementById("fig");
+  if (typeof window.d3 === "undefined") {
+    console.warn("[neuron-boundary] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) { svgEl.outerHTML = '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>'; }
+    return;
+  }
+
+  var DOM = 4;                              // plane shown from -DOM..DOM on both axes
+  var W = 640, H = 460;
+  var M = { top: 18, right: 18, bottom: 44, left: 52 };
+  var iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  var svg = d3.select(svgEl);
+  var root = svg.append("g").attr("transform", "translate(" + M.left + "," + M.top + ")");
+  var x = d3.scaleLinear().domain([-DOM, DOM]).range([0, iw]);
+  var y = d3.scaleLinear().domain([-DOM, DOM]).range([ih, 0]);
+
+  // decision-region heatmap: a grid of cells coloured by sign(z)
+  var N = 30, cw = iw / N, ch = ih / N;
+  var cells = [];
+  for (var gi = 0; gi < N; gi++) for (var gj = 0; gj < N; gj++) {
+    cells.push({ cx: -DOM + (gi + 0.5) * (2*DOM/N), cy: -DOM + (gj + 0.5) * (2*DOM/N), px: gi*cw, py: ih - (gj+1)*ch });
+  }
+  var cellSel = root.selectAll("rect.cell").data(cells).enter().append("rect")
+      .attr("class","cell").attr("x", function(d){return d.px;}).attr("y", function(d){return d.py;})
+      .attr("width", cw+0.6).attr("height", ch+0.6);
+
+  // gridlines + axes
+  root.append("g").attr("class","axis").attr("transform","translate(0,"+ (ih/2) +")")
+      .call(d3.axisBottom(x).ticks(8).tickSize(0).tickFormat(""));
+  root.append("g").attr("class","axis").attr("transform","translate("+ (iw/2) +",0)")
+      .call(d3.axisLeft(y).ticks(8).tickSize(0).tickFormat(""));
+  root.append("g").attr("class","axis").attr("transform","translate(0,"+ih+")").call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("~g")));
+  root.append("g").attr("class","axis").call(d3.axisLeft(y).ticks(8).tickFormat(d3.format("~g")));
+  root.append("text").attr("class","axis-title").attr("x", iw/2).attr("y", ih+36).attr("text-anchor","middle").text("x₁");
+  root.append("text").attr("class","axis-title").attr("transform","rotate(-90)").attr("x", -ih/2).attr("y", -36).attr("text-anchor","middle").text("x₂");
+
+  // origin marker
+  root.append("circle").attr("cx", x(0)).attr("cy", y(0)).attr("r", 3).attr("fill", "var(--muted)");
+  root.append("text").attr("x", x(0)+6).attr("y", y(0)+14).attr("fill","var(--muted)").attr("font-family","var(--mono)").attr("font-size","10px").text("origin");
+
+  var boundary = root.append("line").attr("stroke","var(--accent-d)").attr("stroke-width",3).attr("stroke-linecap","round");
+  var normal = root.append("line").attr("stroke","var(--warn)").attr("stroke-width",2.5).attr("marker-end","url(#nb-arrow)");
+  var defs = svg.append("defs");
+  defs.append("marker").attr("id","nb-arrow").attr("viewBox","0 0 10 10").attr("refX",8).attr("refY",5)
+      .attr("markerWidth",7).attr("markerHeight",7).attr("orient","auto-start-reverse")
+      .append("path").attr("d","M0,0 L10,5 L0,10 z").attr("fill","var(--warn)");
+  // sample point (1,1)
+  var samp = root.append("circle").attr("cx", x(1)).attr("cy", y(1)).attr("r",6).attr("stroke","#fff").attr("stroke-width",2);
+  root.append("text").attr("x", x(1)+9).attr("y", y(1)-6).attr("fill","var(--text)").attr("font-family","var(--mono)").attr("font-size","10px").text("(1,1)");
+
+  var elW1=document.getElementById("w1"), elW2=document.getElementById("w2"), elB=document.getElementById("b");
+  var vW1=document.getElementById("val-w1"), vW2=document.getElementById("val-w2"), vB=document.getElementById("val-b");
+  var roEq=document.getElementById("ro-eq"), roZ=document.getElementById("ro-z"), roFire=document.getElementById("ro-fire");
+
+  function render(){
+    var w1=+elW1.value, w2=+elW2.value, b=+elB.value;
+    vW1.textContent=w1.toFixed(1); vW2.textContent=w2.toFixed(1); vB.textContent=b.toFixed(1);
+    // colour cells by sign of z = w1*x1 + w2*x2 + b
+    cellSel.attr("fill", function(d){
+      var z = w1*d.cx + w2*d.cy + b;
+      return z >= 0 ? "rgba(45,139,85,0.16)" : "rgba(190,62,38,0.10)";
+    });
+    // boundary line w1*x1 + w2*x2 + b = 0 across the domain
+    var pts = boundaryPts(w1,w2,b);
+    if (pts) {
+      boundary.style("display",null)
+        .attr("x1", x(pts[0][0])).attr("y1", y(pts[0][1]))
+        .attr("x2", x(pts[1][0])).attr("y2", y(pts[1][1]));
+      // normal arrow (w direction) from the line's midpoint, scaled
+      var mx=(pts[0][0]+pts[1][0])/2, my=(pts[0][1]+pts[1][1])/2;
+      var mag=Math.hypot(w1,w2)||1, ux=w1/mag, uy=w2/mag;
+      normal.style("display", mag<0.05?"none":null)
+        .attr("x1", x(mx)).attr("y1", y(my))
+        .attr("x2", x(mx+ux*1.3)).attr("y2", y(my+uy*1.3));
+    } else { boundary.style("display","none"); normal.style("display","none"); }
+    // equation + sample verdict
+    roEq.textContent = fmt(w1)+"·x₁ + "+fmt(w2)+"·x₂ + "+fmt(b)+" = 0";
+    var zs = w1*1 + w2*1 + b;
+    roZ.textContent = "z = "+zs.toFixed(2);
+    if (zs>=0){ roFire.textContent="fires"; roFire.className="ro-v fire"; samp.attr("fill","var(--ok)"); }
+    else { roFire.textContent="quiet"; roFire.className="ro-v quiet"; samp.attr("fill","var(--bad)"); }
+  }
+  function fmt(v){ return (v<0?"−":"")+Math.abs(v).toFixed(1); }
+  // find where the line enters/exits the [-DOM,DOM] box
+  function boundaryPts(w1,w2,b){
+    var hits=[];
+    // intersect with x1=-DOM and x1=+DOM (solve for x2) when w2!=0
+    if (Math.abs(w2)>1e-6){
+      [-DOM,DOM].forEach(function(x1){ var x2=-(w1*x1+b)/w2; if (x2>=-DOM-1e-9 && x2<=DOM+1e-9) hits.push([x1,x2]); });
+    }
+    if (Math.abs(w1)>1e-6){
+      [-DOM,DOM].forEach(function(x2){ var x1=-(w2*x2+b)/w1; if (x1>=-DOM-1e-9 && x1<=DOM+1e-9) hits.push([x1,x2]); });
+    }
+    // dedupe close hits
+    var uniq=[]; hits.forEach(function(h){ if(!uniq.some(function(u){return Math.hypot(u[0]-h[0],u[1]-h[1])<1e-6;})) uniq.push(h); });
+    return uniq.length>=2 ? [uniq[0],uniq[1]] : null;
+  }
+
+  ["input","change"].forEach(function(ev){ [elW1,elW2,elB].forEach(function(el){ el.addEventListener(ev, render); }); });
+  Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      var p=btn.getAttribute("data-p");
+      if(p==="origin"){ elW1.value=1.5; elW2.value=-1; elB.value=0; }
+      if(p==="rotate"){ elW1.value=-2; elW2.value=1.5; elB.value=1; }
+      if(p==="shift"){ elW1.value=1; elW2.value=1; elB.value=-2.5; }
+      render();
+    });
+  });
+  render();
+})();
+</script>
+
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activations and Their Slopes — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.seg{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.2rem}
+.seg-btn{font-family:var(--body);font-size:.82rem;font-weight:600;color:var(--accent-d);
+  background:var(--accent-l);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:.45rem .9rem;cursor:pointer;transition:background .15s,transform .1s}
+.seg-btn:hover{background:#d4e9f0}.seg-btn.active{background:var(--accent);color:#fff;border-color:var(--accent-d)}
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.flat{color:var(--bad)}
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;margin:.2rem 0 .6rem;font-size:.8rem;color:var(--text2)}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.swatch{width:16px;height:0;border-top:3px solid var(--accent)}
+.swatch.d{border-top:3px dashed var(--warn)}
+.figwrap{width:100%}
+svg#fig{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.axis path,.axis line{stroke:var(--border);stroke-width:1}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.axis-title{fill:var(--text2);font-family:var(--body);font-size:12px;font-weight:600}
+.grid line{stroke:var(--border2);stroke-width:1;shape-rendering:crispEdges}.grid path{stroke:none}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Activations and Their Slopes</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Activations &middot; saturation</span>
+    <h1>Where an activation stops learning</h1>
+    <p><b>What am I looking at?</b> The solid curve is the activation <b>f(z)</b>; the dashed curve is its
+    <b>slope f&prime;(z)</b> &mdash; how much the output moves when you nudge the input. Learning happens through
+    that slope, so wherever the dashed curve sits near <b>0</b>, the neuron is "asleep" and barely learns. Drag the
+    marker into the flat tails and watch the slope collapse.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <div class="seg" id="seg" role="group" aria-label="choose activation">
+        <button class="seg-btn active" data-f="sigmoid">sigmoid</button>
+        <button class="seg-btn" data-f="tanh">tanh</button>
+        <button class="seg-btn" data-f="relu">ReLU</button>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">input z <span class="ctrl-hint">(the pre-activation w&middot;x + b)</span></span><span class="ctrl-val" id="val-z">0.0</span></div>
+        <input type="range" id="z" min="-6" max="6" step="0.05" value="0" aria-label="input z">
+      </div>
+      <div class="readouts">
+        <div class="ro"><div class="ro-k">output f(z)</div><div class="ro-v" id="ro-f">&mdash;</div></div>
+        <div class="ro"><div class="ro-k">slope f&prime;(z)</div><div class="ro-v" id="ro-d">&mdash;</div></div>
+        <div class="ro"><div class="ro-k">state</div><div class="ro-v" id="ro-state">&mdash;</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Output and slope vs. input</h2>
+    <div class="legend">
+      <span><span class="swatch"></span> f(z) — the activation</span>
+      <span><span class="swatch d"></span> f&prime;(z) — its slope (the learning signal)</span>
+    </div>
+    <div class="figwrap" id="figwrap">
+      <svg id="fig" viewBox="0 0 720 420" role="img"
+           aria-label="Two curves plotted against the input z: the activation output f of z as a solid line, and its derivative f prime of z as a dashed line. For sigmoid and tanh the derivative rises to a peak at z=0 and flattens toward zero in both tails; for ReLU the derivative is a step, 0 for negative z and 1 for positive z."></svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li><b>Sigmoid / tanh:</b> the slope is biggest near z = 0 (sigmoid tops out at <b>0.25</b>, tanh at <b>1.0</b>) and flattens to almost 0 in both tails. A neuron pushed far out is <b>saturated</b> — its slope vanishes and it stops learning.</li>
+      <li><b>ReLU:</b> the slope is a clean step — exactly <b>1</b> for z &gt; 0 (no shrinking, so gradients survive deep stacks) and exactly <b>0</b> for z &lt; 0.</li>
+      <li>That <b>0</b> is ReLU's failure mode: a unit whose input stays negative has slope 0 forever — a <b>dead unit</b> that can never recover. The flat regions are where learning goes to sleep.</li>
+    </ul>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var svgEl = document.getElementById("fig");
+  if (typeof window.d3 === "undefined") {
+    console.warn("[activation-derivatives] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) { svgEl.outerHTML = '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>'; }
+    return;
+  }
+
+  function sigmoid(z){ return 1/(1+Math.exp(-z)); }
+  var FUNCS = {
+    sigmoid: { f: sigmoid, d: function(z){ var s=sigmoid(z); return s*(1-s); }, dmax: "0.25" },
+    tanh:    { f: function(z){ return Math.tanh(z); }, d: function(z){ var t=Math.tanh(z); return 1-t*t; }, dmax: "1.0" },
+    relu:    { f: function(z){ return Math.max(0,z); }, d: function(z){ return z>0?1:0; }, dmax: "1.0" },
+  };
+  var cur = "sigmoid";
+
+  var W=720, H=420, M={top:18,right:24,bottom:44,left:52};
+  var iw=W-M.left-M.right, ih=H-M.top-M.bottom;
+  var svg=d3.select(svgEl);
+  var root=svg.append("g").attr("transform","translate("+M.left+","+M.top+")");
+  var x=d3.scaleLinear().domain([-6,6]).range([0,iw]);
+  var y=d3.scaleLinear().domain([-1.1,1.6]).range([ih,0]);
+
+  root.append("g").attr("class","grid").attr("transform","translate(0,"+ih+")").call(d3.axisBottom(x).ticks(6).tickSize(-ih).tickFormat(""));
+  root.append("g").attr("class","grid").call(d3.axisLeft(y).ticks(6).tickSize(-iw).tickFormat(""));
+  root.append("g").attr("class","axis").attr("transform","translate(0,"+ y(0) +")").call(d3.axisBottom(x).ticks(6).tickFormat(d3.format("~g")));
+  root.append("g").attr("class","axis").call(d3.axisLeft(y).ticks(6).tickFormat(d3.format("~g")));
+  root.append("text").attr("class","axis-title").attr("x", iw/2).attr("y", ih+36).attr("text-anchor","middle").text("input  z");
+
+  var lineF=d3.line().x(function(d){return x(d[0]);}).y(function(d){return y(d[1]);});
+  var pathF=root.append("path").attr("fill","none").attr("stroke","var(--accent)").attr("stroke-width",2.75).attr("stroke-linejoin","round");
+  var pathD=root.append("path").attr("fill","none").attr("stroke","var(--warn)").attr("stroke-width",2.25).attr("stroke-dasharray","6 4").attr("stroke-linejoin","round");
+
+  var markF=root.append("circle").attr("r",6).attr("fill","var(--accent-d)").attr("stroke","#fff").attr("stroke-width",2);
+  var markD=root.append("circle").attr("r",5).attr("fill","var(--warn)").attr("stroke","#fff").attr("stroke-width",1.5);
+  var drop=root.append("line").attr("stroke","var(--muted)").attr("stroke-width",1).attr("stroke-dasharray","2 3").attr("opacity",0.6);
+
+  var elZ=document.getElementById("z"), vZ=document.getElementById("val-z");
+  var roF=document.getElementById("ro-f"), roD=document.getElementById("ro-d"), roState=document.getElementById("ro-state");
+
+  function curvePts(fn){ var p=[]; for(var z=-6; z<=6.0001; z+=0.06){ p.push([z, fn(z)]); } return p; }
+
+  function draw(){
+    var F=FUNCS[cur];
+    pathF.attr("d", lineF(curvePts(F.f)));
+    // clamp derivative curve to the y-domain for display
+    pathD.attr("d", lineF(curvePts(function(z){ return Math.max(-1.1, Math.min(1.6, F.d(z))); })));
+    place();
+  }
+  function place(){
+    var F=FUNCS[cur], z=+elZ.value; vZ.textContent=z.toFixed(2);
+    var fv=F.f(z), dv=F.d(z);
+    markF.attr("cx", x(z)).attr("cy", y(Math.max(-1.1,Math.min(1.6,fv))));
+    markD.attr("cx", x(z)).attr("cy", y(Math.max(-1.1,Math.min(1.6,dv))));
+    drop.attr("x1", x(z)).attr("x2", x(z)).attr("y1", y(Math.max(-1.1,Math.min(1.6,fv)))).attr("y2", ih);
+    roF.textContent=fv.toFixed(3); roD.textContent=dv.toFixed(3);
+    var asleep = dv < 0.02;
+    roState.textContent = asleep ? "asleep (slope≈0)" : "learning";
+    roState.className = "ro-v" + (asleep ? " flat" : "");
+    roD.className = "ro-v" + (asleep ? " flat" : "");
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      cur=btn.getAttribute("data-f");
+      Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function(b){ b.classList.toggle("active", b===btn); });
+      draw();
+    });
+  });
+  ["input","change"].forEach(function(ev){ elZ.addEventListener(ev, place); });
+  draw();
+})();
+</script>
+
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

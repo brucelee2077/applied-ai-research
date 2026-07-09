@@ -161,6 +161,15 @@ def render_prompt(args, lines):
             '        <pre class="prompt-t" id="%s">%s</pre>\n'
             '      </div>' % (args.get('label', ''), pid, pid, text))
 
+def render_viz(args):
+    """Live-viz embed. Emits the .build-embed iframe the shared auto-resize script already drives."""
+    src = args.get('src', '')
+    title = args.get('title', 'interactive visualization')
+    cap = args.get('caption', 'interactive — try the controls.')
+    return ('<div class="build-embed"><iframe src="%s" title="%s" loading="lazy"></iframe>'
+            '<div class="cap">%s <a href="%s" target="_blank" rel="noopener">open full screen</a></div></div>'
+            % (src, title, cap, src))
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -168,6 +177,7 @@ def render_widget(typ, args, lines):
     if typ == 'formula':    return render_formula(lines)
     if typ == 'mathladder': return render_mathladder(lines)
     if typ == 'prompt':     return render_prompt(args, lines)
+    if typ == 'viz':        return render_viz(args)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
