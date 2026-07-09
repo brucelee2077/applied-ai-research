@@ -44,6 +44,16 @@ notebook_yardstick: 00-neural-networks/fundamentals/05_forward_propagation.ipynb
       <h4>First, the picture — hold this before any definition</h4>
       <p>Picture a factory assembly line. Raw material comes in one end; each station does one small job and hands the piece to the next; a finished product rolls off the far end. A neural network runs the same way: your input walks through a line of <strong>layers</strong>, each one reshaping it a little, and the answer drops out at the end. That walk from input to answer has a name — the <strong>forward pass</strong> — and it is literally what happens every time a model is used. Keep that picture; the two definitions below are just names for the line and the walk along it.</p>
 
+      <h4>The words you'll meet today — plain English first</h4>
+      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">layer</td><td style="padding:.4rem .6rem;color:var(--ink2)">A whole group of neurons worked out at once: multiply the input by a weight table, add a bias, then bend it with an activation.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">forward pass</td><td style="padding:.4rem .6rem;color:var(--ink2)">Sending your input down the line of layers in order until an answer drops out the end.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">shape chain</td><td style="padding:.4rem .6rem;color:var(--ink2)">The rule that each layer's output width must match the next layer's input width, or the multiply breaks.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">logits (raw scores)</td><td style="padding:.4rem .6rem;color:var(--ink2)">The plain, un-squashed numbers the last layer gives before you turn them into probabilities.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">inference</td><td style="padding:.4rem .6rem;color:var(--ink2)">Running an already-trained model on a new input to get its answer — a forward pass is exactly this.</td></tr>
+      <tr><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">batching</td><td style="padding:.4rem .6rem;color:var(--ink2)">Stacking many inputs together and running them through in one go to use the hardware better.</td></tr>
+      </tbody></table>
+
       <h4>What is a layer?</h4>
       <p>A <span class="term" data-tip="A group of neurons computed together: activation(x @ W + b). One matmul + bias + activation.">layer</span> is a group of neurons computed in one shot: <code>activation(x @ W + b)</code>. That's M1's matmul, plus a bias, then M2's activation. Its output becomes the input to the next layer.</p>
 

@@ -44,6 +44,16 @@ notebook_yardstick: null   # no matching fundamentals notebook (Notebook Smoothn
       <h4>First, the picture — hold this before the rules</h4>
       <p>Picture the loss as a hilly valley you're trying to reach the bottom of. You could inch down one careful step at a time — or you could let a ball roll and coast through the little dips instead of stopping at each one. That is the whole story of today: three ways of moving downhill, from a careful walk to a smart rolling ball. Keep that picture; the definitions below just give each mover its name.</p>
 
+      <h4>The words you'll meet today — plain English first</h4>
+      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">optimizer</td><td style="padding:.4rem .6rem;color:var(--ink2)">The rule that decides how to change the weights once you know the slope.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">SGD</td><td style="padding:.4rem .6rem;color:var(--ink2)">The plainest rule: take one small step straight downhill each time.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">momentum / velocity</td><td style="padding:.4rem .6rem;color:var(--ink2)">A stored running speed, so the weight keeps rolling in a steady direction and coasts over small bumps.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">Adam</td><td style="padding:.4rem .6rem;color:var(--ink2)">A rule that gives each weight its own step size using two remembered averages of the slope.</td></tr>
+      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">optimizer state</td><td style="padding:.4rem .6rem;color:var(--ink2)">The extra numbers an optimizer keeps per weight; for Adam that is two, roughly doubling the memory.</td></tr>
+      <tr><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">bias correction</td><td style="padding:.4rem .6rem;color:var(--ink2)">A small fix so the averages that start at zero are not too tiny in the first few steps.</td></tr>
+      </tbody></table>
+
       <h4>What is an optimizer?</h4>
       <p>An <span class="term" data-tip="The rule that turns gradients into a weight change each step: SGD, momentum, and Adam are the common ones.">optimizer</span> is the rule that decides how to change the weights once you have the gradients. The forward pass, the loss, and backprop stay the same. Only the last step — the update — is what an optimizer controls.</p>
 
