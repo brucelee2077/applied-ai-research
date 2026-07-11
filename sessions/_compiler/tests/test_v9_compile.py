@@ -33,3 +33,15 @@ def test_concept_mode_shows_visual_in_every_concept():
 def test_concept_compile_is_idempotent():
     a, _ = _compile_mini(); b, _ = _compile_mini()
     assert a == b
+
+def test_concept_emits_js_wiring_contract():
+    """Lock the compiler-emitted DOM the generic donor JS depends on."""
+    html, _ = _compile_mini()
+    import re
+    # every quiz .q carries a numeric data-correct and a .q-fb[data-fb]
+    qs = re.findall(r'<div class="q" data-correct="(\d+)">.*?data-fb="', html, re.DOTALL)
+    assert len(qs) == 4, qs
+    # the demo carries the run button + hidden out/take the engine toggles
+    assert 'class="demo-run"' in html
+    assert 'class="demo-out"' in html
+    assert 'class="demo-take"' in html
