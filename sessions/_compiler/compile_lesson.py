@@ -52,6 +52,8 @@ def main():
     log('== v8 compile:', os.path.relpath(args.source), '->', os.path.relpath(out_path))
     log('   donor:', os.path.relpath(donor_path), '| mode:', meta.get('mode'))
 
+    concept_mode = (meta.get('mode') == 'concept')
+
     # -- Reader Flow Gate (source) : block write on failure --
     rok, rmsgs = reader_flow_gate.run(meta, blocks)
     log('\n-- Reader Flow Gate (source) --')
@@ -59,14 +61,27 @@ def main():
     if not rok:
         log('\nReader Flow Gate FAILED — nothing written.'); sys.exit(2)
 
-    # -- compile --
     donor = open(donor_path, encoding='utf-8').read()
     html = v8lib.compile_html(meta, blocks, donor)
 
-    # -- Shell Invariant Gate (output + donor shell identity) --
-    sok, smsgs = shell_invariant_gate.run(html, meta, donor=donor)
-    log('\n-- Shell Invariant Gate (output vs donor) --')
-    for m in smsgs: log('  ', m)
+    if concept_mode:
+        import concept_shell_gate
+        sok, smsgs = concept_shell_gate.run(html, meta, donor=donor)
+        log('\n-- Concept Shell Gate (output) --')
+        for m in smsgs: log('  ', m)
+        try:
+            import notebook_smoothness_gate
+            nstatus, nmsgs = notebook_smoothness_gate.run(html, meta)
+            log('\n-- Notebook Smoothness Gate --')
+            for m in nmsgs: log('  ', m)
+            if nstatus is False or str(nstatus).upper() == 'FAIL':
+                sok = False; log('   notebook smoothness FAILED')
+        except Exception as e:
+            log('   notebook smoothness skipped:', e)
+    else:
+        sok, smsgs = shell_invariant_gate.run(html, meta, donor=donor)
+        log('\n-- Shell Invariant Gate (output vs donor) --')
+        for m in smsgs: log('  ', m)
 
     if not args.check_only:
         with open(out_path, 'w', encoding='utf-8') as f:

@@ -45,3 +45,15 @@ def test_concept_emits_js_wiring_contract():
     assert 'class="demo-run"' in html
     assert 'class="demo-out"' in html
     assert 'class="demo-take"' in html
+
+
+import subprocess
+def test_compile_lesson_cli_concept_mode_passes(tmp_path):
+    src = os.path.join(HERE, 'fixtures', 'mini_concept.md')
+    out = tmp_path / 'mini.html'
+    r = subprocess.run(['python3', os.path.join(HERE, '..', 'compile_lesson.py'), src,
+                        '--donor', os.path.join(HERE, '..', 'shells', 'v9-base.donor'),
+                        '--out', str(out)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert 'concept shell' in r.stdout.lower() or 'concept_shell' in r.stdout.lower()
+    assert out.exists()
