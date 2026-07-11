@@ -321,6 +321,18 @@ def render_section(block):
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
             % (a['id'], a['data_sec'], a['numclass'], a['num'], a['title'], a['tag'], body, btn))
 
+def render_concept(block):
+    """V9 concept unit: a tracked .module-section (intro -> inline visual -> build-up) with one gotit."""
+    a = block['args']
+    body = render_md('\n'.join(block['lines']))
+    num = a.get('num', ''); numclass = a.get('numclass', 's-study')
+    btn = '<button class="gotit" type="button">%s</button>' % a.get('gotit', 'Got it')
+    return ('<section class="module-section" id="%s" data-sec="%s">\n'
+            '  <div class="sec-head"><span class="sec-num %s">%s</span>'
+            '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
+            '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
+            % (a['id'], a['id'], numclass, num, a.get('title', ''), a.get('tag', ''), body, btn))
+
 def render_sidebar_nav(meta):
     rows = ['      <div class="nav-group-label">Module 02 · Train</div>']
     for it in meta['sidebar']:

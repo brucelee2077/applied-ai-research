@@ -34,3 +34,17 @@ def test_render_quiz_emits_four_q_blocks_with_answer_marker():
     assert out.count('class="q-opt"') == 16
     assert out.count('data-correct="1"') == 4
     assert 'The bend.' in out
+
+
+def test_render_concept_is_tracked_section_with_one_gotit():
+    block = {'type': 'concept',
+             'args': {'id': 'c3', 'num': '3', 'tag': 'Meet ReLU', 'title': 'ReLU — a one-way valve', 'gotit': 'Met ReLU'},
+             'lines': ['Intro prose about ReLU.', '%%% svg', '<svg viewBox="0 0 10 10"></svg>', '%%%', 'Build-up prose.']}
+    out = v8lib.render_concept(block)
+    assert 'class="module-section"' in out
+    assert 'id="c3"' in out and 'data-sec="c3"' in out
+    assert out.count('class="gotit"') == 1
+    assert 'Met ReLU' in out
+    assert 'ReLU — a one-way valve' in out
+    assert '<svg viewBox="0 0 10 10">' in out
+    assert out.count('<svg') == 1
