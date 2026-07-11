@@ -333,6 +333,18 @@ def render_concept(block):
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
             % (a['id'], a['id'], numclass, num, a.get('title', ''), a.get('tag', ''), body, btn))
 
+def concept_nav_items(blocks):
+    """V9 sidebar nav: auto-number concept units in source order; keep quiz/produce."""
+    items = [{'target': 'home', 'label': 'Start here'}]
+    n = 0
+    for b in blocks:
+        if b['type'] == 'concept':
+            n += 1
+            items.append({'target': b['args']['id'], 'label': '%d · %s' % (n, b['args'].get('tag') or b['args'].get('title', ''))})
+        elif b['type'] in ('quiz', 'produce'):
+            items.append({'target': b['args']['id'], 'label': b['args'].get('tag') or b['args'].get('title', b['type'].title())})
+    return items
+
 def render_sidebar_nav(meta):
     rows = ['      <div class="nav-group-label">Module 02 · Train</div>']
     for it in meta['sidebar']:

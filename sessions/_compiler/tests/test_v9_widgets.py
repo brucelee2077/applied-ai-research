@@ -48,3 +48,19 @@ def test_render_concept_is_tracked_section_with_one_gotit():
     assert 'ReLU — a one-way valve' in out
     assert '<svg viewBox="0 0 10 10">' in out
     assert out.count('<svg') == 1
+
+
+def test_concept_nav_items_number_in_order():
+    blocks = [
+        {'type': 'hero', 'args': {}, 'lines': []},
+        {'type': 'concept', 'args': {'id': 'c1', 'title': 'The collapse'}, 'lines': []},
+        {'type': 'concept', 'args': {'id': 'c2', 'title': 'The bend'}, 'lines': []},
+        {'type': 'quiz', 'args': {'id': 'quiz', 'title': 'Check'}, 'lines': []},
+        {'type': 'produce', 'args': {'id': 'produce', 'title': 'Produce'}, 'lines': []},
+    ]
+    items = v8lib.concept_nav_items(blocks)
+    targets = [it['target'] for it in items]
+    assert targets == ['home', 'c1', 'c2', 'quiz', 'produce']
+    labels = {it['target']: it['label'] for it in items}
+    assert labels['c1'].startswith('1') and 'collapse' in labels['c1'].lower()
+    assert labels['c2'].startswith('2')
