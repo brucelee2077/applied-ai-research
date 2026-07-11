@@ -71,13 +71,15 @@ def main():
         for m in smsgs: log('  ', m)
         try:
             import notebook_smoothness_gate
+        except ImportError as e:
+            log('   notebook smoothness skipped:', e)
+        else:
+            # run() outside the import guard so a real bug in it surfaces, not swallowed
             nstatus, nmsgs = notebook_smoothness_gate.run(html, meta)
             log('\n-- Notebook Smoothness Gate --')
             for m in nmsgs: log('  ', m)
             if nstatus is False or str(nstatus).upper() == 'FAIL':
                 sok = False; log('   notebook smoothness FAILED')
-        except Exception as e:
-            log('   notebook smoothness skipped:', e)
     else:
         sok, smsgs = shell_invariant_gate.run(html, meta, donor=donor)
         log('\n-- Shell Invariant Gate (output vs donor) --')
@@ -91,7 +93,7 @@ def main():
         log('\n--check-only: not written')
 
     if not sok:
-        log('\nShell Invariant Gate FAILED.'); sys.exit(3)
+        log('\n%s FAILED.' % ('Concept Shell Gate' if concept_mode else 'Shell Invariant Gate')); sys.exit(3)
     log('\nOK — compiled and all gates pass.')
 
 

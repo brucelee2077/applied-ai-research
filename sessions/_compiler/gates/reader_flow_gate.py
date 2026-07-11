@@ -48,7 +48,7 @@ def _region_texts(blocks):
     return mode, t
 
 
-def _run_concept(meta, blocks, msgs, ok, fail, pas, warn):
+def _run_concept(meta, blocks, msgs, ok, fail, pas):
     spine_word = (meta.get('spine') or 'bend').split(':')[0].split()[0].lower()
     hero = next((b for b in blocks if b['type']=='hero'), None)
     htxt = '\n'.join(hero['lines']).lower() if hero else ''
@@ -83,7 +83,7 @@ def run(meta, blocks, spine_word=None):
     def warn(m): msgs.append('warn ' + m)
 
     if meta.get('mode') == 'concept':
-        return _run_concept(meta, blocks, msgs, ok, fail, pas, warn)
+        return _run_concept(meta, blocks, msgs, ok, fail, pas)
 
     mode, t = _region_texts(blocks)
     strict = (mode == 'clean')

@@ -28,7 +28,7 @@ def run(html, meta, donor=None):
     ids = re.findall(r'<section class="module-section" id="(c\w+)"', html)
     chk(len(ids) >= 3, '>=3 concept sections (got %d)' % len(ids))
     for cid in ids:
-        sec = re.search(r'id="%s".*?</section>' % re.escape(cid), html, re.DOTALL).group(0)
+        sec = re.search(r'<section class="module-section" id="%s".*?</section>' % re.escape(cid), html, re.DOTALL).group(0)
         has_visual = ('<svg' in sec) or ('build-embed' in sec)
         chk(has_visual, 'concept %s has a visual' % cid)
         chk(sec.count('class="gotit"') == 1, 'concept %s has exactly one gotit' % cid)
