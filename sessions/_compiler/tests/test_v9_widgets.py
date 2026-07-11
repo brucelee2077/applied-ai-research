@@ -36,6 +36,24 @@ def test_render_quiz_emits_four_q_blocks_with_answer_marker():
     assert 'The bend.' in out
 
 
+def test_render_quiz_does_not_crash_on_option_starting_with_a_colon():
+    # An option like "a:b mapping" must NOT be misread as an answer marker and crash.
+    lines = ['q: Which is a mapping? | a:1 | a:b mapping | plain option | fb: careful.']
+    out = v8lib.render_widget('quiz', {}, lines)
+    assert out.count('class="q"') == 1
+    # the "a:b mapping" part degrades into a normal option, not an answer marker
+    assert 'a:b mapping' in out
+    assert 'data-correct="1"' in out
+
+
+def test_render_quiz_missing_answer_marker_defaults_safely():
+    # No 'a:N' marker present — must not crash; data-correct defaults to 0.
+    lines = ['q: No marker here | first | second | fb: no answer given.']
+    out = v8lib.render_widget('quiz', {}, lines)
+    assert out.count('class="q"') == 1
+    assert 'data-correct="0"' in out
+
+
 def test_render_concept_is_tracked_section_with_one_gotit():
     block = {'type': 'concept',
              'args': {'id': 'c3', 'num': '3', 'tag': 'Meet ReLU', 'title': 'ReLU — a one-way valve', 'gotit': 'Met ReLU'},

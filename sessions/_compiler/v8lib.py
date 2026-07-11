@@ -84,15 +84,6 @@ def _kv(lines):
                 d[k.strip()] = v.strip()
     return d
 
-def _kv_multiline(lines):
-    d = {}
-    for ln in lines:
-        if ':' in ln:
-            k, v = ln.split(':', 1)
-            if re.fullmatch(r'\w+', k.strip()):
-                d[k.strip()] = v.strip()
-    return d
-
 def attr_esc_text(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
@@ -189,7 +180,7 @@ def render_svg(lines):
 
 def render_demo(args, lines):
     """Inline run-demo: code line, hidden output + takeaway revealed on click."""
-    d = _kv_multiline(lines)
+    d = _kv(lines)
     did = args.get('id', 'demo'); label = args.get('label', 'run it')
     code = attr_esc_text(d.get('code', '')); out = attr_esc_text(d.get('out', '')); take = inline(d.get('take', ''))
     return ('<div class="demo" data-demo="%s">'
@@ -209,10 +200,12 @@ def render_quiz(lines):
         q = parts[0][2:].strip() if parts[0].lower().startswith('q:') else parts[0]
         ans, opts, fb = 0, [], ''
         for p in parts[1:]:
-            if re.match(r'a\s*:', p, re.I):
-                ans = int(re.split(r':', p, 1)[1].strip())
+            # answer marker: only when the tail after 'a:' is all digits (else it is an option)
+            m = re.match(r'a\s*:\s*(.*)$', p, re.I)
+            if m and re.fullmatch(r'\d+', m.group(1).strip()):
+                ans = int(m.group(1).strip())
             elif p.lower().startswith('fb:'):
-                fb = p[3:].strip()
+                fb = p.split(':', 1)[1].strip()
             else:
                 opts.append(p)
         optshtml = ''.join('<button class="q-opt" type="button" data-opt="%d"><span class="mark"></span><span>%s</span></button>' % (i, inline(o)) for i, o in enumerate(opts))
