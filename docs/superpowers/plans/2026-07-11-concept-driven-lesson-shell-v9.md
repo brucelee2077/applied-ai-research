@@ -475,7 +475,7 @@ q: All ReLUs output 0? | a:1 | sigmoid bug | dead ReLUs | OOM | converged | fb: 
 %%%
 
 @@@ produce id=produce tag="Produce" title="Watch the collapse" gotit="Done"
-Predict what `(x@W1)@W2` prints vs `x@(W1@W2)`, then run it and observe they match — until you insert a ReLU.
+Predict what `(x@W1)@W2` prints vs `x@(W1@W2)`, then run it and observe they match — until you insert a ReLU. Write it in `experiment.py` and run it.
 
 @@@ fin
 ```
@@ -535,13 +535,13 @@ Add the new function:
 
 ```python
 def _compile_concept(meta, blocks, donor):
-    # quest-id freeze check (reuse existing logic)
+    # quest-id: the v9 donor is a NEUTRAL template carrying data-quest-id="__QUEST_ID__".
+    # Substitute the source's quest_id, then verify it landed. (Do NOT compare against a
+    # donor-baked id — the donor is shared across all concept lessons.)
     qid = meta['quest_id']
-    m = re.search(r'data-quest-id="([^"]+)"', donor)
-    if not m:
-        raise RuntimeError("donor missing data-quest-id")
-    if m.group(1) != qid:
-        raise RuntimeError("quest-id mismatch: donor=%s source=%s (FROZEN)" % (m.group(1), qid))
+    donor = donor.replace('__QUEST_ID__', qid)          # substitute FIRST
+    if ('data-quest-id="%s"' % qid) not in donor:
+        raise RuntimeError("donor missing data-quest-id=\"__QUEST_ID__\" template token")
 
     bt = {b['type']: b for b in blocks}
     # content = hero + numbered concepts + quiz + produce + fin
@@ -577,6 +577,8 @@ def _compile_concept(meta, blocks, donor):
                  % (meta.get('nav_next_href', ''), meta.get('nav_next_label', '')), H, 'nav-next')
     return H
 ```
+
+**Quest-id decision (consistent with Task 8):** the v9 donor is a neutral template with `data-quest-id="__QUEST_ID__"`. `_compile_concept` substitutes the source `quest_id` in and asserts it landed — there is **no** donor-vs-source mismatch comparison (that only makes sense for V8's per-day donors). The substitution happens before any marker replacement, and Task 9's no-leak check confirms `__QUEST_ID__` never survives into output.
 
 Add the two section wrappers + nav renderer (model on `render_concept` / `render_sidebar_nav`):
 
@@ -680,7 +682,7 @@ Wait — the hero is emitted by the compiler into `<!--V9_CONTENT-->` (Task 6 pr
     <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
   </main>
 ```
-Keep the `data-quest-id="wf2-d02-activations"` attribute on whatever element currently carries it (search the donor for `data-quest-id`) — the compile fails if it's absent or mismatched. For the test fixture (`quest_id: test-mini`) you'll need the donor's quest-id to match; since the donor is shared, make the quest-id check use the *source* value by templating it: replace the donor's `data-quest-id="..."` with `data-quest-id="__QUEST_ID__"` and have `_compile_concept` do `H = H.replace('__QUEST_ID__', qid)` BEFORE the freeze check, OR keep the donor quest-id generic and skip the mismatch check when donor uses the template token. **Decision:** use `__QUEST_ID__` token; `_compile_concept` substitutes it, and the freeze check compares source `quest_id` to the compiled result. Update Task 6's quest-id block accordingly (compare against front-matter only; the donor is a neutral template).
+Keep the `data-quest-id` attribute on whatever element currently carries it (search the m02 donor for `data-quest-id`; it's on the element at donor :275). Because the v9 donor is **shared** across all concept lessons, it cannot bake in one lesson's id — replace `data-quest-id="wf2-d02-activations"` with **`data-quest-id="__QUEST_ID__"`**. `_compile_concept` (Task 6) substitutes the source `quest_id` for this token before any other replacement, and Task 9's no-leak check confirms the token never survives. (This is the single source of the decision; Task 6's snippet already implements it.)
 
 - [ ] **Step 3: Commit the stub**
 
@@ -741,12 +743,24 @@ Leave the progress/checklist/nav/scrollspy/reset/theme engines (donor :495-591, 
 
 - [ ] **Step 5: Syntax-check the emitted JS**
 
-Run:
+Compile via `v8lib` directly (NOT the `compile_lesson.py` CLI — its gate dispatch/concept branch don't exist until Tasks 10-11, and the current unbranched gates would hard-fail a concept source and refuse to write):
+
 ```bash
-python3 sessions/_compiler/compile_lesson.py sessions/_compiler/tests/fixtures/mini_concept.md --donor sessions/_compiler/shells/v9-base.donor --out /tmp/mini.html --check-only 2>&1 | tail -5
-node -e "const h=require('fs').readFileSync('/tmp/mini.html','utf8'); const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)]; m.forEach((s,i)=>{require('vm').compileFunction(s[1]); }); console.log('JS OK:', m.length, 'scripts')"
+python3 - <<'PY'
+import os, sys
+C = 'sessions/_compiler'
+sys.path.insert(0, C)
+import v8lib
+src = open(C+'/tests/fixtures/mini_concept.md', encoding='utf-8').read()
+meta, body = v8lib.split_frontmatter(src)
+html = v8lib.compile_html(meta, v8lib.parse_blocks(body),
+                          open(C+'/shells/v9-base.donor', encoding='utf-8').read())
+open('/tmp/mini.html','w',encoding='utf-8').write(html)
+print('compiled', len(html), 'chars')
+PY
+node -e "const h=require('fs').readFileSync('/tmp/mini.html','utf8'); const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)]; m.forEach(s=>require('vm').compileFunction(s[1])); console.log('JS OK:', m.length, 'scripts')"
 ```
-Expected: `JS OK: N scripts` (no syntax error). (`--check-only` won't write; drop it once gates pass to actually write.)
+Expected: `compiled N chars` then `JS OK: N scripts` (no syntax error). The full CLI path is exercised later by Task 11's test.
 
 - [ ] **Step 6: Run Task 6 + 7 tests now that the donor exists**
 
@@ -842,6 +856,12 @@ def run(html, meta, donor=None):
     chk(html.count('data-sec="quiz"') == 1, 'exactly one quiz section')
     chk(html.count('class="q"') == 4, 'quiz has 4 questions (got %d)' % html.count('class="q"'))
     chk(html.count('data-sec="produce"') == 1, 'exactly one produce section')
+    # produce must reference a runnable artifact (experiment.py) so a concept lesson
+    # cannot silently drop its Produce artifact. Only enforced when meta opts in.
+    if meta.get('require_artifact', True):
+        prod = re.search(r'data-sec="produce".*?</section>', html, re.DOTALL)
+        chk(bool(prod) and 'experiment.py' in prod.group(0),
+            'produce references an experiment.py artifact')
 
     # nav parity: every data-target (minus home) maps to a section id, and vice-versa
     targets = set(re.findall(r'data-target="([^"]+)"', html)) - {'home'}
@@ -1018,7 +1038,7 @@ Expected: FAIL — the V8 `shell_invariant_gate` runs and exits 3 (asserts 7 sec
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `compile_lesson.py`, import the new gate and branch. Replace the gate section (:55-69) with:
+In `compile_lesson.py`, import the new gate and branch. Replace **only** the gate-running section (:55-69) with the block below. **Keep the existing write + exit-code block that follows (:71-80)** — `if not args.check_only: write(html)` then `if not sok: sys.exit(3)` — do not delete it; the new branch just sets `sok`/`smsgs` for it to consume.
 
 ```python
     concept_mode = (meta.get('mode') == 'concept')
@@ -1038,12 +1058,14 @@ In `compile_lesson.py`, import the new gate and branch. Replace the gate section
         sok, smsgs = concept_shell_gate.run(html, meta, donor=donor)
         log('\n-- Concept Shell Gate (output) --')
         for m in smsgs: log('  ', m)
-        # notebook smoothness (yardstick or N/A)
+        # notebook smoothness: 'N/A' or True = pass; a real 'FAIL'/False blocks the write.
         try:
             import notebook_smoothness_gate
             nstatus, nmsgs = notebook_smoothness_gate.run(html, meta)
             log('\n-- Notebook Smoothness Gate --')
             for m in nmsgs: log('  ', m)
+            if nstatus is False or str(nstatus).upper() == 'FAIL':
+                sok = False; log('   notebook smoothness FAILED')
         except Exception as e:
             log('   notebook smoothness skipped:', e)
     else:
@@ -1052,7 +1074,7 @@ In `compile_lesson.py`, import the new gate and branch. Replace the gate section
         for m in smsgs: log('  ', m)
 ```
 
-Add `sys.path.insert(0, os.path.join(HERE, 'gates'))` already exists (:26). Ensure `notebook_smoothness_gate.run` signature matches (`run(html, meta, root=ROOT)` → returns `(status, msgs)`; `status` may be `'N/A'`, treat non-`False` as pass; do **not** fail compile on `N/A`).
+Add `sys.path.insert(0, os.path.join(HERE, 'gates'))` already exists (:26). `notebook_smoothness_gate.run(html, meta)` returns `(status, msgs)` where `status` is `'N/A'` for a null yardstick (treated as pass) — this branch fails the compile only on a genuine `FALSE`/`'FAIL'`, not on `'N/A'`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1126,7 +1148,7 @@ Rebuild the real lesson with 7 concept units. Reuse existing SVGs (extract from 
 
 - [ ] **Step 1: Extract the 5 SVGs**
 
-From `sessions/_compiler/shells/m02-day-02.donor`: `var BUILD[0]` (ReLU), `[1]` (sigmoid), `[2]` (collapse), `[3]` (cure) — convert single-quote attrs to double-quote. tanh SVG is inline at donor :397 (already double-quoted). Save them for the `%%% svg` blocks.
+From `sessions/_compiler/shells/m02-day-02.donor`: `var BUILD` holds **6** SVGs; use only `BUILD[0]` (ReLU), `[1]` (sigmoid), `[2]` (collapse), `[3]` (cure) — index explicitly, do not assume the array has 4 entries. Convert their single-quote attributes to double-quote. The tanh SVG is inline at donor :397 (already double-quoted). Save these 5 for the `%%% svg` blocks.
 
 - [ ] **Step 2: Write the front-matter + 7 concepts**
 
@@ -1167,6 +1189,8 @@ Concept map (author intro → `%%% svg`/`%%% viz` → build-up, reusing the exis
 Then `@@@ quiz` (the 4 existing questions, incl. the dead-ReLU diagnostic — reformatted to the `%%% quiz` `|` syntax) and `@@@ produce` (the existing Option-A/Option-B collapse-then-cure artifact, discovery-framed — keep the `predict → run → observe` cues so the reader-flow gate passes) and `@@@ fin`.
 
 **Preserve:** the bilingual "why this trips people up" note (→ c1 or c2), the jargon glosses via `[[term||tooltip]]`, and all staff-depth content (→ c6). Keep the `%%% demo` outputs numerically identical to the shipped `var DEMOS` values.
+
+**Kicker note:** `render_hero` uses `meta['module_label']` as the hero kicker (the `@kicker` line in the block is ignored). Set `module_label: "Module 2 · Train"` in front-matter — that string becomes both the sidebar nav-group label and the hero kicker. If you want the shipped "Module 2 · Train · Day 2" kicker exactly, set `module_label` to that; pick one and confirm it reads well in both places.
 
 - [ ] **Step 3: Compile**
 
