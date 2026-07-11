@@ -199,6 +199,26 @@ def render_demo(args, lines):
             '<div class="demo-take" hidden>%s</div></div>'
             % (did, code, label, out, take))
 
+def render_quiz(lines):
+    """Authored quiz: one question per line, '|'-separated. q: ask | a:N | opt | ... | fb: text"""
+    blocks = []
+    for ln in lines:
+        if not ln.strip():
+            continue
+        parts = [p.strip() for p in ln.split('|')]
+        q = parts[0][2:].strip() if parts[0].lower().startswith('q:') else parts[0]
+        ans, opts, fb = 0, [], ''
+        for p in parts[1:]:
+            if re.match(r'a\s*:', p, re.I):
+                ans = int(re.split(r':', p, 1)[1].strip())
+            elif p.lower().startswith('fb:'):
+                fb = p[3:].strip()
+            else:
+                opts.append(p)
+        optshtml = ''.join('<button class="q-opt" type="button" data-opt="%d"><span class="mark"></span><span>%s</span></button>' % (i, inline(o)) for i, o in enumerate(opts))
+        blocks.append('<div class="q" data-correct="%d"><div class="q-ask">%s</div><div class="q-opts">%s</div><div class="q-fb" data-fb="%s"></div></div>' % (ans, inline(q), optshtml, attr_esc(fb)))
+    return '<div class="quiz">' + ''.join(blocks) + '</div>'
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -209,6 +229,7 @@ def render_widget(typ, args, lines):
     if typ == 'viz':        return render_viz(args)
     if typ == 'svg':        return render_svg(lines)
     if typ == 'demo':       return render_demo(args, lines)
+    if typ == 'quiz':       return render_quiz(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------

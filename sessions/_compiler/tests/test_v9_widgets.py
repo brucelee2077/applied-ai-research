@@ -20,3 +20,17 @@ def test_render_demo_emits_runnable_console():
     assert 'relu(np.array([-3,-1,0,2,5]))' in out
     assert 'array([0, 0, 0, 2, 5])' in out
     assert 'ReLU zeros negatives' in out
+
+
+def test_render_quiz_emits_four_q_blocks_with_answer_marker():
+    lines = [
+        'q: What does an activation add? | a:1 | More params | Non-linearity | Faster matmul | A bias | fb: The bend.',
+        'q: No activation, ten layers = ? | a:1 | more power | one linear layer | random | sigmoid | fb: One matrix.',
+        'q: ReLU(z) = ? | a:1 | 1/(1+e^-z) | max(0,z) | z^2 | -z | fb: keep positives.',
+        'q: Loss plateaus, ReLUs all 0? | a:1 | sigmoid bug | dead ReLUs | OOM | converged | fb: dead units.',
+    ]
+    out = v8lib.render_widget('quiz', {}, lines)
+    assert out.count('class="q"') == 4
+    assert out.count('class="q-opt"') == 16
+    assert out.count('data-correct="1"') == 4
+    assert 'The bend.' in out
