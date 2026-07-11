@@ -84,6 +84,18 @@ def _kv(lines):
                 d[k.strip()] = v.strip()
     return d
 
+def _kv_multiline(lines):
+    d = {}
+    for ln in lines:
+        if ':' in ln:
+            k, v = ln.split(':', 1)
+            if re.fullmatch(r'\w+', k.strip()):
+                d[k.strip()] = v.strip()
+    return d
+
+def attr_esc_text(s):
+    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
 def render_jargon(lines):
     rows = [tuple(x.strip() for x in ln.split('|', 1)) for ln in lines if '|' in ln]
     head = ('<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem">'
@@ -175,6 +187,18 @@ def render_svg(lines):
     svg = '\n'.join(lines).strip()
     return '<div class="build-viz">%s</div>' % svg
 
+def render_demo(args, lines):
+    """Inline run-demo: code line, hidden output + takeaway revealed on click."""
+    d = _kv_multiline(lines)
+    did = args.get('id', 'demo'); label = args.get('label', 'run it')
+    code = attr_esc_text(d.get('code', '')); out = attr_esc_text(d.get('out', '')); take = inline(d.get('take', ''))
+    return ('<div class="demo" data-demo="%s">'
+            '<div class="demo-code"><code>%s</code>'
+            '<button class="demo-run" type="button">%s ▶</button></div>'
+            '<pre class="demo-out" hidden>%s</pre>'
+            '<div class="demo-take" hidden>%s</div></div>'
+            % (did, code, label, out, take))
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -184,6 +208,7 @@ def render_widget(typ, args, lines):
     if typ == 'prompt':     return render_prompt(args, lines)
     if typ == 'viz':        return render_viz(args)
     if typ == 'svg':        return render_svg(lines)
+    if typ == 'demo':       return render_demo(args, lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
