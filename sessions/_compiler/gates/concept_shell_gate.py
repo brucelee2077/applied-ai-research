@@ -29,7 +29,11 @@ def run(html, meta, donor=None):
     chk(len(ids) >= 3, '>=3 concept sections (got %d)' % len(ids))
     for cid in ids:
         sec = re.search(r'<section class="module-section" id="%s".*?</section>' % re.escape(cid), html, re.DOTALL).group(0)
-        has_visual = ('<svg' in sec) or ('build-embed' in sec)
+        # a real figure = a genuinely closed <svg> element OR a build-embed wrapper that
+        # actually holds an iframe. Bare substrings 'build-embed'/'<svg' in prose don't count.
+        has_svg = bool(re.search(r'<svg[\s>].*?</svg>', sec, re.DOTALL))
+        has_iframe = bool(re.search(r'class="build-embed"[^>]*>\s*<iframe', sec, re.DOTALL))
+        has_visual = has_svg or has_iframe
         chk(has_visual, 'concept %s has a visual' % cid)
         chk(sec.count('class="gotit"') == 1, 'concept %s has exactly one gotit' % cid)
 

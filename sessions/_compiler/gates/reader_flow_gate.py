@@ -59,10 +59,16 @@ def _run_concept(meta, blocks, msgs, ok, fail, pas):
 
     concepts = [b for b in blocks if b['type']=='concept']
     fail('need >=3 concept units (got %d)' % len(concepts)) if len(concepts) < 3 else pas('%d concept units' % len(concepts))
-    VIS = ('<svg', '%%% svg', '%%% viz', 'build-embed', 'build-viz')
+    def _has_visual(raw):
+        # a real figure = a widget directive OR a genuinely closed inline <svg> element.
+        # 'build-embed'/'build-viz' are COMPILED-OUTPUT classes, not source markers, so
+        # prose mentioning them must NOT count (closes the prose-substring bypass).
+        if '%%% svg' in raw or '%%% viz' in raw:
+            return True
+        return bool(re.search(r'<svg[\s>].*?</svg>', raw, re.DOTALL))
     for b in concepts:
         raw = '\n'.join(b['lines']); cid = b['args'].get('id','?')
-        (pas('concept %s ships a visual' % cid) if any(v in raw for v in VIS)
+        (pas('concept %s ships a visual' % cid) if _has_visual(raw)
          else fail('concept %s has NO visual (depict-on-introduction)' % cid))
 
     texts = [htxt] + ['\n'.join(b['lines']).lower() for b in concepts]

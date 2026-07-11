@@ -105,3 +105,50 @@ def test_reader_flow_concept_fails_concept_without_visual():
     ok, msgs = reader_flow_gate.run(meta, blocks)
     assert not ok
     assert any('visual' in m.lower() and 'c1' in m for m in msgs)
+
+
+# ---------------------------------------------------------------------------
+# HARDENING — close the prose-substring bypass in BOTH visual gates.
+# A figure-less concept whose PROSE merely mentions "build-embed" / "<svg"
+# must NOT sneak past. A real figure = %%% svg/%%% viz directive, a genuinely
+# closed <svg>…</svg>, or (compiled) a build-embed wrapper holding an iframe.
+# ---------------------------------------------------------------------------
+def test_reader_flow_concept_rejects_prose_mentioning_build_embed():
+    """Source-side: a concept with NO %%%svg/%%%viz and NO closed <svg>…</svg>,
+    only prose containing the literal 'build-embed', must FAIL."""
+    meta, blocks = _blocks_and_meta()
+    for b in blocks:
+        if b['type']=='concept' and b['args'].get('id')=='c2':
+            b['lines'] = ['We could put a build-embed here later.',
+                          'For now it is just prose about the bend.']
+    ok, msgs = reader_flow_gate.run(meta, blocks)
+    assert not ok
+    assert any('visual' in m.lower() and 'c2' in m for m in msgs), \
+        'expected a c2 visual FAIL; got:\n' + '\n'.join(msgs)
+
+def test_concept_shell_gate_rejects_prose_mentioning_build_embed():
+    """Output-side: replace c2's real <svg> figure with a prose paragraph that
+    contains the substrings 'build-embed' and '<svg' but has no closed <svg>…</svg>
+    and no build-embed iframe → the gate must FAIL c2 for lacking a visual."""
+    html, meta = _compile_mini()
+    import re
+    c2 = re.search(r'<section class="module-section" id="c2".*?</section>', html, re.DOTALL).group(0)
+    real_viz = re.search(r'<div class="build-viz">.*?</div>', c2, re.DOTALL).group(0)
+    assert '<svg' in real_viz  # we are indeed removing the real figure
+    fake = '<p>build-embed and <svg placeholder</p>'
+    c2_broken = c2.replace(real_viz, fake, 1)
+    assert c2_broken != c2
+    html2 = html.replace(c2, c2_broken, 1)
+    ok, msgs = concept_shell_gate.run(html2, meta)
+    assert not ok
+    assert any('visual' in m.lower() and 'c2' in m and m.startswith('FAIL') for m in msgs), \
+        'expected a c2 visual FAIL; got:\n' + '\n'.join(msgs)
+
+def test_both_visual_gates_pass_unmutated_fixture():
+    """Positive regression: the untouched fixture still PASSES both gates."""
+    meta, blocks = _blocks_and_meta()
+    rok, rmsgs = reader_flow_gate.run(meta, blocks)
+    assert rok, 'reader_flow_gate regressed on clean fixture:\n' + '\n'.join(rmsgs)
+    html, meta2 = _compile_mini()
+    sok, smsgs = concept_shell_gate.run(html, meta2)
+    assert sok, 'concept_shell_gate regressed on clean fixture:\n' + '\n'.join(smsgs)
