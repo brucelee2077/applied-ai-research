@@ -106,7 +106,7 @@ Typical use :: hidden layers (modern default) :: binary output / gate :: hidden 
 %%%
 
 @@@ concept id=c6 tag="When bends break" title="Dead ReLUs and saturation" gotit="Got the failure mode"
-A bend can silently stop learning. This is the staff-level part of today: the activation you pick decides whether a neuron keeps improving. Don't take the "Slope near 0" row on faith — **watch the slope**. The dashed curve below is each activation's slope `f′(z)`; drag the marker into the flat tails and see it collapse toward `0`. That vanishing slope <em>is</em> saturation (sigmoid/tanh) and the dead-ReLU zero — the exact reason a stuck unit stops learning.
+A bend can silently stop learning. This is the staff-level part of today: the activation you pick decides whether a neuron keeps improving. Don't take the "Slope near 0" row on faith — **watch the slope**. The dashed curve below is each activation's slope `f′(z)` (how steep the curve is at each point); drag the marker into the flat tails and see it collapse toward `0`. That vanishing slope <em>is</em> saturation (sigmoid/tanh) and the dead-ReLU zero — the exact reason a stuck unit stops learning.
 
 %%% viz src=../../viz/activation-derivatives.html title="activations and their slopes" caption="interactive — pick an activation, drag z; watch the slope flatten"
 %%%
