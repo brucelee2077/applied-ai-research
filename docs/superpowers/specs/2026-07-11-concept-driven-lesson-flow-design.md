@@ -114,14 +114,24 @@ Each entry is a lowercase token matched case-insensitively against prose. If the
 
 ### 5.2 The check
 
+The intent is stronger than "same-or-earlier beat": success criterion #1 requires the curve to be **visible in `s1`/`s2`, before the reader reaches the `s3` playground numbers.** The check therefore encodes *"declared visual objects must be depicted in `s1` or `s2`"*, not merely "depicted no later than first mention."
+
 For each token in `visual_objects`:
 
-1. Determine the **first authored prose beat** (scan `s1`, then `s2`, then `s4` in DOM order) whose text names the token.
-2. A beat "depicts" if its raw source contains any depiction marker: `<svg`, `class="build-viz"`, `class="build-embed"` (behavioral iframe), or a `%%% viz` widget.
-3. **PASS** if the first beat that names the token also contains a depiction marker, OR an earlier beat in DOM order already depicted it.
-4. **FAIL** if the token is first named in a beat that does not depict it and no earlier beat depicted it (this is exactly the "named-but-not-shown / picture comes later" defect).
+1. **Naming location.** Find the first authored prose beat (scan `s1`, then `s2`, then `s4` in DOM order) whose text names the token.
+2. **Depiction location.** A beat "depicts" if its **raw source** contains any depiction marker: `<svg`, `class="build-viz"`, `class="build-embed"` (behavioral iframe), or a `%%% viz` widget.
+3. **PASS** if the token is depicted in `s1` or `s2` (the early beats that precede the `s3` playground).
+4. **FAIL** if the token is named anywhere but not depicted in `s1`/`s2` — this catches both the "named-but-not-shown" defect and the subtler "first curve only appears in `s4`, after the playground" defect (a token whose only depiction is in `s4` FAILs, because the reader still met the playground numbers first).
 
-Note on `s3`/`s5`: these are compiler-generated (DEMOS/BUILD) and not authored prose regions, so the check operates on the authored prose (`s1/s2/s4`). The design intent — "curve visible before the `s3` playground numbers" — is satisfied precisely when the depiction lands in `s1`/`s2`.
+Note on `s3`/`s5`: these are compiler-generated (DEMOS/BUILD) and not authored prose regions, so the check operates on the authored prose. Because `s3` (playground) sits between `s2` and `s4` in DOM order, requiring depiction in `s1`/`s2` is exactly the mechanical form of "curve visible before the playground."
+
+### 5.2a Helper change required (not optional)
+
+`reader_flow_gate._region_texts()` currently returns **tag-stripped** text for `s1`/`s2`/`s4` (via `_text()` → `_TAG.sub`) and exposes a raw copy for **`s1` only** (`t['s1_raw']`). The depiction markers (`<svg`, `build-viz`, `build-embed`) are HTML tags, so they are erased by tag-stripping and are invisible to the current text fields. Therefore the implementation MUST extend `_region_texts()` to also expose `t['s2_raw']` and `t['s4_raw']` (raw, un-stripped source), and the new check MUST read the `*_raw` fields — not the stripped `t['s1']`/`t['s2']`/`t['s4']`. Building the check against the stripped strings would make it green-by-default (find zero markers always) — precisely the failure the §8 adversarial step exists to catch.
+
+### 5.2b Marker relevance in verbatim vs clean mode
+
+Day-2 is `source_mode: verbatim` and embeds depictions as raw HTML (`<div class="build-embed">…`, `<div class="build-viz">…<svg…`). The `%%% viz` widget marker is a **clean-mode** convenience (compiled by `v8lib.render_viz`) and appears **zero** times in the Day-2 source. So for the Day-2 target the load-bearing markers are `<svg` and `build-embed`/`build-viz`; `%%% viz` is retained in the marker list only for future clean-mode lessons. The check must accept any of the four markers so it works in both modes.
 
 ### 5.3 Mode handling (must not break shipped days)
 
@@ -131,7 +141,8 @@ Note on `s3`/`s5`: these are compiler-generated (DEMOS/BUILD) and not authored p
 
 ### 5.4 Gate output contract
 
-- Reuse the existing `run(meta, blocks)` signature and message list; add lines prefixed `pass `/`FAIL `/`warn ` as the current code does.
+- Extend the existing `run(meta, blocks, spine_word=None)` function and its message list; add lines prefixed `pass `/`FAIL `/`warn ` / `N/A ` as the current code does, and route a real failure through the existing `fail()` closure so the `ok` accumulator drives exit code 2 and blocks the compile write.
+- Requires the helper change in §5.2a (`_region_texts()` must expose `s2_raw`/`s4_raw`). The check reads raw source, not stripped text.
 - The new check must be side-effect-free and deterministic (pure function of source), consistent with the compiler's determinism guarantee.
 
 ---
@@ -173,7 +184,8 @@ Loop until convergence:
 | Adding SVG to `s1`/`s2` breaks shell byte-identity | Shell-invariant gate masks content regions; only CSS + JS engine must match donor. Run gate with `--donor` to prove. |
 | Early static curves duplicate the later BUILD curves (redundant) | Acceptable — repetition of a shape aids beginners. Optionally trim the most redundant late SVG, but not required. |
 | Interactive iframe height sticks (known past bug) | `activation-derivatives.html` already ships the postMessage height sender (it's an existing embed just relocated), so no new iframe risk. |
-| Gate is green-by-default and never actually catches the defect | Adversarial step explicitly tests the gate against a broken variant to confirm it FAILs. |
+| Gate is green-by-default and never actually catches the defect | Two mitigations: (a) check reads **raw** source (`*_raw` fields per §5.2a), not tag-stripped text where markers vanish; (b) adversarial step explicitly tests the gate against a broken variant to confirm it FAILs. |
+| Check passes on `s4`-only depiction (curve still after the playground) | §5.2 requires depiction in `s1`/`s2`, not merely "no later than first mention." A token whose only figure is in `s4` FAILs. |
 | Two skill copies drift | Every skill edit applied to both paths in the same step; a diff check confirms parity. |
 
 ---
