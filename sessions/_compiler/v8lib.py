@@ -170,6 +170,11 @@ def render_viz(args):
             '<div class="cap">%s <a href="%s" target="_blank" rel="noopener">open full screen</a></div></div>'
             % (src, title, cap, src))
 
+def render_svg(lines):
+    """Inline static visual: pass raw SVG through, wrapped for consistent styling."""
+    svg = '\n'.join(lines).strip()
+    return '<div class="build-viz">%s</div>' % svg
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -178,6 +183,7 @@ def render_widget(typ, args, lines):
     if typ == 'mathladder': return render_mathladder(lines)
     if typ == 'prompt':     return render_prompt(args, lines)
     if typ == 'viz':        return render_viz(args)
+    if typ == 'svg':        return render_svg(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
