@@ -384,6 +384,8 @@ REGION_PATTERNS = {
 
 def compile_html(meta, blocks, donor):
     bt = {b['type']: b for b in blocks}
+    if meta.get('mode') == 'concept':
+        return _compile_concept(meta, blocks, donor)
     secs = {b['args'].get('id'): b for b in blocks if b['type'] == 'section'}
     js = {b['args'].get('name'): '\n'.join(b['lines']).strip() for b in blocks if b['type'] == 'js'}
     # verbatim regions (extractor / migration mode): name -> exact HTML/JS
@@ -437,4 +439,72 @@ def compile_html(meta, blocks, donor):
         elif name in js:
             H = sub_once(REGION_PATTERNS[name], js[name], H, name)
     return H
+
+
+# ---------------------------------------------------------------------------
+# V9 concept-mode compile: marker-based assembly into a neutral donor
+# ---------------------------------------------------------------------------
+def _compile_concept(meta, blocks, donor):
+    # quest-id: v9 donor is a NEUTRAL template carrying data-quest-id="__QUEST_ID__".
+    # Substitute the source's quest_id, then verify it landed. NO donor-vs-source mismatch compare.
+    qid = meta['quest_id']
+    donor = donor.replace('__QUEST_ID__', qid)
+    if ('data-quest-id="%s"' % qid) not in donor:
+        raise RuntimeError('donor missing data-quest-id="__QUEST_ID__" template token')
+
+    bt = {b['type']: b for b in blocks}
+    parts = []
+    if 'hero' in bt:
+        parts.append(render_hero(meta, bt['hero']))
+    n = 0
+    for b in blocks:
+        if b['type'] == 'concept':
+            n += 1
+            b['args']['num'] = str(n)
+            parts.append(render_concept(b))
+        elif b['type'] == 'quiz':
+            parts.append(render_quiz_section(b))
+        elif b['type'] == 'produce':
+            parts.append(render_produce_section(b))
+    fin_html = render_fin(meta)
+    content = '\n\n    '.join(parts)
+    nav = render_sidebar_nav_items(meta, concept_nav_items(blocks))
+
+    H = donor
+    H = sub_once(r'<title>.*?</title>', '<title>%s</title>' % meta.get('page_title', ''), H, 'title')
+    H = sub_once(r'<div class="brand-sub">.*?</div>', '<div class="brand-sub">%s</div>' % meta.get('brand_sub', ''), H, 'brand-sub')
+    H = H.replace('<!--V9_NAV-->', nav, 1)
+    H = H.replace('<!--V9_CONTENT-->', content + '\n\n    ' + fin_html, 1)
+    H = sub_once(REGION_PATTERNS['nav_prev'], '<a class="lnav prev" href="%s"><span class="d">← Prev</span><span class="t">%s</span></a>' % (meta.get('nav_prev_href', ''), meta.get('nav_prev_label', '')), H, 'nav-prev')
+    H = sub_once(REGION_PATTERNS['nav_next'], '<a class="lnav next" href="%s"><span class="d">Next →</span><span class="t">%s</span></a>' % (meta.get('nav_next_href', ''), meta.get('nav_next_label', '')), H, 'nav-next')
+    return H
+
+
+def render_quiz_section(block):
+    a = block['args']
+    body = render_md('\n'.join(block['lines']))
+    btn = '<button class="gotit" type="button" disabled>%s</button>' % a.get('gotit', 'answer all first')
+    return ('<section class="module-section" id="%s" data-sec="%s">\n'
+            '  <div class="sec-head"><span class="sec-num s-quiz">%s</span>'
+            '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
+            '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
+            % (a['id'], a['id'], a.get('num', ''), a.get('title', ''), a.get('tag', 'Quiz'), body, btn))
+
+
+def render_produce_section(block):
+    a = block['args']
+    body = render_md('\n'.join(block['lines']))
+    btn = '<button class="gotit" type="button">%s</button>' % a.get('gotit', 'Done')
+    return ('<section class="module-section" id="%s" data-sec="%s">\n'
+            '  <div class="sec-head"><span class="sec-num s-produce">%s</span>'
+            '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
+            '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
+            % (a['id'], a['id'], a.get('num', ''), a.get('title', ''), a.get('tag', 'Produce'), body, btn))
+
+
+def render_sidebar_nav_items(meta, items):
+    rows = ['      <div class="nav-group-label">%s</div>' % meta.get('module_label', '')]
+    for it in items:
+        rows.append('      <button class="nav-link" data-target="%s"><span class="nl-dot"></span>%s</button>' % (it['target'], it['label']))
+    return '\n'.join(rows)
 
