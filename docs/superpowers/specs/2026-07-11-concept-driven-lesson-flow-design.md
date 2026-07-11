@@ -153,24 +153,32 @@ Create `sessions/_compiler/shells/v9-base.donor` (one reusable base, not per-day
 
 ### 4.4 Generalized JS engine (the only real JS work)
 
-Start from the existing engine (already generic for progress/nav/scrollspy/completion — keep as-is) and change the three id-coupled widget engines to be selector-driven:
+Start from the existing engine (already generic for progress/nav/scrollspy/completion — keep as-is) and change the three id-coupled widget engines to be selector-driven. Note each engine currently keys off **two** ids (a section id + an inner-wrapper id), so both must be de-hardcoded per engine:
 
-- **Inline run-demos:** replace the `getElementById('s3')` playground engine with a generic one: `querySelectorAll('.demo')`, each demo self-contained (its own run button reveals its own `out`+`take`). No "saw all 3" cross-section gating; each concept's `.gotit` is enabled normally (or on demo-run if present).
-- **Build-reveal:** inline visuals need **no** reveal engine (they're always visible). Drop the `#build`/`s5` scroll-reveal engine entirely for V9. (Static SVGs render immediately; iframes keep their existing auto-resize script.)
-- **Quiz:** change `getElementById('s6')` to select the quiz section by a class/`data-sec="quiz"` marker so it is not tied to a fixed id. The quiz question DOM is emitted by the compiler from `%%% quiz` (not injected from a `var QS`), and the engine wires click-to-answer over `.q` blocks found within the quiz section.
+- **Inline run-demos:** the current playground keys off `getElementById('s3')` (section) + `getElementById('console')`/`getElementById('take')` (inner). Replace with a generic engine: `querySelectorAll('.demo')`, each demo self-contained (its own run button reveals its own `out`+`take` inline). No "saw all 3" cross-section gating; each concept's `.gotit` is enabled normally (or on demo-run if present).
+- **Build-reveal:** the current engine keys off `getElementById('build')` (inner) + `getElementById('s5')` (section). Inline visuals need **no** reveal engine (they're always visible), so drop the build-reveal engine entirely for V9. (Static SVGs render immediately; iframes keep their existing auto-resize script.)
+- **Quiz:** the current engine keys off `getElementById('quiz')` (inner wrapper) + `getElementById('s6')` (section). Change both to select by class / `data-sec="quiz"` so the quiz is not tied to a fixed id. The quiz question DOM is emitted by the compiler from `%%% quiz` (not injected from a `var QS`), and the engine wires click-to-answer over `.q` blocks found within the quiz section.
 
 ### 4.5 Gates
 
-- **New `concept_shell_gate.py`** (V9 replacement for `shell_invariant_gate.py`; the V8 gate stays for V8 lessons). Asserts V9 invariants on the compiled HTML:
+**Gate dispatch (required wiring).** `compile_lesson.py` currently calls `reader_flow_gate.run` then `shell_invariant_gate.run` **unconditionally** (compile_lesson.py:56, :67). Both would hard-fail a V9 lesson. The compiler must **branch on `meta.get('mode')`**:
+- `mode == 'concept'` → run `reader_flow_gate` (in its new concept branch, below) + `concept_shell_gate` (new) + `notebook_smoothness_gate`.
+- any other mode → run the existing `reader_flow_gate` + `shell_invariant_gate` path exactly as today (V8 lessons unchanged).
+This branch is a **required deliverable** (see §9), not an implicit consequence of adding a new gate file.
+
+- **New `concept_shell_gate.py`** (V9 replacement for `shell_invariant_gate.py`; the V8 gate stays and is still used for V8 lessons). Asserts V9 invariants on the compiled HTML:
   - quest-id present and matches donor/front-matter (frozen).
   - `≥3` concept sections (`.module-section` whose `data-sec` starts `c`), each containing **at least one visual** (`<svg` or `.build-embed` iframe) **and exactly one `.gotit`**.
   - exactly one quiz section with 4 questions (4 `.q` blocks / 4 option groups) and one produce section.
   - sidebar `data-target`s are in 1:1 correspondence with section `id`s (nav parity) — generic, not "8 fixed".
   - localStorage keys (`frontier-lesson:`, `frontier-theme`), `.fin`, footer present; no unresolved `@@@`/`%%%`/marker leakage.
   - recompile idempotent (byte-identical).
-- **Extend `reader_flow_gate.py`** with the V9 **concept-visual check**: in concept mode, every `@@@ concept` block's raw source must contain a visual marker (`<svg`, `%%% svg`, `%%% viz`, or `.build-embed`). A concept block with no visual → FAIL (blocks the write, exit 2). In non-concept modes this check is a no-op (existing lessons unaffected). This is the mechanical form of "every concept ships its picture."
-  - Reuse the existing `run(meta, blocks, spine_word=None)` signature, `ok=[True]`/`fail()` accumulator, and `pass `/`FAIL `/`warn `/`N/A ` message style. The check reads **raw** block source (concept blocks expose their raw lines directly via `parse_blocks`, so no tag-stripping problem — unlike the V8 region path).
-- **`notebook_smoothness_gate.py`** — unchanged; still compares the hero's first screen to the notebook yardstick. Day 2 keeps `notebook_yardstick: 00-neural-networks/fundamentals/03_activation_functions.ipynb`.
+- **Extend `reader_flow_gate.py` with a concept-mode branch — NOT merely "one extra check".** The gate currently detects mode by `'hero' in regions` (reader_flow_gate.py:34), where `regions` means `@@@ region` blocks. A V9 source uses `@@@ hero`/`@@@ concept` blocks (not `@@@ region`), so it would fall into the `else` → `mode='clean'` → **strict** path, which hard-fails on `s1` Jargon Ladder (line ~78), "picture precedes vocabulary in s1" (~83), and "spine in ≥3 of hero/s1/s2/s4" (~99) — all keyed to `s1/s2/s4/s7` blocks a concept source does not contain. Therefore:
+  - Add an explicit `meta.get('mode') == 'concept'` detection at the top of `run()` (or in `_region_texts`) that routes to a **concept branch** and does **not** run the `s1/s2/s4/s7`-keyed strict checks.
+  - The concept branch enforces the V9-appropriate rules: hero opens human-first / no frontier-pressure (reuse existing hero logic on the `@@@ hero` lede); spine word appears across ≥3 blocks among {hero + concept units}; produce is discovery-framed; and the **concept-visual check**: every `@@@ concept` block's raw source must contain a visual marker (`<svg`, `%%% svg`, `%%% viz`, or `.build-embed`) — a concept with no visual → FAIL (exit 2, blocks the write).
+  - Reuse the existing `run(meta, blocks, spine_word=None)` signature, `ok=[True]`/`fail()` accumulator, and `pass `/`FAIL `/`warn `/`N/A ` message style. The check reads **raw** block `lines` from `parse_blocks` (concept blocks expose raw source directly — no tag-stripping problem).
+  - Non-concept modes: behavior is unchanged (existing lessons unaffected).
+- **`notebook_smoothness_gate.py`** — unchanged in logic; still compares the hero's first screen to the notebook yardstick. It is **not currently wired into `compile_lesson.py`**; the mode-`concept` branch above adds it to the pipeline (or, if kept standalone, §7 runs it as an explicit step). Day 2 keeps `notebook_yardstick: 00-neural-networks/fundamentals/03_activation_functions.ipynb`.
 
 ---
 
@@ -188,7 +196,11 @@ Three skills, two byte-identical locations each (6 files), kept in sync:
 
 ## 6. Day 2 rebuild (first V9 lesson)
 
-Author `sessions/m02-the-neuron/day-02-activations/source.md` in V9 concept mode with **7 concept units**, reusing existing assets:
+Author `sessions/m02-the-neuron/day-02-activations/source.md` in V9 concept mode with **7 concept units**, reusing existing assets.
+
+**Front-matter change:** replace the current `mode: exemplar` + `source_mode: verbatim` with `mode: concept`; keep `quest_id: wf2-d02-activations`, `page_title`, `notebook_yardstick`, and nav labels. Set `donor: v9-base.donor`.
+
+**SVG provenance (small porting step, budget for it):** only the **tanh** SVG is genuine inline HTML in the current body (lesson.html:~406). The **ReLU / sigmoid / collapse / cure** figures live as **JS string literals inside `var BUILD=[…]`** in the donor (single-quote attributes). Reusing them means *extracting* the 5 SVGs (4 from `var BUILD`, tanh from the s4 body) and converting `'`→`"` on attributes so they are valid inline HTML in `%%% svg` blocks. They are reusable, but this is an extract-and-fix step, not copy-paste.
 
 | Unit | Concept (title) | Inline visual (reused asset) | Build-up |
 |---|---|---|---|
@@ -238,11 +250,12 @@ Heuristic gates BLOCK; LLM judge evaluates qualitatively (decided in brainstormi
 ## 9. Deliverables (this session)
 
 1. `v8lib.py` extended: `@@@ concept`/`@@@ quiz`/`@@@ produce` block rendering + `%%% svg`/`%%% demo`/`%%% quiz` widgets + concept-mode `compile_html` path.
-2. `sessions/_compiler/shells/v9-base.donor` — the reusable V9 shell with the generalized JS engine.
-3. `concept_shell_gate.py` (new) + `reader_flow_gate.py` extended with the concept-visual check + tests against a broken variant.
-4. `sessions/m02-the-neuron/day-02-activations/source.md` rebuilt in V9 concept mode (+ recompiled `lesson.html`).
-5. 6 edited `SKILL.md` files (3 skills × 2 locations), diff-verified identical.
-6. Green run of all gates + jsdom/`node --check` backstops + LLM-judge approval + adversarial-verification notes.
-7. This spec, committed.
+2. `compile_lesson.py` **gate-dispatch branch on `meta.get('mode')`**: concept-mode runs `reader_flow_gate` (concept branch) + `concept_shell_gate` + `notebook_smoothness_gate`; every other mode runs the existing V8 path unchanged.
+3. `sessions/_compiler/shells/v9-base.donor` — the reusable V9 shell with the generalized JS engine.
+4. `concept_shell_gate.py` (new) + `reader_flow_gate.py` given a concept-mode branch (skips the `s1/s2/s4/s7` strict checks; adds the concept-visual check) + tests against a broken variant.
+5. `sessions/m02-the-neuron/day-02-activations/source.md` rebuilt in V9 concept mode (front-matter → `mode: concept`, `donor: v9-base.donor`) + recompiled `lesson.html`.
+6. 6 edited `SKILL.md` files (3 skills × 2 locations), diff-verified identical.
+7. Green run of all gates + jsdom/`node --check` backstops + LLM-judge approval + adversarial-verification notes.
+8. This spec, committed.
 
 Out of scope (future sessions): backport m02 Days 1/3–9 and m03 to V9; resume the m04 rollout on the V9 shell.
