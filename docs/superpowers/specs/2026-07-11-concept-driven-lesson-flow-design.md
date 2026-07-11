@@ -1,178 +1,223 @@
-# Concept-Driven Lesson Flow (V8.1) — Design Spec
+# Concept-Driven Lesson Shell (V9) — Design Spec
 
 **Date:** 2026-07-11
 **Author:** ruifengli (+ Claude)
-**Status:** Draft for review
-**Scope of this session:** Update 3 skills + extend the reader-flow gate + rebuild Module 2 Day 2 (Activation Functions) into concept-beats + prove it with a re-test loop. **Day 2 only** — the other 8 m02 days and m03 are out of scope this session (see Non-Goals).
+**Status:** Draft for review (supersedes the V8.1 "re-purpose 7 slots" spec of the same date)
+**Scope of this session:** Build a new concept-driven lesson shell (V9): a lesson body = N per-concept units, each `intro → its own visual → build-up`, instead of the fixed 7-section template. Deliver the compiler mode + donor template + gates, and rebuild **Module 2 Day 2 (Activation Functions)** as the first V9 lesson to prove it. **Day 2 only** as the shipped lesson; m02 Days 1/3–9, m03, and the paused m04 are out of scope this session (roll-forward is future work).
 
 ---
 
 ## 1. Problem
 
-The V8 lesson-authoring skill produces lessons on a **fixed 7-slot template**: `What is it → Intuition → Playground → Mechanism → Build it up → Quiz → Produce` (DOM section ids `s1…s7`). This template is *template-driven*, not *concept-driven*: it forces **concepts to the front as text** and **visual depictions to the back**.
+V8 lessons are built on a **fixed 7-section template**: `What is it → Intuition → Playground → Mechanism → Build it up → Quiz → Produce` (DOM ids `s1…s7`). This is *template-driven*: concepts are introduced up front as **text** (What-is-it, Intuition), and the **visuals + build-up are quarantined in one late section** (`s5`, "Build it up"). A reader meets a concept's *name and analogy* long before they *see* it.
 
-Concrete failure (Module 2 Day 2, "Activation Functions"):
+Concrete failure — Module 2 Day 2, "Activation Functions": the reader meets `ReLU`, `sigmoid`, `tanh` as words (§1 vocab table), then as analogies (§2 🚰 valve / 🎛️ dimmer cards), then as numbers (§3 playground `array([0,0,0,2,5])`) — and only **sees the actual curves in §4/§5**, after all of that. This contradicts the repo's own `CLAUDE.md` ("Every new concept needs an analogy before any math"; "Every major concept needs at least one diagram") and the user's stated preference for concept-driven, blog/coaching-style material.
 
-| Reader position | What the lesson does | Where the actual picture is |
-|---|---|---|
-| §1 "What is it" | Names `sigmoid`, `ReLU`, `tanh` in a vocab table (words only) | — |
-| §2 "Intuition" | Analogy cards 🚰 valve / 🎛️ dimmer (words only) | — |
-| §3 "Playground" | Prints `array([0,0,0,2,5])` (numbers only) | — |
-| §4 "Mechanism" | **First curve appears** (tanh SVG, derivatives iframe, comparison table) | `s4` |
-| §5 "Build it up" | ReLU / sigmoid / collapse SVG curves | `s5` |
+### 1.1 Root cause
 
-A beginner therefore reads the *names*, the *analogies*, and the *numeric output* of ReLU/sigmoid/tanh **before ever seeing what any of the three curves look like**. This directly contradicts the repo's own `CLAUDE.md` ("Every new concept needs an analogy before any math"; "Every major concept needs at least one diagram") and the user's stated preference for concept-driven, blog/coaching-style material.
+The failure is **structural, not editorial**. The fixed template has exactly one "build-up + visuals" section (`s5`) for the whole lesson, so *every* concept's picture is deferred to one late block regardless of when the concept is introduced. Re-labeling the 7 slots (the rejected V8.1 approach) cannot fix this because it preserves the single-`s5`-buildup and the 7-section cap. The fix is to make the body a **sequence of concept units**, each carrying its own visual and build-up.
 
-### 1.1 Root cause (two layers)
+### 1.2 Why now / why it's feasible
 
-1. **Skill layer.** `frontier-visual-evidence-builder` states the right *principles* — "mental picture visual → mechanism visual", "the first visual in a hard concept should reduce barrier", and lists "activation curve behavior" as requiring plotted evidence — but nothing enforces **adjacency**: that a concept and its depiction ship *in the same beat*. "Mental picture" was satisfied by an **analogy** (🚰🎛️ emoji cards) instead of an actual **picture of the curve**.
-
-2. **Structural layer.** The compiler authors only 4 prose regions (`s1, s2, s4, s7`). The visual-heavy sections are auto-generated from JS data blocks: `s3` (Playground) from `var DEMOS`, `s5` (Build-it-up) from `var BUILD` (which holds the SVG curves), `s6` (Quiz) from `var QS`. In the frozen DOM order `s1→s2→s3→s4→s5→s6→s7`, the curve figures live in `s4`/`s5`, so the earliest a curve can currently appear is *after* the reader has already passed the `s3` playground numbers.
-
-### 1.2 Why this matters beyond Day 2
-
-Per the memory index, the **m04 rollout is paused mid-loop, blocked on "a user-flagged visualization issue to fix first."** This concept-driven-flow work is that blocker. Fixing the skill + gate here is what unblocks m04 cleanly afterward. m02 is a **seed module**: a defect left in it propagates by copy to future modules, so the fix belongs in the skill/gate, not only in one lesson.
+- The **m04 rollout is paused mid-loop**, blocked on exactly "a user-flagged visualization issue to fix first" (per memory index). This work is that blocker; fixing the shell here unblocks m04.
+- **Feasibility confirmed by code inspection.** The shipped lesson JavaScript is ~90% generic already: progress tracking uses `document.querySelectorAll('.module-section')` keyed on each section's `data-sec` attribute; sidebar nav matches `data-target`↔section `id`; scroll-spy iterates over "all sections"; completion counts sections generically. **None of these hardcode `s1–s7` or the number 7.** A variable number of concept sections works for free for nav, scroll-spy, progress, and completion. The only id-coupled pieces are three widget engines (`getElementById('s3')` playground, `getElementById('s5')`/`#build` build-reveal, `getElementById('s6')` quiz) and the gates (which assert exactly 7). Those are the surgical targets.
 
 ---
 
 ## 2. Goal
 
-Encode and enforce a single principle:
+Introduce a **V9 concept-driven shell** in which a lesson is:
 
-> **Depict-on-introduction (adjacency rule).** The moment a lesson names or analogizes a *visual object* (a curve, a distribution, a boundary, a geometric/matrix shape), that same concept-beat must **show** it. Each body section becomes a self-contained **concept-beat**: `plain-words idea → its own diagram → what to notice`. A visual object must not be named in an earlier beat than the one that depicts it. An analogy (🚰 valve) is **not** a substitute for a depiction (the actual curve).
+```
+hero (curiosity hook)
+  → concept unit 1   (intro → visual → build-up  [+ optional inline run-demo])
+  → concept unit 2   (intro → visual → build-up)
+  → …                (as many concept units as the topic needs)
+quiz (one section, all questions)
+produce (discovery artifact)
+fin (completion banner)
+```
 
-**Which beats must ship a visual (decided):** only beats that introduce an inherently *visual object* (curve / distribution / boundary / geometric or matrix shape). A purely definitional or code-run beat is not forced to carry a decorative diagram.
+Each **concept unit** is a normal tracked `.module-section` (so the existing progress/gamification works and improves — more, smaller "got it" steps). Inside every concept unit, in order:
+1. **intro** — the concept in plain words (may include a jargon gloss).
+2. **visual** — its own depiction, **inline**, appearing immediately: a static labeled SVG, or an interactive iframe where the behavior is explorable. *This is mandatory for every concept unit.*
+3. **build-up** — the mechanism/why, building on the intro + visual.
+4. **(optional) inline run-demo** — a click-to-run mini-console folded into the concept it belongs to (e.g. ReLU's `▶ run` lives in the ReLU concept), not a separate playground section.
 
-We achieve this **without tearing down the shell**: keep the compiler, the 7 shell sections, the DEMOS/BUILD/QS blocks, the frozen quest-ids, and both existing gates. We *re-purpose* the 7 slots into concept-beats and add one new enforceable check.
+### 2.1 Decisions locked (from brainstorming)
 
-### 2.1 Success criteria
+- **Break the fixed shell** into a concept-driven body (not re-label 7 slots).
+- **Inline visual per concept** (not scroll-reveal) — simplest, most robust, delivers intro→visual→buildup directly.
+- **Distribute run-demos into their concepts**; the **quiz stays a single section** at the end.
+- **Every concept unit must ship a visual.** (A concept unit introduces a concept; if a unit is purely a code-run or a definition with no visual object, it still must carry at least a minimal diagram — the whole point is concept+picture together. This is stricter than V8.1's "only visual-object beats," and is appropriate because in V9 the author chooses what becomes a concept unit.)
 
-1. A reader sees the shape of ReLU, sigmoid, and tanh **in `s1`/`s2`** (before the `s3` playground numbers).
-2. `frontier-visual-evidence-builder`, `frontier-lesson-builder`, and `frontier-refactor-qa` each carry the depict-on-introduction rule, in **both** skill locations (`.claude/skills/` and `frontier_lab_refactor_skills_v8/skills/`), kept byte-consistent.
-3. `reader_flow_gate.py` has a new **depict-on-introduction check** that FAILs a re-flowed lesson where a declared visual object is named in an earlier beat than the one that depicts it.
-4. Day 2 recompiles: reader-flow gate PASS (incl. new check), shell-invariant gate PASS (byte-identity of the shell preserved), notebook-smoothness gate PASS/N-A as before.
-5. An LLM judge, reading the compiled `lesson.html`, answers "does a beginner see each concept's picture at the moment it's introduced?" = **yes**, with reasons.
-6. Independent adversarial verification confirms 1–5 with no regression to the other 8 m02 days.
+### 2.2 Success criteria
+
+1. Day 2 renders as `hero → 7 concept units → quiz → produce → fin` (see §6 for the 7 concepts), each concept unit showing its own curve/diagram **inline, immediately after its intro**, before any later concept.
+2. The reader sees ReLU, sigmoid, and tanh curves **in their own concept units**, each next to where the concept is named — never as "words now, picture much later."
+3. The V9 JS engine drives nav, scroll-spy, progress, completion, inline demos, and quiz over a **variable** number of sections with no hardcoded `s1–s7`.
+4. New/updated gates PASS on Day 2: structural gate (V9 invariants), reader-flow gate (every concept unit has a visual), notebook-smoothness gate (hero vs notebook), and recompile is idempotent (byte-identical for same source+donor).
+5. The three skills carry the V9 concept-unit rule, in **both** skill locations, kept byte-consistent.
+6. **No regression:** shipped m02 (Days 1/3–9) and m03 lessons are untouched and byte-identical (they keep their V8 donors + verbatim mode); V9 changes are additive.
+7. Independent adversarial verification confirms 1–6, including that the gates actually FAIL on a deliberately-broken V9 variant (a concept unit with no visual).
 
 ---
 
 ## 3. Non-Goals (explicit)
 
-- **Not** rebuilding the shell/compiler into variable-length beats (the "new concept-driven shell" option was considered and rejected as too high-blast-radius this session).
-- **Not** re-flowing m02 Days 1, 3–9, or m03 this session. They remain byte-identical; the new gate check must **not** retroactively fail them (see §5.3 mode handling).
-- **Not** changing quest-ids, sidebar `data-target` ids, DEMOS/BUILD/QS block shapes, the 4-question quiz, `.fin`, or nav wiring.
-- **Not** authoring new interactive viz assets from scratch — Day 2 reuses the existing `viz/activation-derivatives.html`, `viz/xor-limit.html`, and inline SVGs already present.
-- **Not** unrelated prose polish beyond what the re-flow needs.
+- **Not** re-flowing m02 Days 1/3–9 or m03 to V9 this session (future backport).
+- **Not** resuming the m04 rollout this session (V9 unblocks it; the rollout itself is later).
+- **Not** deleting or rewriting the V8 verbatim path — it stays for the already-shipped lessons. V9 is an additional mode.
+- **Not** authoring brand-new interactive viz assets from scratch — Day 2 reuses existing inline SVGs (ReLU/sigmoid/tanh/collapse/cure) and existing iframes (`viz/activation-derivatives.html`, `viz/xor-limit.html`).
+- **Not** scroll-reveal animation for the per-concept visuals (inline was chosen).
+- **Not** changing the shipped lesson's quest-id for Day 2 (`wf2-d02-activations` stays; the page content changes but its identity and localStorage key do not).
 
 ---
 
-## 4. Component 1 — Skill edits
+## 4. Architecture
 
-All three skills exist in two byte-identical locations that MUST stay in sync:
+### 4.1 Source format (V9 mode)
+
+`source.md` front-matter declares `mode: concept` (new). The body is authored as typed blocks parsed by the existing `v8lib.parse_blocks` (`@@@ ` delimited):
+
+```
+@@@ hero
+@kicker Module 2 · Train · Day 2
+@lede …curiosity hook…
+@goal …by the end you can…
+
+@@@ concept id=c1 tag="The problem" title="Straight + straight is still straight" gotit="Got it"
+intro prose (plain words; may use [[term||gloss]] and %%% jargon)
+%%% svg
+<svg …two-rulers-collapse…></svg>
+%%%
+build-up prose (the mechanism/why)
+
+@@@ concept id=c2 tag="The fix" title="A bend between the layers" gotit="Got the bend"
+intro prose
+%%% svg
+<svg …bent shape…></svg>
+%%%
+build-up prose
+
+@@@ concept id=c3 tag="Meet ReLU" title="ReLU — a one-way valve" gotit="Met ReLU"
+intro prose
+%%% svg
+<svg …ReLU curve…></svg>
+%%%
+build-up prose
+%%% demo id=relu label="run it"
+code: relu(np.array([-3,-1,0,2,5]))
+out:  array([0, 0, 0, 2, 5])
+take: ReLU zeros negatives, passes positives — one cheap max.
+%%%
+
+… concepts c4 (sigmoid), c5 (tanh), c6 (when bends break — %%% viz activation-derivatives),
+   c7 (XOR — %%% viz xor-limit) …
+
+@@@ quiz id=quiz tag="Check" title="Four questions" gotit="Checked"
+%%% quiz
+q: … | a:1 | opt: … | opt: … | opt: … | opt: … | fb: …
+q: … (×4 total)
+%%%
+
+@@@ produce id=produce tag="Produce" title="Watch the collapse, then break it" gotit="Done"
+discovery-framed artifact prose (predict → run → observe), reusing the Option-A/Option-B pattern
+
+@@@ fin
+@title Module 2 · Day 2 complete! 🏆
+@body Nice work …
+```
+
+New block types / widgets to add to `v8lib`:
+- `@@@ concept` — renders a `.module-section` with `sec-head` (num auto-incremented, tag, title) + `sec-body` (rendered markdown) + one `.gotit`. `data-sec` = the `id` (e.g. `c1`).
+- `@@@ hero`, `@@@ quiz`, `@@@ produce`, `@@@ fin` — section wrappers (hero already exists in clean mode; quiz/produce are `.module-section`s; fin already exists).
+- `%%% svg` — inline raw-SVG visual widget (passes the SVG through, wrapped in `.build-viz` for consistent styling). This is the mandatory per-concept static visual.
+- `%%% viz src=… caption=…` — existing behavioral-iframe widget (already implemented as `render_viz`), reused for interactive concepts (c6, c7).
+- `%%% demo id=… label=…` — inline run-demo widget: renders a small console with a run button that reveals `out` + `take` (one demo, scoped to its concept).
+- `%%% quiz` — quiz data widget: renders the 4 Q blocks (replaces the old `var QS` JS-data approach with authored source; the quiz engine reads the rendered DOM).
+
+### 4.2 Compiler (`compile_lesson.py` + `v8lib.compile_html`)
+
+- Add a **concept mode** path: when `meta.mode == 'concept'`, build the body by concatenating rendered `hero` + each `concept` + `quiz` + `produce` + `fin` into the donor's content area, and generate the sidebar nav from the concept/quiz/produce list (reuse `render_sidebar_nav`, which already iterates a `meta['sidebar']`-style list — here derived from the concept blocks).
+- The V8 verbatim/clean paths remain unchanged for existing lessons.
+- Determinism preserved: same `(source.md, donor)` → byte-identical output (existing guarantee; keep it).
+
+### 4.3 Donor template (new V9 shell)
+
+Create `sessions/_compiler/shells/v9-base.donor` (one reusable base, not per-day) containing:
+- The existing head/CSS (reused verbatim from the V8 donor — themes, sidebar, `.module-section`, `.gotit`, `.build-viz`, `.build-embed`, quiz, prompt styles all already exist).
+- A content placeholder region the compiler fills with hero + concepts + quiz + produce + fin.
+- A **generalized JS engine** (see §4.4).
+- The shared glossary-tooltip script and the viz-iframe auto-resize script (both already generic — reused verbatim).
+
+### 4.4 Generalized JS engine (the only real JS work)
+
+Start from the existing engine (already generic for progress/nav/scrollspy/completion — keep as-is) and change the three id-coupled widget engines to be selector-driven:
+
+- **Inline run-demos:** replace the `getElementById('s3')` playground engine with a generic one: `querySelectorAll('.demo')`, each demo self-contained (its own run button reveals its own `out`+`take`). No "saw all 3" cross-section gating; each concept's `.gotit` is enabled normally (or on demo-run if present).
+- **Build-reveal:** inline visuals need **no** reveal engine (they're always visible). Drop the `#build`/`s5` scroll-reveal engine entirely for V9. (Static SVGs render immediately; iframes keep their existing auto-resize script.)
+- **Quiz:** change `getElementById('s6')` to select the quiz section by a class/`data-sec="quiz"` marker so it is not tied to a fixed id. The quiz question DOM is emitted by the compiler from `%%% quiz` (not injected from a `var QS`), and the engine wires click-to-answer over `.q` blocks found within the quiz section.
+
+### 4.5 Gates
+
+- **New `concept_shell_gate.py`** (V9 replacement for `shell_invariant_gate.py`; the V8 gate stays for V8 lessons). Asserts V9 invariants on the compiled HTML:
+  - quest-id present and matches donor/front-matter (frozen).
+  - `≥3` concept sections (`.module-section` whose `data-sec` starts `c`), each containing **at least one visual** (`<svg` or `.build-embed` iframe) **and exactly one `.gotit`**.
+  - exactly one quiz section with 4 questions (4 `.q` blocks / 4 option groups) and one produce section.
+  - sidebar `data-target`s are in 1:1 correspondence with section `id`s (nav parity) — generic, not "8 fixed".
+  - localStorage keys (`frontier-lesson:`, `frontier-theme`), `.fin`, footer present; no unresolved `@@@`/`%%%`/marker leakage.
+  - recompile idempotent (byte-identical).
+- **Extend `reader_flow_gate.py`** with the V9 **concept-visual check**: in concept mode, every `@@@ concept` block's raw source must contain a visual marker (`<svg`, `%%% svg`, `%%% viz`, or `.build-embed`). A concept block with no visual → FAIL (blocks the write, exit 2). In non-concept modes this check is a no-op (existing lessons unaffected). This is the mechanical form of "every concept ships its picture."
+  - Reuse the existing `run(meta, blocks, spine_word=None)` signature, `ok=[True]`/`fail()` accumulator, and `pass `/`FAIL `/`warn `/`N/A ` message style. The check reads **raw** block source (concept blocks expose their raw lines directly via `parse_blocks`, so no tag-stripping problem — unlike the V8 region path).
+- **`notebook_smoothness_gate.py`** — unchanged; still compares the hero's first screen to the notebook yardstick. Day 2 keeps `notebook_yardstick: 00-neural-networks/fundamentals/03_activation_functions.ipynb`.
+
+---
+
+## 5. Component: skill edits
+
+Three skills, two byte-identical locations each (6 files), kept in sync:
 - Active: `.claude/skills/<skill>/SKILL.md`
 - Bundle: `frontier_lab_refactor_skills_v8/skills/<skill>/SKILL.md`
 
-Every edit below is applied to both copies (6 file edits total).
-
-### 4.1 `frontier-visual-evidence-builder`
-
-Add a new top-level rule section, **Depict-on-introduction (adjacency rule)**:
-
-- When a beat names or analogizes a visual object (curve, distribution, boundary, geometric/matrix shape), that beat MUST depict it — a static labeled figure at minimum; an interactive viz where the behavior is explorable.
-- A visual object MUST NOT be named or analogized in a beat earlier than the one that depicts it.
-- Analogy is not depiction. A 🚰 valve card does not satisfy "show the ReLU curve."
-- The static figure is the floor, the interactive viz is the ceiling: prefer static-for-instant-recognition **plus** interactive-for-exploration when a behavior is drag-explorable.
-
-Update the existing **Visual sequence** block so "mental picture visual" is explicitly *a picture of the object*, not an analogy card.
-
-### 4.2 `frontier-lesson-builder`
-
-- Reframe the **Reader Flow Blueprint** from a template list into **concept-beats**: each body section is authored as `plain-words idea → its own diagram → what to notice`, self-contained.
-- Add to the **Learning Barrier Gate** P0 list: "a concept-beat that introduces a visual object but is text-only (names/analogizes without depicting)."
-- Note the structural constraint for authors: in this shell the compiler auto-generates `s3`/`s5`/`s6` from DEMOS/BUILD/QS, and prose is authored in `s1/s2/s4/s7`; therefore *the early depiction of a visual object must be placed in the authored `s1`/`s2` regions*, ahead of the `s3` playground.
-
-### 4.3 `frontier-refactor-qa`
-
-- Add to the **Visual/Evidence Gate**: "named-but-not-shown" (a visual object named/analogized in a beat that lacks its depiction) and "visual-object beat is text-only" are **P0** for a fresh build; **seed-propagation P1** if the lesson already shipped and the fix is targeted/low-risk.
-- Reference the new `reader_flow_gate.py` depict-on-introduction check as the mechanical backstop for this finding.
+- **`frontier-lesson-builder`** — replace the fixed "Reader Flow Blueprint" template with the **V9 concept-unit model**: a lesson body = N concept units, each authored as `intro (plain words) → its own inline visual → build-up`, plus hero / quiz / produce / fin. Add to the Learning Barrier Gate P0 list: "a concept unit with no visual" and "a concept's picture deferred to a later unit."
+- **`frontier-visual-evidence-builder`** — add the **depict-in-unit rule**: every concept unit carries its own inline visual (static labeled figure minimum; interactive where behavior is explorable); analogy is not depiction; a lesson must not defer a concept's picture to a later unit or to one shared late "build" section.
+- **`frontier-refactor-qa`** — update the Visual/Evidence + Shell gates to the V9 invariants: "concept unit without a visual" is P0; reference `concept_shell_gate.py` and the reader-flow concept-visual check as the mechanical backstops; the "exactly 7 sections" expectation is replaced by "≥3 concept units + quiz + produce, nav parity."
 
 ---
 
-## 5. Component 2 — The gate (mechanical, build-blocking)
+## 6. Day 2 rebuild (first V9 lesson)
 
-Extend `sessions/_compiler/gates/reader_flow_gate.py` with a **depict-on-introduction check**.
+Author `sessions/m02-the-neuron/day-02-activations/source.md` in V9 concept mode with **7 concept units**, reusing existing assets:
 
-### 5.1 Declaring visual objects (front-matter)
+| Unit | Concept (title) | Inline visual (reused asset) | Build-up |
+|---|---|---|---|
+| c1 | Straight + straight is still straight | two-rulers/collapse SVG (from current BUILD[2]) | `(x@W1)@W2 = x@(W1@W2)`; depth without a bend is an illusion |
+| c2 | The fix is a bend | cure SVG (from current BUILD[3]) | an activation between layers stops the collapse |
+| c3 | Meet ReLU | ReLU curve SVG (from current BUILD[0]) + `%%% demo relu` | `max(0,z)`, one-way valve, cheap default |
+| c4 | Meet sigmoid | sigmoid curve SVG (from current BUILD[1]) + `%%% demo sigmoid` | squash to (0,1), saturates at the ends |
+| c5 | Meet tanh | tanh curve SVG (from current s4 inline SVG) | zero-centered cousin; range (−1,1) |
+| c6 | When bends break | `%%% viz activation-derivatives.html` (interactive) | dead ReLU / saturation; log activation stats (staff lens) |
+| c7 | One line can't do XOR | `%%% viz xor-limit.html` (interactive) | why depth + a bend earn their keep; frontier payoff (GELU/SwiGLU) |
 
-Add an optional front-matter key to `source.md`:
+Then `quiz` (the existing 4 questions, incl. the dead-ReLU diagnostic) and `produce` (the existing collapse-then-cure discovery artifact, Option-A/Option-B). The staff-depth content (failure mode, trade-off, interview line) folds into c6's build-up so Staff Depth still passes.
 
-```yaml
-visual_objects: [relu, sigmoid, tanh]   # tokens whose depiction adjacency is checked
-```
-
-Each entry is a lowercase token matched case-insensitively against prose. If the key is absent, the check is a no-op (records `N/A — no visual_objects declared`). This keeps every currently-shipped lesson unaffected until it opts in.
-
-### 5.2 The check
-
-The intent is stronger than "same-or-earlier beat": success criterion #1 requires the curve to be **visible in `s1`/`s2`, before the reader reaches the `s3` playground numbers.** The check therefore encodes *"declared visual objects must be depicted in `s1` or `s2`"*, not merely "depicted no later than first mention."
-
-For each token in `visual_objects`:
-
-1. **Naming location.** Find the first authored prose beat (scan `s1`, then `s2`, then `s4` in DOM order) whose text names the token.
-2. **Depiction location.** A beat "depicts" if its **raw source** contains any depiction marker: `<svg`, `class="build-viz"`, `class="build-embed"` (behavioral iframe), or a `%%% viz` widget.
-3. **PASS** if the token is depicted in `s1` or `s2` (the early beats that precede the `s3` playground).
-4. **FAIL** if the token is named anywhere but not depicted in `s1`/`s2` — this catches both the "named-but-not-shown" defect and the subtler "first curve only appears in `s4`, after the playground" defect (a token whose only depiction is in `s4` FAILs, because the reader still met the playground numbers first).
-
-Note on `s3`/`s5`: these are compiler-generated (DEMOS/BUILD) and not authored prose regions, so the check operates on the authored prose. Because `s3` (playground) sits between `s2` and `s4` in DOM order, requiring depiction in `s1`/`s2` is exactly the mechanical form of "curve visible before the playground."
-
-### 5.2a Helper change required (not optional)
-
-`reader_flow_gate._region_texts()` currently returns **tag-stripped** text for `s1`/`s2`/`s4` (via `_text()` → `_TAG.sub`) and exposes a raw copy for **`s1` only** (`t['s1_raw']`). The depiction markers (`<svg`, `build-viz`, `build-embed`) are HTML tags, so they are erased by tag-stripping and are invisible to the current text fields. Therefore the implementation MUST extend `_region_texts()` to also expose `t['s2_raw']` and `t['s4_raw']` (raw, un-stripped source), and the new check MUST read the `*_raw` fields — not the stripped `t['s1']`/`t['s2']`/`t['s4']`. Building the check against the stripped strings would make it green-by-default (find zero markers always) — precisely the failure the §8 adversarial step exists to catch.
-
-### 5.2b Marker relevance in verbatim vs clean mode
-
-Day-2 is `source_mode: verbatim` and embeds depictions as raw HTML (`<div class="build-embed">…`, `<div class="build-viz">…<svg…`). The `%%% viz` widget marker is a **clean-mode** convenience (compiled by `v8lib.render_viz`) and appears **zero** times in the Day-2 source. So for the Day-2 target the load-bearing markers are `<svg` and `build-embed`/`build-viz`; `%%% viz` is retained in the marker list only for future clean-mode lessons. The check must accept any of the four markers so it works in both modes.
-
-### 5.3 Mode handling (must not break shipped days)
-
-- The check runs only when `visual_objects` is present in front-matter. The 8 untouched m02 days and all m03 days do not declare it → unaffected, byte-identical, never failed.
-- Day 2's `source.md` opts in by adding `visual_objects: [relu, sigmoid, tanh]`.
-- Emit clear `pass`/`FAIL`/`N/A` messages consistent with the gate's existing message style, and wire the FAIL into the gate's existing `ok` accumulator so a real failure exits non-zero (exit 2) and blocks the compile write.
-
-### 5.4 Gate output contract
-
-- Extend the existing `run(meta, blocks, spine_word=None)` function and its message list; add lines prefixed `pass `/`FAIL `/`warn ` / `N/A ` as the current code does, and route a real failure through the existing `fail()` closure so the `ok` accumulator drives exit code 2 and blocks the compile write.
-- Requires the helper change in §5.2a (`_region_texts()` must expose `s2_raw`/`s4_raw`). The check reads raw source, not stripped text.
-- The new check must be side-effect-free and deterministic (pure function of source), consistent with the compiler's determinism guarantee.
+**Identity preserved:** quest-id `wf2-d02-activations`, localStorage key, nav prev/next hrefs. The page content is intentionally **not** byte-identical to the shipped V8 Day 2 — replacing it is the deliverable.
 
 ---
 
-## 6. Component 3 — Day-2 rebuild (concept-beats, same shell)
+## 7. Re-test / evaluation loop
 
-Edit `sessions/m02-the-neuron/day-02-activations/source.md` **authored regions only** (`s1`, `s2`), plus add `visual_objects` to front-matter. Do not touch DEMOS/BUILD/QS/hero/s4/s7 except as needed to remove now-duplicated late-visual redundancy (optional, minimal).
+Heuristic gates BLOCK; LLM judge evaluates qualitatively (decided in brainstorming).
 
-- **`s1` — relabel toward "Meet the bend / meet the three curves."** Keep the jargon ladder (gate requires it). The instant ReLU/sigmoid/tanh are named, insert a compact **static 3-curve figure** (three small labeled SVGs in the existing tanh-SVG visual language) so the reader sees which shape is which immediately. Curve visuals SHOWN here.
-- **`s2` — relabel toward "See them behave."** Keep the valve/dimmer analogy cards (they are good, just no longer the *only* thing before a curve), and move the **interactive `viz/activation-derivatives.html`** embed here (drag `z`, watch the slope) so the intuition beat is explorable — instead of first appearing in `s4`.
-- `s3` (playground numbers), `s4` (comparison table, XOR via `viz/xor-limit.html`), `s5` (BUILD curves) keep their existing depth; they are simply no longer the *first* sight of a curve.
-
-**Invariants preserved:** 7 sections, 8 `data-target`s, DEMOS/BUILD/QS present, playground ≥3 demos, quiz `q:4 o:16`, 7 `gotit` buttons, `.fin`, nav, quest-id `wf2-d02-activations`, localStorage keys. The shell-invariant gate proves byte-identity of CSS + JS engine + shell; only the authored content regions change.
-
----
-
-## 7. Component 4 — Re-test / evaluation loop
-
-Both gate mechanisms agreed: **heuristic gate BLOCKS, LLM judge evaluates qualitatively.**
-
-Loop until convergence:
-
-1. Compile: `python3 sessions/_compiler/compile_lesson.py sessions/m02-the-neuron/day-02-activations/source.md`
-2. Reader-flow gate (incl. new depict-on-introduction check) — must PASS.
-3. Shell-invariant gate (with `--donor`) — must PASS (byte-identity of shell).
-4. Notebook-smoothness gate — must PASS or N/A (unchanged from current status).
-5. **LLM judge** reads the compiled `lesson.html` and answers: "Does a beginner see each concept's picture at the moment it's introduced? Are ReLU/sigmoid/tanh curves visible before the playground numbers?" → structured `{pass: bool, reasons: [...]}`.
-6. If any gate FAILs or the judge says no → edit `source.md`, recompile, repeat.
-
-**Adversarial verification (final):** dispatch independent agents to confirm (a) curves are visible in `s1`/`s2` of the compiled HTML, (b) shell invariants intact, (c) the other 8 m02 days are byte-identical (unchanged), (d) the new gate actually FAILs on a deliberately-broken variant (proving it has teeth, not just green-by-default).
+1. Compile: `python3 sessions/_compiler/compile_lesson.py sessions/m02-the-neuron/day-02-activations/source.md --donor sessions/_compiler/shells/v9-base.donor`
+2. Reader-flow gate incl. concept-visual check — PASS (every concept has a visual).
+3. `concept_shell_gate.py` — PASS (V9 invariants; idempotent recompile).
+4. Notebook-smoothness gate — PASS or N/A.
+5. Backstops: `node --check` on the emitted `<script>`s; jsdom smoke (nav parity, progress over N sections, one demo runs, quiz answers) if available.
+6. **LLM judge** reads compiled `lesson.html`: "Does every concept appear with its own picture, inline, at the moment it's introduced? Is there any concept named without a visual, or any picture deferred?" → `{pass: bool, reasons:[…]}`.
+7. If any gate FAILs or judge says no → edit source, recompile, repeat.
+8. **Adversarial verification (final):** independent agents confirm (a) each of the 7 concepts shows its visual inline in the compiled HTML in order; (b) V9 invariants intact + idempotent; (c) shipped m02 Days 1/3–9 and m03 are byte-identical (unchanged); (d) the gates actually FAIL on a broken variant (a concept unit stripped of its visual) — proving teeth, not green-by-default.
 
 ---
 
@@ -180,22 +225,24 @@ Loop until convergence:
 
 | Risk | Mitigation |
 |---|---|
-| New gate retroactively fails 8 shipped m02 days / m03 | Check is opt-in via `visual_objects` front-matter; absent key = N/A. Verify byte-identity of untouched days. |
-| Adding SVG to `s1`/`s2` breaks shell byte-identity | Shell-invariant gate masks content regions; only CSS + JS engine must match donor. Run gate with `--donor` to prove. |
-| Early static curves duplicate the later BUILD curves (redundant) | Acceptable — repetition of a shape aids beginners. Optionally trim the most redundant late SVG, but not required. |
-| Interactive iframe height sticks (known past bug) | `activation-derivatives.html` already ships the postMessage height sender (it's an existing embed just relocated), so no new iframe risk. |
-| Gate is green-by-default and never actually catches the defect | Two mitigations: (a) check reads **raw** source (`*_raw` fields per §5.2a), not tag-stripped text where markers vanish; (b) adversarial step explicitly tests the gate against a broken variant to confirm it FAILs. |
-| Check passes on `s4`-only depiction (curve still after the playground) | §5.2 requires depiction in `s1`/`s2`, not merely "no later than first mention." A token whose only figure is in `s4` FAILs. |
-| Two skill copies drift | Every skill edit applied to both paths in the same step; a diff check confirms parity. |
+| New shell breaks shipped m02/m03 lessons | V9 is a separate mode + separate donor. Existing lessons keep V8 donors + verbatim mode; verify byte-identity of Days 1/3–9 + m03 in the adversarial step. |
+| Generalized JS engine regresses nav/progress/quiz | Progress/nav/scrollspy are already generic (confirmed by inspection); only 3 widget engines change. Add a jsdom smoke test over a variable-N page + `node --check`. |
+| Gate green-by-default (never catches a missing visual) | Concept-visual check reads raw block source (no tag-stripping); adversarial step tests it against a visual-stripped variant to confirm FAIL. |
+| Quiz/demo engine coupling to fixed ids leaks through | Select by class/`data-sec` marker, never by `s3`/`s5`/`s6`; the gate asserts nav parity generically. |
+| Losing staff-depth / interview grounding in the re-flow | c6 build-up carries the failure mode + trade-off + interview line; Staff Depth gate still runs. |
+| Two skill copies drift | Every skill edit applied to both paths in one step; diff-check parity. |
+| iframe height sticks (past bug) | Reuse the existing postMessage auto-resize script verbatim; the two iframes already ship the height sender. |
 
 ---
 
 ## 9. Deliverables (this session)
 
-1. 6 edited `SKILL.md` files (3 skills × 2 locations), diff-verified identical.
-2. Extended `reader_flow_gate.py` with the depict-on-introduction check + tests against a broken variant.
-3. Rebuilt `sessions/m02-the-neuron/day-02-activations/source.md` (+ `visual_objects` front-matter) and recompiled `lesson.html`.
-4. Green run of all gates + LLM-judge approval + adversarial-verification notes.
-5. This spec, committed.
+1. `v8lib.py` extended: `@@@ concept`/`@@@ quiz`/`@@@ produce` block rendering + `%%% svg`/`%%% demo`/`%%% quiz` widgets + concept-mode `compile_html` path.
+2. `sessions/_compiler/shells/v9-base.donor` — the reusable V9 shell with the generalized JS engine.
+3. `concept_shell_gate.py` (new) + `reader_flow_gate.py` extended with the concept-visual check + tests against a broken variant.
+4. `sessions/m02-the-neuron/day-02-activations/source.md` rebuilt in V9 concept mode (+ recompiled `lesson.html`).
+5. 6 edited `SKILL.md` files (3 skills × 2 locations), diff-verified identical.
+6. Green run of all gates + jsdom/`node --check` backstops + LLM-judge approval + adversarial-verification notes.
+7. This spec, committed.
 
-Out of scope (future sessions): re-flow m02 Days 1/3–9 and m03; resume the paused m04 rollout using the improved skill/gate.
+Out of scope (future sessions): backport m02 Days 1/3–9 and m03 to V9; resume the m04 rollout on the V9 shell.
