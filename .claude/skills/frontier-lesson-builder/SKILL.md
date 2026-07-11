@@ -58,6 +58,8 @@ Mark P0 if:
 - foundation lesson starts engineering-first,
 - staff/frontier relevance arrives before orientation,
 - artifact feels like homework before curiosity.
+- a concept unit that introduces a visual object (curve, distribution, boundary, shape) but is text-only (no inline visual),
+- a concept's picture deferred to a later unit, or all visuals dumped in one late "build" section.
 
 Mark seed-stabilization P1 if this issue exists in a seed module and is likely to be copied forward.
 
@@ -91,14 +93,25 @@ Under v8 you write `source.md` in reader-flow order; a compiler emits `lesson.ht
 
 Reordering reader flow is moving a block, not splicing HTML. Do not hand-edit `lesson.html`.
 
-## Reader Flow Blueprint
+## Reader Flow Blueprint (v9 — concept-driven)
 
-Author `source.md` in this order (the compiler maps it onto the shell):
+A lesson body is a sequence of **concept units**, not a fixed template. Author `source.md` (mode: concept) as:
+
+    hero (curiosity hook)
+    → concept unit 1  (plain-words intro → its OWN inline visual → build-up)
+    → concept unit 2  (…)
+    → … as many concept units as the topic needs
+    quiz (one section, all questions)
+    produce (discovery artifact)
+    fin
+
+Each concept unit MUST carry its own inline visual, placed immediately after the intro and before the build-up. Never defer a concept's picture to a later unit or to one shared "build" section. Front-load a jargon gloss; introduce each term defined-before-use. Keep the narrative spine word running through hero + most concepts.
+
+WITHIN a single concept unit, order the beats like this (this is unit-level ordering, not fixed body sections):
 
 ```text
-hook → jargon buster → human situation → spine analogy → mental picture →
-worked example → mechanism → frontier payoff → failure/misconception →
-artifact-as-discovery → checkpoint → takeaways
+plain-words intro → inline visual (its own) → worked example → mechanism →
+frontier payoff → failure/misconception → build-up
 ```
 
 ## Jargon Ladder Rule

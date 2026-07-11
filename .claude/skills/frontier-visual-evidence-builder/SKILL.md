@@ -18,6 +18,14 @@ mental picture visual
 → artifact reproduction
 ```
 
+The "mental picture visual" means a picture of the OBJECT itself (the curve, distribution, boundary, shape), not an analogy card standing in for it.
+
+## Depict-in-unit rule (v9)
+
+Every concept unit carries its OWN inline visual: a static labeled figure at minimum, an interactive viz where the behavior is explorable. Analogy is NOT depiction — a "valve"/"dimmer" card does not satisfy "show the ReLU curve." A lesson must not defer a concept's picture to a later unit or to a single shared late "build" section. The moment a concept names a visual object (a curve, distribution, boundary, geometric/matrix shape), that same unit must show it.
+
+Mechanical backstop: the reader_flow_gate concept branch (every @@@ concept must contain a visual marker) + concept_shell_gate (every concept section has a visual).
+
 ## Behavioral visual rule
 
 Behavioral concepts require plotted or live-recomputed evidence.

@@ -169,4 +169,11 @@ For reference / first-principles modules:
 
 - one named failure mode (silent-failure preferred), one trade-off, one grounded interview line, one diagnostic quiz question. Backstop: `staff_lens_audit.js`.
 
+### V9 Concept Gates (mode: concept)
+
+- Gate dispatch: compile_lesson.py branches on meta['mode']; concept mode runs reader_flow_gate (concept branch) + concept_shell_gate + notebook_smoothness. Non-concept lessons use the existing v8 path unchanged.
+- concept_shell_gate (on compiled HTML): ≥3 concept units, each with a visual (<svg or .build-embed) + exactly one gotit; exactly one quiz section (4 questions) + one produce section (references experiment.py); sidebar nav parity (data-targets == section ids); idempotent recompile; no leaked markers.
+- reader_flow_gate concept branch (on source): hero human-first / no frontier-pressure; every @@@ concept ships a visual (P0 if not); spine word across ≥3 blocks; produce discovery-framed.
+- "concept unit without a visual" and "a concept's picture deferred to a later unit" are P0 for a fresh V9 build.
+
 Spec: `sessions/_refactor/v8_source_first_authoring_plan.md`.
