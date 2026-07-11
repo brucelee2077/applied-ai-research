@@ -331,27 +331,24 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section id="home" class="hero">
       <span class="kicker">Module 4 · Represent · Day 4</span>
       <h1>Multi-Head Attention<span class="sub">Many Views at Once</span></h1>
-      <p class="lede">One attention (Day 3) learns <em>one</em> kind of relationship. But a sentence has many at once — who did what, which adjective goes with which noun, what a pronoun refers to. <strong>Multi-head attention</strong> runs several attentions in parallel, each free to focus on something different, then merges their findings.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> explain why transformers use multiple heads, and describe the split → attend → concatenate → project pipeline.</div></div>
+      <p class="lede">You just built one attention (Day 3) — but here's the catch: a single conversation in the meeting can only listen for <em>one</em> kind of relationship at a time. And a real sentence has many at once. Who did what to whom? Which adjective belongs to which noun? What does that pronoun point back to? Asking one conversation to catch all of it is too much. So a transformer runs <strong>several meetings in parallel</strong> — each one a "head" free to focus on something different — and then merges their notes into one answer. That's multi-head attention, and it's why every real transformer has not one attention but many.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, you'll be able to explain why transformers use multiple heads, and describe the split → attend → concatenate → project pipeline.</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
     <section class="module-section" id="s1" data-sec="what">
   <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">Several attentions, side by side</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> M4 Day 3 (one attention = <code>softmax(Q@Kᵀ/√d_k)@V</code>) and M1 Day 4 (matmul). <b>Nothing new needed.</b></div></div>
-
-      <h4>The limitation of one head</h4>
-      <p>A single attention — one <span class="term" data-tip="One attention operation with its own Q, K, V projections. It learns one kind of relationship between words.">head</span> — produces one attention pattern. It can learn to track, say, the subject of a verb. But it can only do <em>one</em> such job at a time.</p>
-
-      <h4>The fix: multiple heads</h4>
-      <p><span class="term" data-tip="Running several attention heads in parallel, each with its own Q/K/V projections, then concatenating and projecting their outputs. Lets the model track many relationships at once.">Multi-head attention</span> runs <code>h</code> attentions in parallel. Each head has its <strong>own</strong> <code>W_Q, W_K, W_V</code>, so each can focus on a different pattern. To keep the cost the same, the model dimension <code>d_model</code> is split across heads: each head works in size <code>d_k = d_model / h</code>.</p>
-
-      <h4>Putting them back together</h4>
-      <p>Run all heads, <strong>concatenate</strong> their outputs back to length <code>d_model</code>, then mix them with one final learned matrix <span class="term" data-tip="The output projection matrix in multi-head attention. It mixes the concatenated head outputs back into one d_model-sized vector.">W_O</span>. The result is one richer vector per word. Keep going 👇</p>
-      <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Llama 3 and Mistral both ship Google's GQA trick in production — sharing Keys/Values across groups of heads to shrink memory, instead of giving every head its own full copy.</div></div>
-      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 听起来 h 个头应该是 h 倍计算量，其实差不多。In plain terms: people expect "more heads = more compute", but total cost is roughly flat — splitting <code>d_model</code> across heads makes each head work in the smaller size <code>d_k = d_model / h</code>. You are re-slicing the same budget, not adding to it.</div></div>
-      <button class="gotit" type="button">Got the idea — let's go</button>
+      <div class="callout c-info"><span class="ic">🧭</span><div><strong>What this assumes:</strong> Day 3 (one full attention: score → softmax → blend). <strong>That's the only prerequisite</strong> — a head is just one Day-3 attention.</div></div>
+      <h4>First, the picture — hold this before any words</h4>
+      <p>Here is the picture: instead of the whole meeting having one conversation, split the room into a few smaller <strong>breakout meetings</strong> running at the same time. Each breakout listens for its own thing — one tracks grammar, one tracks long-range references, one links describing words to what they describe. When they're done, everyone comes back and their notes are stitched into a single summary. Each breakout is a "head"; the stitch-and-summarize at the end is the merge. Hold that, and the vocabulary below is just names for the pieces.</p>
+      <h4>The words you'll meet today — plain English first</h4>
+      <p>Glance down the list first.</p>
+      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">head</td><td style="padding:.4rem .6rem;color:var(--ink2)">One complete attention (the whole Day-3 formula) with its own Q/K/V projections. A breakout meeting.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">multi-head attention</td><td style="padding:.4rem .6rem;color:var(--ink2)">Running several heads in parallel, then merging their outputs into one vector.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">d_model</td><td style="padding:.4rem .6rem;color:var(--ink2)">The full width of a word's vector (the model size).</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">d_k</td><td style="padding:.4rem .6rem;color:var(--ink2)">The width each head works in. Split the model width across heads: <code>d_k = d_model / h</code>.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">h</td><td style="padding:.4rem .6rem;color:var(--ink2)">The number of heads.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">W_O</td><td style="padding:.4rem .6rem;color:var(--ink2)">The learned output matrix that mixes the concatenated heads back into one <code>d_model</code> vector.</td></tr></tbody></table>
+      <h4>The limitation of one head, and the fix</h4>
+      <p>A single head produces <strong>one</strong> attention pattern — one kind of relationship. Useful, but a sentence needs several at once. The fix: give each of <code>h</code> heads its own <code>W_Q, W_K, W_V</code>, each projecting into the smaller size <span class="term" data-tip="The per-head width, d_model / h.">d_k</span> <code>= d_model / h</code>. Every head runs the full Day-3 attention on its own slice. Then <strong>concatenate</strong> the <code>h</code> head outputs back to length <code>d_model</code> and mix them with one learned matrix <span class="term" data-tip="The learned output projection that blends the heads back into a d_model vector.">W_O</span>.</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><strong>为什么这里容易卡住 · Why this trips people up:</strong> 听起来 h 个头应该是 h 倍计算量，其实差不多 — people expect "more heads = more compute," but total cost is roughly flat. Splitting <code>d_model</code> across heads makes each head work in the smaller size <code>d_k = d_model / h</code>, so you're <em>re-slicing the same budget</em>, not adding to it.</div></div>
+      <button class="gotit" type="button">Got why many heads — let's go</button>
     </div>
 </section>
 
@@ -359,13 +356,12 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s2" data-sec="intuition">
   <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">A panel of specialists</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
-      <div class="relate">
-        <div class="card"><span class="big">🧑‍🔬</span><h5>Each head = a specialist</h5><p>One head watches grammar, another tracks long-range references, another links adjectives to nouns. Each reads the sentence with a different lens, at the same time.</p></div>
-        <div class="card"><span class="big">🖍️</span><h5>Many highlighters, one summary</h5><p>Like reading with several colored highlighters, each marking a different pattern — then combining all the highlights into one understanding of the word.</p></div>
-      </div>
+      <h4>The breakout meetings are specialists</h4>
+      <p>Back to the meeting: the breakouts aren't random — each becomes a specialist. Picture a panel reading the same sentence, each member with a different job.</p>
+      <div class="relate"><div class="card"><span class="big">🧑‍🔬</span><h5>Each head = a specialist</h5><p>One head watches grammar, another tracks what a pronoun refers to across a long distance, another links adjectives to their nouns. Same sentence, different focus.</p></div><div class="card"><span class="big">🖍️</span><h5>Many highlighters, one summary</h5><p>Like reading a page with several colored highlighters, each marking a different pattern, then combining all the marks into one understanding.</p></div></div>
       <p><strong>In one line:</strong> split into several small attentions that each specialize, then merge their results into one vector.</p>
-      <p><b>直觉 / Intuition:</b> 一个头只能盯一种关系，多个头就像几支不同颜色的荧光笔同时读句子。 The technical point is that each head runs its own attention on a smaller <code>d_k</code>-sized slice, so the model tracks several relationships at once and then merges them.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: nobody assigns each head a job — they specialize on their own through training (M3). And the heads run in parallel and cost about the same as one big attention, because each works in the smaller size <code>d_k</code>.</div></div>
+      <p><strong>直觉 / Intuition:</strong> 把注意力拆成几个小头，每个头专注一种关系，最后把它们的结果合并成一个向量。 No one hands out the specialties — the heads discover them on their own through training.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: nobody <em>assigns</em> each head a job — they specialize on their own through training (M3). And the heads run in parallel and cost about the same as one big attention, because each works in the smaller size <code>d_k</code>. A human panel would take longer with more members; heads don't.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -394,27 +390,16 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">Split, attend, concat, project — and why every model does it</span><span class="sec-tag">Mechanism &amp; why</span></div>
   <div class="sec-body">
       <h4>The pipeline</h4>
-      <ol>
-        <li><strong>Split:</strong> give each of <code>h</code> heads its own <code>W_Q, W_K, W_V</code>, projecting into size <code>d_k = d_model / h</code>.</li>
-        <li><strong>Attend:</strong> each head runs scaled dot-product attention (Day 3) on its own Q, K, V.</li>
-        <li><strong>Concat:</strong> stack the <code>h</code> head outputs back to length <code>d_model</code>.</li>
-        <li><strong>Project:</strong> multiply by <code>W_O</code> to mix the heads into the final output.</li>
-      </ol>
-
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — split, attend, merge</b>
-<br><b>1 · In words:</b> split the model width into <code>h</code> smaller heads, let each run its own attention on a slice, stitch the results back together, and mix them with one matrix.
-<br><b>2 · The formula:</b> <code>d_k = d_model / h</code>; <code>MultiHead(x) = Concat(head₁,…,head_h)·W_O</code>, where <code>headᵢ = Attention(x·W_Qⁱ, x·W_Kⁱ, x·W_Vⁱ)</code> — <code>d_model</code> = full width; <code>h</code> = number of heads; <code>d_k</code> = per-head width; <code>W_O</code> has shape <code>(d_model, d_model)</code>.
-<br><b>3 · Tiny numbers:</b> <code>d_model=4</code>, <code>h=2</code> → <code>d_k=2</code>. Two heads each output a length-2 vector; concat → length 4; <code>·W_O</code> (4×4) → length 4. Same width in, same width out.
-<br><b>4 · Sanity check:</b> <code>h</code> must divide <code>d_model</code>, and the concat width <code>h·d_k</code> must equal <code>d_model</code> before <code>W_O</code>. Push <code>h</code> too high (<code>d_model=512, h=64 → d_k=8</code>) and each head is too small to hold a useful subspace.</div></div>
-
+      <ol><li><strong>Split:</strong> give each of <code>h</code> heads its own <code>W_Q, W_K, W_V</code>, projecting into size <code>d_k = d_model / h</code>.</li><li><strong>Attend:</strong> each head runs the full scaled dot-product attention (Day 3) on its own Q, K, V.</li><li><strong>Concat:</strong> stack the <code>h</code> head outputs side by side, back to length <code>d_model</code>.</li><li><strong>Project:</strong> multiply by the learned matrix <code>W_O</code> to mix the heads into the final output.</li></ol>
+      <p>One note on the interactive playground above: it uses deliberately tiny numbers so the shapes fit on screen, so <em>its</em> <code>W_O</code> also trims the width down to <code>d_model</code>. The idea is identical — concatenate the heads, then let <code>W_O</code> mix them into the model width — but in the standard design the concatenated width <code>h·d_k</code> already equals <code>d_model</code>, which makes <code>W_O</code> a square <code>(d_model, d_model)</code> matrix.</p>
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — multi-head attention</b><br><b>1 · In words:</b> split the model width into <code>h</code> smaller heads, let each run its own attention on a slice, stitch the results back together, then mix them with one matrix.<br><b>2 · The formula:</b> <code>d_k = d_model / h</code>; <code>MultiHead(x) = Concat(head₁, …, head_h) · W_O</code>, where <code>headᵢ = Attention(x·W_Qⁱ, x·W_Kⁱ, x·W_Vⁱ)</code>. <code>d_model</code> = full width; <code>h</code> = number of heads; <code>d_k</code> = per-head width; <code>W_O</code> has shape <code>(d_model, d_model)</code>.<br><b>3 · Tiny numbers:</b> <code>d_model = 4</code>, <code>h = 2</code> → <code>d_k = 2</code>. Two heads each output a length-2 vector; concat → length 4; <code>· W_O</code> (4×4) → length 4. Same width in, same width out. (Real model: <code>d_model = 512</code>, <code>h = 8</code> → <code>d_k = 64</code>.)<br><b>4 · Sanity check:</b> <code>h</code> must divide <code>d_model</code>, and the concat width <code>h·d_k</code> must equal <code>d_model</code> before <code>W_O</code>. Push <code>h</code> too high (<code>d_model = 512</code>, <code>h = 64</code> → <code>d_k = 8</code>) and each head is too small to hold a useful subspace.</div></div>
       <h4>Why a frontier lab cares</h4>
-      <p>Every real transformer is multi-head — small models use 8–16 heads, big ones 32–128 (<b>Llama 3</b>'s biggest runs 128). Heads visibly <strong>specialize</strong> (some track syntax, some copy earlier tokens). It also sets up a big inference cost: the Keys and Values for every head must be cached, which is exactly the cost <span class="term" data-tip="Grouped-Query / Multi-Query Attention: share Keys and Values across heads to shrink the KV cache and speed up inference. Covered in the decoding modules.">GQA / MQA</span> — the trick <b>Llama 3</b> and <b>Mistral</b> ship in production, per the teaser above — was built to cut, by sharing K/V across groups of heads instead of giving each head its own full copy. Multi-head is the last piece of the attention block.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> split d_model into h heads → each attends with its own Q/K/V → concat the outputs → W_O mixes them. Stack this attention block with the feed-forward layers from M2 and you have a transformer.</div></div>
-
+      <p>Every real transformer is multi-head — small models use 8–16 heads, big ones 32–128 (Llama 3's largest runs 128). Heads visibly specialize: probing a trained model shows some heads tracking syntax, others copying earlier tokens. And multi-head sets up one of the biggest inference costs at scale: the Keys and Values for <em>every head</em> must be cached during generation, so a long context times many heads is a serious <strong>production</strong> memory bill — which is exactly why GQA/MQA (Grouped-Query / Multi-Query Attention) were invented to share K/V across groups of heads.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><strong>Remember this chain:</strong> one attention = one head (Day 3) → <code>h</code> heads in parallel, each in <code>d_k = d_model/h</code> → concat → <code>W_O</code> mixes them → one <code>d_model</code> vector. Stack this block with the Module-2 feed-forward layers and you have a transformer. Next lesson: teach it <em>word order</em>.</div></div>
       <h4>The staff lens — one silent failure, one trade-off</h4>
-      <p>Knowing the pipeline is not enough. A staff engineer also knows the way it breaks <em>without an error</em>, and the knob you are really turning when you set the head count.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): the wrong reshape/transpose when splitting heads.</b> Splitting <code>(seq, d_model)</code> into <code>(h, seq, d_k)</code> takes a reshape <em>and</em> a transpose in the right order. Get the order wrong and the shapes can still line up — so nothing crashes — but each head now attends over scrambled slices of the vector. The model trains and the loss drops; the heads just quietly stop specializing. A senior engineer catches this in <b>code review</b> by printing the per-head shapes, not by waiting for a crash.</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: more heads vs. wider heads.</b> Total compute is about the same however you slice it, because <code>d_k = d_model / h</code>. More heads means more independent relationship channels, but each is lower-resolution; fewer heads means richer per-head subspaces but fewer patterns tracked at once. Push <code>h</code> too high and <code>d_k</code> shrinks so small a head can't hold a useful subspace. That balance is a <b>design-review</b> call — and it's the same axis GQA / MQA trade along to shrink the KV cache.</div></div>
+      <p>Splitting into heads is a reshape — and reshapes are where silent bugs live.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><strong>Failure mode (silent): the wrong reshape/transpose when splitting heads.</strong> Turning <code>(seq, d_model)</code> into <code>(h, seq, d_k)</code> takes a reshape <em>and</em> a transpose in the right order. Get the order wrong and the shapes can still line up — so nothing crashes — but each head now attends over scrambled slices of the vector. The model trains and the loss drops; the heads just quietly stop specializing. A senior engineer catches this in <strong>code review</strong> by printing the per-head shapes, not by waiting for a crash.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><strong>Trade-off: more heads vs. wider heads.</strong> Total compute is about the same however you slice it, because <code>d_k = d_model / h</code>. More heads means more independent relationship channels, but each is lower-resolution; fewer heads means richer per-head subspaces but fewer patterns at once. Push <code>h</code> too high and <code>d_k</code> shrinks until a head can't hold a useful subspace. That balance is a <strong>design-review</strong> call — and it's the same axis GQA / MQA trade along to shrink the KV cache at inference.</div></div>
       <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Multi-head attention runs <code>h</code> attentions in parallel, each with its own Q/K/V projections into a <code>d_k = d_model/h</code> subspace, then concatenates the heads and mixes them with an output matrix <code>W_O</code>. Different heads specialize on different relationships at roughly the same total cost as one big attention. The nuance is the head-count trade-off: too many heads shrinks <code>d_k</code> until each head is too low-dimensional to be useful — and it's the same axis GQA/MQA trade along to shrink the KV cache at inference."</div></div>
       <button class="gotit" type="button">Got multi-head</button>
     </div>
@@ -443,13 +428,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Predict the shapes, then run two heads and merge</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Understanding ≠ being able to write it. Run two heads and merge them yourself — that's what makes the day count. Pick one:</p>
+      <p>Here's the fun part. <strong>Before you write any code, predict the shapes:</strong> with input width <code>d_model = 4</code> and <code>h = 2</code> heads, what width does each head output, what width is the concatenation, and what width comes out after <code>W_O</code>? Write your three guesses. Then build two heads and watch the widths split and rejoin. Pick one path:</p>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m03-attention/day-04-multihead/experiment.py</code>. Reuse your Day-3 attention function. Run it twice with two different sets of <code>W_Q/W_K/W_V</code> (two heads) on the same input, <code>np.concatenate</code> the two outputs, then multiply by an output matrix <code>W_O</code>. Print each head's output shape, the concatenated shape, and the final shape (back to <code>d_model</code>). Run with <code>python3 sessions/m03-attention/day-04-multihead/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
-      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
+      <p>Copy the prompt below back into Claude Code. It triggers the <strong>frontier-experiment-lab</strong> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 4 Day 4 artifact.
@@ -461,13 +446,9 @@ Create sessions/m03-attention/day-04-multihead/experiment.py that, with a commen
 4. Multiplies by an output matrix Wo (4,4) to get the final (2,4) output; prints shapes at each step and notes each head learned a different pattern.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <h4>Acceptance criteria</h4>
-      <ul>
-        <li>Each head's output has width <code>d_k = d_model / h</code>.</li>
-        <li>The concatenated output has width <code>d_model</code> again (before <code>W_O</code>).</li>
-        <li>The final shape after <code>W_O</code> matches the input — one vector per token.</li>
-      </ul>
-      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-04-multihead/log.md</code>: (1) why split <code>d_model</code> across heads instead of giving every head the full size; (2) the shape you printed at each step (per-head → concat → after <code>W_O</code>); (3) one thing you're still unsure about.</div></div>
+      <h4>What you should see (check your prediction)</h4>
+      <ul><li>Each head's output has width <code>d_k = d_model / h = 2</code> — the model width, split in two.</li><li>The concatenated output has width <code>d_model = 4</code> again (before <code>W_O</code>). Then <code>W_O</code> returns the final shape to match the input — one vector per token.</li><li>The thing worth noticing: two heads cost about the same as one big attention, because each worked in half the width — that "re-slice the budget" trick is why real models can afford 32–128 heads. Did your three shape guesses line up?</li></ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><strong>5-minute research log · 5 分钟研究笔记:</strong> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-04-multihead/log.md</code>: (1) why more heads don't cost much more compute; (2) what <code>W_O</code> is for; (3) one thing you're still unsure about (why shrinking <code>d_k</code> too far hurts is fair game).</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -475,7 +456,7 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <div class="fin" id="fin" role="status" aria-hidden="true">
       <span class="em" aria-hidden="true">🎉</span>
       <h3>Module 4 · Day 4 complete! 🏆</h3>
-      <p>Nice work — you've completed <b>Multi-Head Attention</b>.<br>Next up: <b>Positional Encoding &amp; RoPE</b>.</p>
+      <p>Nice work — you've completed <b>Multi-Head Attention</b>.<br>Next up: <b>Positional Encoding</b>.</p>
     </div>
 
     <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>

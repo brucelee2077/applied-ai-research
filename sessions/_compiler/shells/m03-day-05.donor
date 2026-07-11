@@ -361,24 +361,26 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section id="home" class="hero">
       <span class="kicker">Module 4 · Represent · Day 5</span>
       <h1>Positional Encoding<span class="sub">&amp; the Shuffle Problem</span></h1>
-      <p class="lede">Everything you built this week — the meeting where words decide who to listen to — has a hidden blind spot: it doesn't know word <em>order</em>. Shuffle the words and attention gives the exact same answer. So to the meeting, "dog bites man" and "man bites dog" look identical — which is a disaster, because they mean opposite things. Why does this happen? Because attention only computes weighted sums, and a sum doesn't care what order you add things in. <strong>Positional encoding</strong> fixes it by stamping each word with a signal that says where it sits — a seat number — so order finally carries meaning.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, you'll be able to explain why plain self-attention is permutation-invariant, and describe how a sinusoidal position signal added to each embedding restores word order.</div></div>
+      <p class="lede">Attention (Days 1–4) has a hidden blind spot: it does not know word <em>order</em>. Shuffle the words and it gives the same answer. So "dog bites man" and "man bites dog" look identical to it. <strong>Positional encoding</strong> fixes this by stamping each word with a signal that says where it sits.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> explain why plain self-attention is permutation-invariant, and describe how a sinusoidal position signal added to each embedding restores word order.</div></div>
     </section>
 
     <!-- ===== 1. WHAT IS IT ===== -->
     <section class="module-section" id="s1" data-sec="what">
   <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">The shuffle problem, and the fix</span><span class="sec-tag">What is it</span></div>
   <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><strong>What this assumes:</strong> Days 1–4 (embeddings, and attention as score → softmax → blend). <strong>That's all</strong> — this lesson fixes one blind spot in what you already built.</div></div>
-      <h4>First, the picture — hold this before any words</h4>
-      <p>Here is the picture: the meeting is a room full of people talking, but nobody has a <strong>seat number</strong>. You can tell <em>who</em> is in the room and <em>how</em> they relate, but not <em>where</em> each one sits — so if two people swap seats, nothing about the conversation changes. That's the bug: plain attention knows the words and their relationships, but not their order. The fix is to hand every word a seat number before the meeting starts. Every term below names a piece of that fix.</p>
-      <h4>The words you'll meet today — plain English first</h4>
-      <p>Glance down the list first.</p>
-      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">permutation-invariant</td><td style="padding:.4rem .6rem;color:var(--ink2)">A fancy way to say "order doesn't matter": shuffle the inputs and the output is unchanged. Plain self-attention has this property — which here is a bug.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">positional encoding</td><td style="padding:.4rem .6rem;color:var(--ink2)">The seat number: a vector added to each word's embedding that says where the word sits.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">sinusoidal encoding</td><td style="padding:.4rem .6rem;color:var(--ink2)">The classic recipe for those seat numbers, built from sine and cosine waves at many different speeds.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">position signal / fingerprint</td><td style="padding:.4rem .6rem;color:var(--ink2)">The unique pattern each position gets, so no two positions look alike.</td></tr><tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">frequency</td><td style="padding:.4rem .6rem;color:var(--ink2)">How fast a wave wiggles. Mixing fast and slow waves is what makes each position's fingerprint unique.</td></tr></tbody></table>
-      <h4>The blind spot, the fix, and how the signal is made</h4>
-      <ul><li><strong>The blind spot.</strong> Plain self-attention is <span class="term" data-tip="Shuffle the input words and the output is unchanged.">permutation-invariant</span> — it only looks at <em>what</em> each word is and <em>how</em> words relate, never <em>where</em> they sit. Shuffles pass straight through.</li><li><strong>The fix.</strong> Add a <span class="term" data-tip="A per-position vector added to each embedding so word order carries into the model.">positional encoding</span> — one vector per position — to each embedding <em>before</em> attention. Now the same word carries different numbers at different spots.</li><li><strong>How the signal is made.</strong> With <span class="term" data-tip="Sine and cosine waves at many frequencies; each position gets a unique fingerprint.">sinusoidal encoding</span>: sine and cosine waves at many frequencies, so each position gets its own fingerprint of wave values.</li></ul>
-      <div class="callout c-warn"><span class="ic">😕</span><div><strong>为什么这里容易卡住 · Why this trips people up:</strong> 第一反应通常是"模型怎么可能不知道顺序？" — the first reaction is "how could a model <em>not</em> know order?" In plain terms: plain attention only computes weighted sums, and a sum doesn't care what order you add things in. Order isn't built in — it has to be <em>injected</em> as an extra signal.</div></div>
-      <button class="gotit" type="button">Got the shuffle problem — let's go</button>
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> M4 Day 3 (one attention = <code>softmax(Q@Kᵀ/√d_k)@V</code>) and M4 Day 1 (each word becomes an embedding — a list of numbers). <b>Nothing new needed.</b></div></div>
+
+      <h4>The blind spot</h4>
+      <p>Read these two sentences: "the dog bites the man" and "the man bites the dog". The words are the same, but the meaning flips. Plain self-attention cannot tell them apart. It only looks at <em>what</em> each word is and <em>how</em> the words relate — it never asks <em>where</em> each word sits. This property is called <span class="term" data-tip="A function is permutation-invariant if shuffling the order of its inputs does not change the output. Plain self-attention has this property, which is why it cannot read word order on its own.">permutation invariance</span>: shuffle the input words and the output for each word stays the same.</p>
+
+      <h4>The fix: a position signal</h4>
+      <p>Give each word a <span class="term" data-tip="A vector, one per position, added to a word embedding so the model can tell where the word sits in the sequence.">position signal</span> <strong>before</strong> it enters attention. Word 1 gets one pattern, word 2 gets a different pattern, word 3 gets another. Now the same word carries different numbers at different spots, so attention can finally read order.</p>
+
+      <h4>How the signal is made</h4>
+      <p>The original transformer builds this signal from <span class="term" data-tip="A way to encode position using sine and cosine waves at many different frequencies. Each position gets a unique mix of wave values — a fingerprint the model can read.">sinusoidal positional encoding</span>: sine and cosine waves at many speeds. Each position ends up with a unique fingerprint of wave values. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 第一反应通常是"模型怎么可能不知道顺序？" In plain terms: it feels obvious that a model must know word order — but plain attention only computes weighted sums, and a sum does not care what order you add things in. Order is not built in; it has to be <em>injected</em> as an extra signal.</div></div>
+      <button class="gotit" type="button">Got the idea — let's go</button>
     </div>
 </section>
 
@@ -386,12 +388,13 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
     <section class="module-section" id="s2" data-sec="intuition">
   <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Numbered seats in a theater</span><span class="sec-tag">Intuition</span></div>
   <div class="sec-body">
-      <h4>Give the meeting numbered seats</h4>
-      <p>Back to the meeting without seat numbers. Here are two everyday pictures that make the fix click.</p>
-      <div class="relate"><div class="card"><span class="big">🎭</span><h5>Numbered seats in a theater</h5><p>Without numbers you know <em>who</em> is in the room but not <em>where</em>. Print a seat number on each chair and every person now has a definite spot. The seat number is the position signal.</p></div><div class="card"><span class="big">🕐</span><h5>Like a clock's hands</h5><p>An hour hand and a minute hand turn at different speeds; together they name one exact time. Sine and cosine waves at different speeds work the same way — together they name one exact position.</p></div></div>
-      <p><strong>In one line:</strong> without seat numbers you can't read order; positional encoding is the seat number added to each word.</p>
-      <p><strong>直觉 / Intuition:</strong> 没有座位号就读不出顺序；位置编码就是加到每个词上的"座位号"。 Waves at many speeds give each position a unique fingerprint, the way an hour hand plus a minute hand pin down one exact time.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a seat number is a single integer, but a position signal is a whole <em>list</em> of wave values (the same length as the embedding). And a person keeps their identity when they change seats — but a word's numbers actually <em>change</em> once you add the position signal, because it's added right into the embedding.</div></div>
+      <div class="relate">
+        <div class="card"><span class="big">🎭</span><h5>Seats need numbers</h5><p>Imagine a theater with no seat numbers. You know <em>who</em> is in the room, but not <em>where</em> anyone sits. Write a number on each seat and now every person has a spot. The seat number is the position signal.</p></div>
+        <div class="card"><span class="big">🕐</span><h5>Clock hands = waves</h5><p>A clock has an hour hand and a minute hand turning at different speeds. Together they name one exact time. Sine and cosine waves at different speeds work the same way — together they name one exact position.</p></div>
+      </div>
+      <p><strong>In one line:</strong> without seat numbers you cannot read order; positional encoding is the seat number added to each word.</p>
+      <p><b>直觉 / Intuition:</b> 就像时钟的时针和分针以不同速度转动，一起就能指出唯一的时刻。 The technical point is that sine and cosine waves at many different speeds combine into a unique fingerprint for every position, which the model reads as "where am I".</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a seat number is a single integer, but a position signal is a whole list of wave values (same length as the embedding). And a person keeps their identity when they change seats, while a word's numbers actually change once you add the position signal.</div></div>
       <button class="gotit" type="button">Got the picture</button>
     </div>
 </section>
@@ -441,22 +444,36 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
   <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The wave formula, in three small steps — and why order matters</span><span class="sec-tag">Mechanism &amp; why</span></div>
   <div class="sec-body">
       <h4>Step 1 — in plain words</h4>
-      <p>For a word at position <code>pos</code>, build a list the same length as the embedding. Even slots (0, 2, 4, …) get a <strong>sine</strong>; odd slots (1, 3, 5, …) get a <strong>cosine</strong>. Slots near the front use fast waves (short wavelength); slots near the back use slow waves (long wavelength). Mix enough speeds and every position gets a fingerprint no other position shares.</p>
+      <p>For a word at position <code>pos</code>, fill a list the same length as the embedding. Even slots (0, 2, 4…) get a sine wave. Odd slots (1, 3, 5…) get a cosine wave. Slots near the start use fast waves (short wavelength); slots near the end use slow waves (long wavelength). So each position gets its own mix — a fingerprint.</p>
+
       <h4>Step 2 — the formula</h4>
-      <div class="callout c-ok"><span class="ic">🧮</span><div><code>PE(pos, 2i) = sin( pos / 10000^(2i / d_model) )   ·   PE(pos, 2i+1) = cos( pos / 10000^(2i / d_model) )</code><br><span style="font-size:.85rem;color:var(--text2)"><code>pos</code> = which word (0, 1, 2, …); <code>i</code> = which pair of slots; <code>d_model</code> = embedding width; <code>10000</code> = the base that spreads the wave speeds from fast (front slots) to slow (back slots).</span></div></div>
+      <p>For position <code>pos</code> and slot index <code>i</code> inside a vector of size <code>d_model</code>:</p>
+      <div class="callout c-info"><span class="ic">🧮</span><div><code>PE(pos, 2i)&nbsp;&nbsp;= sin( pos / 10000^(2i / d_model) )</code><br><code>PE(pos, 2i+1) = cos( pos / 10000^(2i / d_model) )</code><br><br><b>pos</b> = which word (0, 1, 2…). <b>i</b> = which pair of slots. <b>d_model</b> = embedding size. <b>10000</b> = a base that spreads the wave speeds from slow to fast.</div></div>
+
       <h4>Step 3 — a worked example</h4>
-      <p>Take <code>d_model = 4</code>, so there are two slot-pairs with divisors <code>10000^0 = 1</code> and <code>10000^(2/4) = 100</code>.</p>
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — sinusoidal positional encoding</b><br><b>1 · In words:</b> even slots get a sine, odd slots get a cosine; fast waves near the front, slow near the back — Steps 1–2 above.<br><b>2 · The formula:</b> <code>PE(pos, 2i) = sin(pos / 10000^(2i/d_model))</code>, <code>PE(pos, 2i+1) = cos(…)</code> — <code>pos</code> = position, <code>i</code> = slot pair, <code>d_model</code> = width, <code>10000</code> = frequency base.<br><b>3 · Tiny numbers:</b> position 0 → <code>[sin 0, cos 0, sin 0, cos 0] = [0, 1, 0, 1]</code>. position 1 → <code>[sin 1, cos 1, sin 0.01, cos 0.01] ≈ [0.84, 0.54, 0.01, 1.00]</code>. Add this row to the word's embedding — same size in, same size out.<br><b>4 · Sanity check:</b> every row must be <em>unique</em> — no two positions share a fingerprint — and adding <code>PE</code> keeps the vector the same length as the embedding. If two positions collide, your base or <code>d_model</code> is off.</div></div>
+      <p>Take <code>d_model = 4</code>, so there are two pairs (<code>i = 0</code> and <code>i = 1</code>). The two divisors are <code>10000^0 = 1</code> and <code>10000^(2/4) = 100</code>.</p>
+      <ul>
+        <li><strong>Position 0:</strong> <code>sin(0)=0, cos(0)=1, sin(0)=0, cos(0)=1</code> → <code>[0, 1, 0, 1]</code></li>
+        <li><strong>Position 1:</strong> <code>sin(1)=0.84, cos(1)=0.54, sin(0.01)=0.01, cos(0.01)=1.00</code> → <code>[0.84, 0.54, 0.01, 1.00]</code></li>
+      </ul>
+      <p>The two rows are different, so position 0 and position 1 now carry different numbers. Then you simply <strong>add</strong> this row to the word embedding — same size in, same size out, no matrices break.</p>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — sinusoidal positional encoding</b>
+<br><b>1 · In words:</b> even slots get a sine, odd slots get a cosine; fast waves near the front, slow near the back — see Steps 1–2 above.
+<br><b>2 · The formula:</b> <code>PE(pos,2i)=sin(pos/10000^(2i/d_model))</code>, <code>PE(pos,2i+1)=cos(…)</code> — <code>pos</code> = position, <code>i</code> = slot pair, <code>d_model</code> = width, <code>10000</code> = frequency base.
+<br><b>3 · Tiny numbers:</b> position 0 → <code>[0, 1, 0, 1]</code>, position 1 → <code>[0.84, 0.54, 0.01, 1.00]</code> (Step 3).
+<br><b>4 · Sanity check:</b> every row must be <em>unique</em> — no two positions share a fingerprint — and adding <code>PE</code> keeps the vector the same length as the embedding. If two positions collide, your base or <code>d_model</code> is off.</div></div>
+
       <h4>Modern alternatives (just be aware)</h4>
-      <p>Sinusoidal is the original. Modern LLMs often swap it for <strong>RoPE</strong> (rotate Q and K by a position-dependent angle) or <strong>ALiBi</strong> (a distance penalty added to the attention scores). Both encode <em>relative</em> distance and extrapolate better to longer inputs — same goal, different mechanics.</p>
-      <h4>Why a frontier lab cares</h4>
-      <p>Position is not a nicety — without it a transformer literally cannot tell "dog bites man" from "man bites dog," so <em>every</em> transformer injects it. And the <em>scheme</em> is a live research axis at scale: sinusoidal is free and length-agnostic but absolute; learned absolute positions have no defined values past the longest training length, so they degrade on longer inputs; RoPE/ALiBi encode relative distance and extrapolate to the long contexts that long-context models ship in production. Picking one is a real <strong>design-review</strong> decision for any frontier model that wants to read a whole book.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><strong>Remember this chain:</strong> embeddings (Day 1) → Q/K/V (Day 2) → attention (Day 3) → many heads (Day 4) → <strong>+ position</strong> (today). That's the full input side of a transformer. From here the Module-2 layers stack on top. You've built the representation the whole model runs on.</div></div>
+      <p>Two newer methods act during attention instead of at the input. <span class="term" data-tip="Rotary Position Embedding. Instead of adding a signal, it rotates the Q and K vectors by an angle set by position. Used by LLaMA, Mistral, and most modern open LLMs; it captures relative distance naturally.">RoPE</span> rotates the Q and K vectors by an angle that depends on position — most modern LLMs use it. <span class="term" data-tip="Attention with Linear Biases. It adds no signal to the embedding; it just subtracts a distance penalty from the attention scores, so far-apart words get penalized more. Helps handle sequences longer than training.">ALiBi</span> adds no signal at all — it just penalizes far-apart word pairs in the scores. You do not need to build these; knowing they exist shows breadth in an interview.</p>
+
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> plain attention ignores order → shuffling gives the same output → add a per-position wave signal to each embedding → the same word now differs by position → order is readable. Add multi-head attention (Day 4) on top of position-aware inputs and you have the front of a transformer.</div></div>
+
       <h4>The staff lens — one silent failure, one trade-off</h4>
-      <p>Forgetting position is the classic silent bug — the model still trains, it just quietly ignores order.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><strong>Failure mode (silent): no position signal reaches the model.</strong> Forget to add positional encoding — or add it <em>after</em> attention instead of to the input embeddings — and nothing errors. The model trains and the loss can even look fine on order-insensitive data. But it's now permutation-invariant: "the dog bit the man" and "the man bit the dog" produce the same representation. Word order is silently ignored. A senior engineer catches this in <strong>code review</strong> by asking one question: "where does position enter?"</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><strong>Trade-off: which position scheme.</strong> Sinusoidal needs no parameters and works at any length, but encodes <em>absolute</em> position; learned-absolute is flexible but undefined past the longest sequence seen in training, so it degrades on longer inputs; RoPE / ALiBi encode <em>relative</em> distance and extrapolate to longer contexts, at the cost of acting inside attention and being more to implement. Choosing one for a long-context model is a <strong>design-review</strong> call.</div></div>
-      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Plain self-attention is permutation-invariant — it computes weighted sums, which ignore input order — so word order has to be injected. Sinusoidal positional encoding adds a per-position vector of sine/cosine waves at many frequencies to each embedding, giving every position a unique fingerprint. The nuance is that this absolute scheme extrapolates poorly beyond training lengths, which is why modern LLMs use relative schemes like RoPE — rotating Q and K by a position-dependent angle — or ALiBi, a distance penalty on the scores."</div></div>
+      <p>Position is the piece people forget, because leaving it out does not crash anything. A staff engineer knows both how that shows up and how to choose a scheme.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): no position signal reaches the model.</b> Forget to add positional encoding — or add it after attention instead of to the input embeddings — and nothing errors. The model trains and the loss can even look fine on order-insensitive data. But it is now permutation-invariant: "the dog bit the man" and "the man bit the dog" produce the same representation. Word order is silently ignored. A senior engineer catches this in <b>code review</b> by asking "where does position enter?"</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: which position scheme.</b> Sinusoidal needs no parameters and works at any length, but encodes <em>absolute</em> position; <span class="term" data-tip="Positions whose values are learned during training, one per slot up to a maximum length.">learned absolute</span> is flexible but has no defined values past the longest sequence seen in training, so it degrades on longer inputs; RoPE / ALiBi encode <em>relative</em> distance and extrapolate to longer contexts, at the cost of acting inside attention and being more to implement. Picking one for a long-context model is a <b>design-review</b> call.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Plain self-attention is permutation-invariant — it computes weighted sums, which ignore input order — so word order has to be injected. Sinusoidal positional encoding adds a per-position vector of sine/cosine waves at many frequencies to each embedding, giving every position a unique fingerprint. The nuance is that this absolute scheme extrapolates poorly beyond training lengths, which is why modern LLMs use relative schemes like RoPE (rotating Q and K by a position-dependent angle) or ALiBi (a distance penalty on the scores)."</div></div>
       <button class="gotit" type="button">Got positional encoding</button>
     </div>
 </section>
@@ -484,27 +501,31 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 
     <!-- ===== 7. PRODUCE ===== -->
     <section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Predict whether the shuffle changes anything, then run it</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
   <div class="sec-body">
-      <p>Here's the fun part. <strong>Before you write any code, predict:</strong> run a tiny self-attention on a sentence, then shuffle the word rows and run it again — will each word's output change, or come out the same set of vectors? Write your guess. Then add positional encoding and predict again. Pick one path:</p>
+      <p>Understanding ≠ being able to write it. Prove the shuffle problem, then build the wave table yourself — that's what makes the day count. Pick one:</p>
       <h4>Option A · write it yourself</h4>
       <p>Create <code>sessions/m03-attention/day-05-positional/experiment.py</code>. First run a tiny self-attention on an input, then shuffle the rows and run it again — show the per-word outputs are the same set (permutation invariance). Then write <code>sinusoidal_encoding(max_len, d_model)</code> using the sine/cosine formula and print a small table (say 6 positions × 8 dims). Finally add the encoding to the embeddings and show two shuffled inputs now differ. Run with <code>python3 sessions/m03-attention/day-05-positional/experiment.py</code>.</p>
       <h4>Option B · let Claude build it, then read it</h4>
-      <p>Copy the prompt below back into Claude Code. It triggers the <strong>frontier-experiment-lab</strong> skill, which creates the file, writes the code, and runs it for you.</p>
+      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
       <div class="prompt">
         <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
         <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 4 Day 5 artifact.
 
 Create sessions/m03-attention/day-05-positional/experiment.py that, with a comment on each step:
-1. Defines a tiny scaled dot-product self_attention(x) with fixed random projections.
-2. Runs it on an input (seq=3, d_model=4), then on a row-shuffled input, showing the per-word outputs stay the same set (permutation invariance).
-3. Implements sinusoidal_encoding(max_len, d_model) with PE(pos,2i)=sin(pos/10000**(2i/d_model)) and PE(pos,2i+1)=cos(...); prints a table for max_len=6, d_model=8 confirming every row is unique.
-4. Adds the encoding to the embeddings (x + pe[:seq]) and shows two different word orders now produce different outputs.
+1. Defines a tiny scaled dot-product self_attention(x) (softmax(Q@K.T/sqrt(d_k))@V) with fixed random projections.
+2. Runs it on an input x (seq=3, d_model=4), then runs it again on a row-shuffled x, and shows the set of per-word output rows is the SAME under the shuffle — demonstrating permutation invariance (attention ignores order).
+3. Implements sinusoidal_encoding(max_len, d_model) with PE(pos,2i)=sin(pos/10000**(2i/d_model)) and PE(pos,2i+1)=cos(...); prints a small table for max_len=6, d_model=8 and confirms every row is unique.
+4. Adds the encoding to the embeddings (x + pe[:seq]) and shows that two DIFFERENT word orders now produce different attention outputs — order is recovered.
 Then run it and paste the output at the bottom as a comment.</pre>
       </div>
-      <h4>What you should see (check your prediction)</h4>
-      <ul><li>Shuffling the input rows leaves the <em>set</em> of per-word attention outputs unchanged — proof that plain attention is permutation-invariant. Did you predict that?</li><li><code>sinusoidal_encoding(max_len, d_model)</code> prints a table whose rows are all unique — position 0 starts <code>[0, 1, 0, 1]</code>, position 1 starts <code>[0.84, 0.54, …]</code>.</li><li>After adding the encoding, two different word orders produce <em>different</em> outputs. That's the whole fix: order is now something the meeting can read. You've finished the input side of a transformer.</li></ul>
-      <div class="callout c-info"><span class="ic">📓</span><div><strong>5-minute research log · 5 分钟研究笔记:</strong> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-05-positional/log.md</code>: (1) why plain attention ignores order; (2) how the seat-number fix restores it; (3) one thing you're still unsure about (why RoPE/ALiBi extrapolate better is fair game).</div></div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Shuffling the input rows leaves the set of per-word attention outputs unchanged (permutation invariance shown).</li>
+        <li><code>sinusoidal_encoding(max_len, d_model)</code> prints a table whose rows are all unique.</li>
+        <li>After adding the encoding, two different word orders produce <em>different</em> outputs.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m03-attention/day-05-positional/log.md</code>: (1) why we <em>add</em> the position signal to the embedding instead of concatenating it on the side; (2) what you saw change when the position signal was present vs absent; (3) one thing you're still unsure about.</div></div>
       <button class="gotit" type="button">Done</button>
     </div>
 </section>
@@ -512,7 +533,7 @@ Then run it and paste the output at the bottom as a comment.</pre>
     <div class="fin" id="fin" role="status" aria-hidden="true">
       <span class="em" aria-hidden="true">🎉</span>
       <h3>Module 4 · Day 5 complete! 🏆</h3>
-      <p>Nice work — you've completed <b>Positional Encoding</b>.<br>Next up: the <b>Module 4 Review Gate</b>.</p>
+      <p>Nice work — you've completed <b>Positional Encoding &amp; the Shuffle Problem</b>.<br>Next up: <b>Review Gate</b>.</p>
     </div>
 
     <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
