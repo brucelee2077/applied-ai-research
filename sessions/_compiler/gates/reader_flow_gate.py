@@ -48,11 +48,42 @@ def _region_texts(blocks):
     return mode, t
 
 
+def _run_concept(meta, blocks, msgs, ok, fail, pas, warn):
+    spine_word = (meta.get('spine') or 'bend').split(':')[0].split()[0].lower()
+    hero = next((b for b in blocks if b['type']=='hero'), None)
+    htxt = '\n'.join(hero['lines']).lower() if hero else ''
+    hit = [x for x in v8lib.FRONTIER_TOKENS if x.lower() in htxt]
+    fail('hero opens frontier-first (found %s)' % hit) if hit else pas('hero no frontier-pressure')
+    curiosity = ['you','your','imagine','picture','?','ever','what if','yesterday','here is','wonder']
+    pas('hero human/curiosity opening') if any(c in htxt for c in curiosity) else fail('hero no human/curiosity anchor')
+
+    concepts = [b for b in blocks if b['type']=='concept']
+    fail('need >=3 concept units (got %d)' % len(concepts)) if len(concepts) < 3 else pas('%d concept units' % len(concepts))
+    VIS = ('<svg', '%%% svg', '%%% viz', 'build-embed', 'build-viz')
+    for b in concepts:
+        raw = '\n'.join(b['lines']); cid = b['args'].get('id','?')
+        (pas('concept %s ships a visual' % cid) if any(v in raw for v in VIS)
+         else fail('concept %s has NO visual (depict-on-introduction)' % cid))
+
+    texts = [htxt] + ['\n'.join(b['lines']).lower() for b in concepts]
+    present = sum(1 for t in texts if spine_word in t)
+    pas("spine ('%s') in %d blocks" % (spine_word, present)) if present >= 3 else fail("spine ('%s') in <3 blocks (%d)" % (spine_word, present))
+
+    prod = next((b for b in blocks if b['type']=='produce'), None)
+    ptxt = '\n'.join(prod['lines']).lower() if prod else ''
+    cues = ['predict','guess','observe','notice','watch','what you should see','before you']
+    pas('produce is discovery-framed') if any(c in ptxt for c in cues) else fail('produce not discovery-framed')
+    return ok[0], msgs
+
+
 def run(meta, blocks, spine_word=None):
     msgs, ok = [], [True]
     def fail(m): ok[0] = False; msgs.append('FAIL ' + m)
     def pas(m): msgs.append('pass ' + m)
     def warn(m): msgs.append('warn ' + m)
+
+    if meta.get('mode') == 'concept':
+        return _run_concept(meta, blocks, msgs, ok, fail, pas, warn)
 
     mode, t = _region_texts(blocks)
     strict = (mode == 'clean')
