@@ -40,13 +40,14 @@ The file MUST start with a `---` YAML block. Keys:
 | `spine` | optional (strongly recommended) | reader_flow_gate | The narrative-spine word. Gate lower-cases the first word of the first `:`-split segment and requires it in ≥3 blocks. Defaults to `bend` if absent. |
 | `nav_prev_href` / `nav_prev_label` | optional | prev link | Empty if omitted. |
 | `nav_next_href` / `nav_next_label` | optional | next link | Empty if omitted. |
-| `fin_title` | optional | `render_fin` | Completion banner heading. |
-| `fin_body` | optional | `render_fin` | Completion banner body (HTML allowed). |
+| `fin_title` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner heading. |
+| `fin_body` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner body (HTML allowed). |
 | `notebook_yardstick` | optional | notebook_smoothness_gate | Repo-relative notebook path, or `null`. `null`/absent → gate returns **N/A** (skipped, never fails). |
 | `require_artifact` | optional | concept_shell_gate | Defaults to `true`; when true the produce section must contain `experiment.py`. |
 
-Missing `module_label`, `title`, or `subtitle` raises a `KeyError` in `render_hero`
-before any gate runs.
+Missing `module_label`, `title`, or `subtitle` raises a `KeyError` in `render_hero`;
+missing `fin_title` or `fin_body` raises a `KeyError` in `render_fin`. Either crash exits
+the compiler with code `1` **before any gate runs** — so all five are hard-required.
 
 ---
 
@@ -117,8 +118,10 @@ visual requirement.
 ```
 
 **`viz`** — an interactive embed (iframe) for behavioral concepts. Args: `src=`
-(path to an EXISTING `sessions/viz/*.html`, relative to the lesson), `title=`,
-`caption=`. Emits a `.build-embed` iframe the shared auto-resize script drives.
+(path to a `sessions/viz/*.html`, relative to the lesson — it should point at a file that
+actually exists; a bad path still compiles and passes gates but renders an empty iframe at
+runtime), `title=`, `caption=`. Emits a `.build-embed` iframe the shared auto-resize script
+drives.
 ```text
 %%% viz src=../../viz/activation-derivatives.html title="slopes" caption="drag z"
 %%%
@@ -243,8 +246,9 @@ Every concept unit follows the same three beats, in this order:
    - `%%% svg` for a **fixed shape** (a curve, a matrix diagram, a boundary) — a
      static labeled figure.
    - `%%% viz src=…` for **behavioral** content (something that changes as you drag a
-     control: a slope flattening, a distribution shifting). The `src` MUST point at an
-     EXISTING file under `sessions/viz/`.
+     control: a slope flattening, a distribution shifting). The `src` should point at a
+     file that exists under `sessions/viz/` — this is a runtime-quality concern (a missing
+     file renders an empty iframe), not a compile gate.
 3. **Build-up** — worked example, mechanism, `#### ` headings, callouts, Math Ladder,
    failure mode, frontier payoff.
 
