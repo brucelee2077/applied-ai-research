@@ -80,6 +80,14 @@ def main():
             for m in nmsgs: log('  ', m)
             if nstatus is False or str(nstatus).upper() == 'FAIL':
                 sok = False; log('   notebook smoothness FAILED')
+        # -- Coverage Gate (ADVISORY) : never changes sok / exit code --
+        try:
+            import coverage_gate
+            cstatus, cmsgs = coverage_gate.run(html, meta, source_dir=src_dir)
+            log('\n-- Coverage Gate (advisory) --')
+            for m in cmsgs: log('  ', m)
+        except Exception as e:
+            log('   coverage gate skipped:', e)
     else:
         sok, smsgs = shell_invariant_gate.run(html, meta, donor=donor)
         log('\n-- Shell Invariant Gate (output vs donor) --')
