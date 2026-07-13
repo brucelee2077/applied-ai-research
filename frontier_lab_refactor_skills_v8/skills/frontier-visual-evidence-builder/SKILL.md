@@ -7,6 +7,11 @@ description: Use to design visuals and runnable evidence that reduce learning ba
 
 Visuals are not only proof. They are part of the learning experience.
 
+> **Authoritative V9 authoring grammar + compile/gate loop:**
+> `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
+> The `%%% svg` / `%%% viz` widget grammar and the per-concept visual gate live there,
+> not in the obsolete `v8_source_first_authoring_plan.md`.
+
 ## Visual sequence
 
 Prefer:
@@ -59,8 +64,13 @@ If a seed lesson uses static or late visuals in a way that future modules may co
 
 ## v8 — Source-first behavioral viz
 
-In `source.md`, a behavioral block is flagged `behavioral=true` and names a `viz/*.html`.
+In `source.md`, a behavioral visual is a `%%% viz src=../../viz/<file>.html title="…" caption="…" %%%`
+widget naming an EXISTING `sessions/viz/*.html`; a static shape is a `%%% svg … %%%`
+widget holding a closed `<svg>…</svg>`. (See AUTHORING.md §4/§6 for the exact grammar —
+the earlier `behavioral=true` flag is obsolete.)
 
-The compiler inserts the auto-resizing iframe + `postMessage` height sender. A behavioral block with no viz is a **compile error**, not a late QA finding.
+The compiler renders `%%% viz` as the auto-resizing `.build-embed` iframe + `postMessage`
+height sender. A concept unit with no visual is a **compile error** (Reader Flow + Concept
+Shell gates), not a late QA finding.
 
 Keep claim and moving evidence adjacent in `source.md`. Do not let prose and its plotted evidence drift into separate files — that decoupling is why prose-only behavioral gaps recur in hand-authored HTML.

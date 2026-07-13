@@ -7,6 +7,11 @@ description: Use to validate autonomous rollout loops, seed stabilization, learn
 
 You are the strict quality gate and rollout-state validator.
 
+> **Authoritative V9 authoring grammar + compile/gate loop:**
+> `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
+> Validate authored `source.md` against it, not the obsolete
+> `v8_source_first_authoring_plan.md`.
+
 ## State files
 
 Use both:
@@ -176,4 +181,6 @@ For reference / first-principles modules:
 - reader_flow_gate concept branch (on source): hero human-first / no frontier-pressure; every @@@ concept ships a visual (P0 if not); spine word across ≥3 blocks; produce discovery-framed.
 - "concept unit without a visual" and "a concept's picture deferred to a later unit" are P0 for a fresh V9 build.
 
-Spec: `sessions/_refactor/v8_source_first_authoring_plan.md`.
+Spec: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
+The older `sessions/_refactor/v8_source_first_authoring_plan.md` documents historical/obsolete
+grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects — do not author from it.

@@ -7,6 +7,11 @@ description: Use to build or stabilize lessons so learning experience, mechanism
 
 Your job is to make the learner want to continue while still building staff-level depth.
 
+> **Authoritative V9 authoring grammar + compile/gate loop:**
+> `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
+> Author every `source.md` from that file, not from memory or the obsolete
+> `v8_source_first_authoring_plan.md`.
+
 ## Non-negotiables
 
 No formula before felt intuition.
@@ -133,3 +138,33 @@ Prerequisites read as "just curiosity."
 Failure modes, trade-offs, scale, and frontier relevance appear only after hook → picture → mechanism.
 
 Frame depth as empowerment, not pressure. Every staff/interview claim traces to something taught earlier.
+
+## V9 authoring essentials (full grammar in `sessions/_compiler/AUTHORING.md`)
+
+Required front-matter for a `mode: concept` lesson:
+
+```yaml
+quest_id: <frozen id>       # replaces the donor __QUEST_ID__ token
+mode: concept
+donor: v9-base.donor
+module_label: "…"           # KeyError if missing; drives sidebar group + hero kicker
+title: "…"                  # KeyError if missing
+subtitle: "…"               # KeyError if missing
+brand_sub: "…"              # set it or the donor's old brand line leaks
+spine: "<one word>"         # narrative-spine word; gate needs it in >=3 blocks
+page_title / nav_prev_* / nav_next_* / fin_title / fin_body   # optional
+notebook_yardstick: <path or null>   # null => Notebook Smoothness gate is N/A
+```
+
+Compile + iterate:
+
+```bash
+python3 sessions/_compiler/compile_lesson.py <source.md>              # exit 0 = pass
+python3 sessions/_compiler/compile_lesson.py <source.md> --check-only # run gates, write nothing
+# exit codes: 0 pass · 2 reader-flow fail (nothing written) · 3 shell/concept gate fail · 1 usage/parse error
+```
+
+Every concept unit must ship a real visual (`%%% svg` with a closed `<svg>…</svg>`, or
+`%%% viz src=…` pointing at an EXISTING `sessions/viz/*.html`) or the gate FAILS. See
+AUTHORING.md for the full block grammar, all `%%%` widgets, callouts, and a minimal
+compiling example.
