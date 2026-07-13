@@ -105,6 +105,54 @@ Saturates? :: only for z<0 (flat 0 → can "die") :: both tails (→ 0 and → 1
 Typical use :: hidden layers (modern default) :: binary output / gate :: hidden layers (older RNNs); zero-centered
 %%%
 
+#### All three on one pair of axes
+Here are all three bends — and their slopes — on one pair of axes, in the same colors used above:
+
+%%% svg
+<svg viewBox="0 0 520 380" role="img" aria-label="Top panel: ReLU, sigmoid and tanh curves overlaid on shared axes. Bottom panel: their slopes f prime of z overlaid, sigmoid slope peaking near 0.25 and tanh slope peaking near 1.0."><g font-family="monospace" font-size="12">
+<!-- ===== TOP PANEL: the three curves ===== -->
+<text x="60" y="22" font-size="13" fill="#3A342E" font-weight="bold">The bend  f(z)</text>
+<!-- axes -->
+<line x1="60" y1="110" x2="470" y2="110" stroke="#E5DFD6" stroke-width="1.5"/>
+<line x1="265" y1="36" x2="265" y2="160" stroke="#E5DFD6" stroke-width="1"/>
+<text x="475" y="114" fill="#9A938A" font-size="10" text-anchor="start">z</text>
+<!-- tanh: S through origin, from near -1 up to near +1 (brown #9A5A12) -->
+<path d="M70 155 C 190 153, 225 112, 265 110 C 305 108, 340 67, 460 65" fill="none" stroke="#9A5A12" stroke-width="2.5"/>
+<!-- sigmoid: S from near 0 (bottom) up to near 1, passing through 0.5 at z=0 (purple #7C6DAA) -->
+<path d="M70 152 C 190 150, 230 90, 265 87 C 300 84, 340 46, 460 44" fill="none" stroke="#7C6DAA" stroke-width="2.5"/>
+<!-- ReLU: flat 0 for negatives, rising line for positives (green #2D8B55) -->
+<path d="M70 110 L265 110 L440 46" fill="none" stroke="#2D8B55" stroke-width="2.5"/>
+<!-- curve labels -->
+<text x="450" y="60" fill="#2D8B55" text-anchor="end" font-weight="bold">ReLU</text>
+<text x="405" y="38" fill="#7C6DAA" text-anchor="start">sigmoid</text>
+<text x="405" y="78" fill="#9A5A12" text-anchor="start">tanh</text>
+<!-- ===== BOTTOM PANEL: the slopes ===== -->
+<text x="60" y="212" font-size="13" fill="#3A342E" font-weight="bold">The slope  f′(z)</text>
+<!-- axes -->
+<line x1="60" y1="340" x2="470" y2="340" stroke="#E5DFD6" stroke-width="1.5"/>
+<line x1="265" y1="230" x2="265" y2="352" stroke="#E5DFD6" stroke-width="1"/>
+<text x="475" y="344" fill="#9A938A" font-size="10" text-anchor="start">z</text>
+<!-- peak reference lines -->
+<line x1="60" y1="248" x2="470" y2="248" stroke="#E9E3D9" stroke-width="1" stroke-dasharray="3,3"/>
+<text x="56" y="252" fill="#9A5A12" font-size="10" text-anchor="end">1.0</text>
+<line x1="60" y1="317" x2="470" y2="317" stroke="#E9E3D9" stroke-width="1" stroke-dasharray="3,3"/>
+<text x="56" y="321" fill="#7C6DAA" font-size="10" text-anchor="end">0.25</text>
+<!-- ReLU slope: 0 for z<0 (flat on axis), 1 for z>0 (flat at the 1.0 line) with a step at 0 (green) -->
+<path d="M70 340 L265 340 L265 248 L460 248" fill="none" stroke="#2D8B55" stroke-width="2.5"/>
+<!-- tanh slope: bell peaking ~1.0 at z=0 (brown) -->
+<path d="M70 339 C 200 338, 235 252, 265 248 C 295 252, 330 338, 460 339" fill="none" stroke="#9A5A12" stroke-width="2.5"/>
+<!-- sigmoid slope: lower, flatter bell peaking ~0.25 at z=0 (purple) -->
+<path d="M70 340 C 205 339, 240 319, 265 317 C 290 319, 325 339, 460 340" fill="none" stroke="#7C6DAA" stroke-width="2.5"/>
+<!-- slope labels + peak annotations -->
+<text x="272" y="244" fill="#9A5A12" font-size="11" text-anchor="start">tanh′ peaks ≈ 1.0</text>
+<text x="272" y="313" fill="#7C6DAA" font-size="11" text-anchor="start">sigmoid′ peaks ≈ 0.25</text>
+<text x="450" y="240" fill="#2D8B55" text-anchor="end" font-weight="bold">ReLU′ = 1 (z&gt;0)</text>
+<text x="130" y="333" fill="#2D8B55" font-size="10" text-anchor="middle">ReLU′ = 0 (z&lt;0)</text>
+</g></svg>
+%%%
+
+The slopes are what make saturation visible: sigmoid's slope stays small everywhere (it never rises above ≈ 0.25), tanh's is steeper (up to ≈ 1.0), and ReLU's is flat — either 0 for negatives or a plain 1 for positives.
+
 @@@ concept id=c6 tag="When bends break" title="Dead ReLUs and saturation" gotit="Got the failure mode"
 A bend can silently stop learning. This is the staff-level part of today: the activation you pick decides whether a neuron keeps improving. Don't take the "Slope near 0" row on faith — **watch the slope**. The dashed curve below is each activation's slope `f′(z)` (how steep the curve is at each point); drag the marker into the flat tails and see it collapse toward `0`. That vanishing slope <em>is</em> saturation (sigmoid/tanh) and the dead-ReLU zero — the exact reason a stuck unit stops learning.
 
