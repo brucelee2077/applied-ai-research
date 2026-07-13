@@ -181,6 +181,18 @@ For reference / first-principles modules:
 - reader_flow_gate concept branch (on source): hero human-first / no frontier-pressure; every @@@ concept ships a visual (P0 if not); spine word across ≥3 blocks; produce discovery-framed.
 - "concept unit without a visual" and "a concept's picture deferred to a later unit" are P0 for a fresh V9 build.
 
+### Coverage feedback loop (advisory)
+
+`coverage_gate` (concept mode, after notebook_smoothness) compares the compiled lesson to its `notebook_yardstick`'s topic checklist and classifies each topic COVERED / DEFERRED / OUT_OF_SCOPE / GAP. It is **ADVISORY** — it never changes `sok`, never fails the build, and writes only a `<day>/_coverage.md` sidecar (never edits `lesson.html`). `N/A` when there is no yardstick.
+
+When it flags a **GAP** (a notebook topic the lesson does not cover and the manifest has not curated), route it:
+
+- **(a) real in-scope gap** → fix the lesson: add a concept unit or visual that teaches it, then recompile.
+- **(b) systemic / format defect** (would recur across modules) → fix the relevant `frontier-*` skill, not just this lesson.
+- **(c) legitimate curation** (topic belongs on another day, or is out of scope) → record it in the module manifest `coverage.<day>.deferred` (`topic: where`) or `coverage.<day>.out_of_scope`. That clears the flag on the next run — do NOT edit the lesson to silence it.
+
+`coverage.<day>.covers` is the author-declared checklist when the source has no `coverage_topics`; keep it accurate. Never treat an ADVISORY status as a blocker.
+
 Spec: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
 The older `sessions/_refactor/v8_source_first_authoring_plan.md` documents historical/obsolete
 grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects — do not author from it.
