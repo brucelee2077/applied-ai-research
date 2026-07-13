@@ -42,8 +42,17 @@ The file MUST start with a `---` YAML block. Keys:
 | `nav_next_href` / `nav_next_label` | optional | next link | Empty if omitted. |
 | `fin_title` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner heading. |
 | `fin_body` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner body (HTML allowed). |
-| `notebook_yardstick` | optional | notebook_smoothness_gate | Repo-relative notebook path, or `null`. `null`/absent → gate returns **N/A** (skipped, never fails). |
+| `notebook_yardstick` | optional | notebook_smoothness_gate + coverage_gate | Repo-relative notebook path, or `null`. `null`/absent → both gates return **N/A** (skipped, never fail). |
+| `coverage_topics` | optional | coverage_gate | The in-source coverage checklist. A list whose items are each **a plain string** OR a `{topic: "…", keywords: […]}` mapping. **Overrides** the notebook-headings fallback (see §8). In-source alternative to the module manifest's `coverage.<day>.covers`. |
 | `require_artifact` | optional | concept_shell_gate | Defaults to `true`; when true the produce section must contain `experiment.py`. |
+
+`coverage_topics` schema — a topic is COVERED if any of its keywords (default: the topic
+string itself) appears as a substring in the compiled lesson's normalized text:
+```yaml
+coverage_topics:
+  - relu                                           # plain string: keyword = "relu"
+  - {topic: vanishing gradient, keywords: [gradient shrinks, vanish]}   # any keyword matches
+```
 
 Missing `module_label`, `title`, or `subtitle` raises a `KeyError` in `render_hero`;
 missing `fin_title` or `fin_body` raises a `KeyError` in `render_fin`. Either crash exits
@@ -333,6 +342,18 @@ Gates that run in concept mode (`mode: concept`):
 - `notebook_yardstick: null`/absent → **N/A** (skipped, never fails);
 - otherwise compares the compiled hero lede to the notebook's opening: fails if the
   hero opens frontier-first, has no human/curiosity cue, or opens on a formula wall.
+
+**Coverage Gate (ADVISORY — never fails the build)**:
+- `notebook_yardstick: null`/absent → **N/A**.
+- Otherwise it builds a topic checklist, by precedence: front-matter `coverage_topics`
+  → module manifest `coverage.<day>.covers` → the notebook's markdown headings. It marks
+  each topic COVERED / DEFERRED / OUT_OF_SCOPE / GAP against the manifest curation and
+  writes an advisory `<day>/_coverage.md` sidecar (it never edits `lesson.html`).
+- The notebook-headings fallback intentionally **over-flags** — chrome headings and
+  wording differences show up as GAPs. To get a **semantic** diff, declare
+  `coverage_topics` in the source (or `coverage.<day>.covers` in the manifest).
+- The gate is advisory: you **drive its status to PASS** by declaring the checklist and
+  recording legitimate curation, but you do **not** have to — it never blocks compilation.
 
 ---
 

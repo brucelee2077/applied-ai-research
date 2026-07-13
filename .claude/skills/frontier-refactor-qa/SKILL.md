@@ -193,6 +193,8 @@ When it flags a **GAP** (a notebook topic the lesson does not cover and the mani
 
 `coverage.<day>.covers` is the author-declared checklist when the source has no `coverage_topics`; keep it accurate. Never treat an ADVISORY status as a blocker.
 
+Notebook-heading GAPs are mostly chrome / wording, not real gaps — make the diff semantic by declaring in-source `coverage_topics` or manifest `coverage.<day>.covers`; the gate is advisory (drive it to PASS, it never blocks the build).
+
 Spec: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
 The older `sessions/_refactor/v8_source_first_authoring_plan.md` documents historical/obsolete
 grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects — do not author from it.
