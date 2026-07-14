@@ -90,6 +90,39 @@ sessions/<module>/_refactor/manifest.yaml
 
 The manifest records constraints, quality gates, coverage items, visual/evidence items, artifact items, backlog, held-out eval findings, skill-gap candidates, and loop history.
 
+## Coverage Spec Rule (the skill drafts coverage; the notebook is a test)
+
+`coverage.<day>.covers` is **skill-drafted from domain knowledge**, before and independent of any notebook. A notebook may not exist (JAX, scaling laws); the skill must still produce complete coverage. Never derive `covers` by reading a notebook — that inverts the system and lets a notebook self-certify.
+
+To draft `covers` for a topic, enumerate — from what the topic *is*, not from a reference:
+
+```text
+1. Core mechanism family     the primary objects the lesson teaches, AND each one's
+                             salient first-order properties the lesson leans on
+                             (e.g. the activations ReLU / sigmoid / tanh; ReLU's sparsity)
+2. Historical ancestor       the cruder earlier form, WHEN it motivates the modern one
+                             (step function → why we moved to smooth / valve bends)
+3. Failure → CAUSE + REMEDY  for EVERY failure you teach, name BOTH what triggers it
+                             AND its fix. Symptom without cause is an incomplete spec.
+                             dead ReLU (cause: too-large LR shoves the unit permanently
+                             negative) → Leaky ReLU / GELU; vanishing gradient (cause:
+                             saturating slopes multiply toward 0) → ReLU / normalization.
+4. Capability limit          what the mechanism CANNOT do
+                             (a single neuron → XOR / linear separability)
+5. Forward-pointer           named-but-deferred concepts → coverage.<day>.deferred:
+                             {topic: where} (e.g. softmax → day-04-loss). Enumerate the
+                             full family a beginner will hear (e.g. output-layer choices:
+                             softmax multi-class, sigmoid binary, sigmoid-per-label
+                             multi-label, linear/none for regression), don't stop at one.
+6. Out of scope              variants deliberately excluded → coverage.<day>.out_of_scope
+                             WITH a written reason. A concept that is the REMEDY for a
+                             failure you teach can NEVER be out_of_scope.
+```
+
+`out_of_scope` is a contestable claim, not a silencer — record the reason so a reviewer (or the user) can challenge it. When challenged and wrong, the topic is a gap to fix, not an exclusion to defend.
+
+Where a notebook exists, the coverage gate's **check B** uses it as a **held-out test** of this spec: a notebook concept absent from `covers` / `deferred` / `out_of_scope` is a **SKILL GAP** — the enumeration above missed a step. The fix is to improve THIS rule (add the missing derivation step, e.g. "failure → remedy"), re-draft `covers`, regenerate the lesson, and re-eval — loop until the skill-drafted spec reproduces the notebook's concepts **without reading it**. That reproduction is the proof the skill drives coverage. See `frontier-refactor-qa` → Coverage feedback loop and `sessions/_compiler/AUTHORING.md` §8.
+
 ## Seed Propagation Risk Rule
 
 A seed module P1 can become required-to-fix before future rollout if:
@@ -173,7 +206,7 @@ Under v8 do not hand-edit `lesson.html`. Fix `source.md` and recompile.
 
 The compiler owns the shell, the 7-section mapping, DEMOS/BUILD/QS, quest IDs, localStorage, quiz mechanics, navigation, completion behavior, and single-sourced anchors. Authoring reader-flow and owning invariants are separated — this is why direct HTML refactoring felt rough.
 
-Spec: `sessions/_refactor/v8_source_first_authoring_plan.md`. Diagnosis + the six rules: `sessions/_refactor/v8_exemplar_distillation_report.md`.
+Authoritative grammar + compile/gate loop: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler). The older `sessions/_refactor/v8_source_first_authoring_plan.md` describes an obsolete grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects — do not author from it.
 
 ## Three Authoring Modes
 

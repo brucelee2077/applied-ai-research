@@ -20,6 +20,38 @@ No checklist before invitation in foundation lessons.
 
 No decorative analogy. Use a narrative spine.
 
+## Beginner Intuition Register (per concept — the notebook's tone)
+
+Match the register of a strong beginner notebook: warm, plain-language, analogy-first, heavy on *why*. A staff-depth lesson is NOT an excuse to go straight into mechanism — the intuition layer must carry every concept, not just the hero. This is the difference between "correct but cold" and a lesson a beginner actually wants to read. The eval gate for this is the **beginner-friendliness judge** (`coverage_judge.py` tone axis), which grades the lesson against the notebook on warmth / analogy_quality / intuition_depth / plain_language / curiosity / pace — drive it to MATCHES_NOTEBOOK.
+
+Every concept unit opens with **felt intuition before any formula, range, or notation**, in this order:
+
+```text
+1. Plain-words "what is it"   one sentence a 12-year-old gets, no symbols
+2. Full analogy SCAFFOLD      not a one-word metaphor. Give all four beats:
+                              (a) a concrete everyday thing (switch, dimmer, valve),
+                              (b) what the analogy gets RIGHT,
+                              (c) the concept restated in plain words,
+                              (d) where the analogy BREAKS DOWN (one sentence).
+3. Why it matters             the problem it solves, one line
+4. THEN the mechanism         narrate EVERY symbol in words before/beside the formula
+                              ("1 over 1 plus e-to-the-minus-z" — not a bare glyph); its own visual
+5. When to use it             plain-language pros & cons — the notebook's "When to Use This"
+```
+
+**Warmth & encouragement (sustained, not just the hero):**
+- Voice = a brilliant friend rooting for the reader, never an exam or a textbook. Prefer "let's…", "you", "notice".
+- Normalize confusion: when something is hard, SAY so ("this part trips almost everyone up the first time — that's normal"). Do NOT frame the learner as error-prone.
+- Victory laps: after a hard idea, tell the reader what they just unlocked ("you just discovered why depth needs a bend").
+- Keep required staff/interview depth, but frame it as empowerment ("now you can see why…"), and let it FOLLOW the warm intuition — never lead with "this is the staff-level part" or "say this in an interview" as the concept's opening move.
+
+**Plain language & pace:**
+- Short sentences, one idea each. Break run-ons. Active voice. No idioms.
+- Front-load a Jargon Ladder (`%%% jargon`) glossing every scary term the day uses (saturation, sparsity, XOR, …) BEFORE those terms appear — mirror the notebook's Jargon Buster.
+- Let ideas breathe: a short recap or a one-line "so far…" between big concepts; don't pour them out in one stream.
+
+Mark **P0 (intuition-inverted)** if a concept opens with a formula, a range like `(0,1)`, `max(0,z)`, or notation before the felt picture; if a concept is all mechanism with no analogy and no "why"; if an analogy is given WITHOUT its "where it breaks down" beat; or if the dominant voice is interview/textbook rather than warm-beginner. The inline visual anchors the *intuition*, not the algebra. See repo `CLAUDE.md` §5 (analogy scaffold, simple words, no idioms) and §7 (curiosity hook, normalize confusion, victory laps).
+
 ## Three-layer architecture
 
 ```text

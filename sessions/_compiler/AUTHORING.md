@@ -43,7 +43,7 @@ The file MUST start with a `---` YAML block. Keys:
 | `fin_title` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner heading. |
 | `fin_body` | **required** | `render_fin` | **KeyError if missing** (bracket access). Completion banner body (HTML allowed). |
 | `notebook_yardstick` | optional | notebook_smoothness_gate + coverage_gate | Repo-relative notebook path, or `null`. `null`/absent → both gates return **N/A** (skipped, never fail). |
-| `coverage_topics` | optional | coverage_gate | The in-source coverage checklist. A list whose items are each **a plain string** OR a `{topic: "…", keywords: […]}` mapping. **Overrides** the notebook-headings fallback (see §8). In-source alternative to the module manifest's `coverage.<day>.covers`. |
+| `coverage_topics` | optional | coverage_gate | The in-source **skill-drafted** coverage spec (check A). A list whose items are each **a plain string** OR a `{topic: "…", keywords: […]}` mapping. **Overrides** the manifest `coverage.<day>.covers`. This is the expected-coverage list; the notebook is a separate held-out test (check B), never the spec source (see §7). |
 | `require_artifact` | optional | concept_shell_gate | Defaults to `true`; when true the produce section must contain `experiment.py`. |
 
 `coverage_topics` schema — a topic is COVERED if any of its keywords (default: the topic
@@ -272,25 +272,37 @@ Keep the `spine` word running through the hero and most concepts (gate needs it 
 
 ---
 
-## 7. Notebook → concept-units recipe
+## 7. Coverage is skill-drafted; the notebook is a test
 
-When a `notebook_yardstick` exists:
+**Draft coverage from domain knowledge, not from a notebook.** The concepts a lesson
+must teach come from the topic itself (see `frontier-curriculum-architect` → Coverage
+Spec Rule): core mechanism family, historical ancestor (when it motivates the modern
+form), **every failure mode paired with its remedy**, capability limits, forward-pointers
+(deferred), and out-of-scope items (with a written reason). Record this as the manifest
+`coverage.<day>.covers` (or in-source `coverage_topics`). This works even when no notebook
+exists (JAX, scaling laws).
 
-1. Read the notebook. It is a **yardstick**, not a dependency — the lesson must open
-   at least as smoothly as the notebook's first screen, but it is not a source you
-   must mirror cell-for-cell.
-2. Cluster its cells into topic groups (each group = one idea a reader can hold).
-3. Author **one concept unit per cluster**, in teaching order.
-4. For each unit pick the visual kind: **static `svg`** when the object is a fixed
-   shape (a curve, a diagram); **interactive `viz`** when the point is behavioral
-   (a value moving as you drag).
-5. **Curation is allowed — "named ≠ covered."** If a notebook cell is out of scope for
-   today, defer or omit it rather than forcing a weak unit. **Record every deferral in
-   the module manifest** (`sessions/<module>/_refactor/manifest.yaml`) so coverage is
-   traceable.
+When a `notebook_yardstick` DOES exist it plays two roles, neither of which is "the list
+of what to cover":
 
-When `notebook_yardstick: null`, there is no notebook to match; the smoothness gate is
-N/A. Reference / first-principles modules are the usual `null` case.
+1. **Reader-flow yardstick** — the lesson must open at least as smoothly as the notebook's
+   first screen (Notebook Smoothness Gate). It is not a source you mirror cell-for-cell.
+2. **Held-out coverage test** — the Coverage Gate's check B compares the notebook's
+   concepts to your skill-drafted spec. A notebook concept missing from `covers` /
+   `deferred` / `out_of_scope` is a **SKILL-GAP**: fix the architect skill's derivation,
+   re-draft `covers`, regenerate, re-eval — until the skill reproduces the notebook's
+   concepts without reading it.
+
+Authoring a lesson body from the spec:
+
+1. Turn each `covers` concept into **one concept unit**, in teaching order.
+2. For each unit pick the visual kind: **static `svg`** for a fixed shape (a curve, a
+   diagram); **interactive `viz`** for behavioral content (a value moving as you drag).
+3. Curation is allowed — "named ≠ covered." Defer or scope-out a concept rather than
+   forcing a weak unit, and **record it in the manifest** so coverage stays traceable.
+
+When `notebook_yardstick: null`, there is no notebook; the smoothness gate and check B are
+both N/A, and the skill-drafted spec stands on its own (check A still runs).
 
 ---
 
@@ -344,16 +356,11 @@ Gates that run in concept mode (`mode: concept`):
   hero opens frontier-first, has no human/curiosity cue, or opens on a formula wall.
 
 **Coverage Gate (ADVISORY — never fails the build)**:
-- `notebook_yardstick: null`/absent → **N/A**.
-- Otherwise it builds a topic checklist, by precedence: front-matter `coverage_topics`
-  → module manifest `coverage.<day>.covers` → the notebook's markdown headings. It marks
-  each topic COVERED / DEFERRED / OUT_OF_SCOPE / GAP against the manifest curation and
-  writes an advisory `<day>/_coverage.md` sidecar (it never edits `lesson.html`).
-- The notebook-headings fallback intentionally **over-flags** — chrome headings and
-  wording differences show up as GAPs. To get a **semantic** diff, declare
-  `coverage_topics` in the source (or `coverage.<day>.covers` in the manifest).
-- The gate is advisory: you **drive its status to PASS** by declaring the checklist and
-  recording legitimate curation, but you do **not** have to — it never blocks compilation.
+Principle: **the skills draft coverage; the notebook is a held-out TEST of the skills, never the source of coverage.** (Many topics — JAX, scaling laws — have no notebook at all.) It runs two independent checks and writes an advisory `<day>/_coverage.md` sidecar (it never edits `lesson.html`):
+- **Check A — execution** (always, no notebook needed): does the lesson realize the SKILL-DRAFTED spec? The spec is `coverage_topics` (front-matter), else the manifest `coverage.<day>.covers`. Each spec topic → COVERED / DEFERRED / **EXEC-GAP**. An EXEC-GAP means the builder didn't render a spec item → fix the lesson.
+- **Check B — skill eval** (only when `notebook_yardstick` is set): does the notebook teach a concept the spec never listed / deferred / scoped-out? If so it is a **SKILL-GAP** → the architect skill's coverage-derivation missed it; fix the skill, re-draft `covers`, regenerate, re-eval. Matching is whole-concept and token-aware, so a spec entry `relu` does NOT account for `leaky relu`, and out-of-scope `elu` does NOT swallow `relu`.
+- **N/A** only when there is neither a spec nor a notebook. Where there is no notebook, only check A runs and the skill is trusted (validated by check B on topics that do have notebooks).
+- The gate is advisory: you **drive its status to PASS** by authoring a complete skill-drafted spec and recording legitimate curation, but it never blocks compilation.
 
 ---
 

@@ -70,6 +70,8 @@ Mark P0 if:
 - opening feels task-like or checklist-like,
 - foundation lesson starts engineering-first,
 - first technical term arrives before mental picture,
+- a concept unit opens with a formula / range / notation before its felt intuition (intuition-inverted — see the builder's Beginner Intuition Register),
+- a concept is all mechanism: no analogy, no plain-words "what is it", no "why it matters",
 - analogy is decorative rather than structural,
 - staff/frontier relevance appears before orientation,
 - artifact feels like homework before curiosity,
@@ -181,19 +183,39 @@ For reference / first-principles modules:
 - reader_flow_gate concept branch (on source): hero human-first / no frontier-pressure; every @@@ concept ships a visual (P0 if not); spine word across ≥3 blocks; produce discovery-framed.
 - "concept unit without a visual" and "a concept's picture deferred to a later unit" are P0 for a fresh V9 build.
 
-### Coverage feedback loop (advisory)
+### Coverage feedback loop (advisory) — skills are the source, the notebook is a test
 
-`coverage_gate` (concept mode, after notebook_smoothness) compares the compiled lesson to its `notebook_yardstick`'s topic checklist and classifies each topic COVERED / DEFERRED / OUT_OF_SCOPE / GAP. It is **ADVISORY** — it never changes `sok`, never fails the build, and writes only a `<day>/_coverage.md` sidecar (never edits `lesson.html`). `N/A` when there is no yardstick.
+`coverage_gate` (concept mode, after notebook_smoothness) is **ADVISORY**: it never changes `sok`, never fails the build, and writes only a `<day>/_coverage.md` sidecar (never edits `lesson.html`). Its design principle: **the skills draft coverage; the notebook is a held-out test of the skills, never the source of coverage.** It runs two independent checks:
 
-When it flags a **GAP** (a notebook topic the lesson does not cover and the manifest has not curated), route it:
+- **Check A — execution.** Does the lesson realize the SKILL-DRAFTED spec (`coverage_topics`, else manifest `coverage.<day>.covers`)? Each spec topic is COVERED / DEFERRED / **EXEC-GAP**. Runs always — no notebook needed (this is what covers JAX-style topics).
+- **Check B — skill eval.** Only where a `notebook_yardstick` exists. Does the notebook teach a concept the spec never listed / deferred / scoped-out? If so it is a **SKILL-GAP** — the skill's coverage-derivation (architect Coverage Spec Rule) missed a concept the world considers part of this topic. Where there is no notebook, check B is N/A and the skill is trusted (having been validated by check B where notebooks do exist).
 
-- **(a) real in-scope gap** → fix the lesson: add a concept unit or visual that teaches it, then recompile.
-- **(b) systemic / format defect** (would recur across modules) → fix the relevant `frontier-*` skill, not just this lesson.
-- **(c) legitimate curation** (topic belongs on another day, or is out of scope) → record it in the module manifest `coverage.<day>.deferred` (`topic: where`) or `coverage.<day>.out_of_scope`. That clears the flag on the next run — do NOT edit the lesson to silence it.
+Route each finding:
 
-`coverage.<day>.covers` is the author-declared checklist when the source has no `coverage_topics`; keep it accurate. Never treat an ADVISORY status as a blocker.
+- **EXEC-GAP** (spec says teach it, lesson doesn't) → fix the **lesson / builder**: add the concept unit or visual, recompile.
+- **SKILL-GAP** (notebook teaches it, spec missed it) → fix the **architect skill's Coverage Spec Rule** (add the missing derivation step — e.g. "for every failure mode, its remedy"), then **re-draft `covers`, regenerate the lesson, and re-eval**. Do NOT just paste the topic into `covers` for this one day — that patches the symptom and leaves the skill (and every future module) broken. Loop until the skill-drafted spec reproduces the notebook's concepts without reading it.
+- **Legitimate curation** (belongs on another day / genuinely out of scope) → record in manifest `coverage.<day>.deferred` (`topic: where`) or `coverage.<day>.out_of_scope` (with a written reason). Never edit the lesson to silence a flag. `out_of_scope` is contestable — a concept that is the remedy for a failure the lesson teaches can never be out_of_scope.
 
-Notebook-heading GAPs are mostly chrome / wording, not real gaps — make the diff semantic by declaring in-source `coverage_topics` or manifest `coverage.<day>.covers`; the gate is advisory (drive it to PASS, it never blocks the build).
+Never treat an ADVISORY status as a blocker. `coverage.<day>.covers` is the author-declared spec when the source has no `coverage_topics`; it is skill-drafted per the architect Coverage Spec Rule — keep it accurate.
+
+### Two tiers of coverage judgment
+
+- **Tier-1 (deterministic, offline):** `gates/coverage_gate.py` — fast substring/token pre-filter. Always available (no bridge), advisory. Good for check A execution and a rough check B. Cannot tell "genuinely TAUGHT" from "mentioned", or a concept from an analogy label.
+- **Tier-2 (LLM judge, authoritative):** `gates/coverage_judge.py` — an LLM sub-agent (local keyless bridge, graceful fallback to tier-1 if unreachable) with TWO judges: (1) a **coverage** judge — per concept execution (TAUGHT / MENTIONED / ABSENT), skill_gaps (notebook concepts the spec missed), and per-concept intuition-first; and (2) a **beginner-friendliness (tone) judge** that grades the lesson *against the notebook as the gold standard* on warmth / analogy_quality (full scaffold incl. "where it breaks down") / intuition_depth / plain_language / curiosity / pace, returning per-dimension deltas + concrete fixes and an overall MATCHES_NOTEBOOK | BELOW_NOTEBOOK verdict. Coverage being clean is necessary but NOT sufficient — a lesson can cover everything and still read cold and dense; drive the tone judge to MATCHES_NOTEBOOK. Run both after a (re)build:
+  `python3 sessions/_compiler/gates/coverage_judge.py <lesson.html> --source <source.md>`
+
+### Coverage Review Workflow (skill-defined sub-agents)
+
+The reusable, skill-driven review pipeline lives at `sessions/_compiler/workflows/coverage_review.js` (run with the Workflow tool; reusable for ANY module via `args {topic, source, lesson, notebook}`). It is **read-only** — it drafts/judges/reports; it never writes lessons or skills (fixes are applied separately, one file at a time, to avoid tone drift). Its sub-agents:
+
+- **spec-drafter (blind)** — given ONLY the architect Coverage Spec Rule and the topic (NOT the notebook), drafts `covers`/`deferred`/`out_of_scope` from domain knowledge. Reproducing the notebook's concepts here — blind — is the proof the skill drives coverage.
+- **test-oracle** — reads the notebook and lists the concepts it teaches (chrome/analogy filtered).
+- **coverage-judge (LLM)** — uses TWO references, not one: it judges **execution + intuition** against the **committed manifest spec** (`coverage.<day>.covers`), and judges **skill-completeness** by comparing the **blind-drafted** spec to the oracle (→ **skill_gaps**). A concept the committed manifest already defers/scopes-out is NOT a skill gap even if the blind draft under-enumerated it — the skill merely under-listed a correctly-deferred long-tail. Verdict PASS iff exec_gaps is empty and every skill_gap is genuinely un-curated.
+- **synthesizer** — routes: genuine skill_gaps → fix the architect Coverage Spec Rule (re-draft, regenerate, re-eval); exec/intuition → fix the builder/lesson.
+
+Do NOT chase a specific notebook's long tail into the skill (e.g. an activation notebook's whole softmax chapter — temperature, log/sampled/hierarchical softmax, calibration, distillation). Those are correctly deferred to the day that owns them; forcing them into every day's skill-draft bloats the rule. Convergence = the blind draft reproduces the CORE coverage (family, ancestor, failure+cause+remedy, capability limit) and the committed lesson is clean on both tiers.
+
+When there is no notebook (JAX, scaling laws), the oracle/skill-gap phase is N/A and the workflow judges execution + intuition only; the blind-drafted spec stands on its own.
 
 Spec: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
 The older `sessions/_refactor/v8_source_first_authoring_plan.md` documents historical/obsolete
