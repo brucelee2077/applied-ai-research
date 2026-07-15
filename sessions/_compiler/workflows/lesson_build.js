@@ -168,7 +168,10 @@ const report = [
   ``,
   `- Converged: ${converged}  (rounds: ${round}/${MAX_ROUNDS})`,
   `- Final compile: exit ${compileRes.exit_code}, ${compileRes.concept_count || '?'} concepts`,
-  `- Residual P0 (if any): ${routing ? routing.p0.length : 'n/a'}`,
+  !compileRes.compiled
+    ? `\n## Hard-gate blocker (lesson never compiled — the LLM judge panel did NOT run)\n\`\`\`\n${(compileRes.gate_output || '(no gate output captured)').slice(-2000)}\n\`\`\``
+    : '',
+  `- Residual P0 (if any): ${routing ? routing.p0.length : 'n/a (lesson never compiled)'}`,
   routing && routing.p0.length ? `\n## Residual findings\n${routing.p0.map(f => `- [${f.severity}/${f.lens}] ${f.kind}: ${f.why}`).join('\n')}` : `\n(no residual P0)`,
   skillProposal ? `\n## Skill-gap proposal (needs your approval)\n${skillProposal.rationale}\n\n\`\`\`diff\n${skillProposal.proposal_diff}\n\`\`\`` : `\n(no skill-gap proposals)`,
 ].join('\n')
