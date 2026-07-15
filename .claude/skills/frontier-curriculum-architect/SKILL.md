@@ -104,8 +104,14 @@ To draft `covers` for a topic, enumerate — from what the topic *is*, not from 
                              (step function → why we moved to smooth / valve bends)
 3. Failure → CAUSE + REMEDY  for EVERY failure you teach, name BOTH what triggers it
                              AND its fix. Symptom without cause is an incomplete spec.
+                             When the fix is a NAMED technique (not just a knob), the
+                             technique itself becomes its own covers topic — a prose
+                             remedy phrase ("sensible init") does not count as covering
+                             the named method it stands for. Enumerate the method the
+                             beginner will actually hear.
                              dead ReLU (cause: too-large LR shoves the unit permanently
-                             negative) → Leaky ReLU / GELU; vanishing gradient (cause:
+                             negative) → He init (the sensible default for ReLU nets) /
+                             Leaky ReLU / GELU; vanishing gradient (cause:
                              saturating slopes multiply toward 0) → ReLU / normalization.
 4. Capability limit          what the mechanism CANNOT do
                              (a single neuron → XOR / linear separability)
