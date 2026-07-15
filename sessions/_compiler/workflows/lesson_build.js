@@ -72,7 +72,7 @@ Follow the authoring grammar in sessions/_compiler/AUTHORING.md EXACTLY (mode: c
 Follow .claude/skills/frontier-lesson-builder and -visual-evidence-builder: every concept unit = intuition + analogy (WITH where it breaks down) -> its OWN inline visual -> step-by-step build-up. Beginner voice (repo CLAUDE.md §5/§7).
 Coverage to realize (committed manifest is authoritative; this blind draft is guidance):
 ${JSON.stringify(draft, null, 2)}
-Write the FULL source.md, then compile and report:
+Write source.md INCREMENTALLY — do NOT compose the whole lesson silently and write it in one shot (that stalls the agent on dense days). Instead: FIRST create ${source} with the front-matter + the @@@ hero block, THEN append each @@@ concept unit one at a time with repeated edits, THEN append @@@ quiz / @@@ produce / @@@ fin. Keep making steady tool-call progress. When the file is complete, compile and report:
   python3 sessions/_compiler/compile_lesson.py ${source}
 Also run: python3 sessions/_compiler/gates/concept_structure_gate.py ${source}
 Return: wrote_source; compiled = TRUE only if BOTH commands exit 0 (if EITHER compile_lesson.py OR concept_structure_gate.py fails, set compiled=false and put both outputs in gate_output); compile_exit_code (compile_lesson.py's); gate_output (tail of BOTH commands); concept_count.${findingsBlock}`,
