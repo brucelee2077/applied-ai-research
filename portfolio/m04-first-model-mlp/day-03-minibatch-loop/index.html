@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The mini-batch loop: why a falling training loss is evidence of an optimizer, not a model</title>
+<style>body{max-width:820px;margin:2rem auto;padding:0 1rem;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1c2530}pre{background:#0f172a;color:#e2e8f0;padding:1rem;border-radius:8px;overflow:auto}code{font-family:ui-monospace,Menlo,monospace}p code,li code{background:#eef2f7;padding:.1em .3em;border-radius:4px}img,iframe{max-width:100%;border:1px solid #d9e0e8;border-radius:8px}iframe{width:100%;height:520px}h2.repro{margin-top:2.5rem;border-top:1px solid #d9e0e8;padding-top:1.5rem}</style></head><body>
+<article>
+<h1>The mini-batch loop: why a falling training loss is evidence of an optimizer, not a model</h1>
+<p>Day 2 produced a corrector — a forward pass that guesses, a backward pass that hands back one gradient per weight. That was a single correction on a single batch. The engineering content of Day 3 is small to state and large in consequence: put that correction inside a loop over the data, and for the first time the training loss *moves*. The interesting claim for a staff-level reader is not &quot;the loss falls&quot; — it is that a falling <strong>training</strong> loss is a fact about the *optimizer*, and says almost nothing about the *model*. This note builds a real NumPy mini-batch loop (no autograd, no framework), drives the training loss down, and then breaks it three ways to show what the loss curve does and does not license you to conclude. Every number below comes from <code>experiment.py</code>, seeded, float64, on a 3-class problem with heavily overlapping clouds (mean spread 1.0, noise std 3.0) so the loss cannot trivially collapse to zero.</p>
+<h2>The mechanism: four steps on repeat, over shuffled slices</h2>
+<p>The loop reuses the Day 1-2 forward and backward passes verbatim. The only new code is the control flow around them:</p>
+<pre><code>for epoch in range(epochs):
+    idx = rng.permutation(N)              # shuffle the INDICES every epoch
+    for start in range(0, N, batch_size): # slice into consecutive chunks
+        b  = idx[start:start+batch_size]   # this batch (the LAST one may be ragged)
+        loss, cache = forward(p, X[b], Y[b])          # guess
+        grads = backward(p, X[b], Y[b], cache, &quot;mean&quot;) # which way (averaged)
+        p = p - lr * grads                            # one step</code></pre>
+<p>The vocabulary is exact arithmetic, not hand-waving. For the lesson&#x27;s canonical case, <code>N = 60,000</code>, <code>batch_size = 32</code> gives <code>60,000 // 32 = 1,875</code> iterations per epoch, and it divides evenly. This experiment deliberately uses a size that does *not* divide evenly:</p>
+<pre><code>this run : N=1000, batch_size=32 -&gt; 31 full batches + 1 ragged batch of 8 = 32 iterations/epoch
+batch sizes sum back to N : 1000 == 1000  -&gt; OK (leftovers still train)</code></pre>
+<p>The <strong>ragged final batch</strong> of 8 is the wrinkle worth naming: a loop that hard-codes <code>batch_size</code> anywhere (a reshape to <code>(32, ...)</code>, a divide by a literal <code>32</code>) either crashes or silently computes wrong numbers on that last short batch. The <code>31 full + 1 ragged of 8 = 32</code> sizes summing back to exactly <code>1000</code> is the check that the leftovers are not dropped.</p>
+<p>Run the loop and the training loss falls hard. The per-batch loss inside a single epoch is bumpy (that is the mini-batch gradient noise — <code>min=2.478, max=13.625</code> in epoch 1 alone), but the per-epoch mean trends cleanly down:</p>
+<pre><code>epoch  1: 6.8972
+epoch  5: 2.8106
+epoch 10: 1.3641
+epoch 20: 0.3901
+epoch 40: 0.0025</code></pre>
+<p>From <code>6.8972</code> to <code>0.0025</code> — a drop of <code>6.8947</code>, and far below the uniform-guess baseline of <code>ln 3 = 1.0986</code>. That is the first live proof the whole Day 1-2 machinery connects and learns. It is also the last honest thing the training loss tells you on its own.</p>
+<h2>Failure mode 1: forgetting to shuffle sorted data — silent, no crash</h2>
+<p>Sort the data by label (<code>000...111...222</code>) and run the identical optimizer with <code>shuffle=False</code>. Nothing throws. But now every batch of 32 is almost entirely one class, so consecutive batches yank the weights toward one class and then another. The signal is real and measurable:</p>
+<pre><code>final training loss  shuffled=0.0025   un-shuffled(sorted)=0.4971
+within-epoch-1 batch-loss swing (max-min)  shuffled=11.147   un-shuffled(sorted)=18.133</code></pre>
+<p>The sorted run&#x27;s within-epoch batch loss swings wider (<code>18.133</code> vs <code>11.147</code> in epoch 1 — single-class batches whipsaw the weights), and it settles at a final training loss of <code>0.4971</code> against the shuffled run&#x27;s <code>0.0025</code> — <strong>196x higher</strong>, with no exception, no NaN, no shape error. This is the canonical *silent* bug: a suspiciously jerky loss on data that happens to be sorted is a data-ordering smell, not a learning-rate problem. The fix is to shuffle the indices every epoch — not to fiddle with the step size. A staff engineer who reaches for <code>lr</code> first here wastes hours; the tell is that the loss is jerky *and* the data was never shuffled.</p>
+<h2>Failure mode 2: summing the batch gradient makes batch_size a hidden lr</h2>
+<p>When you reduce the per-example loss and gradient over a batch, you take the <strong>mean</strong>, not the sum. This is a one-word change in code (<code>/ B</code> versus <code>/ 1</code>) and a large change in behavior, because it couples the effective step size to <code>batch_size</code>. Summing makes the gradient roughly <code>batch_size</code> times larger, so at the same nominal learning rate the *real* step is <code>~32x</code> too big:</p>
+<pre><code>MEAN gradient (correct): epoch losses = [6.897, 4.278, 4.423, 2.729, 2.811]
+SUM  gradient (bug)    : epoch losses = [16.906, 17.711, 17.47, 18.08, 17.208]</code></pre>
+<p>With the mean, <code>lr = 0.1</code> converges (<code>6.897 -&gt; 2.811</code> over five epochs). With the sum — same <code>lr</code>, same data, same seed — the loss *diverges* and sticks around <code>17</code>, because the effective step overshoots the valley every time. The consequence for the engineer: if you sum, your learning rate silently becomes a function of your batch size, so the moment you change <code>batch_size</code> (say to fit memory) your previously-tuned <code>lr</code> breaks. Taking the mean keeps <code>lr</code> a clean, orthogonal knob you can tune once and reuse across batch sizes. That decoupling is the entire reason the convention exists.</p>
+<h2>Design trade-off: the batch_size dial — noise versus frequency versus memory</h2>
+<p><code>batch_size</code> is the dial that sets where you sit between the two ancestors of mini-batch descent. Full-batch (all <code>N</code>) gives an exact, smooth gradient but only *one* update per pass over the data — on 60,000 images that is one step per epoch, and it must hold all <code>N</code> examples&#x27; activations in memory at once. Single-example SGD (<code>batch_size = 1</code>) updates <code>N</code> times per epoch but each gradient is a noisy one-example estimate. Mini-batch averages a handful: in this run, 32 examples of evidence per step instead of 1, which is why the per-epoch mean trends down smoothly even though the per-batch loss swings between <code>2.478</code> and <code>13.625</code>.</p>
+<p>The trade-off has a sharp edge that the noise is not purely a cost: small batches give a shakier gradient *and often generalize better*, because the jitter knocks weights out of sharp minima. Large batches give a smoother, more accurate gradient but fewer updates per epoch and higher memory. In practice <code>32</code>-<code>256</code> is the sweet spot. The important staff-level point is that <code>batch_size</code> and <code>lr</code> are coupled through the reduction: only because we take the *mean* can we treat them as separable at all.</p>
+<h2>The ceiling: a low training loss is not a good model</h2>
+<p>Here is the claim that matters most, and the one the loss curve cannot make on its own. Train the same architecture longer (200 epochs, a wide 256-unit hidden layer, only 1000 training points) and then measure the loss on 4000 held-out points drawn from the *same distribution* the model never trained on:</p>
+<pre><code>TRAINING  loss (data it practiced on) = 0.0003
+HELD-OUT  loss (data it never saw)    = 4.5263
+gap (held-out - train)                = +4.5260</code></pre>
+<p>The loop did exactly what a loop does: it drove the <strong>training</strong> loss to <code>0.0003</code>, essentially zero. And the model is <strong>17,732x worse</strong> on unseen data. The mini-batch loop is an *optimization procedure* — a machine for driving the training loss down — and that is *all* it is. A perfectly-wired loop with a near-zero training loss can be a badly overfit model that memorized 1000 noisy points. The training loss alone gives you no way to tell the difference; both a great model and a memorizing one show a falling training loss. The <code>+4.5260</code> gap is invisible until you hold out data and measure it. This is why &quot;our training loss is going down&quot; is not a claim that survives a design review, and why the very next step is a train/validation split.</p>
+<h2>What this evidence shows and does not show</h2>
+<p>It shows a from-scratch mini-batch loop drives the training loss <code>6.8972 -&gt; 0.0025</code> (it learns); that dropping the shuffle on sorted data silently costs <code>196x</code> in final training loss with no crash; that summing instead of averaging the gradient turns a converging run (<code>-&gt; 2.811</code>) into a diverging one (<code>~17</code>) at the same <code>lr</code>; and that a training loss of <code>0.0003</code> coexists with a held-out loss of <code>4.5263</code> — the overfitting gap the loop is blind to. It does *not* show how to close that gap: measuring generalization needs the held-out split, and shrinking it needs regularization (dropout, weight decay) — both of which belong to the training-loop days that follow. The habit to carry forward is the discipline of distrust: a falling training loss earns you the right to believe your loop is wired, and nothing more.</p>
+</article>
+<figure><img src="assets/minibatch_loss_curves.png" alt="minibatch_loss_curves.png"></figure>
+<iframe src="assets/gradient-descent.html" title="gradient-descent.html" loading="lazy"></iframe>
+<h2 class="repro">Reproducible experiment</h2>
+<h3>experiment.py</h3>
+<pre><code>#!/usr/bin/env python3
+&quot;&quot;&quot;
+Evidence for M5 Day 3 — &quot;The Mini-Batch Training Loop&quot;.
+
+ONE concrete claim, made falsifiable:
+
+  Wrapping the Day 1-2 forward+backward MLP inside a mini-batch loop -- shuffle,
+  slice into batches of `batch_size` (incl. the ragged final batch), average the
+  gradient over each batch, take one step -- makes the TRAINING loss actually
+  fall. But a falling training loss is an optimization fact, NOT a proof the
+  model is good: the SAME run, measured on held-out data, tells a different
+  story (the train/held-out gap = overfitting).
+
+We back it up four ways, all from a real NumPy MLP (no autograd, no framework):
+
+  (1) The vocabulary arithmetic is real: iterations_per_epoch = ceil(N/batch),
+      and with a ragged final batch the batch sizes sum back to exactly N.
+  (2) Shuffled mini-batch loop: per-epoch mean training loss trends DOWN.
+  (3) Un-shuffled, label-sorted loop: SAME optimizer, SAME data -- but each
+      batch is one class, so it learns worse (higher final loss, jerkier).
+  (4) Mean-vs-sum: summing the batch gradient silently scales the step with
+      batch_size (a 32x-too-large step here) -&gt; the loss diverges, while the
+      mean keeps the same learning rate working. batch_size is NOT a step-size.
+
+Then the ceiling: the shuffled model&#x27;s TRAINING loss falls far below its
+HELD-OUT loss -- low training loss did not buy generalization.
+
+Self-contained script (NOT a notebook), so savefig() into assets/ is allowed.
+Everything is seeded, so the printed numbers are reproducible. float64 so the
+losses are not swamped by float32 round-off.
+&quot;&quot;&quot;
+
+import os
+import math
+import numpy as np
+
+import matplotlib
+matplotlib.use(&quot;Agg&quot;)  # headless backend -- no display in the sandbox
+import matplotlib.pyplot as plt
+
+RNG = np.random.default_rng(0)  # seed everything so the run is reproducible
+HERE = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(HERE, &quot;assets&quot;)
+os.makedirs(ASSETS, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# A small, real classification task the loop can learn but NOT perfectly: the
+# class clouds OVERLAP heavily (noise ~ 3x the class-mean spread), so the Bayes
+# floor is well above zero. This matters -- if the task were trivially separable
+# the loss would collapse to 0 and every failure mode below would be invisible.
+# Small train set + wide net =&gt; the model can memorize the train points and open
+# a real train/held-out gap (the c8 ceiling).
+#   N_TRAIN is deliberately NOT a multiple of batch_size (=&gt; ragged final batch).
+# ---------------------------------------------------------------------------
+N_IN, N_HID, N_OUT = 20, 256, 3
+N_TRAIN = 1000          # 1000 / 32 = 31 full batches + a ragged batch of 8
+N_HELD = 4000           # large held-out set for a stable generalization estimate
+
+
+# One shared data-generating process for train + held-out (same distribution).
+# Overlapping clouds: mean spread 1.0, noise std 3.0 -&gt; classes bleed together.
+_DATA_RNG = np.random.default_rng(1)
+_MEANS = _DATA_RNG.standard_normal((N_OUT, N_IN)) * 1.0
+
+
+def sample(n, rng):
+    y = rng.integers(0, N_OUT, size=n)
+    x = _MEANS[y] + rng.standard_normal((n, N_IN)) * 3.0   # heavy overlap
+    y_oh = np.zeros((n, N_OUT))
+    y_oh[np.arange(n), y] = 1.0
+    return x, y, y_oh
+
+
+Xtr, ytr, Ytr = sample(N_TRAIN, np.random.default_rng(2))
+Xho, yho, Yho = sample(N_HELD, np.random.default_rng(3))
+
+
+# ---------------------------------------------------------------------------
+# The Day 1-2 MLP: forward pass (cached), analytic backward pass. Unchanged.
+# ---------------------------------------------------------------------------
+def init_params(rng):
+    return {
+        &quot;W1&quot;: rng.standard_normal((N_IN, N_HID)) * math.sqrt(2.0 / N_IN),  # He init
+        &quot;b1&quot;: np.zeros(N_HID),
+        &quot;W2&quot;: rng.standard_normal((N_HID, N_OUT)) * math.sqrt(2.0 / N_HID),
+        &quot;b2&quot;: np.zeros(N_OUT),
+    }
+
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)             # subtract max for stability
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def forward(p, x, y_oh):
+    z1 = x @ p[&quot;W1&quot;] + p[&quot;b1&quot;]                        # (B, N_HID) pre-activation
+    h = np.maximum(0.0, z1)                           # ReLU hidden activations
+    logits = h @ p[&quot;W2&quot;] + p[&quot;b2&quot;]                    # (B, N_OUT) class scores
+    probs = softmax(logits)
+    # MEAN cross-entropy over the batch: the average, not the sum (see reduce=)
+    loss = -np.mean(np.sum(y_oh * np.log(probs + 1e-12), axis=1))
+    return loss, (z1, h, probs)
+
+
+def backward(p, x, y_oh, cache, reduce=&quot;mean&quot;):
+    &quot;&quot;&quot;Analytic gradient. reduce=&#x27;mean&#x27; divides by B (the correct, batch-size-
+    independent step). reduce=&#x27;sum&#x27; does NOT -- the gradient then grows with the
+    batch, silently scaling the effective step size (the c6 failure mode).&quot;&quot;&quot;
+    z1, h, probs = cache
+    B = x.shape[0]
+    denom = B if reduce == &quot;mean&quot; else 1              # &lt;-- mean vs sum is this one line
+    dlogits = (probs - y_oh) / denom                  # (B, N_OUT)
+    dW2 = h.T @ dlogits
+    db2 = dlogits.sum(axis=0)
+    dh = dlogits @ p[&quot;W2&quot;].T
+    dz1 = dh * (z1 &gt; 0)                                # ReLU gate (Day 2)
+    dW1 = x.T @ dz1
+    db1 = dz1.sum(axis=0)
+    return {&quot;W1&quot;: dW1, &quot;b1&quot;: db1, &quot;W2&quot;: dW2, &quot;b2&quot;: db2}
+
+
+def sgd_step(p, grads, lr):
+    for k in p:
+        p[k] = p[k] - lr * grads[k]                   # param = param - lr * grad
+
+
+# ---------------------------------------------------------------------------
+# The mini-batch training loop -- the whole point of today.
+# ---------------------------------------------------------------------------
+def train(X, Y, epochs, batch_size, lr, shuffle=True, reduce=&quot;mean&quot;, seed=10):
+    &quot;&quot;&quot;Returns (params, per_epoch_mean_loss, per_batch_loss_first_epoch).&quot;&quot;&quot;
+    p = init_params(np.random.default_rng(seed))
+    n = X.shape[0]
+    epoch_losses, first_epoch_batch_losses = [], []
+    rng = np.random.default_rng(seed + 100)
+    for e in range(epochs):
+        # shuffle the INDICES at the start of every epoch (or don&#x27;t, for contrast)
+        idx = rng.permutation(n) if shuffle else np.arange(n)
+        batch_losses = []
+        # slice into consecutive chunks of batch_size -- the LAST one may be ragged
+        for start in range(0, n, batch_size):
+            b = idx[start:start + batch_size]         # this batch&#x27;s indices
+            xb, yb = X[b], Y[b]
+            loss, cache = forward(p, xb, yb)          # forward: guess
+            grads = backward(p, xb, yb, cache, reduce=reduce)  # backward: which way
+            sgd_step(p, grads, lr)                    # update: one step
+            batch_losses.append(loss)
+        epoch_losses.append(float(np.mean(batch_losses)))
+        if e == 0:
+            first_epoch_batch_losses = batch_losses
+    return p, epoch_losses, first_epoch_batch_losses
+
+
+def eval_loss(p, X, Y):
+    return float(forward(p, X, Y)[0])
+
+
+# ===========================================================================
+# (1) The vocabulary is real arithmetic, including the ragged final batch.
+# ===========================================================================
+BATCH = 32
+print(&quot;=&quot; * 70)
+print(&quot;(1) VOCABULARY  (epoch / iteration / batch / batch_size)&quot;)
+print(&quot;=&quot; * 70)
+# Textbook case from the lesson: N = 60,000, batch_size = 32.
+N_LESSON = 60_000
+iters_lesson = N_LESSON // BATCH
+print(f&quot;lesson case : N={N_LESSON:,}, batch_size={BATCH} &quot;
+      f&quot;-&gt; iterations/epoch = {N_LESSON:,}//{BATCH} = {iters_lesson:,}  &quot;
+      f&quot;(exact: {N_LESSON % BATCH == 0})&quot;)
+# This experiment&#x27;s data: N is NOT divisible by 32 -&gt; a ragged final batch.
+full = N_TRAIN // BATCH
+ragged = N_TRAIN % BATCH
+iters_here = math.ceil(N_TRAIN / BATCH)
+sizes = [BATCH] * full + ([ragged] if ragged else [])
+print(f&quot;this run    : N={N_TRAIN}, batch_size={BATCH} &quot;
+      f&quot;-&gt; {full} full batches + 1 ragged batch of {ragged} &quot;
+      f&quot;= {iters_here} iterations/epoch&quot;)
+print(f&quot;batch sizes sum back to N : {sum(sizes)} == {N_TRAIN}  &quot;
+      f&quot;-&gt; {&#x27;OK (leftovers still train)&#x27; if sum(sizes) == N_TRAIN else &#x27;MISMATCH&#x27;}&quot;)
+print()
+
+
+# ===========================================================================
+# (2) Shuffled mini-batch loop: the training loss actually falls.
+# ===========================================================================
+EPOCHS, LR = 40, 0.1
+print(&quot;=&quot; * 70)
+print(&quot;(2) SHUFFLED mini-batch loop -- does the training loss fall?&quot;)
+print(&quot;=&quot; * 70)
+p_shuf, loss_shuf, batch0 = train(Xtr, Ytr, EPOCHS, BATCH, LR, shuffle=True)
+print(f&quot;per-batch loss WITHIN epoch 1 is bumpy: &quot;
+      f&quot;first 5 = {[round(v, 3) for v in batch0[:5]]}, &quot;
+      f&quot;min={min(batch0):.3f}, max={max(batch0):.3f}&quot;)
+print(f&quot;per-EPOCH mean training loss (should trend down):&quot;)
+for e in [0, 4, 9, 19, EPOCHS - 1]:
+    print(f&quot;    epoch {e + 1:&gt;2}: {loss_shuf[e]:.4f}&quot;)
+print(f&quot;loss[0]={loss_shuf[0]:.4f} -&gt; loss[-1]={loss_shuf[-1]:.4f}  &quot;
+      f&quot;(dropped {loss_shuf[0] - loss_shuf[-1]:.4f}; &quot;
+      f&quot;{&#x27;TRENDS DOWN&#x27; if loss_shuf[-1] &lt; loss_shuf[0] else &#x27;DID NOT FALL&#x27;})&quot;)
+print(f&quot;uniform-guess baseline = ln({N_OUT}) = {math.log(N_OUT):.4f}  &quot;
+      f&quot;(final loss is {&#x27;below&#x27; if loss_shuf[-1] &lt; math.log(N_OUT) else &#x27;above&#x27;} it)&quot;)
+print()
+
+
+# ===========================================================================
+# (3) Un-shuffled, label-sorted data: SAME optimizer learns worse. (c5)
+# ===========================================================================
+print(&quot;=&quot; * 70)
+print(&quot;(3) NO SHUFFLE on LABEL-SORTED data -- silent failure, no crash&quot;)
+print(&quot;=&quot; * 70)
+order = np.argsort(ytr, kind=&quot;stable&quot;)               # sort by label: 000..111..222
+Xsorted, Ysorted = Xtr[order], Ytr[order]
+p_sorted, loss_sorted, batch0_sorted = train(
+    Xsorted, Ysorted, EPOCHS, BATCH, LR, shuffle=False)
+# within-epoch-1 swing: sorted batches are single-class, so batch loss whipsaws
+swing_shuf = max(batch0) - min(batch0)
+swing_sorted = max(batch0_sorted) - min(batch0_sorted)
+print(f&quot;final training loss  shuffled={loss_shuf[-1]:.4f}   &quot;
+      f&quot;un-shuffled(sorted)={loss_sorted[-1]:.4f}&quot;)
+print(f&quot;within-epoch-1 batch-loss swing (max-min)  &quot;
+      f&quot;shuffled={swing_shuf:.3f}   un-shuffled(sorted)={swing_sorted:.3f}&quot;)
+print(f&quot;nothing crashed -- the sorted run just LEARNS WORSE: final training loss &quot;
+      f&quot;{loss_sorted[-1] - loss_shuf[-1]:+.4f} vs shuffled &quot;
+      f&quot;({loss_sorted[-1] / max(loss_shuf[-1], 1e-9):.0f}x higher).&quot;)
+print()
+
+
+# ===========================================================================
+# (4) MEAN vs SUM: summing the batch gradient makes batch_size a hidden lr. (c6)
+# ===========================================================================
+print(&quot;=&quot; * 70)
+print(&quot;(4) MEAN vs SUM reduction -- same lr, same data, one word changed&quot;)
+print(&quot;=&quot; * 70)
+_, loss_mean, _ = train(Xtr, Ytr, 5, BATCH, LR, shuffle=True, reduce=&quot;mean&quot;)
+_, loss_sum, _ = train(Xtr, Ytr, 5, BATCH, LR, shuffle=True, reduce=&quot;sum&quot;)
+print(f&quot;MEAN gradient (correct): epoch losses = {[round(v, 3) for v in loss_mean]}&quot;)
+sum_str = [(&quot;inf&quot; if not np.isfinite(v) else round(v, 3)) for v in loss_sum]
+print(f&quot;SUM  gradient (bug)    : epoch losses = {sum_str}&quot;)
+mean_ok = loss_mean[-1] &lt; loss_mean[0]
+sum_bad = (not np.isfinite(loss_sum[-1])) or (loss_sum[-1] &gt; loss_sum[0])
+print(f&quot;with SUM the effective step is ~batch_size ({BATCH}x) too large at the &quot;
+      f&quot;same lr={LR} -&gt; {&#x27;DIVERGES&#x27; if sum_bad else &#x27;ok&#x27;}; &quot;
+      f&quot;MEAN {&#x27;converges&#x27; if mean_ok else &#x27;stalls&#x27;}. &quot;
+      f&quot;batch_size must NOT be a hidden step-size.&quot;)
+print()
+
+
+# ===========================================================================
+# (5) THE CEILING: a falling TRAINING loss does not prove a good model. (c8)
+# ===========================================================================
+print(&quot;=&quot; * 70)
+print(&quot;(5) THE CEILING -- train the loss down, then measure held-out data&quot;)
+print(&quot;=&quot; * 70)
+# Train a slightly over-capacity net long enough to open a train/held-out gap.
+p_over, loss_over, _ = train(
+    Xtr, Ytr, epochs=200, batch_size=BATCH, lr=0.3, shuffle=True, seed=42)
+train_final = loss_over[-1]
+held_final = eval_loss(p_over, Xho, Yho)
+gap = held_final - train_final
+print(f&quot;after 200 epochs:&quot;)
+print(f&quot;    TRAINING  loss (data it practiced on) = {train_final:.4f}&quot;)
+print(f&quot;    HELD-OUT  loss (data it never saw)    = {held_final:.4f}&quot;)
+print(f&quot;    gap (held-out - train)                = {gap:+.4f}&quot;)
+print(f&quot;the loop drove the TRAINING loss to {train_final:.4f}, yet the model is &quot;
+      f&quot;{held_final / max(train_final, 1e-9):.1f}x worse on unseen data.&quot;)
+print(f&quot;=&gt; a low training loss proves the LOOP optimizes, not that the MODEL is &quot;
+      f&quot;good. Measuring that needs held-out data (Day 4).&quot;)
+print()
+
+
+# ---------------------------------------------------------------------------
+# Plot: the whole story on one canvas.
+#   left  -- shuffled vs un-shuffled per-epoch training loss (the loop learns;
+#            sorted data learns worse).
+#   right -- training vs held-out loss over the long over-fit run (the gap).
+# ---------------------------------------------------------------------------
+fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.2))
+
+axL.plot(range(1, EPOCHS + 1), loss_shuf, &quot;-o&quot;, ms=3, color=&quot;#2D8B55&quot;,
+         label=&quot;shuffled (correct)&quot;)
+axL.plot(range(1, EPOCHS + 1), loss_sorted, &quot;--s&quot;, ms=3, color=&quot;#C99A12&quot;,
+         label=&quot;un-shuffled, label-sorted&quot;)
+axL.axhline(math.log(N_OUT), color=&quot;#8A6D3B&quot;, ls=&quot;:&quot;, lw=1,
+            label=f&quot;uniform-guess = ln {N_OUT}&quot;)
+axL.set_xlabel(&quot;epoch&quot;)
+axL.set_ylabel(&quot;mean training loss&quot;)
+axL.set_title(&quot;The loop learns -- and shuffling matters&quot;)
+axL.legend(fontsize=8)
+axL.grid(True, alpha=0.25)
+
+# recompute held-out loss along the long run for the curve
+p_curve = init_params(np.random.default_rng(42))
+n = Xtr.shape[0]
+rng_curve = np.random.default_rng(142)
+tr_curve, ho_curve = [], []
+for e in range(200):
+    idx = rng_curve.permutation(n)
+    for start in range(0, n, BATCH):
+        b = idx[start:start + BATCH]
+        _, cache = forward(p_curve, Xtr[b], Ytr[b])
+        grads = backward(p_curve, Xtr[b], Ytr[b], cache, reduce=&quot;mean&quot;)
+        sgd_step(p_curve, grads, 0.3)
+    tr_curve.append(eval_loss(p_curve, Xtr, Ytr))
+    ho_curve.append(eval_loss(p_curve, Xho, Yho))
+axR.plot(range(1, 201), tr_curve, &quot;-&quot;, color=&quot;#2D8B55&quot;, label=&quot;training loss&quot;)
+axR.plot(range(1, 201), ho_curve, &quot;--&quot;, color=&quot;#C93B3B&quot;, label=&quot;held-out loss&quot;)
+axR.set_xlabel(&quot;epoch&quot;)
+axR.set_ylabel(&quot;loss&quot;)
+axR.set_title(&quot;Low training loss != good model (the gap)&quot;)
+axR.legend(fontsize=8)
+axR.grid(True, alpha=0.25)
+
+fig.tight_layout()
+plot_path = os.path.join(ASSETS, &quot;minibatch_loss_curves.png&quot;)
+fig.savefig(plot_path, dpi=110)
+print(f&quot;saved plot : assets/{os.path.basename(plot_path)}&quot;)
+print()
+
+print(&quot;KEY RESULT: the mini-batch loop drove the shuffled training loss &quot;
+      f&quot;{loss_shuf[0]:.4f} -&gt; {loss_shuf[-1]:.4f} (falls), while the SAME optimizer &quot;
+      f&quot;on label-sorted data settled higher ({loss_sorted[-1]:.4f}); and a &quot;
+      f&quot;long run reached training loss {train_final:.4f} but held-out loss &quot;
+      f&quot;{held_final:.4f} (gap {gap:+.4f}) -- a falling training loss optimizes &quot;
+      &quot;the loop, it does not prove the model generalizes.&quot;)
+</code></pre>
+<h3>Output</h3>
+<pre>======================================================================
+(1) VOCABULARY  (epoch / iteration / batch / batch_size)
+======================================================================
+lesson case : N=60,000, batch_size=32 -&gt; iterations/epoch = 60,000//32 = 1,875  (exact: True)
+this run    : N=1000, batch_size=32 -&gt; 31 full batches + 1 ragged batch of 8 = 32 iterations/epoch
+batch sizes sum back to N : 1000 == 1000  -&gt; OK (leftovers still train)
+
+======================================================================
+(2) SHUFFLED mini-batch loop -- does the training loss fall?
+======================================================================
+per-batch loss WITHIN epoch 1 is bumpy: first 5 = [np.float64(3.779), np.float64(4.503), np.float64(13.583), np.float64(11.354), np.float64(8.767)], min=2.478, max=13.625
+per-EPOCH mean training loss (should trend down):
+    epoch  1: 6.8972
+    epoch  5: 2.8106
+    epoch 10: 1.3641
+    epoch 20: 0.3901
+    epoch 40: 0.0025
+loss[0]=6.8972 -&gt; loss[-1]=0.0025  (dropped 6.8947; TRENDS DOWN)
+uniform-guess baseline = ln(3) = 1.0986  (final loss is below it)
+
+======================================================================
+(3) NO SHUFFLE on LABEL-SORTED data -- silent failure, no crash
+======================================================================
+final training loss  shuffled=0.0025   un-shuffled(sorted)=0.4971
+within-epoch-1 batch-loss swing (max-min)  shuffled=11.147   un-shuffled(sorted)=18.133
+nothing crashed -- the sorted run just LEARNS WORSE: final training loss +0.4945 vs shuffled (196x higher).
+
+======================================================================
+(4) MEAN vs SUM reduction -- same lr, same data, one word changed
+======================================================================
+MEAN gradient (correct): epoch losses = [6.897, 4.278, 4.423, 2.729, 2.811]
+SUM  gradient (bug)    : epoch losses = [16.906, 17.711, 17.47, 18.08, 17.208]
+with SUM the effective step is ~batch_size (32x) too large at the same lr=0.1 -&gt; DIVERGES; MEAN converges. batch_size must NOT be a hidden step-size.
+
+======================================================================
+(5) THE CEILING -- train the loss down, then measure held-out data
+======================================================================
+after 200 epochs:
+    TRAINING  loss (data it practiced on) = 0.0003
+    HELD-OUT  loss (data it never saw)    = 4.5263
+    gap (held-out - train)                = +4.5260
+the loop drove the TRAINING loss to 0.0003, yet the model is 17732.1x worse on unseen data.
+=&gt; a low training loss proves the LOOP optimizes, not that the MODEL is good. Measuring that needs held-out data (Day 4).
+
+saved plot : assets/minibatch_loss_curves.png
+
+KEY RESULT: the mini-batch loop drove the shuffled training loss 6.8972 -&gt; 0.0025 (falls), while the SAME optimizer on label-sorted data settled higher (0.4971); and a long run reached training loss 0.0003 but held-out loss 4.5263 (gap +4.5260) -- a falling training loss optimizes the loop, it does not prove the model generalizes.
+</pre>
+</body></html>

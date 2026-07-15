@@ -1,0 +1,47 @@
+======================================================================
+(1) VOCABULARY  (epoch / iteration / batch / batch_size)
+======================================================================
+lesson case : N=60,000, batch_size=32 -> iterations/epoch = 60,000//32 = 1,875  (exact: True)
+this run    : N=1000, batch_size=32 -> 31 full batches + 1 ragged batch of 8 = 32 iterations/epoch
+batch sizes sum back to N : 1000 == 1000  -> OK (leftovers still train)
+
+======================================================================
+(2) SHUFFLED mini-batch loop -- does the training loss fall?
+======================================================================
+per-batch loss WITHIN epoch 1 is bumpy: first 5 = [np.float64(3.779), np.float64(4.503), np.float64(13.583), np.float64(11.354), np.float64(8.767)], min=2.478, max=13.625
+per-EPOCH mean training loss (should trend down):
+    epoch  1: 6.8972
+    epoch  5: 2.8106
+    epoch 10: 1.3641
+    epoch 20: 0.3901
+    epoch 40: 0.0025
+loss[0]=6.8972 -> loss[-1]=0.0025  (dropped 6.8947; TRENDS DOWN)
+uniform-guess baseline = ln(3) = 1.0986  (final loss is below it)
+
+======================================================================
+(3) NO SHUFFLE on LABEL-SORTED data -- silent failure, no crash
+======================================================================
+final training loss  shuffled=0.0025   un-shuffled(sorted)=0.4971
+within-epoch-1 batch-loss swing (max-min)  shuffled=11.147   un-shuffled(sorted)=18.133
+nothing crashed -- the sorted run just LEARNS WORSE: final training loss +0.4945 vs shuffled (196x higher).
+
+======================================================================
+(4) MEAN vs SUM reduction -- same lr, same data, one word changed
+======================================================================
+MEAN gradient (correct): epoch losses = [6.897, 4.278, 4.423, 2.729, 2.811]
+SUM  gradient (bug)    : epoch losses = [16.906, 17.711, 17.47, 18.08, 17.208]
+with SUM the effective step is ~batch_size (32x) too large at the same lr=0.1 -> DIVERGES; MEAN converges. batch_size must NOT be a hidden step-size.
+
+======================================================================
+(5) THE CEILING -- train the loss down, then measure held-out data
+======================================================================
+after 200 epochs:
+    TRAINING  loss (data it practiced on) = 0.0003
+    HELD-OUT  loss (data it never saw)    = 4.5263
+    gap (held-out - train)                = +4.5260
+the loop drove the TRAINING loss to 0.0003, yet the model is 17732.1x worse on unseen data.
+=> a low training loss proves the LOOP optimizes, not that the MODEL is good. Measuring that needs held-out data (Day 4).
+
+saved plot : assets/minibatch_loss_curves.png
+
+KEY RESULT: the mini-batch loop drove the shuffled training loss 6.8972 -> 0.0025 (falls), while the SAME optimizer on label-sorted data settled higher (0.4971); and a long run reached training loss 0.0003 but held-out loss 4.5263 (gap +4.5260) -- a falling training loss optimizes the loop, it does not prove the model generalizes.

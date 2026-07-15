@@ -1,0 +1,25 @@
+batch / dims       : batch=32, MLP 784->128->10 (float64)
+initial loss       : 2.620411  (uniform-guess baseline = ln 10 = 2.302585)
+
+gradient shapes match their weights (mismatch = transpose bug):
+  dW1 (784, 128)   vs W1 (784, 128)   -> MATCH
+  dW2 (128, 10)    vs W2 (128, 10)    -> MATCH
+
+CORRECT backprop -- analytic gradient vs numerical (finite-difference):
+  W2 (dW2 = h.T @ dlogits)           max|analytic - numerical| = 2.975e-10
+  W1 (through ReLU gate)             max|analytic - numerical| = 2.849e-10
+
+BROKEN backprop -- SAME check after DROPPING the ReLU gate (dz1 = dh):
+  W1 (gate dropped -> BUG)           max|analytic - numerical| = 2.437e-02
+
+gradient-check verdict:
+  correct dW1/dW2 agree to  ~10 decimal places (max diff 2.975e-10)
+  broken  dW1 disagrees by   2.437e-02  (8.2e+07x worse -- silent bug the check caught)
+
+update rule (param = param - lr * grad):
+  right-sized lr=0.05  loss 2.620411 -> 2.150728  (delta -0.469683; downhill step lowers the loss)
+  too-large   lr=0.5   loss 2.620411 -> 9.245406  (delta +6.624995; OVERSHOOTS -> loss climbs)
+
+saved plot         : assets/gradient_check.png
+
+KEY RESULT: hand-wired analytic backprop agrees with a finite-difference gradient to ~10 decimals (max diff 2.975e-10); dropping the ReLU gate breaks the SAME check (2.437e-02, 8.2e+07x worse) with no crash.

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why One Neuron Can't Do XOR — Interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12; --k:#7C6DAA;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%);padding-bottom:4rem}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+.nav{position:sticky;top:0;left:0;right:0;z-index:100;background:rgba(250,247,242,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:860px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+.nav-back:hover{color:var(--accent)}
+main{max-width:860px;margin:0 auto;padding:2rem 1.25rem 0}
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.9rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:62ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;grid-template-columns:1fr;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;margin-top:.2rem}
+.toggle{display:inline-flex;align-items:center;gap:.5rem;font-size:.86rem;font-weight:600;color:var(--text);cursor:pointer}
+.toggle input{width:16px;height:16px;cursor:pointer}
+.readouts{display:grid;grid-template-columns:repeat(2,1fr);gap:.85rem;margin-top:.4rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.bad{color:var(--bad)}.ro-v.ok{color:var(--ok)}
+.tt{border-collapse:collapse;font-family:var(--mono);font-size:.82rem;margin-top:.2rem}
+.tt th,.tt td{border:1px solid var(--border);padding:.35rem .7rem;text-align:center}
+.tt th{color:var(--muted);font-weight:600}
+.tt .c0{color:var(--accent-d);font-weight:700}.tt .c1{color:var(--warn);font-weight:700}
+.figwrap{width:100%}
+svg#fig{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.axis path,.axis line{stroke:var(--border);stroke-width:1}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.axis-title{fill:var(--text2);font-family:var(--body);font-size:12px;font-weight:600}
+.fig-fallback{padding:2rem;text-align:center;color:var(--muted);font-size:.95rem}
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem;margin-bottom:1.5rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem;color:var(--text)}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">Why One Neuron Can't Do XOR</span>
+    <a class="nav-back" href="#">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Capability limit &middot; linear separability</span>
+    <h1>One line, four points, no solution</h1>
+    <p><b>What am I looking at?</b> XOR wants "output 1 when exactly one input is on." That is the four dots below:
+    the <b>blue</b> pair should say 0, the <b>orange</b> pair should say 1. A single neuron can only draw <b>one
+    straight line</b>. Slide the line every which way &mdash; you can always get at most <b>3 of 4</b> right. Then
+    tick "add a hidden layer" to see why two lines fix it.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls — your single dividing line</h2>
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">w&#8321;</span><span class="ctrl-val" id="val-w1">1.0</span></div>
+        <input type="range" id="w1" min="-3" max="3" step="0.1" value="1" aria-label="w1">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">w&#8322;</span><span class="ctrl-val" id="val-w2">1.0</span></div>
+        <input type="range" id="w2" min="-3" max="3" step="0.1" value="1" aria-label="w2">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top"><span class="ctrl-label">b <span class="ctrl-hint">(bias)</span></span><span class="ctrl-val" id="val-b">-0.5</span></div>
+        <input type="range" id="b" min="-3" max="3" step="0.1" value="-0.5" aria-label="bias b">
+      </div>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="hidden"> add a hidden layer (two lines)</label>
+      </div>
+      <div class="readouts">
+        <div class="ro"><div class="ro-k">Points correctly classified</div><div class="ro-v" id="ro-correct">&mdash;</div></div>
+        <div class="ro"><div class="ro-k">One-line verdict</div><div class="ro-v" id="ro-verdict">&mdash;</div></div>
+      </div>
+      <table class="tt" aria-label="XOR truth table">
+        <thead><tr><th>x&#8321;</th><th>x&#8322;</th><th>XOR target</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>0</td><td class="c0">0</td></tr>
+          <tr><td>0</td><td>1</td><td class="c1">1</td></tr>
+          <tr><td>1</td><td>0</td><td class="c1">1</td></tr>
+          <tr><td>1</td><td>1</td><td class="c0">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Input space</h2>
+    <div class="figwrap" id="figwrap">
+      <svg id="fig" viewBox="0 0 560 460" role="img"
+           aria-label="A plane with four points: (0,0) and (1,1) are class 0 (blue), (0,1) and (1,0) are class 1 (orange). A single straight dividing line cannot put both blue points on one side and both orange points on the other. Enabling a hidden layer shows two lines that carve out the correct region."></svg>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>A single neuron is <b>one line</b>. XOR's two classes sit on opposite diagonals, so <b>no</b> single line can separate them &mdash; the best you ever do is 3 of 4. XOR is <b>not linearly separable</b>.</li>
+      <li>Add <b>one hidden layer</b> and the network draws <b>two</b> lines, then combines them. Two lines can fence off the corner region where exactly one input is on &mdash; now all four points are correct.</li>
+      <li>This is the whole reason for depth and non-linear activations: stacking layers <b>composes simple lines into curved, carved-up regions</b> that a single neuron could never express.</li>
+    </ul>
+  </div>
+</main>
+
+<script src="./d3.v7.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var svgEl = document.getElementById("fig");
+  if (typeof window.d3 === "undefined") {
+    console.warn("[xor-limit] window.d3 is undefined — D3 failed to load from ./d3.v7.min.js. Showing fallback.");
+    if (svgEl) { svgEl.outerHTML = '<div class="fig-fallback">The interactive chart needs D3, which did not load.<br>Make sure <code>d3.v7.min.js</code> is next to this file, then reload.</div>'; }
+    return;
+  }
+
+  // XOR points: class 0 = {(0,0),(1,1)}, class 1 = {(0,1),(1,0)}
+  var PTS = [ {x1:0,x2:0,c:0}, {x1:0,x2:1,c:1}, {x1:1,x2:0,c:1}, {x1:1,x2:1,c:0} ];
+  var COL = ["var(--accent-d)","var(--warn)"];
+
+  var W=560, H=460, M={top:20,right:24,bottom:46,left:52};
+  var iw=W-M.left-M.right, ih=H-M.top-M.bottom;
+  var svg=d3.select(svgEl);
+  var root=svg.append("g").attr("transform","translate("+M.left+","+M.top+")");
+  var x=d3.scaleLinear().domain([-0.5,1.5]).range([0,iw]);
+  var y=d3.scaleLinear().domain([-0.5,1.5]).range([ih,0]);
+
+  // decision-region heatmap for the single line
+  var N=28, cw=iw/N, ch=ih/N, cells=[];
+  for (var gi=0;gi<N;gi++) for(var gj=0;gj<N;gj++){
+    cells.push({cx:-0.5+(gi+0.5)*(2/N), cy:-0.5+(gj+0.5)*(2/N), px:gi*cw, py:ih-(gj+1)*ch});
+  }
+  var cellSel=root.selectAll("rect.cell").data(cells).enter().append("rect")
+      .attr("x",function(d){return d.px;}).attr("y",function(d){return d.py;}).attr("width",cw+0.6).attr("height",ch+0.6);
+
+  root.append("g").attr("class","axis").attr("transform","translate(0,"+ih+")").call(d3.axisBottom(x).ticks(4).tickFormat(d3.format("~g")));
+  root.append("g").attr("class","axis").call(d3.axisLeft(y).ticks(4).tickFormat(d3.format("~g")));
+  root.append("text").attr("class","axis-title").attr("x",iw/2).attr("y",ih+36).attr("text-anchor","middle").text("x₁");
+  root.append("text").attr("class","axis-title").attr("transform","rotate(-90)").attr("x",-ih/2).attr("y",-36).attr("text-anchor","middle").text("x₂");
+
+  var line1=root.append("line").attr("stroke","var(--accent-d)").attr("stroke-width",3).attr("stroke-linecap","round");
+  var line2=root.append("line").attr("stroke","var(--k)").attr("stroke-width",2.5).attr("stroke-dasharray","7 4").attr("stroke-linecap","round").style("display","none");
+
+  var dots=root.selectAll("g.dot").data(PTS).enter().append("g");
+  dots.append("circle").attr("cx",function(d){return x(d.x1);}).attr("cy",function(d){return y(d.x2);})
+      .attr("r",11).attr("fill",function(d){return COL[d.c];}).attr("stroke","#fff").attr("stroke-width",2.5);
+  var rings=dots.append("circle").attr("cx",function(d){return x(d.x1);}).attr("cy",function(d){return y(d.x2);})
+      .attr("r",16).attr("fill","none").attr("stroke","var(--bad)").attr("stroke-width",2.5).style("display","none");
+  dots.append("text").attr("x",function(d){return x(d.x1);}).attr("y",function(d){return y(d.x2)+4;})
+      .attr("text-anchor","middle").attr("fill","#fff").attr("font-family","var(--mono)").attr("font-size","11px").attr("font-weight","700")
+      .text(function(d){return d.c;});
+
+  function boundaryPts(w1,w2,b){
+    var D=[-0.5,1.5], hits=[];
+    if(Math.abs(w2)>1e-6){ D.forEach(function(x1){ var x2=-(w1*x1+b)/w2; if(x2>=-0.5-1e-9&&x2<=1.5+1e-9) hits.push([x1,x2]); }); }
+    if(Math.abs(w1)>1e-6){ D.forEach(function(x2){ var x1=-(w2*x2+b)/w1; if(x1>=-0.5-1e-9&&x1<=1.5+1e-9) hits.push([x1,x2]); }); }
+    var u=[]; hits.forEach(function(h){ if(!u.some(function(q){return Math.hypot(q[0]-h[0],q[1]-h[1])<1e-6;})) u.push(h); });
+    return u.length>=2?[u[0],u[1]]:null;
+  }
+
+  var elW1=document.getElementById("w1"), elW2=document.getElementById("w2"), elB=document.getElementById("b"), elH=document.getElementById("hidden");
+  var vW1=document.getElementById("val-w1"), vW2=document.getElementById("val-w2"), vB=document.getElementById("val-b");
+  var roC=document.getElementById("ro-correct"), roV=document.getElementById("ro-verdict");
+
+  function render(){
+    var w1=+elW1.value, w2=+elW2.value, b=+elB.value, hid=elH.checked;
+    vW1.textContent=w1.toFixed(1); vW2.textContent=w2.toFixed(1); vB.textContent=b.toFixed(1);
+
+    if(hid){
+      // hidden-layer solution: XOR = (x1 + x2 - 0.5 > 0) AND (x1 + x2 - 1.5 < 0) — the middle diagonal band
+      cellSel.attr("fill",function(d){ var s=d.cx+d.cy; return (s>0.5 && s<1.5) ? "rgba(201,154,18,0.18)" : "rgba(42,123,155,0.10)"; });
+      line1.attr("x1",x(-0.5)).attr("y1",y(1.0)).attr("x2",x(1.0)).attr("y2",y(-0.5));   // x1+x2=0.5
+      line2.style("display",null).attr("x1",x(0.0)).attr("y1",y(1.5)).attr("x2",x(1.5)).attr("y2",y(0.0)); // x1+x2=1.5
+      rings.style("display","none");
+      roC.textContent="4 / 4"; roC.className="ro-v ok";
+      roV.textContent="two lines separate it"; roV.className="ro-v ok";
+      return;
+    }
+    line2.style("display","none");
+    // single line region + point classification
+    cellSel.attr("fill",function(d){ var z=w1*d.cx+w2*d.cy+b; return z>=0?"rgba(201,154,18,0.14)":"rgba(42,123,155,0.10)"; });
+    var pts=boundaryPts(w1,w2,b);
+    if(pts){ line1.style("display",null).attr("x1",x(pts[0][0])).attr("y1",y(pts[0][1])).attr("x2",x(pts[1][0])).attr("y2",y(pts[1][1])); }
+    else { line1.style("display","none"); }
+    // a point is "correct" if its side of the line matches its class:
+    // predict class 1 when z>0. correct = (z>0) === (c===1)
+    var correct=0;
+    rings.each(function(d){
+      var z=w1*d.x1+w2*d.x2+b, pred=z>0?1:0, ok=(pred===d.c);
+      if(ok) correct++;
+      d3.select(this).style("display", ok?"none":null);
+    });
+    roC.textContent=correct+" / 4"; roC.className="ro-v"+(correct===4?" ok":" bad");
+    roV.textContent = correct===4 ? "impossible — check again" : "no single line gets 4/4";
+    roV.className="ro-v bad";
+  }
+
+  ["input","change"].forEach(function(ev){ [elW1,elW2,elB].forEach(function(el){ el.addEventListener(ev,render); }); });
+  elH.addEventListener("change", render);
+  render();
+})();
+</script>
+
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>
