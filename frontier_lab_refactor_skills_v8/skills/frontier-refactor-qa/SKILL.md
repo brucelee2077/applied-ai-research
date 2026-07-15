@@ -224,3 +224,9 @@ grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects
 ### Lesson Build Engine (v9)
 
 `sessions/_compiler/workflows/lesson_build.js` wraps this QA into an autonomous loop: it reuses the judges above as a parallel panel and re-runs author → compile → judge until P0-clear, then checkpoints per lesson. Two-tier gating holds — the deterministic gates block at compile; the LLM judges (coverage · tone · concept-structure · correctness) gate the loop only. skill_gaps route to a **user-approved proposal**, never an auto-edit. The new `concept_structure_gate.py` (deterministic per-concept intro→visual→build-up triad) and `judge_concept_structure` (LLM, in `coverage_judge.py`) are the concept-structure checks. See the architect skill's "Lesson Build Engine" section.
+
+Dense lessons may not reach P0-clear within `maxRounds`; that is a valid **judge-flagged** checkpoint (the lesson still compiles + passes the deterministic gates). For a build-at-scale pass, run with `maxRounds: 1` to build + surface findings without grinding. The author writes `source.md` **incrementally** (front-matter+hero, then one concept at a time) to avoid a stall-retry loop on long lessons.
+
+### Evidence Pipeline (v9, Plan 2)
+
+After a lesson passes, `sessions/_compiler/workflows/evidence_build.js` produces its frontier-facing evidence: a producer sub-agent writes + RUNS a real `experiment.py`, writes a staff-depth `blog.md` embedding the real numbers, and reuses the lesson's viz; `evidence_compile.py` assembles a self-contained `portfolio/<module>/<day>/index.html`; an `evidence_judge.py` (frontier-staff bar) gates on `numbers_match` (a blog number not backed by the run output is a fabrication) + verdict. `evidence_index.py` builds the portfolio hub; `scripts/publish_portfolio.py` validates self-containment (scans `index.html` AND copied viz) before a clean-repo push. Evidence must be REAL — no fabricated figures.
