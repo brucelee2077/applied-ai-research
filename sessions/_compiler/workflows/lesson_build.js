@@ -80,7 +80,9 @@ Return wrote_source, compiled (exit 0?), exit_code, the gate_output (both comman
 }
 
 phase('Compile')
-let compileRes = await authorAndCompile(0, null)
+// A.seedFindings lets a "polish round" re-run seed round-0 with known findings
+// (e.g. P1s surfaced at a prior checkpoint the user chose to fix). Null on a fresh run.
+let compileRes = await authorAndCompile(0, (A.seedFindings && A.seedFindings.length) ? A.seedFindings : null)
 log(`author r0: compiled=${compileRes.compiled} exit=${compileRes.exit_code} concepts=${compileRes.concept_count}`)
 
 const JUDGE_SCHEMA = {
