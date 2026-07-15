@@ -248,6 +248,81 @@ def judge_tone(lesson_text, notebook_md, model=MODEL, timeout=90):
     return data
 
 
+# ===========================================================================
+# CONCEPT-STRUCTURE JUDGE — per-concept intuition-first / analogy / build-up
+# ===========================================================================
+# The deterministic concept_structure_gate proves the triad is STRUCTURALLY
+# present (prose -> visual -> prose). This judge grades whether the unit is
+# intuition-first IN SPIRIT: leads with a felt picture, carries a real analogy
+# WITH its "where it breaks down" half, and builds up step-by-step. Advisory,
+# graceful fallback, never raises. Mirrors judge_tone.
+_STRUCT_MAX = 22000
+_STRUCT_SYS = (
+    "You are a CONCEPT-STRUCTURE judge for a beginner ML lesson built as concept units. "
+    "For each named concept, judge whether the unit (1) leads with intuition/a felt picture "
+    "BEFORE notation, (2) carries a concrete everyday analogy INCLUDING where it breaks down, "
+    "and (3) builds up step-by-step rather than dumping the mechanism. Be specific and quote. "
+    "Return STRICT JSON only (no prose, no markdown fences)."
+)
+
+
+def _struct_prompt(lesson_text, concept_titles):
+    names = '\n'.join('- %s' % c for c in (concept_titles or [])) or '(none)'
+    return f"""CONCEPT UNITS TO JUDGE (by name/title):
+{names}
+
+LESSON TEXT (plain-text extract):
+\"\"\"
+{lesson_text[:_STRUCT_MAX]}
+\"\"\"
+
+For EACH concept unit above, return a verdict on three axes. verdict is one of:
+GOOD (clearly meets it) / WEAK (partially) / MISSING (absent).
+Return STRICT JSON:
+{{
+  "concepts": [ {{"concept":"<name>", "intuition_first":"GOOD|WEAK|MISSING",
+                  "analogy":"GOOD|WEAK|MISSING", "buildup":"GOOD|WEAK|MISSING",
+                  "note":"<one line, quote a spot>", "fix":"<concrete rewrite if not GOOD>"}} ],
+  "overall": "GOOD|WEAK|MISSING",
+  "summary": "<=2 sentences"
+}}
+Rules: judge every concept. "analogy":"GOOD" requires BOTH a concrete analogy AND an explicit
+"where it breaks down" (or equivalent limit). Lead-with-formula => intuition_first is WEAK/MISSING."""
+
+
+def judge_concept_structure(lesson_text, concept_titles, model=MODEL, timeout=90):
+    """LLM per-concept structure judge. Never raises. N/A when no concepts given."""
+    if not concept_titles:
+        return {'status': 'N/A', 'reason': 'no concepts to judge',
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e),
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    try:
+        client = OpenAI(api_key='not-needed', base_url=BRIDGE_URL, timeout=timeout)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{'role': 'system', 'content': _STRUCT_SYS},
+                      {'role': 'user', 'content': _struct_prompt(lesson_text, concept_titles)}],
+            max_tokens=2000,
+        )
+        content = (resp.choices[0].message.content or '').strip()
+    except Exception as e:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e),
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    data = _extract_json(content)
+    if data is None:
+        return {'status': 'PARSE_ERROR', 'raw': content,
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    data.setdefault('concepts', [])
+    data.setdefault('overall', 'N/A')
+    data.setdefault('summary', '')
+    data['status'] = 'OK'
+    return data
+
+
 def _extract_json(text):
     """Parse a JSON object from the model output (tolerant of stray fences/prose)."""
     if not text:
@@ -267,9 +342,10 @@ def _extract_json(text):
 
 
 def run_from_paths(lesson_html_path, source_path, root=ROOT):
-    """Convenience: gather spec/curation/notebook via coverage_gate, then run BOTH
-    the coverage judge and the beginner-friendliness (tone) judge. Returns
-    {'coverage': <coverage verdict>, 'tone': <tone verdict>}."""
+    """Convenience: gather spec/curation/notebook via coverage_gate, then run ALL
+    THREE judges — coverage, beginner-friendliness (tone), and concept-structure.
+    Returns {'coverage': <coverage verdict>, 'tone': <tone verdict>,
+    'structure': <concept-structure verdict>}."""
     from v8lib import split_frontmatter
     meta, _ = split_frontmatter(open(source_path, encoding='utf-8').read())
     html = open(lesson_html_path, encoding='utf-8').read()
@@ -289,8 +365,13 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
 
     lesson_text = _readable_text(html)   # real prose (punctuation + breaks) for the LLM judges
     curation = {'deferred': deferred, 'out_of_scope': list(oos.values())}
+    # concept titles come from the source's @@@ concept title="..." args
+    import re as _re
+    src_text = open(source_path, encoding='utf-8').read()
+    concept_titles = _re.findall(r'@@@\s+concept\b[^\n]*\btitle="([^"]+)"', src_text)
     return {'coverage': judge(lesson_text, spec, nb_concepts, curation),
-            'tone': judge_tone(lesson_text, notebook_md)}
+            'tone': judge_tone(lesson_text, notebook_md),
+            'structure': judge_concept_structure(lesson_text, concept_titles)}
 
 
 # ---------------------------------------------------------------------------

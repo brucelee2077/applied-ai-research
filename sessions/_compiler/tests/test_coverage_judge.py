@@ -67,3 +67,33 @@ def test_judge_graceful_when_sdk_missing(monkeypatch):
     res = cj.judge('lesson text', [('relu', ['relu'])], ['ReLU'], None)
     assert res['status'] == 'BRIDGE_UNAVAILABLE'
     assert res['execution'] == [] and res['skill_gaps'] == [] and res['intuition'] == []
+
+
+# --- concept-structure judge ------------------------------------------------
+def test_struct_prompt_contains_concepts_and_axes():
+    p = cj._struct_prompt('lesson body about relu and sigmoid', ['ReLU', 'Sigmoid'])
+    assert 'ReLU' in p and 'Sigmoid' in p
+    assert 'intuition_first' in p and 'analogy' in p and 'buildup' in p
+    assert 'lesson body about relu' in p
+
+def test_struct_prompt_truncates_long_lesson():
+    long_text = 'y' * (cj._STRUCT_MAX + 5000)
+    p = cj._struct_prompt(long_text, ['ReLU'])
+    assert long_text[:cj._STRUCT_MAX] in p
+    assert long_text not in p
+
+def test_judge_structure_graceful_when_sdk_missing(monkeypatch):
+    import builtins
+    real_import = builtins.__import__
+    def fake_import(name, *a, **k):
+        if name == 'openai':
+            raise ImportError('simulated missing sdk')
+        return real_import(name, *a, **k)
+    monkeypatch.setattr(builtins, '__import__', fake_import)
+    res = cj.judge_concept_structure('lesson text', ['ReLU'])
+    assert res['status'] == 'BRIDGE_UNAVAILABLE'
+    assert res['concepts'] == [] and res['overall'] == 'N/A'
+
+def test_judge_structure_empty_concepts_is_na():
+    res = cj.judge_concept_structure('lesson', [])
+    assert res['status'] == 'N/A'
