@@ -97,3 +97,17 @@ def test_judge_structure_graceful_when_sdk_missing(monkeypatch):
 def test_judge_structure_empty_concepts_is_na():
     res = cj.judge_concept_structure('lesson', [])
     assert res['status'] == 'N/A'
+
+
+# ---------------------------------------------------------------------------
+# CLI panel-header contract — the lesson_build.js coverage/tone/structure lenses
+# parse coverage_judge.py's printed panel headers by exact string. Pin that
+# contract so a header rename can't silently break a lens (final-review finding).
+# ---------------------------------------------------------------------------
+def test_cli_panel_headers_match_orchestrator_lens_prompts():
+    cj_src = open(os.path.join(HERE, '..', 'gates', 'coverage_judge.py'), encoding='utf-8').read()
+    lb_src = open(os.path.join(HERE, '..', 'workflows', 'lesson_build.js'), encoding='utf-8').read()
+    for header in ('Coverage Judge', 'Beginner-Friendliness Judge', 'Concept-Structure Judge',
+                   'skill gaps (notebook teaches; spec missed)'):
+        assert header in cj_src, 'coverage_judge.py CLI must print %r' % header
+        assert header in lb_src, 'lesson_build.js lens must reference %r' % header

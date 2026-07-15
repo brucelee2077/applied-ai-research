@@ -36,11 +36,11 @@ const COMPILE_SCHEMA = {
   properties: {
     wrote_source: { type: 'boolean' },
     compiled: { type: 'boolean' },
-    exit_code: { type: 'integer' },
+    compile_exit_code: { type: 'integer' },
     gate_output: { type: 'string' },
     concept_count: { type: 'integer' },
   },
-  required: ['wrote_source', 'compiled', 'exit_code', 'gate_output'],
+  required: ['wrote_source', 'compiled', 'compile_exit_code', 'gate_output'],
 }
 
 // --- Phase 1: blind coverage draft (reused role from coverage_review.js) ----
@@ -75,7 +75,7 @@ ${JSON.stringify(draft, null, 2)}
 Write the FULL source.md, then compile and report:
   python3 sessions/_compiler/compile_lesson.py ${source}
 Also run: python3 sessions/_compiler/gates/concept_structure_gate.py ${source}
-Return: wrote_source; compiled = TRUE only if BOTH commands exit 0 (if EITHER compile_lesson.py OR concept_structure_gate.py fails, set compiled=false and put both outputs in gate_output); exit_code (compile_lesson.py's); gate_output (tail of BOTH commands); concept_count.${findingsBlock}`,
+Return: wrote_source; compiled = TRUE only if BOTH commands exit 0 (if EITHER compile_lesson.py OR concept_structure_gate.py fails, set compiled=false and put both outputs in gate_output); compile_exit_code (compile_lesson.py's); gate_output (tail of BOTH commands); concept_count.${findingsBlock}`,
     { label: `author r${round}`, phase: 'Author', schema: COMPILE_SCHEMA, agentType: 'general-purpose' })
 }
 
@@ -83,7 +83,7 @@ phase('Compile')
 // A.seedFindings lets a "polish round" re-run seed round-0 with known findings
 // (e.g. P1s surfaced at a prior checkpoint the user chose to fix). Null on a fresh run.
 let compileRes = await authorAndCompile(0, (A.seedFindings && A.seedFindings.length) ? A.seedFindings : null)
-log(`author r0: compiled=${compileRes.compiled} exit=${compileRes.exit_code} concepts=${compileRes.concept_count}`)
+log(`author r0: compiled=${compileRes.compiled} exit=${compileRes.compile_exit_code} concepts=${compileRes.concept_count}`)
 
 const JUDGE_SCHEMA = {
   type: 'object',
@@ -130,7 +130,7 @@ let round = 0, routing = null, lastEvals = []
 while (round < MAX_ROUNDS) {
   // hard-gate failure short-circuits the LLM panel: loop straight back to author
   if (!compileRes.compiled) {
-    log(`r${round}: hard gate failed (exit ${compileRes.exit_code}) -> regenerate`)
+    log(`r${round}: hard gate failed (exit ${compileRes.compile_exit_code}) -> regenerate`)
     round += 1
     compileRes = await authorAndCompile(round, [{ kind: 'compile_gate', severity: 'P0', why: compileRes.gate_output }])
     continue
@@ -169,7 +169,7 @@ const report = [
   `# Lesson build report — ${module_}/${day}`,
   ``,
   `- Converged: ${converged}  (rounds: ${round}/${MAX_ROUNDS})`,
-  `- Final compile: exit ${compileRes.exit_code}, ${compileRes.concept_count || '?'} concepts`,
+  `- Final compile: exit ${compileRes.compile_exit_code}, ${compileRes.concept_count || '?'} concepts`,
   !compileRes.compiled
     ? `\n## Hard-gate blocker (lesson never compiled — the LLM judge panel did NOT run)\n\`\`\`\n${(compileRes.gate_output || '(no gate output captured)').slice(-2000)}\n\`\`\``
     : '',
