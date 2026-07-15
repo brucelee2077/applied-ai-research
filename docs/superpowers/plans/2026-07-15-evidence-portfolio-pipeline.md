@@ -97,9 +97,10 @@ Flow (`args {module, day, maxRounds}`, default maxRounds 3):
 ## Task 5: `scripts/publish_portfolio.py` — self-containment validator + dry-run publish
 
 ```python
-# python3 scripts/publish_portfolio.py [--to <target_repo_dir>] [--dry-run]
+# python3 scripts/publish_portfolio.py [--to <target_repo_dir>] [--no-dry-run]
 # 1. Validate every portfolio/**/index.html has NO absolute or ../sessions links (self-contained).
-# 2. If --to given: copy portfolio/ -> <target>/ (rsync-like via shutil); if --dry-run, only list.
+# 2. If --to given: copy portfolio/ -> <target>/ (rsync-like via shutil), but ONLY with --no-dry-run
+#    (dry-run is the DEFAULT — without --no-dry-run it just lists what it would copy).
 # 3. Print a summary; exit 1 if any self-containment violation.
 ```
 
