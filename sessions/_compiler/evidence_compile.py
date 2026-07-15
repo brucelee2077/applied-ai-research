@@ -24,7 +24,7 @@
 # CLI:
 #   python3 evidence_compile.py <module> <day>
 # =============================================================================
-import sys, os, re, json, shutil, html as _htmlmod, argparse
+import sys, os, re, json, html as _htmlmod, argparse
 
 # repo root = two dirs up from this file (sessions/_compiler/evidence_compile.py)
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -105,6 +105,23 @@ def _read(path):
         return ''
 
 
+# A quoted href whose value starts with `../` — a parent-escaping NAV back-link
+# (e.g. href="../index.html"). Copied viz carry these back to their old lesson
+# location; once relocated into portfolio/<m>/<d>/assets/ they are dead. Only
+# NAV (href=) links that escape the parent are neutralized. External links
+# (http/https//), same-dir links, and ALL src= attributes are left untouched
+# (viz srcs are inline/same-dir; rewriting them would break the visual).
+_PARENT_HREF_RE = re.compile(r'''href\s*=\s*(["'])\.\.\/[^"']*\1''', re.IGNORECASE)
+
+
+def _sanitize_copied_viz(html):
+    """Neutralize parent-escaping NAV back-links in a copied viz's HTML: any
+    quoted href whose value starts with `../` becomes href="#". Leaves external
+    (http/https/protocol-relative) links, same-dir links, and every src=
+    attribute untouched. Returns the sanitized HTML."""
+    return _PARENT_HREF_RE.sub('href="#"', html or '')
+
+
 def _title_from_blog(blog_md, day_slug):
     """Blog's first `# ` heading, else the day slug."""
     for line in (blog_md or '').split('\n'):
@@ -132,13 +149,17 @@ def assemble(module, day, root):
     assets_dir = os.path.join(pdir, 'assets')
     os.makedirs(assets_dir, exist_ok=True)
 
-    # Copy referenced viz files (resolved relative to the lesson source dir) into assets/.
+    # Copy referenced viz files (resolved relative to the lesson source dir) into
+    # assets/. Sanitize each first: read -> neutralize parent-escaping NAV links ->
+    # write. A raw shutil.copy would carry dead href="../index.html" back-links
+    # (and hide them from the self-containment gate, which now scans copied viz too).
     copied_viz = []
     for ref in refs:
         resolved = os.path.normpath(os.path.join(src_dir, ref))
         if os.path.isfile(resolved):
             base = os.path.basename(resolved)
-            shutil.copy(resolved, os.path.join(assets_dir, base))
+            sanitized = _sanitize_copied_viz(_read(resolved))
+            open(os.path.join(assets_dir, base), 'w', encoding='utf-8').write(sanitized)
             if base not in copied_viz:
                 copied_viz.append(base)
 

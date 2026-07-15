@@ -106,3 +106,59 @@ def test_assemble_missing_files_ok(tmp_path):
     assert meta['viz'] == []
     # title falls back to the day slug
     assert meta['title'] == 'D2'
+
+
+# ---------------------------------------------------------------------------
+# _sanitize_copied_viz — neutralize parent-escaping NAV links in copied viz
+# ---------------------------------------------------------------------------
+def test_sanitize_neutralizes_parent_href():
+    html = '<a href="../index.html">back</a>'
+    assert ec._sanitize_copied_viz(html) == '<a href="#">back</a>'
+
+
+def test_sanitize_neutralizes_single_quoted_parent_href():
+    html = "<a href='../../foo/bar.html'>up</a>"
+    out = ec._sanitize_copied_viz(html)
+    assert '../' not in out
+    assert 'href="#"' in out or "href='#'" in out
+
+
+def test_sanitize_leaves_external_and_samedir_and_src_untouched():
+    html = ('<link href="https://fonts.googleapis.com/css">'
+            '<link href="//cdn.example.com/x.css">'
+            '<a href="detail.html">same dir</a>'
+            '<script src="../../lib/d3.min.js"></script>'
+            '<img src="./plot.png">')
+    out = ec._sanitize_copied_viz(html)
+    # external + protocol-relative + same-dir hrefs are untouched
+    assert 'https://fonts.googleapis.com/css' in out
+    assert '//cdn.example.com/x.css' in out
+    assert 'href="detail.html"' in out
+    # src attributes are NEVER rewritten (viz srcs are inline/same-dir)
+    assert 'src="../../lib/d3.min.js"' in out
+    assert 'src="./plot.png"' in out
+
+
+def test_assemble_sanitizes_copied_viz_but_keeps_external(tmp_path):
+    root = str(tmp_path)
+    module, day = 'M', 'D'
+    pdir = os.path.join(root, 'portfolio', module, day)
+    os.makedirs(pdir)
+    open(os.path.join(pdir, 'blog.md'), 'w').write('# Title\n\nbody.')
+    sdir = os.path.join(root, 'sessions', module, day)
+    os.makedirs(sdir)
+    open(os.path.join(sdir, 'source.md'), 'w').write('%%% viz src=../../viz/nav.html title=t\n')
+    vizdir = os.path.join(root, 'sessions', 'viz')
+    os.makedirs(vizdir)
+    open(os.path.join(vizdir, 'nav.html'), 'w').write(
+        '<html><head><link href="https://fonts.example/x.css"></head>'
+        '<body><a href="../index.html">back</a><script src="./d3.js"></script></body></html>')
+    ec.assemble(module, day, root)
+    copied = open(os.path.join(pdir, 'assets', 'nav.html'), encoding='utf-8').read()
+    # dead parent back-link neutralized
+    assert '../index.html' not in copied
+    assert 'href="#"' in copied
+    # external font link preserved
+    assert 'https://fonts.example/x.css' in copied
+    # same-dir src preserved
+    assert 'src="./d3.js"' in copied
