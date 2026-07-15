@@ -75,7 +75,7 @@ ${JSON.stringify(draft, null, 2)}
 Write the FULL source.md, then compile and report:
   python3 sessions/_compiler/compile_lesson.py ${source}
 Also run: python3 sessions/_compiler/gates/concept_structure_gate.py ${source}
-Return wrote_source, compiled (exit 0?), exit_code, the gate_output (both commands' tail), concept_count.${findingsBlock}`,
+Return: wrote_source; compiled = TRUE only if BOTH commands exit 0 (if EITHER compile_lesson.py OR concept_structure_gate.py fails, set compiled=false and put both outputs in gate_output); exit_code (compile_lesson.py's); gate_output (tail of BOTH commands); concept_count.${findingsBlock}`,
     { label: `author r${round}`, phase: 'Author', schema: COMPILE_SCHEMA, agentType: 'general-purpose' })
 }
 
@@ -102,9 +102,9 @@ const JUDGE_SCHEMA = {
 }
 
 const LENSES = [
-  { key: 'coverage', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Coverage Judge" section: report each MENTIONED/ABSENT spec concept as an exec_gap finding (P0). If the bridge is unavailable, say so with verdict PASS (structural fallback) and note it.` },
+  { key: 'coverage', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Coverage Judge" section: report each MENTIONED/ABSENT spec concept as an exec_gap finding (P0). ALSO parse its "skill gaps (notebook teaches; spec missed)" subsection: report EACH listed concept as a finding with kind="skill_gap" (severity P1) — these route to a user-approved skill proposal, NOT the author. If the bridge is unavailable, say so with verdict PASS (structural fallback) and note it.` },
   { key: 'tone', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Beginner-Friendliness Judge" section: report each BELOW/WORSE dimension as a tone finding (P1). Bridge unavailable -> verdict PASS, note it.` },
-  { key: 'structure', prompt: `Read ${lesson} (strip HTML). For each concept unit judge intuition_first / analogy-with-breakdown / stepwise buildup. Report each WEAK/MISSING as an intuition|analogy|buildup finding (P0 for MISSING, P1 for WEAK).` },
+  { key: 'structure', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Concept-Structure Judge" section (per-concept intuition_first / analogy / buildup). Report each concept whose ANY axis is WEAK or MISSING as an intuition|analogy|buildup finding (P0 for MISSING, P1 for WEAK). Bridge unavailable -> verdict PASS, note it.` },
   { key: 'correctness', prompt: `Adversarially read ${lesson} (strip HTML) for TECHNICAL errors, numeric self-inconsistency, and broken narrative spine. Report each as a correctness finding (P0). Default to reporting if unsure.` },
 ]
 
@@ -175,6 +175,7 @@ const report = [
     : '',
   `- Residual P0 (if any): ${routing ? routing.p0.length : 'n/a (lesson never compiled)'}`,
   routing && routing.p0.length ? `\n## Residual findings\n${routing.p0.map(f => `- [${f.severity}/${f.lens}] ${f.kind}: ${f.why}`).join('\n')}` : `\n(no residual P0)`,
+  routing && routing.fixable.filter(f => f.severity !== 'P0').length ? `\n## Advisory findings (P1/P2 — surfaced, not looped this run)\n${routing.fixable.filter(f => f.severity !== 'P0').map(f => `- [${f.severity}/${f.lens}] ${f.kind}${f.concept ? ' (' + f.concept + ')' : ''}: ${f.why}`).join('\n')}` : '',
   skillProposal ? `\n## Skill-gap proposal (needs your approval)\n${skillProposal.rationale}\n\n\`\`\`diff\n${skillProposal.proposal_diff}\n\`\`\`` : `\n(no skill-gap proposals)`,
 ].join('\n')
 

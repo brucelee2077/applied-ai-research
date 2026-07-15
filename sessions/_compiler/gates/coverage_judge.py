@@ -383,7 +383,7 @@ def main():
     ap.add_argument('--source', required=True)
     a = ap.parse_args()
     out = run_from_paths(a.lesson, a.source)
-    res, tone = out['coverage'], out['tone']
+    res, tone, struct = out['coverage'], out['tone'], out['structure']
     print('== Coverage Judge (tier-2, advisory):', os.path.relpath(a.lesson), '==')
     print('status:', res['status'])
     if res['status'] != 'OK':
@@ -418,6 +418,18 @@ def main():
         print('\nsummary:', tone['summary'])
     elif tone.get('error'):
         print('  error:', tone['error'])
+
+    print('\n== Concept-Structure Judge (per concept, advisory) ==')
+    print('status:', struct['status'], '| overall:', struct.get('overall'))
+    if struct['status'] == 'OK':
+        print('\n-- per concept (intuition_first / analogy / buildup) --')
+        for c in struct['concepts']:
+            print('  [if:%s an:%s bu:%s] %s — %s' % (
+                c.get('intuition_first', '?'), c.get('analogy', '?'), c.get('buildup', '?'),
+                c.get('concept', '?'), c.get('note', '')))
+        print('\nsummary:', struct['summary'])
+    elif struct.get('error'):
+        print('  error:', struct['error'])
     sys.exit(0)
 
 
