@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The loss, the overfitting turn, and dropout: why the held-out number is the only one you can trust</title>
+<style>body{max-width:820px;margin:2rem auto;padding:0 1rem;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1c2530}pre{background:#0f172a;color:#e2e8f0;padding:1rem;border-radius:8px;overflow:auto}code{font-family:ui-monospace,Menlo,monospace}p code,li code{background:#eef2f7;padding:.1em .3em;border-radius:4px}img,iframe{max-width:100%;border:1px solid #d9e0e8;border-radius:8px}iframe{width:100%;height:520px}h2.repro{margin-top:2.5rem;border-top:1px solid #d9e0e8;padding-top:1.5rem}</style></head><body>
+<article>
+<h1>The loss, the overfitting turn, and dropout: why the held-out number is the only one you can trust</h1>
+<p>Day 3 drove a training loss down and made the staff-level point that a falling *training* loss is a fact about the optimizer, not the model. Day 4 is where that warning becomes operational. It names the number the loop is minimizing (the <strong>loss</strong>), picks the right one for classification (<strong>cross-entropy</strong>), and then shows the failure that a training-loss-only view is structurally blind to: <strong>overfitting</strong>. The cure — <strong>dropout</strong>, specifically inverted dropout with its <code>1/(1−p)</code> train-time scaling — is built from scratch and, critically, *measured*, because dropout is one of those techniques where the folklore (&quot;it regularizes&quot;) is easy to repeat and easy to get wrong (wrong rate, wrong data regime, left on at eval).</p>
+<p>Every number below comes from <code>experiment.py</code>: a seeded, float64, from-scratch NumPy MLP (no autograd, no framework), <code>30 → 512 (ReLU) → 4</code>, trained on a <strong>nonlinear</strong> 4-class task — a <code>(radius-band × angle-band)</code> decision boundary hidden among 28 distractor-noise features, with 10% of labels randomly flipped. That combination — genuine nonlinear signal, real distractor and label noise, a wide net, and only <code>N_train = 600</code> — is deliberately chosen: it is a regime where the net *can* memorize the training noise and where dropout *can* actually help. A trivially separable task would collapse to loss 0 and hide every effect this note is about.</p>
+<h2>The mechanism: one scalar, and cross-entropy&#x27;s shape</h2>
+<p>The loss is one number for &quot;how wrong were these guesses,&quot; and it is one number for a mechanical reason: the backward pass needs a single scalar to push down. For classification the standard choice is cross-entropy, which for one example is <code>−log(p)</code> where <code>p</code> is the probability the model assigned to the *correct* class. The shape is the whole point — the penalty is near 0 when <code>p → 1</code>, modest (<code>−log 0.5 ≈ 0.69</code>) when the model is unsure, and unbounded as <code>p → 0</code>. Confident *and wrong* (tiny <code>p</code> on the true class) is punished hardest, which is exactly the signal you want: the loop fixes its most arrogant mistakes first. Training then minimizes the <strong>average</strong> cross-entropy over the training set — the mean, not the sum, so the objective is batch-size-independent.</p>
+<p>The subtlety a staff reader must hold: that objective only ever touches the *training* data. Nothing in it references data the model has not seen. So the loop can drive the training loss arbitrarily low without the model being any good — which is precisely what the next section measures.</p>
+<h2>The overfitting turn: the training loss lies, the held-out loss tells the truth</h2>
+<p>Train the over-capacity net with no dropout and watch both losses per epoch. The training loss falls monotonically toward zero. The held-out loss does something the training loss never reveals: it bottoms out, then turns and climbs.</p>
+<pre><code>epoch |  train loss  | held-out loss
+    1 |      1.5395 |      1.6906
+   34 |      0.7868 |      1.5187  &lt;-- turn
+  201 |      0.1448 |      1.8586
+  401 |      0.0476 |      2.1633
+  800 |      0.0169 |      2.4560</code></pre>
+<p>The <strong>overfitting turn is at epoch 34</strong>, where held-out loss bottoms at <code>1.5187</code>. After that, the training loss keeps falling (<code>1.5395 → 0.0169</code>) while the held-out loss *rises* <code>+0.9373</code> to <code>2.4560</code>. The final generalization gap (held-out − train) is <code>+2.4391</code>: the model reached a near-perfect training loss of <code>0.0169</code> and a held-out loss of <code>2.4560</code> — worse, at the end, than the uniform-guess baseline of <code>ln(4) = 1.3863</code>. A practitioner watching only the training curve would have declared victory somewhere around epoch 400 and shipped a model that had been *degrading on unseen data for 366 epochs*.</p>
+<p>The mechanistic cause is the standard one: capacity (512 hidden units, ~17.9k weights) far exceeds what 600 noisy points can pin down, so the cheapest way to shrink training loss past the turn is to memorize individual points — including the 10% of labels that are pure noise. Memorizing noise cannot transfer, so held-out loss rises.</p>
+<h2>The cure, measured: dropout narrows the gap — but it is not free</h2>
+<p>Re-run the identical net and optimizer with inverted dropout at <code>p = 0.5</code> on the hidden layer. Every effect the theory predicts shows up in the numbers:</p>
+<pre><code>best held-out loss  : no-dropout=1.5187   dropout=1.3258   (IMPROVED +0.1929)
+best held-out acc   : no-dropout=0.3930   dropout=0.4753   (IMPROVED +0.0822)
+FINAL held-out loss : no-dropout=2.4560   dropout=1.4237   (IMPROVED +1.0323)
+final generalization gap : no-dropout=+2.4391  dropout=+1.2746  (NARROWED +1.1645)</code></pre>
+<p>Dropout improved best held-out loss by <code>0.1929</code>, lifted best held-out accuracy by <code>+0.0822</code> (0.393 → 0.475), and cut the *final* held-out loss almost in half (<code>2.4560 → 1.4237</code>). The final gap narrowed by <code>1.1645</code>. That is the regularizer working: by randomly zeroing half the activations each step, no single neuron can become a crutch, so the network is pushed toward distributed features that transfer instead of a brittle memorized lookup.</p>
+<p>The trade-off is visible in the same run and must be stated: <strong>dropout makes the training loss worse on purpose.</strong> The final training loss with dropout is <code>0.1491</code> versus <code>0.0169</code> without — an order of magnitude higher. Practice is deliberately harder. This is the design tension: a larger <code>p</code> fights memorization harder but handicaps more of the network at once, so it can *under*-fit if you overdo it. <code>p</code> is the one knob, and you tune it by watching the train-vs-held-out gap, never the training loss alone. <code>p = 0.5</code> is the standard hidden-layer starting point, but &quot;add dropout&quot; is not automatically a win: too small a <code>p</code> barely regularizes and too large a <code>p</code> under-fits, and whether it helps at all depends on the data regime (a near-linearly-separable task with little noise gives it nothing to fix). That is exactly why this experiment fixed a regime where the effect is real — a nonlinear boundary with genuine label noise — and then *measured* the gain rather than asserting it.</p>
+<h2>The <code>1/(1−p)</code> scaling, and why eval needs no adjustment</h2>
+<p>Zeroing half a layer&#x27;s outputs halves its total signal, so training and test would see systematically different magnitudes unless something corrects it. Inverted dropout puts the correction in *training*: divide the survivors by <code>(1 − p)</code>.</p>
+<pre><code>full layer            = [4.0, 4.0, 4.0, 4.0]  sum = 16.0
+after drop (no scale) = [4.0, 0.0, 4.0, 0.0]  sum = 8.0   (half of 16)
+survivors / (1-0.5)   = [8.0, 0.0, 8.0, 0.0]  sum = 16.0  (back to full)
+eval (all on, no scale) = [4.0, 4.0, 4.0, 4.0] sum = 16.0</code></pre>
+<p>Train-time sum (<code>16</code>) equals eval-time sum (<code>16</code>): the magnitudes agree, so <strong>eval is a plain full-strength forward pass with no scaling.</strong> On the real 512-unit layer this holds in expectation too — mean hidden activation <code>0.5789</code> (full) versus <code>0.5788</code> (inverted-dropout), ratio <code>1.000</code>. This is why the scaling lives in training: it buys a do-nothing-extra eval pass.</p>
+<h2>The failure mode that ships silently: dropout left on at eval</h2>
+<p>The classic bug is not a crash — it is a model in <code>train</code> mode when you evaluate, so dropout keeps randomly zeroing neurons while you predict. Nothing errors; the numbers are just quietly, randomly wrong. The tell is that identical inputs give different answers across runs. Evaluating the trained dropout model on the *same fixed* held-out set five times, with dropout mistakenly left on versus in proper eval mode:</p>
+<pre><code>dropout LEFT ON at eval (bug) : [0.403, 0.4158, 0.407, 0.4183, 0.4073]
+    spread across runs        = 0.0152   (same input, different answers -- NOISY)
+proper EVAL mode (dropout off): [0.4713, 0.4713, 0.4713, 0.4713, 0.4713]
+    spread across runs        = 0.0000   (IDENTICAL every run -- STABLE)</code></pre>
+<p>Two things to notice. First, the buggy accuracy *jitters* by <code>0.0152</code> across runs on data that never changed — that non-determinism is the diagnostic. Second, the buggy accuracy (~0.41) is also *lower* than the correct eval accuracy (<code>0.4713</code>), because a randomly crippled network is strictly weaker than the full one at test time. The senior habit that catches this in one line: before reporting any metric, confirm the model is in eval mode and that scoring the same fixed data twice returns the *exact* same number. A non-zero spread means a train-only behavior (dropout, or batchnorm&#x27;s running stats) is still active.</p>
+<h2>The ceiling: what dropout cannot do</h2>
+<p>Dropout regularizes; it cannot manufacture information the training set never contained. In this run, even the best dropout model tops out at <code>0.4753</code> held-out accuracy — well above the <code>0.25</code> random floor, but capped by the 10% irreducible label noise and the finite <code>N_train = 600</code>. Dropout changed *how* the model leaned on the data it had; it could not hand the model data it was never given. Closing that kind of gap is a data problem (collect more, or more varied, examples), not a regularization problem — which is why the honest summary of the whole day is: the train-vs-held-out <strong>gap</strong>, not the training loss, is the number you trust, and no regularizer excuses you from measuring it.</p>
+<h2>What the run establishes</h2>
+<p>The mini-batch loop from Day 3 optimizes; Day 4 shows that optimization and generalization are different things you must measure separately. On a from-scratch NumPy MLP: the training loss fell to <code>0.0169</code> while held-out loss turned up at epoch 34 and climbed to <code>2.4560</code> (gap <code>+2.4391</code>); inverted dropout at <code>p = 0.5</code> cut that final gap to <code>+1.2746</code> and lifted best held-out accuracy <code>0.393 → 0.475</code>, at the cost of a deliberately higher training loss (<code>0.0169 → 0.1491</code>); and leaving dropout on at eval made accuracy jitter by <code>0.0152</code> on fixed data that a proper eval pass scored identically every time. Not one of those facts was visible in the training loss alone.</p>
+</article>
+<figure><img src="assets/overfitting_turn_and_dropout.png" alt="overfitting_turn_and_dropout.png"></figure>
+<h2 class="repro">Reproducible experiment</h2>
+<h3>experiment.py</h3>
+<pre><code>#!/usr/bin/env python3
+&quot;&quot;&quot;
+Evidence for M5 Day 4 — &quot;Full Training: The Loss &amp; Dropout&quot;.
+
+ONE concrete claim, made falsifiable:
+
+  Watching the TRAINING loss alone hides overfitting. On an over-capacity MLP
+  trained on a small, noisy set, the training loss keeps falling toward zero
+  while the HELD-OUT (validation) loss bottoms out at some epoch and then TURNS
+  UPWARD -- that turn is the overfitting turn, the moment &quot;learning to read&quot;
+  became &quot;memorizing the answer key&quot;. Inverted dropout (zero a fraction p of the
+  hidden activations each step, scale the survivors by 1/(1-p)) is the named cure:
+  it improves the best held-out loss/accuracy and dramatically narrows the final
+  train/held-out gap. And dropout MUST be off at eval: left on, the same fixed
+  data yields a jittering accuracy across re-runs; eval mode (a plain
+  full-strength pass) is rock-steady.
+
+We back it up four ways, all from a real NumPy MLP (no autograd, no framework):
+
+  (1) THE OVERFITTING TURN: train an over-capacity net with NO dropout; record
+      train + held-out loss every epoch; find the epoch where held-out loss turns
+      upward while training loss keeps falling.
+  (2) DROPOUT AS CURE: same net + inverted dropout (p=0.5); the best held-out
+      loss/accuracy improve and the final train/held-out gap shrinks sharply.
+  (3) THE 1/(1-p) SCALING is real arithmetic: dropping half of [4,4,4,4] and
+      scaling survivors by 1/(1-0.5) restores the sum to the full-layer sum, so
+      train-time and eval-time magnitudes agree.
+  (4) THE CLASSIC BUG: dropout left ON at eval makes accuracy on the SAME fixed
+      data jitter across re-runs; eval mode makes it identical every run.
+
+The task is a NONLINEAR 4-class problem (a radius-band x angle-band structure)
+buried in distractor-noise features, with 10% label noise. That nonlinear true
+boundary plus real noise is what dropout genuinely helps with: a wide net can
+memorize the training noise (train loss -&gt; 0) while the held-out loss turns up,
+and distributed features (which dropout forces) transfer better than a memorized
+lookup. A trivially separable task would collapse to loss 0 and hide every one
+of these effects.
+
+Self-contained script (NOT a notebook), so savefig() into assets/ is allowed.
+Everything is seeded, so the printed numbers are reproducible. float64 so the
+losses are not swamped by float32 round-off.
+&quot;&quot;&quot;
+
+import os
+import math
+import numpy as np
+
+import matplotlib
+matplotlib.use(&quot;Agg&quot;)  # headless backend -- no display in the sandbox
+import matplotlib.pyplot as plt
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(HERE, &quot;assets&quot;)
+os.makedirs(ASSETS, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# A NONLINEAR 4-class task with real noise -- the regime where overfitting and
+# dropout are both visible.
+#   * True label = (radius band) x (angle band): a genuinely nonlinear boundary
+#     a linear model can&#x27;t get and a wide MLP must bend to fit.
+#   * The two informative coordinates are hidden among 28 distractor-noise
+#     features, so the net has plenty of room to memorize spurious structure.
+#   * 10% of labels are randomly flipped -- irreducible noise the net can only
+#     &quot;fit&quot; by memorizing individual training points (pure overfitting fuel).
+# ---------------------------------------------------------------------------
+N_IN, N_HID, N_OUT = 30, 512, 4
+N_TRAIN = 600            # small enough that a 512-wide net overfits it
+N_HELD = 4000            # large held-out set for a stable generalization estimate
+FEAT_NOISE = 0.4         # per-feature Gaussian noise
+LABEL_NOISE = 0.10       # fraction of labels randomly flipped (irreducible)
+
+
+def make_data(n, rng):
+    ang = rng.uniform(0.0, 2.0 * math.pi, n)
+    rad = rng.uniform(0.2, 3.0, n)
+    x0, x1 = rad * np.cos(ang), rad * np.sin(ang)
+    r_band = (rad &gt; 1.6).astype(int)                 # inner vs outer ring
+    a_band = (np.sin(2.0 * ang) &gt; 0).astype(int)     # angular sector
+    y = r_band * 2 + a_band                          # 4 classes from a nonlinear combo
+    base = np.stack([x0, x1], axis=1)                # the 2 informative features
+    extra = rng.standard_normal((n, N_IN - 2))       # 28 distractor features
+    X = np.concatenate([base, extra], axis=1)
+    X = X + rng.standard_normal(X.shape) * FEAT_NOISE  # feature noise
+    flip = rng.random(n) &lt; LABEL_NOISE               # irreducible label noise
+    y[flip] = rng.integers(0, N_OUT, flip.sum())
+    y_oh = np.zeros((n, N_OUT))
+    y_oh[np.arange(n), y] = 1.0
+    return X, y, y_oh
+
+
+Xtr_raw, ytr, Ytr = make_data(N_TRAIN, np.random.default_rng(2))
+Xho_raw, yho, Yho = make_data(N_HELD, np.random.default_rng(3))
+# Standardize using TRAINING statistics only (no held-out leakage).
+_MU, _SD = Xtr_raw.mean(axis=0), Xtr_raw.std(axis=0) + 1e-8
+Xtr = (Xtr_raw - _MU) / _SD
+Xho = (Xho_raw - _MU) / _SD
+
+
+# ---------------------------------------------------------------------------
+# The MLP with an INVERTED-DROPOUT hidden layer. Forward pass caches what the
+# backward pass needs, INCLUDING the dropout mask so gradients flow only through
+# the neurons that survived this step.
+# ---------------------------------------------------------------------------
+def init_params(rng):
+    return {
+        &quot;W1&quot;: rng.standard_normal((N_IN, N_HID)) * math.sqrt(2.0 / N_IN),  # He init
+        &quot;b1&quot;: np.zeros(N_HID),
+        &quot;W2&quot;: rng.standard_normal((N_HID, N_OUT)) * math.sqrt(2.0 / N_HID),
+        &quot;b2&quot;: np.zeros(N_OUT),
+    }
+
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)             # subtract max for stability
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def forward(p, x, y_oh, p_drop=0.0, training=False, rng=None):
+    &quot;&quot;&quot;Forward pass with optional INVERTED dropout on the hidden layer.
+
+    training=True and p_drop&gt;0 : draw a 0/1 keep-mask, zero the dropped units,
+        and scale the SURVIVORS by 1/(1-p_drop) so the layer&#x27;s expected output
+        matches the full (no-dropout) layer -- the c8 scaling done IN TRAINING.
+    training=False (eval)      : NO mask, NO scaling -- a plain full-strength
+        forward pass. Because the scaling already happened in training, eval
+        needs no adjustment (the whole point of inverted dropout).
+    &quot;&quot;&quot;
+    z1 = x @ p[&quot;W1&quot;] + p[&quot;b1&quot;]                        # (B, N_HID) pre-activation
+    h = np.maximum(0.0, z1)                           # ReLU hidden activations
+    if training and p_drop &gt; 0.0:
+        keep = 1.0 - p_drop
+        # mask: 1 where kept, 0 where dropped; survivors divided by keep = 1/(1-p)
+        mask = (rng.random(h.shape) &gt;= p_drop).astype(h.dtype) / keep
+        h = h * mask
+    else:
+        mask = np.ones_like(h)                        # eval: everything kept, no scale
+    logits = h @ p[&quot;W2&quot;] + p[&quot;b2&quot;]                    # (B, N_OUT) class scores
+    probs = softmax(logits)
+    # MEAN cross-entropy over the batch (the average, size-independent)
+    loss = -np.mean(np.sum(y_oh * np.log(probs + 1e-12), axis=1))
+    return loss, (z1, h, mask, probs)
+
+
+def backward(p, x, cache, y_oh):
+    &quot;&quot;&quot;Analytic gradient. The dropout mask is reused so gradient flows only
+    through the surviving, up-scaled units -- the same units the loss saw.&quot;&quot;&quot;
+    z1, h, mask, probs = cache
+    B = x.shape[0]
+    dlogits = (probs - y_oh) / B                      # (B, N_OUT), mean reduction
+    dW2 = h.T @ dlogits
+    db2 = dlogits.sum(axis=0)
+    dh = (dlogits @ p[&quot;W2&quot;].T) * mask                 # dropout mask on the backward path
+    dz1 = dh * (z1 &gt; 0)                               # ReLU gate
+    dW1 = x.T @ dz1
+    db1 = dz1.sum(axis=0)
+    return {&quot;W1&quot;: dW1, &quot;b1&quot;: db1, &quot;W2&quot;: dW2, &quot;b2&quot;: db2}
+
+
+def sgd_step(p, grads, lr):
+    for k in p:
+        p[k] = p[k] - lr * grads[k]                   # param = param - lr * grad
+
+
+def eval_loss(p, X, Y):
+    &quot;&quot;&quot;Plain full-strength forward pass (eval mode): no dropout, no scaling.&quot;&quot;&quot;
+    return float(forward(p, X, Y, training=False)[0])
+
+
+def eval_acc(p, X, y, p_drop=0.0, training=False, rng=None):
+    &quot;&quot;&quot;Accuracy. training=True with p_drop&gt;0 = the BUG: dropout left on at eval.&quot;&quot;&quot;
+    _, (_, _, _, probs) = forward(p, X, np.zeros((X.shape[0], N_OUT)),
+                                  p_drop=p_drop, training=training, rng=rng)
+    return float((probs.argmax(axis=1) == y).mean())
+
+
+# ---------------------------------------------------------------------------
+# The training loop. Records per-epoch train + held-out loss so we can SEE the
+# overfitting turn. p_drop=0 -&gt; no dropout; p_drop&gt;0 -&gt; inverted dropout ON.
+# ---------------------------------------------------------------------------
+BATCH, LR, EPOCHS = 32, 0.01, 800
+
+
+def train(X, Y, epochs, p_drop, lr=LR, batch=BATCH, seed=10):
+    p = init_params(np.random.default_rng(seed))
+    n = X.shape[0]
+    rng = np.random.default_rng(seed + 100)
+    tr_hist, ho_hist, acc_hist = [], [], []
+    for e in range(epochs):
+        idx = rng.permutation(n)                      # shuffle indices each epoch
+        for start in range(0, n, batch):
+            b = idx[start:start + batch]
+            xb, yb = X[b], Y[b]
+            _, cache = forward(p, xb, yb, p_drop=p_drop, training=True, rng=rng)
+            grads = backward(p, xb, cache, yb)
+            sgd_step(p, grads, lr)
+        # measure BOTH losses in eval mode (plain full-strength pass, no dropout)
+        tr_hist.append(eval_loss(p, X, Y))
+        ho_hist.append(eval_loss(p, Xho, Yho))
+        acc_hist.append(eval_acc(p, Xho, yho))
+    return p, tr_hist, ho_hist, acc_hist
+
+
+# ===========================================================================
+# (1) THE OVERFITTING TURN -- train loss falls forever, held-out loss turns up.
+# ===========================================================================
+print(&quot;=&quot; * 72)
+print(&quot;(1) THE OVERFITTING TURN  (NO dropout, over-capacity net on tiny data)&quot;)
+print(&quot;=&quot; * 72)
+p_plain, tr_plain, ho_plain, acc_plain = train(Xtr, Ytr, EPOCHS, p_drop=0.0)
+
+turn = int(np.argmin(ho_plain))                        # epoch of lowest held-out loss
+print(f&quot;net = {N_IN}-&gt;{N_HID}(ReLU)-&gt;{N_OUT},  N_train={N_TRAIN},  N_held={N_HELD}&quot;)
+print(f&quot;uniform-guess baseline = ln({N_OUT}) = {math.log(N_OUT):.4f}&quot;)
+print(f&quot;held-out loss BOTTOMS at epoch {turn + 1} (loss={ho_plain[turn]:.4f}); &quot;
+      f&quot;after that it RISES -&gt; the overfitting turn.&quot;)
+print(&quot;epoch |  train loss  | held-out loss&quot;)
+for e in sorted(set([0, turn, EPOCHS // 4, EPOCHS // 2, EPOCHS - 1])):
+    tag = &quot;  &lt;-- turn&quot; if e == turn else &quot;&quot;
+    print(f&quot;  {e + 1:&gt;3} | {tr_plain[e]:&gt;11.4f} | {ho_plain[e]:&gt;11.4f}{tag}&quot;)
+print(f&quot;training loss keeps falling : {tr_plain[0]:.4f} -&gt; {tr_plain[-1]:.4f} &quot;
+      f&quot;({&#x27;FALLS&#x27; if tr_plain[-1] &lt; tr_plain[0] else &#x27;no&#x27;})&quot;)
+print(f&quot;held-out loss turns up      : min {ho_plain[turn]:.4f} (ep {turn + 1}) &quot;
+      f&quot;-&gt; {ho_plain[-1]:.4f} (ep {EPOCHS}) &quot;
+      f&quot;({&#x27;RISES &#x27; + format(ho_plain[-1] - ho_plain[turn], &#x27;+.4f&#x27;) + &#x27; after the turn&#x27; if ho_plain[-1] &gt; ho_plain[turn] else &#x27;no&#x27;})&quot;)
+gap_plain = ho_plain[-1] - tr_plain[-1]
+print(f&quot;final generalization gap (held-out - train) = {gap_plain:+.4f}  &quot;
+      f&quot;(train {tr_plain[-1]:.4f} vs held-out {ho_plain[-1]:.4f})&quot;)
+print()
+
+
+# ===========================================================================
+# (2) DROPOUT AS CURE -- same net + inverted dropout narrows the gap.
+# ===========================================================================
+P_DROP = 0.5
+print(&quot;=&quot; * 72)
+print(f&quot;(2) DROPOUT AS CURE  (same net, inverted dropout p={P_DROP})&quot;)
+print(&quot;=&quot; * 72)
+p_drop, tr_drop, ho_drop, acc_drop = train(Xtr, Ytr, EPOCHS, p_drop=P_DROP)
+
+best_plain_ho, best_plain_acc = min(ho_plain), max(acc_plain)
+best_drop_ho, best_drop_acc = min(ho_drop), max(acc_drop)
+gap_drop = ho_drop[-1] - tr_drop[-1]
+print(f&quot;training loss falls SLOWER / settles HIGHER with dropout &quot;
+      f&quot;(practice is harder on purpose):&quot;)
+print(f&quot;    no-dropout final train loss = {tr_plain[-1]:.4f}&quot;)
+print(f&quot;    dropout    final train loss = {tr_drop[-1]:.4f}  &quot;
+      f&quot;({&#x27;higher&#x27; if tr_drop[-1] &gt; tr_plain[-1] else &#x27;lower&#x27;} -- as predicted)&quot;)
+print(f&quot;best held-out loss  : no-dropout={best_plain_ho:.4f}   &quot;
+      f&quot;dropout={best_drop_ho:.4f}  &quot;
+      f&quot;({&#x27;IMPROVED &#x27; + format(best_plain_ho - best_drop_ho, &#x27;+.4f&#x27;) if best_drop_ho &lt; best_plain_ho else &#x27;no gain&#x27;})&quot;)
+print(f&quot;best held-out acc   : no-dropout={best_plain_acc:.4f}   &quot;
+      f&quot;dropout={best_drop_acc:.4f}  &quot;
+      f&quot;({&#x27;IMPROVED &#x27; + format(best_drop_acc - best_plain_acc, &#x27;+.4f&#x27;) if best_drop_acc &gt; best_plain_acc else &#x27;no gain&#x27;})&quot;)
+print(f&quot;FINAL held-out loss : no-dropout={ho_plain[-1]:.4f}   &quot;
+      f&quot;dropout={ho_drop[-1]:.4f}  &quot;
+      f&quot;({&#x27;IMPROVED &#x27; + format(ho_plain[-1] - ho_drop[-1], &#x27;+.4f&#x27;) if ho_drop[-1] &lt; ho_plain[-1] else &#x27;no gain&#x27;})&quot;)
+print(f&quot;final generalization gap : no-dropout={gap_plain:+.4f}   &quot;
+      f&quot;dropout={gap_drop:+.4f}  &quot;
+      f&quot;({&#x27;NARROWED &#x27; + format(gap_plain - gap_drop, &#x27;+.4f&#x27;) if gap_drop &lt; gap_plain else &#x27;widened&#x27;})&quot;)
+print()
+
+
+# ===========================================================================
+# (3) THE 1/(1-p) SCALING is real arithmetic (the c8 math ladder, in code).
+# ===========================================================================
+print(&quot;=&quot; * 72)
+print(&quot;(3) THE 1/(1-p) SCALING  -- survivors up-scaled so magnitudes agree&quot;)
+print(&quot;=&quot; * 72)
+layer = np.array([4.0, 4.0, 4.0, 4.0])
+full_sum = layer.sum()
+keep_mask = np.array([1.0, 0.0, 1.0, 0.0])            # drop units 2 and 4 (p=0.5)
+dropped_no_scale = layer * keep_mask                  # naive dropout, no scaling
+scaled = layer * keep_mask / (1.0 - P_DROP)           # INVERTED dropout survivors
+print(f&quot;full layer                 = {layer.tolist()}  sum = {full_sum:.1f}&quot;)
+print(f&quot;after drop (no scale)      = {dropped_no_scale.tolist()}  &quot;
+      f&quot;sum = {dropped_no_scale.sum():.1f}  (too small -- half of {full_sum:.0f})&quot;)
+print(f&quot;survivors / (1-p) = / {1 - P_DROP:.1f}  = {scaled.tolist()}  &quot;
+      f&quot;sum = {scaled.sum():.1f}  (back to full {full_sum:.0f})&quot;)
+print(f&quot;eval (all on, NO scale)    = {layer.tolist()}  sum = {full_sum:.1f}  &quot;
+      f&quot;=&gt; train sum ({scaled.sum():.0f}) == eval sum ({full_sum:.0f}): magnitudes agree.&quot;)
+# Verify at scale on the real net: expected activation is preserved in the mean.
+_rng = np.random.default_rng(77)
+h_full = np.maximum(0.0, Xtr @ p_plain[&quot;W1&quot;] + p_plain[&quot;b1&quot;])   # full activations
+keep = 1.0 - P_DROP
+h_dropped = h_full * (_rng.random(h_full.shape) &gt;= P_DROP) / keep  # inverted dropout
+print(f&quot;real net check: mean hidden activation  full={h_full.mean():.4f}  &quot;
+      f&quot;inverted-dropout={h_dropped.mean():.4f}  &quot;
+      f&quot;(ratio {h_dropped.mean() / max(h_full.mean(), 1e-12):.3f} ~ 1.0 -- preserved)&quot;)
+print()
+
+
+# ===========================================================================
+# (4) THE CLASSIC BUG -- dropout left ON at eval makes accuracy jitter.
+# ===========================================================================
+print(&quot;=&quot; * 72)
+print(&quot;(4) THE CLASSIC BUG  -- dropout left ON at eval vs proper eval mode&quot;)
+print(&quot;=&quot; * 72)
+# Same trained dropout model, same FIXED held-out data, evaluated 5 times.
+buggy_accs = []
+for r in range(5):
+    rng = np.random.default_rng(1000 + r)             # different mask each run
+    buggy_accs.append(eval_acc(p_drop, Xho, yho, p_drop=P_DROP, training=True, rng=rng))
+proper_accs = [eval_acc(p_drop, Xho, yho, training=False) for _ in range(5)]
+print(f&quot;dropout LEFT ON at eval (bug) : {[round(a, 4) for a in buggy_accs]}&quot;)
+print(f&quot;    spread across runs        = {max(buggy_accs) - min(buggy_accs):.4f}  &quot;
+      f&quot;(same input, different answers -- NOISY)&quot;)
+print(f&quot;proper EVAL mode (dropout off): {[round(a, 4) for a in proper_accs]}&quot;)
+print(f&quot;    spread across runs        = {max(proper_accs) - min(proper_accs):.4f}  &quot;
+      f&quot;({&#x27;IDENTICAL every run -- STABLE&#x27; if max(proper_accs) - min(proper_accs) == 0.0 else &#x27;still varies&#x27;})&quot;)
+print()
+
+
+# ---------------------------------------------------------------------------
+# Plot: the whole story on one canvas.
+#   left  -- no-dropout train vs held-out loss (the overfitting turn marked).
+#   right -- held-out loss with vs without dropout (the cure holds it lower).
+# ---------------------------------------------------------------------------
+fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.2))
+
+ep = range(1, EPOCHS + 1)
+axL.plot(ep, tr_plain, &quot;-&quot;, color=&quot;#2D8B55&quot;, label=&quot;training loss&quot;)
+axL.plot(ep, ho_plain, &quot;--&quot;, color=&quot;#C93B3B&quot;, label=&quot;held-out loss&quot;)
+axL.axvline(turn + 1, color=&quot;#7C6DAA&quot;, ls=&quot;:&quot;, lw=1.4,
+            label=f&quot;overfitting turn (ep {turn + 1})&quot;)
+axL.set_xlabel(&quot;epoch&quot;)
+axL.set_ylabel(&quot;loss&quot;)
+axL.set_title(&quot;No dropout: training loss falls, held-out loss turns up&quot;)
+axL.legend(fontsize=8)
+axL.grid(True, alpha=0.25)
+
+axR.plot(ep, ho_plain, &quot;--&quot;, color=&quot;#C93B3B&quot;, label=&quot;held-out loss (no dropout)&quot;)
+axR.plot(ep, ho_drop, &quot;-&quot;, color=&quot;#2D8B55&quot;, label=&quot;held-out loss (dropout p=0.5)&quot;)
+axR.set_xlabel(&quot;epoch&quot;)
+axR.set_ylabel(&quot;held-out loss&quot;)
+axR.set_title(&quot;Dropout holds held-out loss lower&quot;)
+axR.legend(fontsize=8)
+axR.grid(True, alpha=0.25)
+
+fig.tight_layout()
+plot_path = os.path.join(ASSETS, &quot;overfitting_turn_and_dropout.png&quot;)
+fig.savefig(plot_path, dpi=110)
+print(f&quot;saved plot : assets/{os.path.basename(plot_path)}&quot;)
+print()
+
+print(&quot;KEY RESULT: with NO dropout the training loss fell &quot;
+      f&quot;{tr_plain[0]:.4f} -&gt; {tr_plain[-1]:.4f} while the held-out loss bottomed at &quot;
+      f&quot;epoch {turn + 1} ({ho_plain[turn]:.4f}) and TURNED UP to {ho_plain[-1]:.4f} &quot;
+      f&quot;(final gap {gap_plain:+.4f}); inverted dropout (p={P_DROP}) improved best &quot;
+      f&quot;held-out loss {best_plain_ho:.4f} -&gt; {best_drop_ho:.4f} and best held-out &quot;
+      f&quot;accuracy {best_plain_acc:.4f} -&gt; {best_drop_acc:.4f}, cutting the final gap &quot;
+      f&quot;to {gap_drop:+.4f}. Dropout left ON at eval made accuracy jitter by &quot;
+      f&quot;{max(buggy_accs) - min(buggy_accs):.4f} across identical runs; eval mode was &quot;
+      &quot;identical every run. The falling training loss alone never revealed any of &quot;
+      &quot;this -- only the held-out number did.&quot;)
+</code></pre>
+<h3>Output</h3>
+<pre>========================================================================
+(1) THE OVERFITTING TURN  (NO dropout, over-capacity net on tiny data)
+========================================================================
+net = 30-&gt;512(ReLU)-&gt;4,  N_train=600,  N_held=4000
+uniform-guess baseline = ln(4) = 1.3863
+held-out loss BOTTOMS at epoch 34 (loss=1.5187); after that it RISES -&gt; the overfitting turn.
+epoch |  train loss  | held-out loss
+    1 |      1.5395 |      1.6906
+   34 |      0.7868 |      1.5187  &lt;-- turn
+  201 |      0.1448 |      1.8586
+  401 |      0.0476 |      2.1633
+  800 |      0.0169 |      2.4560
+training loss keeps falling : 1.5395 -&gt; 0.0169 (FALLS)
+held-out loss turns up      : min 1.5187 (ep 34) -&gt; 2.4560 (ep 800) (RISES +0.9373 after the turn)
+final generalization gap (held-out - train) = +2.4391  (train 0.0169 vs held-out 2.4560)
+
+========================================================================
+(2) DROPOUT AS CURE  (same net, inverted dropout p=0.5)
+========================================================================
+training loss falls SLOWER / settles HIGHER with dropout (practice is harder on purpose):
+    no-dropout final train loss = 0.0169
+    dropout    final train loss = 0.1491  (higher -- as predicted)
+best held-out loss  : no-dropout=1.5187   dropout=1.3258  (IMPROVED +0.1929)
+best held-out acc   : no-dropout=0.3930   dropout=0.4753  (IMPROVED +0.0822)
+FINAL held-out loss : no-dropout=2.4560   dropout=1.4237  (IMPROVED +1.0323)
+final generalization gap : no-dropout=+2.4391   dropout=+1.2746  (NARROWED +1.1645)
+
+========================================================================
+(3) THE 1/(1-p) SCALING  -- survivors up-scaled so magnitudes agree
+========================================================================
+full layer                 = [4.0, 4.0, 4.0, 4.0]  sum = 16.0
+after drop (no scale)      = [4.0, 0.0, 4.0, 0.0]  sum = 8.0  (too small -- half of 16)
+survivors / (1-p) = / 0.5  = [8.0, 0.0, 8.0, 0.0]  sum = 16.0  (back to full 16)
+eval (all on, NO scale)    = [4.0, 4.0, 4.0, 4.0]  sum = 16.0  =&gt; train sum (16) == eval sum (16): magnitudes agree.
+real net check: mean hidden activation  full=0.5789  inverted-dropout=0.5788  (ratio 1.000 ~ 1.0 -- preserved)
+
+========================================================================
+(4) THE CLASSIC BUG  -- dropout left ON at eval vs proper eval mode
+========================================================================
+dropout LEFT ON at eval (bug) : [0.403, 0.4158, 0.407, 0.4183, 0.4073]
+    spread across runs        = 0.0152  (same input, different answers -- NOISY)
+proper EVAL mode (dropout off): [0.4713, 0.4713, 0.4713, 0.4713, 0.4713]
+    spread across runs        = 0.0000  (IDENTICAL every run -- STABLE)
+
+saved plot : assets/overfitting_turn_and_dropout.png
+
+KEY RESULT: with NO dropout the training loss fell 1.5395 -&gt; 0.0169 while the held-out loss bottomed at epoch 34 (1.5187) and TURNED UP to 2.4560 (final gap +2.4391); inverted dropout (p=0.5) improved best held-out loss 1.5187 -&gt; 1.3258 and best held-out accuracy 0.3930 -&gt; 0.4753, cutting the final gap to +1.2746. Dropout left ON at eval made accuracy jitter by 0.0152 across identical runs; eval mode was identical every run. The falling training loss alone never revealed any of this -- only the held-out number did.
+</pre>
+</body></html>

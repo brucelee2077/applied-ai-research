@@ -1,0 +1,47 @@
+========================================================================
+(1) THE OVERFITTING TURN  (NO dropout, over-capacity net on tiny data)
+========================================================================
+net = 30->512(ReLU)->4,  N_train=600,  N_held=4000
+uniform-guess baseline = ln(4) = 1.3863
+held-out loss BOTTOMS at epoch 34 (loss=1.5187); after that it RISES -> the overfitting turn.
+epoch |  train loss  | held-out loss
+    1 |      1.5395 |      1.6906
+   34 |      0.7868 |      1.5187  <-- turn
+  201 |      0.1448 |      1.8586
+  401 |      0.0476 |      2.1633
+  800 |      0.0169 |      2.4560
+training loss keeps falling : 1.5395 -> 0.0169 (FALLS)
+held-out loss turns up      : min 1.5187 (ep 34) -> 2.4560 (ep 800) (RISES +0.9373 after the turn)
+final generalization gap (held-out - train) = +2.4391  (train 0.0169 vs held-out 2.4560)
+
+========================================================================
+(2) DROPOUT AS CURE  (same net, inverted dropout p=0.5)
+========================================================================
+training loss falls SLOWER / settles HIGHER with dropout (practice is harder on purpose):
+    no-dropout final train loss = 0.0169
+    dropout    final train loss = 0.1491  (higher -- as predicted)
+best held-out loss  : no-dropout=1.5187   dropout=1.3258  (IMPROVED +0.1929)
+best held-out acc   : no-dropout=0.3930   dropout=0.4753  (IMPROVED +0.0822)
+FINAL held-out loss : no-dropout=2.4560   dropout=1.4237  (IMPROVED +1.0323)
+final generalization gap : no-dropout=+2.4391   dropout=+1.2746  (NARROWED +1.1645)
+
+========================================================================
+(3) THE 1/(1-p) SCALING  -- survivors up-scaled so magnitudes agree
+========================================================================
+full layer                 = [4.0, 4.0, 4.0, 4.0]  sum = 16.0
+after drop (no scale)      = [4.0, 0.0, 4.0, 0.0]  sum = 8.0  (too small -- half of 16)
+survivors / (1-p) = / 0.5  = [8.0, 0.0, 8.0, 0.0]  sum = 16.0  (back to full 16)
+eval (all on, NO scale)    = [4.0, 4.0, 4.0, 4.0]  sum = 16.0  => train sum (16) == eval sum (16): magnitudes agree.
+real net check: mean hidden activation  full=0.5789  inverted-dropout=0.5788  (ratio 1.000 ~ 1.0 -- preserved)
+
+========================================================================
+(4) THE CLASSIC BUG  -- dropout left ON at eval vs proper eval mode
+========================================================================
+dropout LEFT ON at eval (bug) : [0.403, 0.4158, 0.407, 0.4183, 0.4073]
+    spread across runs        = 0.0152  (same input, different answers -- NOISY)
+proper EVAL mode (dropout off): [0.4713, 0.4713, 0.4713, 0.4713, 0.4713]
+    spread across runs        = 0.0000  (IDENTICAL every run -- STABLE)
+
+saved plot : assets/overfitting_turn_and_dropout.png
+
+KEY RESULT: with NO dropout the training loss fell 1.5395 -> 0.0169 while the held-out loss bottomed at epoch 34 (1.5187) and TURNED UP to 2.4560 (final gap +2.4391); inverted dropout (p=0.5) improved best held-out loss 1.5187 -> 1.3258 and best held-out accuracy 0.3930 -> 0.4753, cutting the final gap to +1.2746. Dropout left ON at eval made accuracy jitter by 0.0152 across identical runs; eval mode was identical every run. The falling training loss alone never revealed any of this -- only the held-out number did.

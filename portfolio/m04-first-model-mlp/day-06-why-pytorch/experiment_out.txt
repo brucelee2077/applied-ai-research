@@ -1,0 +1,46 @@
+==========================================================================
+(1) CANONICAL CHECK   y = x**2 at x = 3   =>   x.grad should be 2*x = 6.0
+==========================================================================
+autograd x.grad = 6.000000
+analytic 2*x    = 6.000000
+|autograd - analytic| = 0.000e+00   (exactly equal: True)
+
+==========================================================================
+(2) COMPOSED GRAPH   f(x) = sin(x^2) + 3*log(x)   vs analytic f'(x)
+==========================================================================
+x               = [0.5, 1.0, 1.7000000476837158, 2.299999952316284, 3.0]
+autograd grad   = [6.968912124633789, 4.080604076385498, -1.5282529592514038, 3.8160579204559326, -4.466782093048096]
+analytic grad   = [6.968912124633789, 4.080604076385498, -1.5282529592514038, 3.8160579204559326, -4.466782093048096]
+max |autograd - analytic| over 5 points = 0.000e+00
+=> the chain rule is being REPLAYED node-by-node, not memorized.
+
+==========================================================================
+(3) DEFINE-BY-RUN   a Python if-branch + data-dependent for-loop
+==========================================================================
+x=  2.0, k=3  [x>0 branch, x**3  ]  autograd=+12.0000  analytic=+12.0000  |diff|=0.00e+00
+x=  1.5, k=4  [x>0 branch, x**4  ]  autograd=+13.5000  analytic=+13.5000  |diff|=0.00e+00
+x= -1.0, k=3  [x<=0 branch, -2x  ]  autograd=-2.0000  analytic=-2.0000  |diff|=0.00e+00
+x=  0.7, k=5  [x>0 branch, x**5  ]  autograd=+1.2005  analytic=+1.2005  |diff|=1.14e-08
+max |autograd - analytic| across branches/loops = 1.144e-08
+=> ordinary if / for JUST WORK: autograd differentiates whatever path ran.
+
+==========================================================================
+(4) FREED-GRAPH BUG   backward() twice on the SAME graph -> RuntimeError
+==========================================================================
+after 1st backward:  w.grad = 6.0000   (analytic 2*(w-1) = 6.0000)
+2nd backward RAISED RuntimeError: Trying to backward through the graph a second time (or directly access saved tensors aft...
+after recomputing forward + 2nd backward (NO zero_grad):  w.grad = 12.0000
+  => it ACCUMULATED: 6.0000 + 6.0000 = 12.0000  (this is exactly why you must call zero_grad each step)
+
+==========================================================================
+(5) CAPABILITY LIMIT   autograd differentiates a badly-scaled graph faithfully
+==========================================================================
+well-scaled (scale=1):    autograd grad = -1.000000   analytic = -1.000000   |diff|=0.00e+00
+badly-scaled (scale=1e4): autograd grad = +9.998000e+07   analytic = +9.998000e+07   |rel diff|=0.00e+00
+the bad graph's gradient is 9.998e+07x larger -- CORRECT, but enormous.
+=> autograd computed the RIGHT gradient of a BAD graph, silently. Correct
+   gradients say nothing about whether the model is good. Judgment stays yours.
+
+saved plot : assets/autograd_equals_chain_rule.png
+
+KEY RESULT: autograd is the chain rule replayed over a recorded tape, not magic. For y=x² at x=3 it returned x.grad = 6.0 = 2x exactly; on the composed graph sin(x²)+3·log(x) its gradient matched the hand-derived analytic derivative to 0.0e+00 (and to 9.5e-07 over a 300-point sweep); through a Python if-branch and a data-dependent for-loop it still matched the branch-specific analytic gradient to 1.1e-08 (define-by-run). A 2nd backward() on the freed graph raised RuntimeError, and gradients accumulated (6+6=12) -- the zero_grad root cause. And on a badly-scaled graph autograd returned a CORRECT-but-1e+08x-larger gradient with no complaint: correct gradients are no evidence of a good model. The framework changes the labor, not the judgment.

@@ -1,0 +1,42 @@
+==========================================================================
+(1) FORWARD EQUIVALENCE  (same weights, same input, same output)
+==========================================================================
+net = 784->128(ReLU)->10
+model.fc1.weight.shape = (128, 784)   (out,in) -- the TRANSPOSE of the numpy W1 (784, 128) (in,out)
+max |torch_logits - numpy_logits| over a 64x10 batch = 3.886e-16
+predicted-class agreement = 64/64 examples
+example row (class scores rounded): numpy = [-0.2213, -0.3009, 0.0388, 0.1077, -0.17, 0.1136, 0.1863, 0.1091, -0.2643, -0.2892]
+                                    torch = [-0.2213, -0.3009, 0.0388, 0.1077, -0.17, 0.1136, 0.1863, 0.1091, -0.2643, -0.2892]
+
+==========================================================================
+(2) GRADIENT EQUIVALENCE  (hand-derived chain rule vs loss.backward())
+==========================================================================
+loss:  numpy CE = 2.313130   torch CE = 2.313130   |diff| = 1.031e-11
+grad W1: max |torch.grad - numpy hand-derived grad| = 1.041e-17
+grad b1: max |torch.grad - numpy hand-derived grad| = 5.204e-18
+grad W2: max |torch.grad - numpy hand-derived grad| = 4.163e-17
+grad b2: max |torch.grad - numpy hand-derived grad| = 2.776e-17
+=> loss.backward() reproduces the ~30-line hand-derived backward pass exactly.
+
+==========================================================================
+(3) TRAINING EQUIVALENCE  (same init, same SGD rule, same loss curve)
+==========================================================================
+train loss  epoch 1  : torch=0.3961   numpy=0.3961
+train loss  epoch 15 : torch=0.0009   numpy=0.0009
+max per-epoch loss-curve difference over 15 epochs = 1.976e-12
+final TEST accuracy : torch=1.0000   numpy=1.0000   |diff|=0.000e+00
+=> the five-line PyTorch loop and the hand-written numpy loop are the SAME model.
+
+==========================================================================
+(4) THE zero_grad SILENT BUG  (drop zero_grad => grads accumulate)
+==========================================================================
+fc1 grad-norm step 1    = 2.2273
+fc1 grad-norm PEAK      = 1013.0119   (grew 454.8x -- gradients ACCUMULATE across batches)
+loss step 1  = 2.3656
+loss PEAK    = 21085.1494   loss final = 21085.1494   (DIVERGED (spiked / NaN)) -- and NO error was thrown.
+=> this bug cannot happen in the numpy path: it recomputes a fresh dW each
+   batch with nothing to accumulate. zero_grad() is the one new habit.
+
+saved plot : assets/pytorch_equivalence_and_zero_grad_bug.png
+
+KEY RESULT: with identical weights and input, the PyTorch and hand-derived NumPy MLPs produced logits matching to 3.9e-16 (predictions agree 64/64); loss.backward() reproduced the hand-derived gradients to ~1e-6; trained from the same init with the same SGD their loss curves stayed within 2.0e-12 of each other over 15 epochs and reached the same test accuracy (torch 1.0000 vs numpy 1.0000). Dropping optimizer.zero_grad() made the fc1 grad norm balloon 455x and the loss spike to 21085.15 with no error thrown. PyTorch is a re-expression, not a new algorithm: it changes the labor, not the power.

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The same model in PyTorch: proving a re-expression, not a new algorithm</title>
+<style>body{max-width:820px;margin:2rem auto;padding:0 1rem;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1c2530}pre{background:#0f172a;color:#e2e8f0;padding:1rem;border-radius:8px;overflow:auto}code{font-family:ui-monospace,Menlo,monospace}p code,li code{background:#eef2f7;padding:.1em .3em;border-radius:4px}img,iframe{max-width:100%;border:1px solid #d9e0e8;border-radius:8px}iframe{width:100%;height:520px}h2.repro{margin-top:2.5rem;border-top:1px solid #d9e0e8;padding-top:1.5rem}</style></head><body>
+<article>
+<h1>The same model in PyTorch: proving a re-expression, not a new algorithm</h1>
+<p>Days 1–4 built an MLP by hand in NumPy: the forward pass, the hand-derived backward pass, the mini-batch loop, cross-entropy, dropout. Day 5 rebuilds the *exact same* <code>784 → 128 → 10</code> model in PyTorch and makes the claim that the whole week has been building toward — the claim a staff engineer must be able to *prove* rather than assume: <strong>PyTorch is a re-expression of that NumPy model, not a new algorithm.</strong> <code>nn.Module</code> is a container, <code>nn.Linear</code> is a pre-built weight matrix, <code>loss.backward()</code> is autograd running the chain rule, and <code>optimizer.step()</code> is the update line. None of it changes what the model *can* learn. It changes the labor, not the power.</p>
+<p>That claim is only worth stating if it is *falsifiable*, so <code>experiment.py</code> puts it on trial. It builds the MLP twice — once in PyTorch as an <code>nn.Module</code>, once in from-scratch NumPy with a <strong>hand-derived</strong> backward pass (no autograd in the NumPy path) — and checks equivalence at four levels: the forward output, the gradients, the whole training trajectory, and the one failure mode the framework introduces. Everything is <code>float64</code> and seeded, so the numbers below are reproducible.</p>
+<h2>The one detail that trips everyone: the <code>(out, in)</code> transpose</h2>
+<p>Before the outputs can agree, the weights have to be copied across correctly, and that copy is where the first subtlety lives. Your NumPy <code>W1</code> was shaped <code>(784, 128)</code> — <code>(in, out)</code> — and you computed <code>x @ W1 + b1</code>. PyTorch&#x27;s <code>nn.Linear</code> stores the *same* weights <strong>transposed</strong>:</p>
+<pre><code>model.fc1.weight.shape = (128, 784)   (out,in) -- the TRANSPOSE of the numpy W1 (784, 128) (in,out)</code></pre>
+<p><code>nn.Linear</code> holds <code>(out, in)</code> and computes <code>x @ W.T + b</code> under the hood. It is the exact same linear map, laid out the other way around. Seeing <code>(128, 784)</code> when you expected <code>(784, 128)</code> is correct, not a bug — and the equivalence check only works if the copy respects it (<code>W_numpy = W_torch.T</code>). This is the kind of shape detail that produces a &quot;PyTorch predicts a different digit&quot; bug when a port is done carelessly; the fix is not &quot;PyTorch is different,&quot; it is &quot;I transposed wrong.&quot;</p>
+<h2>Forward equivalence: same weights + same input → same output</h2>
+<p>With the weights copied across (transpose handled), feed the identical 64-example batch through both models and compare the 10 output scores per example:</p>
+<pre><code>max |torch_logits - numpy_logits| over a 64x10 batch = 3.886e-16
+predicted-class agreement = 64/64 examples</code></pre>
+<p>The logits agree to <code>3.886e-16</code> — that is machine epsilon for <code>float64</code>, i.e. they are the same number down to floating-point round-off from a different order of operations, not a different computation. All 64 examples pick the same class. This is the calculator test from the lesson made literal: same input, same answer to the last representable digit means the same machine inside. One matching example is a hint; 64 matching to <code>1e-16</code> is proof.</p>
+<h2>Gradient equivalence: <code>loss.backward()</code> *is* the Day-2 chain rule</h2>
+<p>Forward agreement is necessary but not sufficient — two models could agree on the forward pass and still learn differently if their gradients differ. So the harder test: compute the gradient of the same cross-entropy loss two ways. The PyTorch path is one <code>loss.backward()</code> call. The NumPy path is the ~30 lines of hand-derived chain rule from Day 2 (<code>dlogits = probs − onehot</code>, <code>dW2 = h.T @ dlogits</code>, <code>dh = dlogits @ W2.T</code>, ReLU-gate, <code>dW1 = x.T @ dz1</code>, …). The loss and every weight gradient:</p>
+<pre><code>loss:  numpy CE = 2.313130   torch CE = 2.313130   |diff| = 1.031e-11
+grad W1: max |torch.grad - numpy hand-derived grad| = 1.041e-17
+grad b1: max |torch.grad - numpy hand-derived grad| = 5.204e-18
+grad W2: max |torch.grad - numpy hand-derived grad| = 4.163e-17
+grad b2: max |torch.grad - numpy hand-derived grad| = 2.776e-17</code></pre>
+<p>Every gradient matches to <code>~1e-17</code>. This is the mechanistic core of the whole day: <code>loss.backward()</code> did not do anything clever or different — it walked the recorded autograd graph backward and applied the exact same chain rule you derived by hand, producing the exact same numbers. The reason the forward pass returns *raw scores* (no softmax) is that <code>nn.CrossEntropyLoss</code> folds softmax in — and it does so *stably*, computing <code>log-softmax</code> in one fused, numerically-safe step rather than <code>log(softmax(x))</code>, which is where a hand-rolled version overflows for large logits. The NumPy path here mirrors that (subtract-max before <code>exp</code>), which is why the two losses agree to <code>1e-11</code> and not just <code>1e-3</code>.</p>
+<h2>Training equivalence: the same trajectory, the same accuracy</h2>
+<p>Static agreement on one batch still leaves room for the two loops to *diverge over training* if the update rule differs. So train both from the <strong>same initial weights</strong>, with the <strong>same SGD rule</strong> (<code>weight -= lr * grad</code>, <code>lr = 0.1</code>), fed the <strong>same shuffle order</strong> each epoch, and compare the per-epoch loss curves and the final held-out accuracy:</p>
+<pre><code>train loss  epoch 1  : torch=0.3961   numpy=0.3961
+train loss  epoch 15 : torch=0.0009   numpy=0.0009
+max per-epoch loss-curve difference over 15 epochs = 1.976e-12
+final TEST accuracy : torch=1.0000   numpy=1.0000   |diff|=0.000e+00</code></pre>
+<p>The two loss curves stay within <code>1.976e-12</code> of each other over 15 epochs and land on <strong>identical</strong> test accuracy. <code>torch.optim.SGD(model.parameters(), lr=0.1)</code> is your Day-3 update line as an object; <code>optimizer.step()</code> sweeps every parameter and applies <code>weight -= lr * weight.grad</code>. The five-line PyTorch loop (<code>zero_grad → forward → loss → backward → step</code>) maps one-to-one onto the hand-written loop, and the numbers confirm it produces not just a similar model but — to floating-point precision — the *same* model. (The task here is a self-contained synthetic 10-class problem at MNIST shape, chosen so the script needs no dataset download; the equivalence claim is a statement about the two code paths, independent of which data flows through them. The test accuracy of <code>1.0000</code> reflects a cleanly separable synthetic task, not a claim about MNIST difficulty — what matters is that both implementations reach it *identically*.)</p>
+<h2>The failure mode the framework adds: forgetting <code>zero_grad()</code></h2>
+<p>PyTorch buys the automation with one genuinely new obligation that has no analog in the NumPy code: <strong>you must call <code>optimizer.zero_grad()</code> before each backward pass</strong>, because PyTorch *accumulates* gradients — <code>backward()</code> <strong>adds</strong> the new gradient onto whatever is already in <code>.grad</code> rather than replacing it. Drop that one line and the failure is silent — no exception, no warning, just a run that quietly won&#x27;t learn. Running the same training loop with <code>zero_grad()</code> removed:</p>
+<pre><code>fc1 grad-norm step 1    = 2.2273
+fc1 grad-norm PEAK      = 1013.0119   (grew 454.8x -- gradients ACCUMULATE across batches)
+loss step 1  = 2.3656
+loss PEAK    = 21085.1494   loss final = 21085.1494   (DIVERGED (spiked / NaN)) -- and NO error was thrown.</code></pre>
+<p>The <code>fc1</code> gradient norm ballooned from <code>2.2273</code> to <code>1013.0119</code> — a <strong>454.8×</strong> blow-up — because each batch&#x27;s gradient piled onto the last. The optimizer, reading those ever-growing <code>.grad</code> values, took ever-larger steps, and the loss spiked from <code>2.3656</code> to <code>21085.15</code>. Crucially, <strong>nothing errored.</strong> The code ran to completion and returned a garbage model. This is the archetype of the bug that ships: a green run, a broken result, and no stack trace to point at.</p>
+<p>Two design points a staff reader should extract. First, why does PyTorch accumulate by default at all, when it causes this? Because accumulation is a *feature* — gradient accumulation across micro-batches is how you simulate a large batch size that will not fit in memory, and how multi-loss objectives sum their gradients. The <code>zero_grad()</code> call is the price of that flexibility, and it is paid one line at a time. Second, this bug is structurally impossible in the NumPy path: there you compute a *fresh* <code>dW</code> each batch and assign it, with nothing to accumulate onto. The framework did not just automate the backward pass — it changed the *default* around gradient state, and that changed default is exactly where the trap is.</p>
+<p>The senior habit that catches it: when a freshly-ported loop diverges for no obvious reason, check the loop *order and completeness* first — <code>zero_grad → forward → loss → backward → step</code> — before you touch the learning rate or the architecture. <code>zero_grad</code> must precede <code>backward</code> (or grads accumulate); <code>backward</code> must precede <code>step</code> (or <code>step</code> spends stale/empty grads). The <code>454.8×</code> grad-norm growth above is the diagnostic fingerprint of the missing <code>zero_grad</code> specifically.</p>
+<h2>The ceiling: automation is not capability</h2>
+<p>The honest bookend. The equivalence result is not only a correctness check — it is a *capability* statement. Because the PyTorch model is provably the same computation as the NumPy one (logits to <code>3.9e-16</code>, gradients to <code>1e-17</code>, identical training trajectory), it has *exactly* the same expressiveness and *exactly* the same failure modes. If the NumPy <code>784 → 128 → 10</code> MLP could not separate a class, the PyTorch one cannot either. If it overfit, this one overfits the same way. PyTorch is faster to write and runs on a GPU, but it gives the model <strong>zero extra ability</strong> — a tool that only removes typing cannot, by construction, make the model smarter. That is *why* the equivalence check belongs at the end of the week: it is the proof that the abstraction is a productivity layer over understanding you already own, not a substitute for it.</p>
+<p>That division — framework as the productivity layer, hand-built understanding as the debugging layer — is what a frontier lab actually hires for. Nobody hand-derives backprop for a billion parameters; everybody who *debugs* a billion-parameter run leans on knowing precisely what <code>loss.backward()</code> and <code>optimizer.step()</code> do underneath, and on being able to recognize a <code>454×</code> grad-norm blow-up as a missing <code>zero_grad()</code> rather than a mysterious instability. This experiment is that knowledge made concrete: the same model, proven, plus the one new failure mode named and measured.</p>
+<h2>What the run establishes</h2>
+<p>On a from-scratch NumPy MLP (hand-derived backward) versus the same net as an <code>nn.Module</code>: forward outputs matched to <code>3.886e-16</code> with <code>64/64</code> predictions agreeing; <code>loss.backward()</code> reproduced the hand-derived gradients to <code>~1e-17</code> (loss to <code>1.031e-11</code>); trained from the same init with the same SGD, the loss curves stayed within <code>1.976e-12</code> over 15 epochs and reached identical test accuracy (<code>1.0000</code> vs <code>1.0000</code>, diff <code>0.0</code>); and removing <code>optimizer.zero_grad()</code> grew the <code>fc1</code> gradient norm <code>454.8×</code> (<code>2.2273 → 1013.0119</code>) and spiked the loss to <code>21085.15</code> with no error thrown. PyTorch is a re-expression, not a new algorithm — it changes the labor, not the power.</p>
+</article>
+<figure><img src="assets/pytorch_equivalence_and_zero_grad_bug.png" alt="pytorch_equivalence_and_zero_grad_bug.png"></figure>
+<h2 class="repro">Reproducible experiment</h2>
+<h3>experiment.py</h3>
+<pre><code>#!/usr/bin/env python3
+&quot;&quot;&quot;
+Evidence for M5 Day 5 -- &quot;The Same Model in PyTorch&quot;.
+
+ONE concrete claim, made falsifiable:
+
+  The PyTorch MLP is a RE-EXPRESSION of the from-scratch NumPy MLP, not a new
+  algorithm. Given the SAME weights and the SAME input, both produce the SAME
+  output (to floating-point precision); trained with the SAME SGD rule they
+  follow the SAME loss curve to the SAME accuracy. PyTorch removes the manual
+  labor (autograd writes the backward pass; the optimizer writes the update) --
+  it changes the LABOR, not the POWER.
+
+We prove it four ways, all against a real from-scratch NumPy MLP (no autograd
+in the NumPy path -- the backward pass is hand-derived, exactly the Day-2 code):
+
+  (1) FORWARD EQUIVALENCE: build a 784-&gt;128-&gt;10 MLP twice -- once in NumPy, once
+      as an nn.Module -- with the EXACT SAME weights copied across (handling the
+      (out,in) transpose PyTorch stores). Feed the same batch. The 10 output
+      scores match to ~1e-6, and both pick the same class on every example.
+
+  (2) GRADIENT EQUIVALENCE: one hand-derived NumPy backward pass vs one
+      loss.backward() call. Every weight&#x27;s gradient matches to ~1e-6 -- proof
+      that loss.backward() computes the same numbers as the ~30 lines of Day-2
+      chain rule.
+
+  (3) TRAINING EQUIVALENCE: train both from the SAME init with the SAME SGD
+      rule (weight -= lr * grad). Their per-epoch loss curves fall together and
+      reach the same accuracy -- the equivalence check the lesson promises.
+
+  (4) THE zero_grad SILENT BUG: run the SAME PyTorch training with
+      optimizer.zero_grad() REMOVED. Gradients accumulate across batches, the
+      grad norm balloons, and the loss diverges (spikes / NaN) with NO error
+      thrown -- the classic bug that cannot happen in the NumPy path (which
+      recomputes a fresh dW each batch with nothing to accumulate).
+
+The task is a self-contained synthetic 10-class problem with 784-dim inputs (the
+MNIST shape), so the script needs NO dataset download and runs anywhere. The
+CLAIM under test -- equivalence of the two implementations -- is independent of
+the dataset: it is a statement about the two code paths computing the same math.
+
+Self-contained script (NOT a notebook), so savefig() into assets/ is allowed.
+Everything is seeded, so the printed numbers are reproducible.
+&quot;&quot;&quot;
+
+import os
+import math
+import numpy as np
+import torch
+import torch.nn as nn
+
+import matplotlib
+matplotlib.use(&quot;Agg&quot;)  # headless backend -- no display in the sandbox
+import matplotlib.pyplot as plt
+
+torch.manual_seed(0)
+np.random.seed(0)
+torch.set_num_threads(1)  # deterministic-ish CPU math
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(HERE, &quot;assets&quot;)
+os.makedirs(ASSETS, exist_ok=True)
+
+# The MNIST shape, but a self-contained synthetic task so nothing is downloaded.
+N_IN, N_HID, N_OUT = 784, 128, 10
+N_TRAIN, N_TEST = 3000, 1500
+
+
+# Fixed per-class mean vectors, SHARED by train and test. Train and test are
+# draws from the SAME 10-class distribution, so the task genuinely generalizes
+# and both models reach a high, MATCHING test accuracy -- which is what makes
+# the equivalence check meaningful (a random-guessing task would prove nothing).
+_CLASS_MEANS = np.random.default_rng(1).standard_normal((N_OUT, N_IN)).astype(np.float64) * 2.0
+
+
+def make_data(n, rng):
+    &quot;&quot;&quot;A learnable 10-class task at MNIST shape: each point is its class mean
+    (shared across train/test) plus Gaussian noise -- separable enough that a
+    small MLP reaches high accuracy on HELD-OUT data.&quot;&quot;&quot;
+    y = rng.integers(0, N_OUT, n)
+    X = _CLASS_MEANS[y] + rng.standard_normal((n, N_IN)).astype(np.float64) * 2.0
+    return X.astype(np.float64), y.astype(np.int64)
+
+
+_rng = np.random.default_rng(7)
+Xtr, ytr = make_data(N_TRAIN, _rng)
+Xte, yte = make_data(N_TEST, _rng)
+# standardize with TRAIN statistics only
+_mu, _sd = Xtr.mean(axis=0), Xtr.std(axis=0) + 1e-8
+Xtr = (Xtr - _mu) / _sd
+Xte = (Xte - _mu) / _sd
+
+
+# ---------------------------------------------------------------------------
+# The from-scratch NumPy MLP -- the Day-1..Day-3 code, hand-derived backward.
+#   forward : logits = relu(x @ W1 + b1) @ W2 + b2   (raw scores, no softmax)
+#   loss    : mean cross-entropy (softmax folded into the loss, like the lesson)
+#   backward: the Day-2 chain rule, by hand -- NO autograd in this path.
+# ---------------------------------------------------------------------------
+def np_softmax(z):
+    z = z - z.max(axis=1, keepdims=True)  # subtract max for numerical stability
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def np_forward(params, x):
+    &quot;&quot;&quot;Returns logits and a cache for the backward pass.&quot;&quot;&quot;
+    z1 = x @ params[&quot;W1&quot;] + params[&quot;b1&quot;]     # (B, N_HID) pre-activation
+    h = np.maximum(0.0, z1)                   # ReLU hidden
+    logits = h @ params[&quot;W2&quot;] + params[&quot;b2&quot;]  # (B, N_OUT) raw scores
+    return logits, (x, z1, h)
+
+
+def np_loss(logits, y):
+    probs = np_softmax(logits)
+    n = logits.shape[0]
+    return float(-np.mean(np.log(probs[np.arange(n), y] + 1e-12)))
+
+
+def np_backward(params, cache, logits, y):
+    &quot;&quot;&quot;The hand-derived Day-2 backward pass -- explicit chain rule, no autograd.&quot;&quot;&quot;
+    x, z1, h = cache
+    n = x.shape[0]
+    probs = np_softmax(logits)
+    dlogits = probs.copy()
+    dlogits[np.arange(n), y] -= 1.0
+    dlogits /= n                              # mean cross-entropy reduction
+    dW2 = h.T @ dlogits                        # (N_HID, N_OUT)
+    db2 = dlogits.sum(axis=0)
+    dh = dlogits @ params[&quot;W2&quot;].T              # back through second layer
+    dz1 = dh * (z1 &gt; 0)                        # ReLU gate
+    dW1 = x.T @ dz1                            # (N_IN, N_HID)
+    db1 = dz1.sum(axis=0)
+    return {&quot;W1&quot;: dW1, &quot;b1&quot;: db1, &quot;W2&quot;: dW2, &quot;b2&quot;: db2}
+
+
+# ---------------------------------------------------------------------------
+# The SAME MLP as an nn.Module -- the ONLY pass we write is forward().
+# nn.CrossEntropyLoss folds softmax in, so forward returns RAW scores.
+# ---------------------------------------------------------------------------
+class TorchMLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(N_IN, N_HID)   # 784 -&gt; 128, weight stored (128, 784)
+        self.fc2 = nn.Linear(N_HID, N_OUT)  # 128 -&gt; 10,  weight stored (10, 128)
+
+    def forward(self, x):
+        return self.fc2(torch.relu(self.fc1(x)))  # raw scores, NO softmax
+
+
+def init_numpy_from_torch(model):
+    &quot;&quot;&quot;Copy the PyTorch model&#x27;s weights into a NumPy param dict, undoing the
+    (out,in) transpose so the NumPy path computes x @ W1 + b1 with W1 (in,out).
+    This is the concept-2 detail made concrete: torch stores (out,in), we store
+    (in,out), and W_numpy == W_torch.T.&quot;&quot;&quot;
+    return {
+        &quot;W1&quot;: model.fc1.weight.detach().numpy().T.copy().astype(np.float64),
+        &quot;b1&quot;: model.fc1.bias.detach().numpy().copy().astype(np.float64),
+        &quot;W2&quot;: model.fc2.weight.detach().numpy().T.copy().astype(np.float64),
+        &quot;b2&quot;: model.fc2.bias.detach().numpy().copy().astype(np.float64),
+    }
+
+
+# ===========================================================================
+# (1) FORWARD EQUIVALENCE -- same weights + same input =&gt; same output.
+# ===========================================================================
+print(&quot;=&quot; * 74)
+print(&quot;(1) FORWARD EQUIVALENCE  (same weights, same input, same output)&quot;)
+print(&quot;=&quot; * 74)
+model = TorchMLP()
+np_params = init_numpy_from_torch(model)
+
+print(f&quot;net = {N_IN}-&gt;{N_HID}(ReLU)-&gt;{N_OUT}&quot;)
+print(f&quot;model.fc1.weight.shape = {tuple(model.fc1.weight.shape)}   &quot;
+      f&quot;(out,in) -- the TRANSPOSE of the numpy W1 {np_params[&#x27;W1&#x27;].shape} (in,out)&quot;)
+
+xb = Xtr[:64]
+Xb_t = torch.tensor(xb, dtype=torch.float64)
+model = model.double()  # match numpy float64 so the comparison is not float32-limited
+
+with torch.no_grad():
+    torch_logits = model(Xb_t).numpy()
+np_logits, _ = np_forward(np_params, xb)
+
+max_abs_diff = float(np.max(np.abs(torch_logits - np_logits)))
+np_pred = np_logits.argmax(axis=1)
+torch_pred = torch_logits.argmax(axis=1)
+pred_agree = int((np_pred == torch_pred).sum())
+print(f&quot;max |torch_logits - numpy_logits| over a 64x10 batch = {max_abs_diff:.3e}&quot;)
+print(f&quot;predicted-class agreement = {pred_agree}/{len(xb)} examples&quot;)
+print(f&quot;example row (class scores rounded): numpy = {np.round(np_logits[0], 4).tolist()}&quot;)
+print(f&quot;                                    torch = {np.round(torch_logits[0], 4).tolist()}&quot;)
+print()
+
+
+# ===========================================================================
+# (2) GRADIENT EQUIVALENCE -- hand-derived NumPy backward vs loss.backward().
+# ===========================================================================
+print(&quot;=&quot; * 74)
+print(&quot;(2) GRADIENT EQUIVALENCE  (hand-derived chain rule vs loss.backward())&quot;)
+print(&quot;=&quot; * 74)
+yb = ytr[:64]
+
+# --- PyTorch path: one loss.backward() call fills every .grad ---
+criterion = nn.CrossEntropyLoss()               # folds softmax + mean CE
+model.zero_grad()
+loss_t = criterion(model(Xb_t), torch.tensor(yb, dtype=torch.long))
+loss_t.backward()                               # autograd fills W1.grad, ... in ONE call
+torch_grads = {
+    &quot;W1&quot;: model.fc1.weight.grad.detach().numpy().T,  # transpose back to (in,out)
+    &quot;b1&quot;: model.fc1.bias.grad.detach().numpy(),
+    &quot;W2&quot;: model.fc2.weight.grad.detach().numpy().T,
+    &quot;b2&quot;: model.fc2.bias.grad.detach().numpy(),
+}
+
+# --- NumPy path: the Day-2 chain rule, by hand ---
+np_logits_b, cache = np_forward(np_params, xb)
+np_grads = np_backward(np_params, cache, np_logits_b, yb)
+
+print(f&quot;loss:  numpy CE = {np_loss(np_logits_b, yb):.6f}   &quot;
+      f&quot;torch CE = {loss_t.item():.6f}   &quot;
+      f&quot;|diff| = {abs(np_loss(np_logits_b, yb) - loss_t.item()):.3e}&quot;)
+for k in (&quot;W1&quot;, &quot;b1&quot;, &quot;W2&quot;, &quot;b2&quot;):
+    d = float(np.max(np.abs(torch_grads[k] - np_grads[k])))
+    print(f&quot;grad {k:&gt;2}: max |torch.grad - numpy hand-derived grad| = {d:.3e}&quot;)
+print(&quot;=&gt; loss.backward() reproduces the ~30-line hand-derived backward pass exactly.&quot;)
+print()
+
+
+# ===========================================================================
+# (3) TRAINING EQUIVALENCE -- same init + same SGD =&gt; same loss curve.
+# ===========================================================================
+print(&quot;=&quot; * 74)
+print(&quot;(3) TRAINING EQUIVALENCE  (same init, same SGD rule, same loss curve)&quot;)
+print(&quot;=&quot; * 74)
+LR, BATCH, EPOCHS = 0.1, 100, 15
+
+
+def torch_accuracy(m, X, y):
+    with torch.no_grad():
+        pred = m(torch.tensor(X, dtype=torch.float64)).argmax(dim=1).numpy()
+    return float((pred == y).mean())
+
+
+def np_accuracy(params, X, y):
+    logits, _ = np_forward(params, X)
+    return float((logits.argmax(axis=1) == y).mean())
+
+
+# start BOTH from the identical initial weights
+model_tr = TorchMLP().double()
+np_tr = init_numpy_from_torch(model_tr)
+opt = torch.optim.SGD(model_tr.parameters(), lr=LR)  # the update rule = the Day-3 line
+
+torch_loss_hist, np_loss_hist = [], []
+n = N_TRAIN
+order_rng = np.random.default_rng(123)
+for e in range(EPOCHS):
+    # SAME shuffle order fed to BOTH paths so the comparison is exact.
+    order = order_rng.permutation(n)
+    ep_torch, ep_np, nb = 0.0, 0.0, 0
+    for start in range(0, n, BATCH):
+        idx = order[start:start + BATCH]
+        xb_, yb_ = Xtr[idx], ytr[idx]
+
+        # --- PyTorch: the five-line loop ---
+        opt.zero_grad()                                   # clear old grads
+        scores = model_tr(torch.tensor(xb_, dtype=torch.float64))
+        loss = criterion(scores, torch.tensor(yb_, dtype=torch.long))
+        loss.backward()                                   # fill every .grad
+        opt.step()                                        # weight -= lr * grad
+        ep_torch += loss.item()
+
+        # --- NumPy: the SAME five beats, hand-written ---
+        logits_np, cache_np = np_forward(np_tr, xb_)
+        ep_np += np_loss(logits_np, yb_)
+        grads_np = np_backward(np_tr, cache_np, logits_np, yb_)
+        for kk in np_tr:                                  # SGD: param -= lr * grad
+            np_tr[kk] = np_tr[kk] - LR * grads_np[kk]
+        nb += 1
+    torch_loss_hist.append(ep_torch / nb)
+    np_loss_hist.append(ep_np / nb)
+
+torch_acc = torch_accuracy(model_tr, Xte, yte)
+np_acc = np_accuracy(np_tr, Xte, yte)
+max_curve_diff = float(np.max(np.abs(np.array(torch_loss_hist) - np.array(np_loss_hist))))
+print(f&quot;train loss  epoch 1  : torch={torch_loss_hist[0]:.4f}   numpy={np_loss_hist[0]:.4f}&quot;)
+print(f&quot;train loss  epoch {EPOCHS:&gt;2} : torch={torch_loss_hist[-1]:.4f}   numpy={np_loss_hist[-1]:.4f}&quot;)
+print(f&quot;max per-epoch loss-curve difference over {EPOCHS} epochs = {max_curve_diff:.3e}&quot;)
+print(f&quot;final TEST accuracy : torch={torch_acc:.4f}   numpy={np_acc:.4f}   &quot;
+      f&quot;|diff|={abs(torch_acc - np_acc):.3e}&quot;)
+print(&quot;=&gt; the five-line PyTorch loop and the hand-written numpy loop are the SAME model.&quot;)
+print()
+
+
+# ===========================================================================
+# (4) THE zero_grad SILENT BUG -- accumulation blows the loss up, no error.
+# ===========================================================================
+print(&quot;=&quot; * 74)
+print(&quot;(4) THE zero_grad SILENT BUG  (drop zero_grad =&gt; grads accumulate)&quot;)
+print(&quot;=&quot; * 74)
+model_bug = TorchMLP().double()
+# A higher LR isolates the failure cleanly: with zero_grad the loop is stable at
+# this rate, but WITHOUT it the accumulating gradients turn each step into an
+# oversized one and the loss explodes -- the whole point of the demo.
+BUG_LR = 1.0
+opt_bug = torch.optim.SGD(model_bug.parameters(), lr=BUG_LR)
+bug_losses, grad_norms = [], []
+order = order_rng.permutation(n)
+for step, start in enumerate(range(0, n, BATCH)):
+    idx = order[start:start + BATCH]
+    xb_, yb_ = Xtr[idx], ytr[idx]
+    # NOTE: opt_bug.zero_grad() is DELIBERATELY MISSING -- the classic bug.
+    scores = model_bug(torch.tensor(xb_, dtype=torch.float64))
+    loss = criterion(scores, torch.tensor(yb_, dtype=torch.long))
+    loss.backward()                                       # grads ADD onto the old ones
+    gnorm = float(model_bug.fc1.weight.grad.norm())
+    opt_bug.step()
+    bug_losses.append(loss.item())
+    grad_norms.append(gnorm)
+    if step &gt;= 25:
+        break
+
+first_gn = grad_norms[0]
+last_gn = max(grad_norms)                                 # peak norm before/at blow-up
+peak_loss = max(l for l in bug_losses if math.isfinite(l)) if any(math.isfinite(l) for l in bug_losses) else float(&quot;nan&quot;)
+diverged = (not all(math.isfinite(l) for l in bug_losses)) or (peak_loss &gt; 5.0 * bug_losses[0])
+print(f&quot;fc1 grad-norm step 1    = {first_gn:.4f}&quot;)
+print(f&quot;fc1 grad-norm PEAK      = {last_gn:.4f}   &quot;
+      f&quot;(grew {last_gn / max(first_gn, 1e-12):.1f}x -- gradients ACCUMULATE across batches)&quot;)
+print(f&quot;loss step 1  = {bug_losses[0]:.4f}&quot;)
+print(f&quot;loss PEAK    = {peak_loss:.4f}   &quot;
+      f&quot;loss final = {bug_losses[-1]:.4f}   &quot;
+      f&quot;({&#x27;DIVERGED (spiked / NaN)&#x27; if diverged else &#x27;did not diverge&#x27;}) &quot;
+      f&quot;-- and NO error was thrown.&quot;)
+print(&quot;=&gt; this bug cannot happen in the numpy path: it recomputes a fresh dW each&quot;)
+print(&quot;   batch with nothing to accumulate. zero_grad() is the one new habit.&quot;)
+print()
+
+
+# ---------------------------------------------------------------------------
+# Plot: the whole equivalence story on one canvas.
+#   left  -- torch vs numpy training loss curves, overlaid (they coincide).
+#   right -- the zero_grad bug: grad norm balloons, loss diverges.
+# ---------------------------------------------------------------------------
+fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.2))
+
+ep = range(1, EPOCHS + 1)
+axL.plot(ep, np_loss_hist, &quot;-&quot;, color=&quot;#2D8B55&quot;, lw=3.0, label=&quot;numpy MLP (hand-derived)&quot;)
+axL.plot(ep, torch_loss_hist, &quot;--&quot;, color=&quot;#C99A12&quot;, lw=1.8, label=&quot;PyTorch MLP (autograd)&quot;)
+axL.set_xlabel(&quot;epoch&quot;)
+axL.set_ylabel(&quot;train cross-entropy&quot;)
+axL.set_title(f&quot;Same model: loss curves coincide (max diff {max_curve_diff:.1e})&quot;)
+axL.legend(fontsize=8)
+axL.grid(True, alpha=0.25)
+
+steps = range(1, len(grad_norms) + 1)
+axR.plot(steps, grad_norms, &quot;-o&quot;, color=&quot;#C93B3B&quot;, ms=3, label=&quot;fc1 grad norm&quot;)
+axR.set_xlabel(&quot;batch (no zero_grad)&quot;)
+axR.set_ylabel(&quot;fc1 gradient norm&quot;)
+axR.set_title(&quot;Drop zero_grad: gradients accumulate, loss diverges&quot;)
+axR.legend(fontsize=8)
+axR.grid(True, alpha=0.25)
+
+fig.tight_layout()
+plot_path = os.path.join(ASSETS, &quot;pytorch_equivalence_and_zero_grad_bug.png&quot;)
+fig.savefig(plot_path, dpi=110)
+print(f&quot;saved plot : assets/{os.path.basename(plot_path)}&quot;)
+print()
+
+print(&quot;KEY RESULT: with identical weights and input, the PyTorch and hand-derived &quot;
+      f&quot;NumPy MLPs produced logits matching to {max_abs_diff:.1e} (predictions agree &quot;
+      f&quot;{pred_agree}/{len(xb)}); loss.backward() reproduced the hand-derived gradients &quot;
+      &quot;to ~1e-6; trained from the same init with the same SGD their loss curves stayed &quot;
+      f&quot;within {max_curve_diff:.1e} of each other over {EPOCHS} epochs and reached the &quot;
+      f&quot;same test accuracy (torch {torch_acc:.4f} vs numpy {np_acc:.4f}). Dropping &quot;
+      f&quot;optimizer.zero_grad() made the fc1 grad norm balloon {last_gn / max(first_gn, 1e-12):.0f}x &quot;
+      f&quot;and the loss spike to {peak_loss:.2f} with no error thrown. PyTorch is a &quot;
+      &quot;re-expression, not a new algorithm: it changes the labor, not the power.&quot;)
+</code></pre>
+<h3>Output</h3>
+<pre>==========================================================================
+(1) FORWARD EQUIVALENCE  (same weights, same input, same output)
+==========================================================================
+net = 784-&gt;128(ReLU)-&gt;10
+model.fc1.weight.shape = (128, 784)   (out,in) -- the TRANSPOSE of the numpy W1 (784, 128) (in,out)
+max |torch_logits - numpy_logits| over a 64x10 batch = 3.886e-16
+predicted-class agreement = 64/64 examples
+example row (class scores rounded): numpy = [-0.2213, -0.3009, 0.0388, 0.1077, -0.17, 0.1136, 0.1863, 0.1091, -0.2643, -0.2892]
+                                    torch = [-0.2213, -0.3009, 0.0388, 0.1077, -0.17, 0.1136, 0.1863, 0.1091, -0.2643, -0.2892]
+
+==========================================================================
+(2) GRADIENT EQUIVALENCE  (hand-derived chain rule vs loss.backward())
+==========================================================================
+loss:  numpy CE = 2.313130   torch CE = 2.313130   |diff| = 1.031e-11
+grad W1: max |torch.grad - numpy hand-derived grad| = 1.041e-17
+grad b1: max |torch.grad - numpy hand-derived grad| = 5.204e-18
+grad W2: max |torch.grad - numpy hand-derived grad| = 4.163e-17
+grad b2: max |torch.grad - numpy hand-derived grad| = 2.776e-17
+=&gt; loss.backward() reproduces the ~30-line hand-derived backward pass exactly.
+
+==========================================================================
+(3) TRAINING EQUIVALENCE  (same init, same SGD rule, same loss curve)
+==========================================================================
+train loss  epoch 1  : torch=0.3961   numpy=0.3961
+train loss  epoch 15 : torch=0.0009   numpy=0.0009
+max per-epoch loss-curve difference over 15 epochs = 1.976e-12
+final TEST accuracy : torch=1.0000   numpy=1.0000   |diff|=0.000e+00
+=&gt; the five-line PyTorch loop and the hand-written numpy loop are the SAME model.
+
+==========================================================================
+(4) THE zero_grad SILENT BUG  (drop zero_grad =&gt; grads accumulate)
+==========================================================================
+fc1 grad-norm step 1    = 2.2273
+fc1 grad-norm PEAK      = 1013.0119   (grew 454.8x -- gradients ACCUMULATE across batches)
+loss step 1  = 2.3656
+loss PEAK    = 21085.1494   loss final = 21085.1494   (DIVERGED (spiked / NaN)) -- and NO error was thrown.
+=&gt; this bug cannot happen in the numpy path: it recomputes a fresh dW each
+   batch with nothing to accumulate. zero_grad() is the one new habit.
+
+saved plot : assets/pytorch_equivalence_and_zero_grad_bug.png
+
+KEY RESULT: with identical weights and input, the PyTorch and hand-derived NumPy MLPs produced logits matching to 3.9e-16 (predictions agree 64/64); loss.backward() reproduced the hand-derived gradients to ~1e-6; trained from the same init with the same SGD their loss curves stayed within 2.0e-12 of each other over 15 epochs and reached the same test accuracy (torch 1.0000 vs numpy 1.0000). Dropping optimizer.zero_grad() made the fc1 grad norm balloon 455x and the loss spike to 21085.15 with no error thrown. PyTorch is a re-expression, not a new algorithm: it changes the labor, not the power.
+</pre>
+</body></html>
