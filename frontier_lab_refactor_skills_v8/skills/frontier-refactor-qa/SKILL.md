@@ -220,3 +220,7 @@ When there is no notebook (JAX, scaling laws), the oracle/skill-gap phase is N/A
 Spec: `sessions/_compiler/AUTHORING.md` (source of truth — matches the shipped compiler).
 The older `sessions/_refactor/v8_source_first_authoring_plan.md` documents historical/obsolete
 grammar (`:::` fences, `{{anchor}}`, `[[term:weight]]`) the compiler now rejects — do not author from it.
+
+### Lesson Build Engine (v9)
+
+`sessions/_compiler/workflows/lesson_build.js` wraps this QA into an autonomous loop: it reuses the judges above as a parallel panel and re-runs author → compile → judge until P0-clear, then checkpoints per lesson. Two-tier gating holds — the deterministic gates block at compile; the LLM judges (coverage · tone · concept-structure · correctness) gate the loop only. skill_gaps route to a **user-approved proposal**, never an auto-edit. The new `concept_structure_gate.py` (deterministic per-concept intro→visual→build-up triad) and `judge_concept_structure` (LLM, in `coverage_judge.py`) are the concept-structure checks. See the architect skill's "Lesson Build Engine" section.

@@ -246,3 +246,16 @@ author source.md per day in reader-flow order (six rules, anchors single-sourced
 compile source.md → lesson.html
 fix P0 in source.md and recompile (never hand-edit lesson.html)
 ```
+
+## Lesson Build Engine (v9)
+
+The author + compile + QA steps of the Autonomous Rollout Loop are executed by the Workflow `sessions/_compiler/workflows/lesson_build.js` (run with the Workflow tool; `args {module, day, maxRounds, seedFindings}`). It chains: blind coverage-draft → author (ONE write-capable sub-agent, full regeneration into V9 concept structure) → compile → parallel judge panel (coverage · tone · concept-structure · correctness) → deterministic router → self-correcting loop until P0-clear or `maxRounds`, then a per-lesson checkpoint.
+
+Rules the engine enforces:
+
+- One writer per lesson (full regeneration each round) — never split a lesson's prose across agents (repo `CLAUDE.md` §4).
+- Deterministic gates (Reader Flow · Concept Shell · Notebook Smoothness) stay the hard compile block; the LLM judges gate the loop only.
+- **skill_gaps are surfaced as a proposed diff for user approval — never auto-applied** (a Coverage Spec Rule edit changes every future lesson).
+- `args.seedFindings` seeds a polish round with findings a prior checkpoint chose to fix.
+
+Design + plan: `docs/superpowers/specs/2026-07-14-lesson-generation-orchestration-design.md`, `docs/superpowers/plans/2026-07-14-lesson-orchestration-engine.md`.
