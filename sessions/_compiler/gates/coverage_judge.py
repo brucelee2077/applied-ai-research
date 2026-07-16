@@ -160,11 +160,12 @@ def judge(lesson_text, spec, notebook_concepts, curation=None, model=MODEL, time
 # and concrete rewrite fixes. Advisory; graceful fallback like the coverage judge.
 _TONE_MAX = 22000
 _TONE_SYS = (
-    "You are a BEGINNER-FRIENDLINESS judge for an ML lesson aimed at a curious 12-year-old for "
+    "You are a STRICT BEGINNER-FRIENDLINESS judge for an ML lesson aimed at a curious 12-year-old for "
     "whom English may be a second language. You are given a companion NOTEBOOK that is the GOLD "
     "STANDARD for warm, analogy-first, intuition-heavy teaching, and the LESSON under review. "
-    "Grade the LESSON *relative to the notebook*: where does the lesson read colder, denser, more "
-    "rushed, or more textbook-like than the notebook? Be specific and quote. Return STRICT JSON only."
+    "Grade the LESSON *relative to the notebook*, HARSHLY: it must be AS warm and analogy-rich as the "
+    "notebook to score MATCHES. If it reads even somewhat colder, denser, more rushed, or more "
+    "textbook/interview-like than the notebook, it is BELOW. Be specific and quote. Return STRICT JSON only."
 )
 
 
@@ -258,10 +259,13 @@ def judge_tone(lesson_text, notebook_md, model=MODEL, timeout=90):
 # graceful fallback, never raises. Mirrors judge_tone.
 _STRUCT_MAX = 22000
 _STRUCT_SYS = (
-    "You are a CONCEPT-STRUCTURE judge for a beginner ML lesson built as concept units. "
-    "For each named concept, judge whether the unit (1) leads with intuition/a felt picture "
-    "BEFORE notation, (2) carries a concrete everyday analogy INCLUDING where it breaks down, "
-    "and (3) builds up step-by-step rather than dumping the mechanism. Be specific and quote. "
+    "You are a STRICT CONCEPT-STRUCTURE judge for a BEGINNER ML lesson (a curious 12-year-old for whom "
+    "English may be a second language) built as concept units. This is the make-or-break beginner-friendliness "
+    "bar — grade HARSHLY and default to the LOWER grade when in doubt. For each named concept, judge whether "
+    "the unit (1) leads with a felt picture / plain-words intuition BEFORE any formula, notation, or undefined "
+    "jargon; (2) carries a CONCRETE, everyday, physically-experienced analogy INCLUDING an explicit 'where it "
+    "breaks down'; (3) builds up step-by-step rather than dumping the mechanism. A generic, abstract, or "
+    "one-word metaphor is NOT a concrete analogy. Be specific and quote. "
     "Return STRICT JSON only (no prose, no markdown fences)."
 )
 
@@ -286,8 +290,13 @@ Return STRICT JSON:
   "overall": "GOOD|WEAK|MISSING",
   "summary": "<=2 sentences"
 }}
-Rules: judge every concept. "analogy":"GOOD" requires BOTH a concrete analogy AND an explicit
-"where it breaks down" (or equivalent limit). Lead-with-formula => intuition_first is WEAK/MISSING."""
+Rules: judge every concept, HARSHLY (default to the LOWER grade when in doubt).
+"analogy": GOOD requires a CONCRETE everyday analogy (a physical/experienced thing a 12-year-old knows)
+AND an explicit "where it breaks down". A generic/abstract/one-word metaphor, or an analogy with no
+breakdown, is WEAK. No real analogy is MISSING.
+"intuition_first": GOOD requires the unit to OPEN with a felt picture in plain words before any formula,
+notation, or undefined jargon. Leading with a definition/formula/notation is WEAK or MISSING.
+"buildup": GOOD is a step-by-step build a beginner can follow; a dense dump is WEAK/MISSING."""
 
 
 def judge_concept_structure(lesson_text, concept_titles, model=MODEL, timeout=90):
