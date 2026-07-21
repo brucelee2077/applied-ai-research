@@ -83,13 +83,43 @@ def inline(t):
 # typed widget renderers  (replace the old raw-HTML escapes; reusable for D2-D9)
 # ---------------------------------------------------------------------------
 def _kv(lines):
-    """Parse 'key: value' body lines into an ordered dict (values keep colons)."""
+    """Parse 'key: value' body lines into an ordered dict (values keep colons).
+
+    A line opens a NEW field only when it is `key:` — a `\\w+` word IMMEDIATELY
+    followed by a colon (no space between), which is the authoring convention
+    for every field (`code:`, `out:`, `take:`, `expr:`, `note:`, `words:`, …).
+    Any other line (including an aligned continuation like ``join  :  …`` whose
+    word has spaces before the colon) is a CONTINUATION of the previous field's
+    value and is appended with a newline. This lets a `demo` `out:` (or a
+    `formula`/`mathladder` field) carry several lines that all reach the
+    rendered <pre> — without it, only the first line survived and every
+    following line was silently dropped.
+    """
     d = {}
+    last = None
+    cont_raw = {}  # key -> list of raw continuation lines (for dedented alignment)
     for ln in lines:
-        if ':' in ln and not ln.strip().startswith(('#', '-')):
-            k, v = ln.split(':', 1)
-            if re.fullmatch(r'\w+', k.strip()):
-                d[k.strip()] = v.strip()
+        stripped = ln.strip()
+        # new field: leading word directly touching a colon, e.g. "out:" / "take:".
+        m = re.match(r'\s*(\w+):', ln)
+        if m and not stripped.startswith(('#', '-')):
+            last = m.group(1)
+            d[last] = ln.split(':', 1)[1].strip()
+            cont_raw[last] = []
+            continue
+        # continuation line: fold it into the current field's value so multi-line
+        # values survive. Keep raw (rstrip only) so the author's column
+        # alignment is preserved for watchable numbers; a common leading indent
+        # is removed below.
+        if last is not None and stripped:
+            cont_raw[last].append(ln.rstrip())
+    # append continuation lines, dedented by their common leading indent, so
+    # aligned columns stay aligned in the rendered <pre> without a big left gap.
+    for k, raws in cont_raw.items():
+        if not raws:
+            continue
+        indent = min(len(r) - len(r.lstrip(' ')) for r in raws)
+        d[k] = d[k] + '\n' + '\n'.join(r[indent:] for r in raws)
     return d
 
 def attr_esc_text(s):

@@ -22,6 +22,63 @@ def test_render_demo_emits_runnable_console():
     assert 'ReLU zeros negatives' in out
 
 
+def test_render_demo_keeps_every_line_of_a_multiline_out():
+    # Regression: a multi-line `out:` used to be truncated to only its first
+    # line (continuation lines were silently dropped by _kv), which made the
+    # rendered demo contradict its take-away. Every out line must survive.
+    lines = [
+        'code: head_1 must answer using BOTH describe->tired AND place->mat',
+        'out: describe-only would give:  [tired 1.00, mat 0.00]   (crisp)',
+        '     place-only would give:     [tired 0.00, mat 1.00]   (crisp)',
+        '     ONE head must do both  ->  [tired 0.50, mat 0.50]   (muddy)',
+        'take: <b>One head splits the difference.</b>',
+    ]
+    out = v8lib.render_widget('demo', {'id': 'average', 'label': 'run'}, lines)
+    import re
+    pre = re.search(r'<pre class="demo-out" hidden>(.*?)</pre>', out, re.S).group(1)
+    assert 'describe-only would give' in pre
+    assert 'place-only would give' in pre
+    assert 'ONE head must do both' in pre
+    assert '[tired 0.50, mat 0.50]' in pre   # the punchline line the take-away cites
+    assert pre.count('\n') == 2               # three lines total
+    # continuation lines are dedented but keep internal column alignment
+    assert '\nplace-only would give' in pre
+
+
+def test_kv_single_line_values_are_unchanged():
+    # The multi-line fix must not alter simple single-line key: value parsing.
+    d = v8lib._kv(['code: relu(x)', 'out: array([0, 0, 2])', 'take: keeps positives.'])
+    assert d == {'code': 'relu(x)', 'out': 'array([0, 0, 2])', 'take': 'keeps positives.'}
+
+
+def test_render_demo_keeps_aligned_continuation_with_word_colon():
+    # Regression: a continuation line whose first token is a single word followed
+    # by an ALIGNED colon (e.g. "join  :  …") must stay part of `out`, not be
+    # misread as a new field. A field only opens when the word directly touches
+    # the colon ("out:"), never when spaces separate them ("join  :").
+    lines = [
+        'code: d_model = 6, h = 3; split -> join -> W_O',
+        'out: split :  d_k = 6/3 = 2      -> 3 answers of width 2',
+        '     join  :  stitch side by side -> one vector of width 6',
+        '     W_O   :  mix the width-6 vector -> final width 6',
+        'take: <b>Width 6 in, width 6 out.</b>',
+    ]
+    d = v8lib._kv(lines)
+    assert set(d) == {'code', 'out', 'take'}   # no stray 'join' / 'W_O' keys
+    assert 'split :' in d['out']
+    assert 'join  :' in d['out']
+    assert 'W_O   :' in d['out']
+    assert 'final width 6' in d['out']
+    assert d['out'].count('\n') == 2           # all three out lines present
+
+
+def test_kv_value_keeps_an_internal_colon():
+    # A value may itself contain a colon after the first one; only the FIRST
+    # colon separates key from value.
+    d = v8lib._kv(['code: answer using BOTH: a AND b'])
+    assert d['code'] == 'answer using BOTH: a AND b'
+
+
 def test_render_quiz_emits_four_q_blocks_with_answer_marker():
     lines = [
         'q: What does an activation add? | a:1 | More params | Non-linearity | Faster matmul | A bias | fb: The bend.',
