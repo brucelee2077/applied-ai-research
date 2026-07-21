@@ -1,216 +1,364 @@
 ---
 quest_id: wf3-d03-training-loop
-donor: m02-day-06.donor
-mode: exemplar
-source_mode: verbatim   # migration mode — regions captured byte-for-byte from the shipped lesson
+mode: concept
+donor: v9-base.donor
 page_title: "Module 2 · Day 6 — The Training Loop"
+module_label: "Module 2 · Train · Day 6"
+title: "The Training Loop"
+subtitle: "Where the Network Actually Learns"
+brand_sub: "Foundations · M2 Day 6"
 spine: "free-throw"
+nav_prev_href: "../day-05-gradients-backprop/lesson.html"
+nav_prev_label: "Gradients & Backpropagation"
+nav_next_href: "../day-07-optimizers/lesson.html"
+nav_next_label: "Optimizers (SGD, Momentum, Adam)"
+fin_title: "Module 2 · Day 6 complete! 🏆"
+fin_body: "Nice work — you've assembled the <b>training loop</b>: forward pass → loss → backward pass → update, repeated over batches and epochs until the loss falls. That loop is where a network actually learns.<br>Next up: <b>Optimizers</b> — smarter ways to take each downhill step."
 notebook_yardstick: 00-neural-networks/fundamentals/08_training_loop.ipynb
+coverage_topics:
+  - {topic: the four-phase loop, keywords: [four steps, forward pass, loss, backward pass, update, over and over]}
+  - {topic: forward pass phase, keywords: [make a guess, weighted sum, prediction]}
+  - {topic: loss phase, keywords: [how wrong, one number, loss]}
+  - {topic: backward pass phase, keywords: [gradient, which way, backpropagation, blame]}
+  - {topic: update phase, keywords: [the update, nudge the aim, shift each weight, new weight, small step in the gradient]}
+  - {topic: minus sign goes downhill, keywords: [minus sign, opposite way, subtract]}
+  - {topic: learning rate step size, keywords: [learning rate, step size, how big a step]}
+  - {topic: epoch vs iteration, keywords: [epoch, one full pass, iteration, one step, one update]}
+  - {topic: loss curve, keywords: [loss curve, plot the loss, goes down, watch it fall]}
+  - {topic: convergence, keywords: [convergence, flattens out, stops improving, levels off]}
+  - {topic: perceptron ancestor, keywords: [perceptron, rosenblatt, only on mistakes, fixed rule, crude ancestor]}
+  - {topic: lr too high failure, keywords: [too high, overshoot, diverges, blows up, nan, oscillates]}
+  - {topic: lr scheduling decay remedy, keywords: [learning-rate schedule, decay, shrink the learning rate, smaller steps later]}
+  - {topic: lr too low failure, keywords: [too low, crawls, barely moves, too tiny]}
+  - {topic: zero grad failure, keywords: [reset the gradients, gradients pile up, accumulate, forget to reset]}
+  - {topic: zero grad remedy, keywords: [zero the gradients, reset the gradients each step, clear the gradients]}
+  - {topic: shuffle failure, keywords: [same fixed order, fixed order, biased by that order, never shuffling]}
+  - {topic: shuffle remedy, keywords: [shuffle the data, reshuffle each epoch, mix up the order]}
+  - {topic: too few epochs underfit, keywords: [too few epochs, stopping too early, still high, underfit, train longer]}
+  - {topic: overfitting from over-training, keywords: [memorizes, overfitting, train too long, validation loss rises]}
+  - {topic: early stopping remedy, keywords: [early stopping, stop when validation stops improving, held-out]}
+  - {topic: capability limit xor, keywords: [xor, non-linearly separable, more iterations never, plateaus above zero, single neuron cannot]}
+  - {topic: local minimum plateau, keywords: [local minimum, plateau, non-convex, not the global best]}
 ---
 
-@@@ region name=title
-<title>Module 2 · Day 6 — The Training Loop</title>
-@@@ region name=brand_sub
-<div class="brand-sub">Foundations · M2 Day 6</div>
-@@@ region name=sidebar_nav
-<nav aria-label="Sections">
-      <div class="nav-group-label">Module 02 · Train</div>
-      <button class="nav-link" data-target="home"><span class="nl-dot"></span>Start here</button>
-      <button class="nav-link" data-target="s1"><span class="nl-dot"></span>1 · What is it</button>
-      <button class="nav-link" data-target="s2"><span class="nl-dot"></span>2 · Intuition</button>
-      <button class="nav-link" data-target="s3"><span class="nl-dot"></span>3 · Playground</button>
-      <button class="nav-link" data-target="s4"><span class="nl-dot"></span>4 · Mechanism &amp; why</button>
-      <button class="nav-link" data-target="s5"><span class="nl-dot"></span>5 · Build it up</button>
-      <button class="nav-link" data-target="s6"><span class="nl-dot"></span>6 · Quiz</button>
-      <button class="nav-link" data-target="s7"><span class="nl-dot"></span>7 · Produce</button>
-    </nav>
-@@@ region name=nav_prev
-<a class="lnav prev" href="../day-05-gradients-backprop/lesson.html"><span class="d">← Prev</span><span class="t">Gradients &amp; Backpropagation</span></a>
-@@@ region name=nav_next
-<a class="lnav next" href="../day-07-optimizers/lesson.html"><span class="d">Next →</span><span class="t">Optimizers (SGD, Momentum, Adam)</span></a>
-@@@ region name=hero
-<section id="home" class="hero">
-      <span class="kicker">Module 2 · Train · Day 6</span>
-      <h1>The Training Loop<span class="sub">Where the Network Actually Learns</span></h1>
-      <p class="lede">This is the day it all comes alive. The forward pass, the loss, and the gradients you built stop being separate ideas and click into one short cycle — the <strong>training loop</strong> — that a network runs over and over until it gets good. Scaled up, this exact loop is how every model you've heard of was trained.</p>
-      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>By the time you close this tab, "training" will just be a loop you can trace: you'll list its four steps, run it by hand to watch a loss fall, and know what an epoch, a batch, and "overfit one batch" mean.</div></div>
-    </section>
-@@@ region name=s1
-<section class="module-section" id="s1" data-sec="what">
-  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">The loop that turns pieces into learning</span><span class="sec-tag">What is it</span></div>
-  <div class="sec-body">
-      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> Day 3 (forward pass), Day 4 (loss), Day 5 (gradients, backprop, gradient descent). Today just assembles them. <b>Nothing new needed.</b></div></div>
+@@@ hero
+@lede Think about learning to sink a **free-throw** in basketball. You step up, you shoot, and the ball clanks off the left of the rim. So you aim a hair to the right and shoot again — a little closer. Clank, adjust, shoot. Clank, adjust, shoot. Nobody sinks it clean on the first try; you get good by *repeating one small fix, over and over*, until the ball drops through. That exact rhythm — *try, measure the miss, nudge, repeat* — is the whole secret of how a neural network learns. It has a name: the **training loop**, and it is the engine humming underneath every model you've heard of, from the tiny neuron you'll train today all the way up to ChatGPT. Over the last few days you built each separate piece — the neuron's guess, the loss that scores the miss, the gradient that says which way to nudge. Today the pieces click together into one repeating cycle. Press "go" and watch a single number — the loss — fall, shot after shot, until the network can sink it.
+@goal Together we'll snap the pieces into one loop you could run in your sleep: **forward** (take the shot) → **loss** (measure the miss) → **backward** (which way was I off?) → **update** (nudge the aim), then loop again. You'll meet the **learning rate** — how big a nudge you make each shot — and the words **epoch** and **iteration** for counting your practice. You'll watch the **loss curve** slide downhill and flatten out when the network has (roughly) got it. Then we'll poke at the sneaky ways practice goes wrong — nudging too hard, too soft, forgetting to reset, drilling in a fixed rut, quitting too early, or grinding so long you just memorize — each a little puzzle with a neat one-line fix. Every formula shows up in plain words first; any heavy math sits in a skippable box.
 
-      <h4>First, the picture — hold this before the steps</h4>
-      <p>Think about practicing free throws in basketball. You take a shot, you see how far you missed, you work out what to adjust, and you shoot again — and after enough shoot-check-adjust cycles, you get good. A network learns in exactly that rhythm: it makes a guess, measures how wrong it was, works out which way to nudge its weights, and tries again. Keep that picture; the four steps below are just that one rhythm written down precisely.</p>
+@@@ concept id=c1 tag="The practice loop" title="The training loop — four steps, on repeat" gotit="Got the loop"
+Let's stay on the basketball court, because you already know this loop by heart. Picture one **free-throw** practice cycle. **(1)** You shoot the ball — that's your best try right now. **(2)** You *look* at where it landed — a foot left of the rim — and measure the miss. **(3)** You figure out *which way* you were off — "I leaned left." **(4)** You *nudge* your aim a little to the right for next time. Then you do the whole thing again. Four little steps, over and over. That is the training loop, and every single piece of it is something you already built this module.
 
-      <h4>The words you'll meet today — plain English first</h4>
-      <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:.86rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.4rem .6rem;color:var(--k)">Word</th><th style="padding:.4rem .6rem;color:var(--muted)">Plain-English meaning — before we use it</th></tr></thead><tbody>
-      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">training loop</td><td style="padding:.4rem .6rem;color:var(--ink2)">The short repeating cycle a network runs to get better: guess, score the mistake, find the fix, nudge, repeat.</td></tr>
-      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">epoch</td><td style="padding:.4rem .6rem;color:var(--ink2)">One full trip through all your training data.</td></tr>
-      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">batch</td><td style="padding:.4rem .6rem;color:var(--ink2)">A small chunk of examples you handle together before you nudge the weights once.</td></tr>
-      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">step (iteration)</td><td style="padding:.4rem .6rem;color:var(--ink2)">One nudge of the weights, after processing one batch.</td></tr>
-      <tr style="border-bottom:1px solid var(--line)"><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">overfit one batch</td><td style="padding:.4rem .6rem;color:var(--ink2)">A first sanity check: train on one tiny chunk until its score hits near zero, to prove the model can learn.</td></tr>
-      <tr><td style="padding:.4rem .6rem;color:var(--ink);font-weight:600">hyperparameters</td><td style="padding:.4rem .6rem;color:var(--ink2)">Settings you pick yourself (like learning rate and batch size), not ones the model figures out.</td></tr>
-      </tbody></table>
+%%% svg
+<svg viewBox="0 0 520 232" role="img" aria-label="A basketball free-throw practice loop drawn as four steps arranged in a circle: shoot the ball, see where it landed, figure out which way you were off, nudge your aim. Arrows connect them in a ring, showing the cycle repeats."><g font-family="monospace" font-size="10.5"><text x="260" y="18" text-anchor="middle" fill="#2C2A28" font-size="12">One free-throw practice cycle — repeated until it drops clean</text><circle cx="140" cy="70" r="40" fill="#E7F0F5" stroke="#2A7B9B"/><text x="140" y="64" text-anchor="middle" fill="#1F6280">🏀 shoot</text><text x="140" y="78" text-anchor="middle" fill="#1F6280" font-size="9">(take the shot)</text><circle cx="380" cy="70" r="40" fill="#FDECEC" stroke="#C93B3B"/><text x="380" y="64" text-anchor="middle" fill="#C93B3B">📏 measure</text><text x="380" y="78" text-anchor="middle" fill="#C93B3B" font-size="9">(how far off?)</text><circle cx="380" cy="180" r="40" fill="#EDE9F8" stroke="#7C6DAA"/><text x="380" y="174" text-anchor="middle" fill="#5E5191">🧭 which way?</text><text x="380" y="188" text-anchor="middle" fill="#5E5191" font-size="9">(I leaned left)</text><circle cx="140" cy="180" r="40" fill="#EAF5EE" stroke="#2D8B55"/><text x="140" y="174" text-anchor="middle" fill="#1a5c38">🎯 nudge aim</text><text x="140" y="188" text-anchor="middle" fill="#1a5c38" font-size="9">(a little right)</text><g stroke="#B8AEA2" stroke-width="2" fill="#B8AEA2"><path d="M180 62 l160 0"/><polygon points="340,62 331,57 331,67"/><path d="M380 110 l0 30"/><polygon points="380,140 375,131 385,131"/><path d="M340 188 l-160 0"/><polygon points="180,188 189,183 189,193"/><path d="M140 140 l0 -30"/><polygon points="140,110 135,119 145,119"/></g><text x="260" y="130" text-anchor="middle" fill="#6B645E" font-size="9">round and round — each loop, a little closer</text></g></svg>
+%%%
 
-      <h4>What is the training loop?</h4>
-      <p>The <span class="term" data-tip="The repeating cycle that trains a model: forward pass → loss → backprop (gradients) → update weights → repeat.">training loop</span> is the four-step cycle repeated many times:</p>
-      <ol>
-        <li><strong>Forward pass</strong> — run the input through the network to get a prediction (Day 3).</li>
-        <li><strong>Loss</strong> — measure how wrong it is, one number (Day 4).</li>
-        <li><strong>Backprop</strong> — compute the gradient for every weight (Day 5).</li>
-        <li><strong>Update</strong> — nudge each weight downhill: <code>w ← w − lr × grad</code>.</li>
-      </ol>
-      <p>Then repeat. Each pass makes the prediction a little better.</p>
+**What the free-throw picture gets right:** you improve by *repeating* one small correction — no single shot fixes everything, but hundreds of tiny fixes add up. That is exactly how a network trains. **Where it breaks down:** a basketball player adjusts one thing at a time (aim, then arc, then power), but a network nudges *every* one of its knobs at once, on every single loop. It is like fixing your aim, arc, power, stance, and breathing all in one motion, thousands of times.
 
-      <h4>Two words you'll see</h4>
-      <p>An <span class="term" data-tip="One full pass over the entire training dataset.">epoch</span> is one full pass over all the training data. A <span class="term" data-tip="A small chunk of the dataset processed together in one step, so you update weights often without loading everything at once.">batch</span> is a chunk processed in one step. Real training loops over batches, and over epochs. Keep going 👇</p>
-      <div class="callout c-info"><span class="ic">🏭</span><div><b>A real one:</b> Meta has reported training Llama 3's biggest model on more than 15 trillion tokens — the exact loop you're about to run, just repeated an enormous number of times.</div></div>
-      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 前几天学了 forward、loss、gradient，但很多人还是不知道它们怎么"合"成训练 — you've met the forward pass, loss, and gradients, yet it's easy to still not see how they fit together. In plain terms: the training loop is just those pieces in a cycle — predict, score, find the slope, nudge the weights — run over and over. There is no hidden fifth step.</div></div>
-      <button class="gotit" type="button">Got the loop — let's go</button>
-    </div>
-</section>
-@@@ region name=s2
-<section class="module-section" id="s2" data-sec="intuition">
-  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Practicing free throws</span><span class="sec-tag">Intuition</span></div>
-  <div class="sec-body">
-      <p>You already have the free-throw picture from Section 1 — here it is as two cards, one for the single shoot-check-adjust cycle and one for why the repetition is the whole point:</p>
-      <div class="relate">
-        <div class="card"><span class="big">🏀</span><h5>Shoot, check, adjust</h5><p>Take a shot (forward pass), see how far you missed (loss), work out what to fix (gradients), adjust your form (update). Then shoot again.</p></div>
-        <div class="card"><span class="big">🔁</span><h5>Repetition is the training</h5><p>One shot barely improves you. Thousands of shoot-check-adjust cycles do. Same for a network: the loop, run many times, is the learning.</p></div>
-      </div>
-      <p><strong>In one line:</strong> the training loop is shoot-check-adjust for weights, repeated until the loss is low.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a network can "memorize" the practice set and still miss new shots — that's <span class="term" data-tip="When a model fits the training data well but fails on new, unseen data. Checked by evaluating on held-out data.">overfitting</span>. So we also check the loss on data the model has not trained on. More on that in the evaluation modules.</div></div>
-      <p><b>直觉 / Intuition:</b> 直觉上，training loop 就是"投篮 → 看偏了多少 → 调整 → 再投"，一遍遍重复直到稳定。The technical point: each iteration runs forward → loss → backprop → weight update, and repeating it drives the loss down — the whole of "training" is this one cycle, scaled up.</p>
-      <button class="gotit" type="button">Got the picture</button>
-    </div>
-</section>
-@@@ region name=s4
-<section class="module-section" id="s4" data-sec="why">
-  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The loop in code, and why it IS frontier training</span><span class="sec-tag">Mechanism &amp; why</span></div>
-  <div class="sec-body">
-      <h4>The loop, in plain code</h4>
-      <div class="callout c-ok"><span class="ic">🧮</span><div><code>for epoch in range(E):</code><br>&nbsp;&nbsp;<code>for batch in data:</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>reset_grads()</code>&nbsp;&nbsp;<span style="color:var(--muted)"># frameworks accumulate — clear last step's grads (PyTorch: optimizer.zero_grad())</span><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>pred = forward(batch.x)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>loss = loss_fn(pred, batch.y)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>grads = backprop(loss)</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>weights = weights − lr × grads</code></div></div>
-      <div class="callout c-info"><span class="ic">💡</span><div><b>Where do the weights start?</b> Before the first pass the weights are small <b>random</b> numbers — never all-equal (the symmetry trap from Day 1), and scaled to the layer's fan-in so the pre-activations don't start too big or too small (the named recipes are Xavier and He). The loop does all the rest.</div></div>
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — one training step of <code>pred = w·x</code></b>
-      <br><b>1 · In words:</b> predict, measure how wrong, find the slope of the loss w.r.t. <code>w</code>, then nudge <code>w</code> against that slope. Repeat.
-      <br><b>2 · The formula:</b> <code>pred = w·x</code>; <code>loss = (pred − y)²</code>; <code>grad = 2(pred − y)·x</code>; <code>w ← w − lr·grad</code>. Here <code>x=2, y=6</code>, start <code>w=1</code>, <code>lr=0.05</code>.
-      <br><b>3 · Tiny numbers:</b> step 1 — <code>pred = 2</code>, <code>loss = (2−6)² = 16</code>, <code>grad = 2(−4)(2) = −16</code>, <code>w ← 1 − 0.05(−16) = 1.8</code>. Next step the loss is smaller and <code>w</code> keeps climbing toward the true answer <code>3</code>.
-      <br><b>4 · Sanity check:</b> at <code>w=3</code>, <code>pred = 6 = y</code>, so <code>loss = 0</code> and <code>grad = 0</code> — the update stops moving. A loss that <em>rises</em> instead means <code>lr</code> is too big.</div></div>
+#### The four steps, in network words
+Each step on the court is a phase of the [[training loop||the four-step cycle — forward, loss, backward, update — repeated over and over until the network's mistakes get small]] you'll run in code:
 
-      <h4>A sanity check you'll use forever</h4>
-      <p>Before training for real, run the loop on a <strong>single batch</strong> until the loss hits ~0. If it can't, your gradients aren't flowing (a bug). "Overfit one batch" is the first thing engineers do to prove a new model can learn at all — you'll see it in the JAX modules.</p>
-      <div class="callout c-info"><span class="ic">🪜</span><div><b>Epoch, step, batch — with a number.</b> A <b>batch</b> is the chunk of examples used for one weight update; a <b>step</b> (iteration) is one such update; an <b>epoch</b> is one full pass over the data. With 100 examples and batch size 25, one epoch = <code>100/25 = 4</code> steps. The batch's gradient is the <b>mean of the per-example gradients</b>, so a batch gives a <em>noisy but unbiased</em> estimate of the true whole-dataset gradient — a smaller batch means a noisier estimate. In a real loop you also measure the loss on a held-out slice each epoch (the <b>validation</b> loss) — that's the signal Day 9 uses to catch overfitting.</div></div>
+- **Step 1 · Forward pass** — the network takes its shot: run an input through the neuron to get a **prediction** (the weighted-sum-then-activation you built on earlier days).
+- **Step 2 · Loss** — measure the miss: the [[loss||one number saying how wrong the guess is; lower is better, 0 is perfect]] scores how far the guess landed from the true answer.
+- **Step 3 · Backward pass** — which way was I off? [[backpropagation||the backward sweep from yesterday that hands every weight its gradient — which way to nudge it]] computes the **gradient** for every weight.
+- **Step 4 · Update** — nudge the aim: shift each weight a small step in the direction that lowers the loss.
 
-      <h4>Why a frontier lab cares</h4>
-      <p>This exact loop, scaled up, <em>is</em> how frontier models are trained — that's the Llama 3 run from the teaser above, just repeated an almost unimaginable number of times. How big to make each repetition is exactly the trade-off you're about to meet below: the batch size. Tuning the <span class="term" data-tip="Settings you choose, not learn: learning rate, batch size, number of epochs. They strongly affect training.">hyperparameters</span> — learning rate, batch size — is much of the craft.</p>
-      <div class="callout c-info"><span class="ic">🔗</span><div><b>Remember this chain:</b> forward → loss → backprop → update, repeated over batches and epochs = training. One batch to near-zero loss proves it learns; scaled to a datacenter, it's how every model you've heard of was made. The core loop is now assembled — the next three days refine <em>how</em> it steps (optimizers Day 7, learning rate Day 8) and whether it truly learned (generalization Day 9).</div></div>
+Then jump back to Step 1 and do it all again. Here is the loop laid out flat, so you can see one lap feed into the next.
 
-      <h4>The staff lens — one silent failure, one trade-off</h4>
-      <p>The loop is only four lines, and a missing fifth one is the most common quiet bug in all of training.</p>
-      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): forgetting to reset the gradients each step.</b> In common frameworks (like PyTorch), gradients <em>add up</em> across steps by default — each backward pass piles its gradient on top of the last one instead of replacing it. If you forget the reset (in PyTorch, <code>optimizer.zero_grad()</code>) at the top of the loop, the update uses a growing sum of gradients from every past batch. On the free-throw court, that is like letting the feedback from every shot you have ever taken pile on top of this one's — you keep over-correcting for misses you already fixed. The loop still runs and the loss still changes, so nothing crashes — but training behaves strangely and learns poorly for no obvious reason. A senior engineer catches this in <b>code review</b> by checking that the loop clears the gradients before each backward pass.</div></div>
-      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: how big to make each batch.</b> A <span class="term" data-tip="The number of examples processed together in one training step before the weights are updated.">batch</span> is how many examples you process before one weight update. Big batches give a smoother, more reliable gradient estimate and use the hardware efficiently, but need much more memory and sometimes generalize slightly worse. Small batches are noisy and slower per example on the hardware, but use little memory and the noise can even help the model escape bad spots. Choosing the batch size is a <b>design-review</b> decision that trades memory and hardware efficiency against gradient quality.</div></div>
-      <table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:.88rem"><thead><tr style="text-align:left;border-bottom:2px solid var(--line2)"><th style="padding:.5rem .6rem"></th><th style="padding:.5rem .6rem;color:var(--q)">Large batch</th><th style="padding:.5rem .6rem;color:var(--v)">Small batch</th></tr></thead><tbody>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Gradient estimate</td><td style="padding:.5rem .6rem;color:var(--ink2)">smoother, lower-noise</td><td style="padding:.5rem .6rem;color:var(--ink2)">noisier</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Hardware use</td><td style="padding:.5rem .6rem;color:var(--ink2)">efficient (high throughput)</td><td style="padding:.5rem .6rem;color:var(--ink2)">underutilized</td></tr>
-        <tr style="border-bottom:1px solid var(--line)"><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Memory</td><td style="padding:.5rem .6rem;color:var(--ink2)">high</td><td style="padding:.5rem .6rem;color:var(--ink2)">low</td></tr>
-        <tr><td style="padding:.5rem .6rem;color:var(--ink);font-weight:600">Generalization</td><td style="padding:.5rem .6rem;color:var(--ink2)">can be slightly worse; needs LR retuning</td><td style="padding:.5rem .6rem;color:var(--ink2)">noise can help escape bad spots</td></tr>
-      </tbody></table>
-      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "The training loop is four steps repeated over batches and epochs: forward pass → loss → backprop for gradients → weight update <code>w ← w − lr·grad</code>. That cycle, scaled to a datacenter, is how every model is trained. My first move on any new model is 'overfit one batch' — run the loop on a single batch until the loss hits ~0; if it can't, gradients aren't flowing and there's a bug. The main knob is batch size, trading gradient quality and hardware efficiency against memory."</div></div>
-      <button class="gotit" type="button">Got the loop</button>
-    </div>
-</section>
-@@@ region name=s7
-<section class="module-section" id="s7" data-sec="produce">
-  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Predict where it lands, then run the loop</span><span class="sec-tag">Produce</span></div>
-  <div class="sec-body">
-      <p>Here's the fun part. <b>Before you run anything, predict:</b> after 20 shoot-check-adjust steps, where does <code>w</code> end up and what happens to the loss? Write your guess. Then run the loop and watch <code>w</code> climb toward <code>3</code> while the loss collapses toward <code>0</code> — and notice that the <em>first</em> step moves <code>w</code> the most (gradient <code>−16</code>) while later steps barely nudge it. That slowdown you see <em>is</em> the loss curve flattening out. Pick one path:</p>
-      <h4>Option A · write it yourself</h4>
-      <p>Create <code>sessions/m02-the-neuron/day-06-training-loop/experiment.py</code>. Fit <code>pred = w·x</code> to <code>x=2, y=6</code>. Start <code>w=1.0</code>; loop 20 steps doing: <code>pred=w*x</code>; <code>loss=(pred-y)**2</code>; <code>grad=2*(pred-y)*x</code>; <code>w=w-0.05*grad</code>; print step, w, loss. Confirm <code>w → 3</code> and <code>loss → 0</code>. Run with <code>python3 sessions/m02-the-neuron/day-06-training-loop/experiment.py</code>.</p>
-      <h4>Option B · let Claude build it, then read it</h4>
-      <p>Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.</p>
-      <div class="prompt">
-        <div class="prompt-h"><span class="prompt-l">triggers <b>frontier-experiment-lab</b></span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
-        <pre class="prompt-t" id="pp">Use /frontier-experiment-lab to build my Module 2 Day 6 artifact.
+%%% svg
+<svg viewBox="0 0 520 168" role="img" aria-label="The four phases of the training loop drawn as a horizontal conveyor: forward pass gives a prediction, loss measures how wrong, backward pass gives gradients, update nudges the weights. A curved arrow loops from update back to forward, labelled repeat."><g font-family="monospace" font-size="10"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">One lap of the training loop — then it repeats</text><rect x="14" y="44" width="108" height="34" rx="5" fill="#E7F0F5" stroke="#2A7B9B"/><text x="68" y="59" text-anchor="middle" fill="#1F6280" font-size="9.5">1 · forward pass</text><text x="68" y="71" text-anchor="middle" fill="#1F6280" font-size="9">→ prediction</text><text x="128" y="63" fill="#B8AEA2">→</text><rect x="142" y="44" width="96" height="34" rx="5" fill="#FDECEC" stroke="#C93B3B"/><text x="190" y="59" text-anchor="middle" fill="#C93B3B" font-size="9.5">2 · loss</text><text x="190" y="71" text-anchor="middle" fill="#C93B3B" font-size="9">→ how wrong</text><text x="244" y="63" fill="#B8AEA2">→</text><rect x="258" y="44" width="112" height="34" rx="5" fill="#EDE9F8" stroke="#7C6DAA"/><text x="314" y="59" text-anchor="middle" fill="#5E5191" font-size="9.5">3 · backward pass</text><text x="314" y="71" text-anchor="middle" fill="#5E5191" font-size="9">→ gradients</text><text x="376" y="63" fill="#B8AEA2">→</text><rect x="390" y="44" width="112" height="34" rx="5" fill="#EAF5EE" stroke="#2D8B55"/><text x="446" y="59" text-anchor="middle" fill="#1a5c38" font-size="9.5">4 · update</text><text x="446" y="71" text-anchor="middle" fill="#1a5c38" font-size="9">→ nudge weights</text><path d="M446 82 C 446 130, 68 130, 68 84" fill="none" stroke="#C99A12" stroke-width="2" stroke-dasharray="4,3"/><polygon points="68,84 63,94 73,94" fill="#C99A12"/><text x="260" y="126" text-anchor="middle" fill="#9A7208" font-size="10">↻ repeat — every lap, the loss drops a little</text></g></svg>
+%%%
+
+The one line to keep: **forward → loss → backward → update, on repeat.** The first three steps you already built; today's new magic is Step 4, the actual nudge. Let's zoom into it next — the moment the network truly *changes*.
+
+@@@ concept id=c2 tag="Nudge the aim" title="The update — the one step that changes the weights" gotit="Got the update"
+This is the heart of the loop, so let's slow down. Back on the court: your last **free-throw** clanked off the *left* of the rim. Your body already knows what to do — aim a little to the *right*. Not all the way across the gym (you'd overcorrect and miss right), just a *small nudge* opposite to the miss. The network does the same thing with each weight. Yesterday's gradient told it "nudging this weight up makes the miss *worse*" — so it does the obvious thing and nudges the weight the **opposite** way, a small step toward *less* miss.
+
+%%% svg
+<svg viewBox="0 0 520 176" role="img" aria-label="A basketball hoop seen from above. The last shot landed left of the rim, marked with an X. A red arrow shows the miss pointing left. A green arrow shows the aim being nudged the opposite way, a small step to the right, toward the center of the rim."><g font-family="monospace" font-size="10.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Miss went left → nudge the aim the OPPOSITE way, a small step right</text><circle cx="300" cy="96" r="46" fill="none" stroke="#C99A12" stroke-width="3"/><text x="300" y="152" text-anchor="middle" fill="#9A7208" font-size="9">the rim (target)</text><text x="188" y="100" text-anchor="middle" fill="#C93B3B" font-size="16">✕</text><text x="188" y="120" text-anchor="middle" fill="#C93B3B" font-size="9">last shot landed here</text><path d="M270 96 l-70 0" stroke="#C93B3B" stroke-width="2.5"/><polygon points="200,96 210,91 210,101" fill="#C93B3B"/><text x="235" y="86" text-anchor="middle" fill="#C93B3B" font-size="9">the miss →</text><path d="M300 70 l44 -20" stroke="#2D8B55" stroke-width="2.5"/><polygon points="344,50 333,50 338,60" fill="#2D8B55"/><text x="392" y="50" text-anchor="middle" fill="#2D8B55" font-size="9">nudge aim: small step</text><text x="392" y="63" text-anchor="middle" fill="#2D8B55" font-size="9">the opposite way</text></g></svg>
+%%%
+
+**What the aim-nudge picture gets right:** the correction is *small* and points *opposite* to the miss — nudge too hard and you'll fly past to the other side. **Where it breaks down:** a shooter feels the miss and guesses the fix; the network doesn't guess — the gradient gives it the exact opposite direction for every weight, no feeling required.
+
+#### The update rule, in plain words
+The update is one short sentence: **new weight = old weight − a small step in the gradient's direction.** The gradient points *uphill* (toward more loss), so the **minus sign** is what turns the network around to walk *downhill*. That "how big a step" number has a name — the [[learning rate||the step size: how big a nudge you make each loop. Too big overshoots, too small crawls]] — and you'll meet it properly in the next concept. Here is the whole rule as one line:
+
+%%% formula
+expr: w ← w − lr × (gradient of the loss for w)
+note: "w" is a weight, "lr" is the learning rate (step size). The MINUS sign walks downhill — opposite the uphill gradient. The bias updates the exact same way: b ← b − lr × (its gradient).
+%%%
+
+Now watch it actually move. Say one weight should really be `3.0`, but it starts at `0.5` — like standing a big step left of the rim. Each loop, the gradient points back toward `3.0`, and with a learning rate of `0.25` the weight takes a *fraction* of that gap each time. Predict it first: will it jump straight to `3.0`, or creep up? Then run it.
+
+%%% demo id=update label="run it — one weight, five nudges"
+code: w=0.5; target=3.0; lr=0.25
+code: for i in range(5): grad = 2*(w-target); w = w - lr*grad; print(round(w,3))
+out: 1.75
+out: 2.375
+out: 2.688
+out: 2.844
+out: 2.922
+take: <b>Update = old weight − lr × gradient.</b> The weight climbs 0.5 → 1.75 → 2.375 → 2.69 → 2.84 → 2.92, closing in on 3.0 a little each loop — never one giant leap. That patient, repeated nudge is exactly the free-throw drill. Run the loop longer and it lands right on 3.0.
+%%%
+
+And to *see* that creep, here is the same climb drawn as bars — the weight stepping toward its target, the gap shrinking each loop.
+
+%%% svg
+<svg viewBox="0 0 520 176" role="img" aria-label="A bar chart of one weight climbing over five loops from 0.5 toward its target of 3.0. Bars rise 0.5, 1.75, 2.375, 2.69, 2.84, 2.92, each closer to a dashed line at 3.0. The gap between the bar top and the target shrinks every loop."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">One weight nudging toward its target (3.0) — gap shrinks each loop</text><line x1="46" y1="140" x2="500" y2="140" stroke="#E5DFD6" stroke-width="1.5"/><line x1="46" y1="42" x2="500" y2="42" stroke="#2D8B55" stroke-width="1.3" stroke-dasharray="5,3"/><text x="502" y="45" fill="#2D8B55" font-size="9">target 3.0</text><g fill="#2A7B9B"><rect x="60" y="123" width="44" height="17"/><rect x="132" y="83" width="44" height="57"/><rect x="204" y="63" width="44" height="77"/><rect x="276" y="53" width="44" height="87"/><rect x="348" y="48" width="44" height="92"/><rect x="420" y="45" width="44" height="95"/></g><g fill="#1F6280" text-anchor="middle"><text x="82" y="118">0.5</text><text x="154" y="78">1.75</text><text x="226" y="58">2.38</text><text x="298" y="48">2.69</text><text x="370" y="43">2.84</text><text x="442" y="40">2.92</text></g><g fill="#6B645E" text-anchor="middle" font-size="9"><text x="82" y="154">start</text><text x="154" y="154">loop 1</text><text x="226" y="154">loop 2</text><text x="298" y="154">loop 3</text><text x="370" y="154">loop 4</text><text x="442" y="154">loop 5</text></g></g></svg>
+%%%
+
+That single move — subtract a small multiple of the gradient — is called **gradient descent**, and it is Step 4 of every loop. It is also the great-grandchild of a much cruder idea from the 1950s. Let's meet its ancestor next — it makes today's smooth version feel almost magical.
+
+@@@ concept id=c3 tag="The old way" title="The perceptron — the crude ancestor of the loop" gotit="Got the ancestor"
+Before the smooth loop you just met, there was a much blunter one, and seeing it makes today's version click. Imagine an old-school **free-throw** coach with only one rule: he stays silent while you're sinking shots, and the instant you *miss*, he blows a whistle and shoves your elbow a fixed inch — always the same shove, whether you missed by a hair or by a mile. If your shot was already good, he says *nothing* — no praise, no fine-tuning. That was the very first learning machine, the [[perceptron||Frank Rosenblatt's 1958 learning machine: it nudged weights by a fixed amount, and only when it got an example wrong]], built by Frank Rosenblatt in 1958.
+
+%%% svg
+<svg viewBox="0 0 520 184" role="img" aria-label="An old-fashioned coach with a whistle. On the left, a made shot: the coach is silent, no correction. On the right, a missed shot: the coach blows the whistle and gives a fixed-size elbow shove, the same size every time regardless of how big the miss was."><g font-family="monospace" font-size="10.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">The perceptron coach: silent on hits, one fixed shove on any miss</text><line x1="260" y1="30" x2="260" y2="170" stroke="#E5DFD6" stroke-dasharray="4,3"/><rect x="20" y="34" width="222" height="130" rx="6" fill="#EAF5EE" stroke="#2D8B55"/><text x="131" y="54" text-anchor="middle" fill="#1a5c38">shot was GOOD</text><text x="131" y="92" text-anchor="middle" font-size="24">🏀 ✓</text><text x="131" y="126" text-anchor="middle" fill="#1a5c38" font-size="9.5">coach: silent 🤐</text><text x="131" y="144" text-anchor="middle" fill="#6B645E" font-size="9">no nudge at all</text><rect x="278" y="34" width="222" height="130" rx="6" fill="#FDECEC" stroke="#C93B3B"/><text x="389" y="54" text-anchor="middle" fill="#C93B3B">shot MISSED</text><text x="389" y="92" text-anchor="middle" font-size="24">🏀 ✕</text><text x="389" y="126" text-anchor="middle" fill="#C93B3B" font-size="9.5">whistle 📣 + fixed shove</text><text x="389" y="144" text-anchor="middle" fill="#6B645E" font-size="9">same size, tiny miss or huge miss</text></g></svg>
+%%%
+
+**What the strict-coach picture gets right:** the perceptron only reacts to *mistakes*, and every correction is the *same fixed size*. **Where it breaks down:** a coach can at least see *how badly* you missed even if he ignores it; the perceptron had no smooth "how wrong" number at all, so it truly couldn't tell a near-miss from a disaster.
+
+#### Why the modern loop is smoother
+The perceptron had two rough edges, and fixing both is exactly what today's loop does:
+
+- It only corrected on a **mistake**. A shot that was *nearly* perfect got zero feedback, so it never got polished.
+- Every nudge was the **same fixed size**, no matter how big the miss.
+
+Today's loop swaps in a smooth [[loss||one number saying how wrong the guess is; lower is better]] and its **gradient**, so *every* example — even a near-perfect one — gives a **graded** correction: a big miss earns a big nudge, a tiny miss earns a tiny one. Here's the two side by side.
+
+%%% svg
+<svg viewBox="0 0 520 190" role="img" aria-label="Before-and-after comparison. Top row, the perceptron: correct examples get no bar, wrong examples all get the same fixed-height bar. Bottom row, gradient descent: every example gets a bar whose height matches how big its miss was, small misses give small bars, big misses give big bars."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Size of correction per example — fixed vs graded</text><text x="16" y="42" fill="#C93B3B" font-size="10">perceptron (fixed / only on miss):</text><line x1="30" y1="86" x2="360" y2="86" stroke="#E5DFD6"/><g fill="#C93B3B"><rect x="60" y="58" width="26" height="28"/><rect x="150" y="58" width="26" height="28"/><rect x="285" y="58" width="26" height="28"/></g><g fill="#6B645E" text-anchor="middle" font-size="8"><text x="73" y="98">miss</text><text x="118" y="98">✓ hit: 0</text><text x="163" y="98">miss</text><text x="208" y="98">✓ hit: 0</text><text x="253" y="98">✓ hit: 0</text><text x="298" y="98">miss</text></g><text x="16" y="128" fill="#2D8B55" font-size="10">gradient descent (graded / every example):</text><line x1="30" y1="172" x2="360" y2="172" stroke="#E5DFD6"/><g fill="#2D8B55"><rect x="60" y="150" width="26" height="22"/><rect x="105" y="166" width="26" height="6"/><rect x="150" y="140" width="26" height="32"/><rect x="195" y="163" width="26" height="9"/><rect x="240" y="158" width="26" height="14"/><rect x="285" y="132" width="26" height="40"/></g><text x="200" y="186" text-anchor="middle" fill="#6B645E" font-size="8">bar height = how big the miss — everyone gets a fair, graded nudge</text></g></svg>
+%%%
+
+That single upgrade — a graded nudge for *everyone*, every loop — is why the modern loop learns so much more smoothly than its 1958 ancestor. Now back to today's loop, and the one knob that decides how big each nudge is.
+
+@@@ concept id=c4 tag="How big a nudge" title="The learning rate — and two ways it bites" gotit="Got the learning rate"
+Now the single most important dial in the whole loop. Think of walking down a hill to a valley in the dark, and you can only take **fixed-size steps**. Take *baby* steps and you'll get there, but it takes all night. Take *giant leaps* and you might overshoot the valley completely — bound down one side, up the other, back and forth, never settling. The right stride is *big enough to make progress, small enough not to fly past the bottom*. That stride length is the [[learning rate||the step size: how far the network moves each loop. Written "lr". Too big overshoots, too small crawls]] — often written `lr` — and it multiplies every nudge in the update rule.
+
+%%% svg
+<svg viewBox="0 0 520 188" role="img" aria-label="Three walkers heading into a valley. Left: tiny baby steps, barely moving down the slope, labelled too small crawls. Middle: medium steps landing near the bottom, labelled just right. Right: giant leaps bouncing from one wall of the valley to the other and back, overshooting, labelled too big overshoots."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Step size into the valley: too small, just right, too big</text><path d="M20 40 Q 90 130 160 130 Q 175 130 180 40" fill="none" stroke="#B8AEA2" stroke-width="1.8"/><g stroke="#2A7B9B" stroke-width="1.6" fill="none"><path d="M40 62 l10 8"/><path d="M50 70 l10 7"/><path d="M60 77 l9 6"/></g><text x="95" y="160" text-anchor="middle" fill="#1F6280" font-size="9">too small</text><text x="95" y="174" text-anchor="middle" fill="#6B645E" font-size="8">crawls forever</text><path d="M195 40 Q 265 130 335 130 Q 350 130 355 40" fill="none" stroke="#B8AEA2" stroke-width="1.8"/><g stroke="#2D8B55" stroke-width="1.8" fill="none"><path d="M215 60 l30 34"/><path d="M245 94 l28 34"/></g><circle cx="273" cy="128" r="4" fill="#2D8B55"/><text x="270" y="160" text-anchor="middle" fill="#1a5c38" font-size="9">just right</text><text x="270" y="174" text-anchor="middle" fill="#6B645E" font-size="8">lands at the bottom</text><path d="M370 40 Q 440 130 510 130 Q 515 130 518 40" fill="none" stroke="#B8AEA2" stroke-width="1.8"/><g stroke="#C93B3B" stroke-width="1.8" fill="none"><path d="M388 58 l70 66"/><path d="M458 124 l60 -70"/></g><text x="445" y="160" text-anchor="middle" fill="#C93B3B" font-size="9">too big</text><text x="445" y="174" text-anchor="middle" fill="#6B645E" font-size="8">overshoots, bounces</text></g></svg>
+%%%
+
+**What the stepping-into-a-valley picture gets right:** one dial (stride length) decides between crawling, arriving, and bouncing past. **Where it breaks down:** a hiker can shorten her stride as she nears the bottom by feel; a network uses the *same* learning rate every loop unless you deliberately shrink it — which is exactly the remedy we'll reach in a moment.
+
+#### Puzzle 1 — the learning rate too *high*
+Set `lr` too big and each nudge overshoots the bottom. The weight leaps past the target, the loss goes *up*, so the next nudge leaps back even harder — the loss **oscillates**, then **diverges**, and can blow up to `NaN` ("not a number", what you get from math gone infinite). **Cause:** the step is larger than the distance to the bottom. **Remedy:** *lower the learning rate.* You spot this instantly on the loss curve — it should slope *down*; if it zig-zags up, your `lr` is too big.
+
+#### Puzzle 2 — the learning rate too *low*
+Set `lr` too tiny and every nudge is a grain of sand. The loss *does* fall, but so slowly that training **crawls** — you'd wait hours for progress an hour of the right `lr` would give in seconds. **Cause:** steps too small to make real headway. **Remedy:** *raise the learning rate* until the loss falls briskly without zig-zagging.
+
+Here are all three side by side — the shape of the loss curve tells you which one you're in.
+
+%%% svg
+<svg viewBox="0 0 520 190" role="img" aria-label="Three loss curves over loops. Green just-right curve slides smoothly down and flattens near zero. Blue too-low curve slopes down very gently, barely dropping, still high at the end. Red too-high curve zig-zags upward and diverges off the top."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Read the loss curve → diagnose the learning rate</text><line x1="46" y1="26" x2="46" y2="150" stroke="#B8AEA2"/><line x1="46" y1="150" x2="500" y2="150" stroke="#B8AEA2"/><text x="20" y="90" fill="#6B645E" font-size="9" transform="rotate(-90 20 90)">loss</text><text x="270" y="172" text-anchor="middle" fill="#6B645E" font-size="9">loops →</text><path d="M52 40 C 140 130, 300 146, 490 148" fill="none" stroke="#2D8B55" stroke-width="2.2"/><text x="405" y="140" fill="#2D8B55" font-size="9">just right ✓ (falls, flattens)</text><path d="M52 46 C 200 60, 360 74, 490 84" fill="none" stroke="#2A7B9B" stroke-width="2.2"/><text x="360" y="70" fill="#1F6280" font-size="9">too low (crawls, still high)</text><path d="M52 120 L 100 60 L 148 132 L 196 44 L 244 140 L 292 30 L 330 150" fill="none" stroke="#C93B3B" stroke-width="2.2"/><text x="130" y="34" fill="#C93B3B" font-size="9">too high (zig-zags → diverges → NaN)</text></g></svg>
+%%%
+
+#### The best-of-both remedy — a learning-rate schedule
+Here's the trick that gets both: start with a *big* stride to cover ground fast, then *shrink* it as you near the valley so you settle gently instead of bouncing. Deliberately lowering `lr` as training goes on is a [[learning-rate schedule||a plan that shrinks the learning rate over time — big early steps for speed, small late steps to settle; also called decay]] (also called *decay*). Big early steps for speed, small late steps to settle — the smart middle path.
+
+!!! c-info 🔬
+<b>Optional (skippable) — the update rule, symbol by symbol.</b> For weight `w` with gradient `g` and learning rate `η` (the Greek letter "eta", the usual symbol for the learning rate): the update is `w ← w − η·g`. If `η` is bigger than roughly `2 / (curvature of the loss)` the step overshoots and the loss grows — that's the "too high" failure in one inequality. A schedule replaces the single `η` with a shrinking sequence `η₁ > η₂ > η₃ > …`. You never need this to run the loop — the loss curve tells you everything by eye.
+!!!
+
+With the stride set sensibly, the loop *will* march the loss down. But how do we *count* all this practice — and how do we know when to stop? That's the next piece.
+
+@@@ concept id=c5 tag="Counting practice" title="Epochs, iterations, and the loss curve" gotit="Got epochs & the curve"
+Now we need words for *how much* practice, and a way to *watch* it pay off. Picture studying a **deck of flashcards** for a test. Flipping through *one* card and fixing what you got wrong is a single small round of practice. Flipping through the *whole deck* once — every card, front to back — is one full pass. You'd repeat the whole deck many times before the test. Training uses those same two counts, with fancier names.
+
+%%% svg
+<svg viewBox="0 0 520 176" role="img" aria-label="A deck of flashcards. One highlighted card is labelled iteration, one update. A bracket around the whole row of cards is labelled epoch, one full pass through all cards. Below, three copies of the deck labelled epoch 1, epoch 2, epoch 3 show the deck being repeated."><g font-family="monospace" font-size="9.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Flashcards: one card = an iteration, one full deck = an epoch</text><g><rect x="40" y="40" width="40" height="52" rx="4" fill="#FDF3D6" stroke="#C99A12"/><rect x="92" y="40" width="40" height="52" rx="4" fill="#E7F0F5" stroke="#2A7B9B" stroke-width="2"/><rect x="144" y="40" width="40" height="52" rx="4" fill="#FDF3D6" stroke="#C99A12"/><rect x="196" y="40" width="40" height="52" rx="4" fill="#FDF3D6" stroke="#C99A12"/><rect x="248" y="40" width="40" height="52" rx="4" fill="#FDF3D6" stroke="#C99A12"/></g><path d="M112 96 l0 12" stroke="#2A7B9B"/><text x="112" y="122" text-anchor="middle" fill="#1F6280" font-size="9">1 iteration</text><text x="112" y="134" text-anchor="middle" fill="#6B645E" font-size="8">(one update)</text><path d="M40 34 l248 0" stroke="#7C6DAA" stroke-width="1.6"/><text x="164" y="30" text-anchor="middle" fill="#5E5191" font-size="9">1 epoch = whole deck once</text><g font-size="8" fill="#6B645E"><rect x="330" y="44" width="34" height="44" rx="3" fill="#F3ECDB" stroke="#C99A12"/><text x="347" y="102" text-anchor="middle">epoch 1</text><rect x="392" y="44" width="34" height="44" rx="3" fill="#F3ECDB" stroke="#C99A12"/><text x="409" y="102" text-anchor="middle">epoch 2</text><rect x="454" y="44" width="34" height="44" rx="3" fill="#F3ECDB" stroke="#C99A12"/><text x="471" y="102" text-anchor="middle">epoch 3</text></g><text x="409" y="130" text-anchor="middle" fill="#6B645E" font-size="8">repeat the deck many times</text></g></svg>
+%%%
+
+**What the flashcards picture gets right:** one card is one small update, the whole deck is one full pass, and you repeat the deck many times. **Where it breaks down:** with flashcards you flip one card at a time; a network often grabs a small *handful* of examples per update instead of exactly one — but that's a knob (batching) we'll meet in a later module. For now, one example per nudge is a perfect mental model.
+
+#### Two counts to keep straight
+- An [[iteration||one loop of forward → loss → backward → update, i.e. one weight update, from one example (or one small batch)]] (also called a *step*) is a single trip around the four-step loop — **one update**.
+- An [[epoch||one full pass over all of your training data — many iterations back to back]] is one full pass over *all* your training data. If you have 100 examples and update after each, one epoch is 100 iterations.
+
+You train for many epochs, so the whole deck gets seen again and again. The natural next question: how do you *know* it's working?
+
+#### The loss curve — your progress report
+Every loop, jot down the loss and plot it against the loop number. That plot is the [[loss curve||a plot of the loss over loops; a falling curve is proof the network is learning]], and it is the single most useful picture in all of training. A curve that slides *down* is a network that is learning. When the curve **flattens out** near a low value — barely dropping anymore — the network has (roughly) finished; that flattening is called [[convergence||when the loss stops dropping much and levels off — the loop has mostly finished learning]]. Watch a healthy run: a steep drop early, then a gentle glide, then flat.
+
+%%% svg
+<svg viewBox="0 0 520 186" role="img" aria-label="A healthy loss curve over epochs. It starts high, drops steeply in the first few epochs, then bends and glides down more gently, then flattens into a nearly horizontal line near the bottom, where a label reads converged: loss stops dropping."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">A healthy loss curve: steep drop, gentle glide, then flat</text><line x1="46" y1="26" x2="46" y2="150" stroke="#B8AEA2"/><line x1="46" y1="150" x2="500" y2="150" stroke="#B8AEA2"/><text x="20" y="92" fill="#6B645E" font-size="9" transform="rotate(-90 20 92)">loss</text><text x="270" y="172" text-anchor="middle" fill="#6B645E" font-size="9">epochs →</text><path d="M52 36 C 110 120, 180 140, 260 146 C 340 149, 420 150, 494 150" fill="none" stroke="#2D8B55" stroke-width="2.4"/><circle cx="70" cy="52" r="3.5" fill="#2D8B55"/><text x="110" y="52" fill="#1a5c38" font-size="9">steep drop (fast learning)</text><circle cx="200" cy="141" r="3.5" fill="#2D8B55"/><text x="240" y="128" fill="#1a5c38" font-size="9">gentle glide</text><circle cx="470" cy="150" r="3.5" fill="#C99A12"/><text x="360" y="140" fill="#9A7208" font-size="9">flat = converged</text></g></svg>
+%%%
+
+Two failures hide in this curve, and they sit at opposite ends of the *time* dial — stop the loop too early or run it too long. Those are the next puzzle, and the last piece of the healthy loop.
+
+@@@ concept id=c6 tag="Too little, too much" title="Puzzle — stopping too early, and drilling too long" gotit="Got early/late stopping"
+How *long* should the loop run? Both extremes bite, and you've felt both when studying for a test. Study **too little** and you walk in unprepared — you bomb it. Study **too much in the wrong way** — memorizing the exact practice answers word-for-word — and you ace the practice sheet but freeze on the real exam, because it asks the *same ideas* with *different numbers*. Good practice lives in between: enough to learn the pattern, not so much that you memorize the exact questions.
+
+%%% svg
+<svg viewBox="0 0 520 188" role="img" aria-label="A student studying for a test, shown three ways. Left: barely studied, sad face, labelled too little, underfit. Middle: studied just enough, happy face, labelled just right. Right: memorized every practice answer word for word, confused on the real exam, labelled too much, memorized."><g font-family="monospace" font-size="9.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Studying for a test: too little, just right, too much</text><rect x="16" y="34" width="150" height="132" rx="6" fill="#FDECEC" stroke="#C93B3B"/><text x="91" y="70" text-anchor="middle" font-size="26">😟</text><text x="91" y="104" text-anchor="middle" fill="#C93B3B">too little</text><text x="91" y="124" text-anchor="middle" fill="#6B645E" font-size="8.5">barely practised</text><text x="91" y="140" text-anchor="middle" fill="#6B645E" font-size="8.5">→ bombs the test</text><text x="91" y="156" text-anchor="middle" fill="#C93B3B" font-size="9">(underfit)</text><rect x="185" y="34" width="150" height="132" rx="6" fill="#EAF5EE" stroke="#2D8B55"/><text x="260" y="70" text-anchor="middle" font-size="26">🙂</text><text x="260" y="104" text-anchor="middle" fill="#1a5c38">just right</text><text x="260" y="124" text-anchor="middle" fill="#6B645E" font-size="8.5">learned the pattern</text><text x="260" y="140" text-anchor="middle" fill="#6B645E" font-size="8.5">→ handles new questions</text><rect x="354" y="34" width="150" height="132" rx="6" fill="#FDF3D6" stroke="#C99A12"/><text x="429" y="70" text-anchor="middle" font-size="26">😵</text><text x="429" y="104" text-anchor="middle" fill="#9A7208">too much</text><text x="429" y="124" text-anchor="middle" fill="#6B645E" font-size="8.5">memorized the answers</text><text x="429" y="140" text-anchor="middle" fill="#6B645E" font-size="8.5">→ freezes on new ones</text><text x="429" y="156" text-anchor="middle" fill="#9A7208" font-size="9">(overfit)</text></g></svg>
+%%%
+
+**What the studying picture gets right:** too little and too much both hurt, in opposite ways — one from not enough practice, one from the wrong kind. **Where it breaks down:** a student *knows* when they're just memorizing; a network can't tell on its own — its practice score keeps looking great even as it starts memorizing, so you need a *separate* check to catch it.
+
+#### Puzzle — too few epochs (underfit)
+Stop the loop too soon and the loss is still high — the network hasn't finished descending. This is **underfitting**: not enough practice. **Cause:** too few loops. **Remedy:** *train for more epochs*, and watch the loss curve until it flattens (converges).
+
+#### Puzzle — too many epochs (overfit)
+Run the loop *too* long and something sneaky happens: the training loss keeps dropping, but the network stops learning the real *pattern* and starts **memorizing the exact training examples**. That's [[overfitting||when the network memorizes the training data instead of the pattern, so it does great on data it has seen and badly on new data]]. **Cause:** too many loops relative to how much the data can teach. The catch: the *training* loss looks better and better — memorizing lowers it — so you can't spot the problem from training loss alone.
+
+#### The remedy — a held-out check and early stopping
+The fix is to keep a small slice of data the network *never trains on* — a [[validation set||a slice of data held back from training, used only to check if the network handles data it hasn't practised on]] — and measure the loss on it each epoch. While the network is truly learning, *both* losses fall. The moment it starts memorizing, the training loss keeps falling but the **validation loss turns back up** — that fork is your alarm. Stopping right at that turn is [[early stopping||halt training when the validation loss stops improving and starts rising — right before memorizing takes over]]. Watch the fork:
+
+%%% svg
+<svg viewBox="0 0 520 190" role="img" aria-label="Two loss curves over epochs. The blue training-loss curve falls steadily and keeps dropping toward zero. The red validation-loss curve falls at first alongside it, reaches a lowest point, then turns back upward. A vertical dashed line at that lowest point is labelled stop here, early stopping. The region after it is shaded and labelled overfitting."><g font-family="monospace" font-size="9.5"><text x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Training loss vs validation loss — stop at the fork</text><line x1="46" y1="26" x2="46" y2="150" stroke="#B8AEA2"/><line x1="46" y1="150" x2="500" y2="150" stroke="#B8AEA2"/><text x="20" y="92" fill="#6B645E" font-size="9" transform="rotate(-90 20 92)">loss</text><text x="270" y="174" text-anchor="middle" fill="#6B645E" font-size="9">epochs →</text><rect x="300" y="26" width="200" height="124" fill="#FDF3D6" opacity="0.55"/><text x="400" y="42" text-anchor="middle" fill="#9A7208" font-size="9">overfitting zone</text><path d="M52 40 C 160 110, 320 138, 494 148" fill="none" stroke="#2A7B9B" stroke-width="2.2"/><text x="410" y="140" fill="#1F6280" font-size="9">training loss (keeps falling)</text><path d="M52 46 C 150 96, 280 108, 300 108 C 380 108, 440 90, 494 70" fill="none" stroke="#C93B3B" stroke-width="2.2"/><text x="360" y="66" fill="#C93B3B" font-size="9">validation loss (turns up!)</text><line x1="300" y1="26" x2="300" y2="150" stroke="#2D8B55" stroke-width="1.8" stroke-dasharray="5,3"/><circle cx="300" cy="108" r="4" fill="#2D8B55"/><text x="300" y="166" text-anchor="middle" fill="#1a5c38" font-size="9">⬆ stop here (early stopping)</text></g></svg>
+%%%
+
+So the loop has a Goldilocks amount of practice: run *enough* to converge, stop *before* the validation loss climbs. Before the recap, two easy housekeeping slips — and then one honest wall the loop can't climb.
+
+@@@ concept id=c7 tag="Two easy slips" title="Two housekeeping traps — reset, and shuffle" gotit="Got reset & shuffle"
+Two more traps, and these are the kind that bite *everyone* the first time — not because the idea is hard, but because they're easy to *forget*. Think of a shared **Etch A Sketch** (the red toy where you turn two knobs to draw, then shake it to erase). If you start a new drawing *without shaking the old one off first*, your new lines pile on top of the old — a scribbled mess. In the loop, the "old drawing" is last loop's gradient: if you don't clear it, this loop's gradient piles on top and the nudge goes haywire.
+
+%%% svg
+<svg viewBox="0 0 520 176" role="img" aria-label="Two Etch A Sketch toys side by side. Left: not shaken clear first, so a new clean line is drawn on top of an old scribble, making a mess, labelled forgot to reset: gradients pile up. Right: shaken clear first, so only the new clean line shows, labelled reset first: clean gradient each loop."><g font-family="monospace" font-size="9.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Clear the sketch before you draw — reset the gradient each loop</text><rect x="24" y="34" width="212" height="120" rx="10" fill="#FDECEC" stroke="#C93B3B" stroke-width="2"/><path d="M44 70 q30 30 60 -10 q30 40 60 0 q20 -20 50 20" fill="none" stroke="#B8AEA2" stroke-width="1.4"/><path d="M50 110 L110 60 L170 118 L216 74" fill="none" stroke="#C93B3B" stroke-width="2"/><text x="130" y="140" text-anchor="middle" fill="#C93B3B" font-size="9">forgot to reset → old + new pile up</text><rect x="284" y="34" width="212" height="120" rx="10" fill="#EAF5EE" stroke="#2D8B55" stroke-width="2"/><path d="M310 110 L370 60 L430 118 L476 74" fill="none" stroke="#2D8B55" stroke-width="2"/><text x="390" y="140" text-anchor="middle" fill="#1a5c38" font-size="9">reset first → clean gradient this loop</text></g></svg>
+%%%
+
+**What the Etch A Sketch picture gets right:** you must *clear the old marks* before each new drawing, or they add together. **Where it breaks down:** shaking an Etch A Sketch is a choice you make when it looks messy; in the loop the piling-up is *silent and automatic* — the tools add new gradients onto old ones by default, so you must reset *every* loop, on purpose.
+
+#### Puzzle 1 — forgetting to reset the gradients
+Most training tools *add* each loop's gradient onto whatever was there before (it's a default that helps in fancier setups). So if you don't clear it, loop 2's gradient sits on top of loop 1's, loop 3's on top of that — the nudge gets bigger and more wrong every loop. **Cause:** gradients accumulate by default. **Remedy:** [[zero the gradients||reset every weight's gradient to 0 at the start of each loop, before the backward pass — so each nudge uses only this loop's signal]] at the start of every loop (often literally a `zero_grad()` call). Watch the difference with real numbers — same gradient of `2` each loop, with and without a reset:
+
+%%% demo id=zerograd label="run it — reset vs pile-up"
+code: g = 2   # this loop's gradient, same every loop
+code: acc = 0
+code: for i in range(3): acc = acc + g; print('no reset -> used gradient', acc)
+code: for i in range(3): used = g; print('with reset -> used gradient', used)
+out: no reset -> used gradient 2
+out: no reset -> used gradient 4
+out: no reset -> used gradient 6
+out: with reset -> used gradient 2
+out: with reset -> used gradient 2
+out: with reset -> used gradient 2
+take: <b>Forget to reset and the gradient piles up: 2 → 4 → 6</b>, so the nudge grows wrong every loop. Reset each loop and it stays a clean 2. One tiny line — zero the gradients — saves the whole run.
+%%%
+
+#### Puzzle 2 — never shuffling the data
+Here's the other slip. If you always feed the examples in the *same fixed order* — like only ever shooting **free-throws** from the exact same spot on the floor — the network's nudges get biased by that order, and it never generalizes to the rest of the court. **Cause:** a fixed, correlated order. **Remedy:** [[shuffle the data||mix the order of your training examples before each epoch, so the network doesn't lock onto the order itself]] before each epoch — reshuffle the deck every pass so no ordering can sneak into the weights.
+
+!!! c-warn ⚠️
+<b>The two silent slips:</b> both of these run *without any error message* — the loop keeps going, the numbers just come out wrong. Reset the gradients every loop, and reshuffle the data every epoch. Two one-line habits that separate a loop that learns from one that quietly doesn't.
+!!!
+
+You now know a healthy loop *and* its traps. One last honest truth before the recap: some targets a single-neuron loop simply cannot learn, no matter how perfectly you run it.
+
+@@@ concept id=c8 tag="Where it hits a wall" title="Two honest limits of the loop" gotit="Got the limits"
+The loop is powerful, but it is not magic — and knowing its edges is what separates someone who *uses* it from someone who *understands* it. Two honest walls. First, think about trying to draw a perfect **circle using only a straight ruler**. You can practise your ruler-drawing all year, and every stroke is a straight line — you will *never* get a circle out of a tool that can only make straight lines. More practice can't add a power the tool never had.
+
+%%% svg
+<svg viewBox="0 0 520 180" role="img" aria-label="A grid of four points showing the XOR pattern: bottom-left and top-right are one class, top-left and bottom-right are the other. A dashed straight line tries to separate them but always leaves one point on the wrong side. A caption says no single straight line can split these — a one-neuron loop plateaus above zero."><g font-family="monospace" font-size="9.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">A straight line can't split XOR — no matter how long you train</text><line x1="90" y1="40" x2="90" y2="150" stroke="#B8AEA2"/><line x1="90" y1="150" x2="240" y2="150" stroke="#B8AEA2"/><circle cx="110" cy="130" r="9" fill="#2A7B9B"/><circle cx="220" cy="60" r="9" fill="#2A7B9B"/><circle cx="110" cy="60" r="9" fill="#C93B3B"/><circle cx="220" cy="130" r="9" fill="#C93B3B"/><line x1="80" y1="150" x2="240" y2="55" stroke="#9A938A" stroke-width="1.8" stroke-dasharray="5,3"/><text x="165" y="172" text-anchor="middle" fill="#6B645E" font-size="8.5">a straight cut always mis-sorts one dot</text><line x1="300" y1="40" x2="300" y2="150" stroke="#B8AEA2"/><line x1="300" y1="150" x2="500" y2="150" stroke="#B8AEA2"/><text x="285" y="94" fill="#6B645E" font-size="8" transform="rotate(-90 285 94)">loss</text><text x="400" y="168" text-anchor="middle" fill="#6B645E" font-size="8.5">loops →</text><path d="M306 50 C 340 96, 380 104, 494 104" fill="none" stroke="#C93B3B" stroke-width="2.2"/><line x1="300" y1="104" x2="494" y2="104" stroke="#C99A12" stroke-width="1" stroke-dasharray="3,3"/><text x="410" y="98" fill="#9A7208" font-size="8.5">stuck above 0 forever</text></g></svg>
+%%%
+
+**What the ruler picture gets right:** some jobs need a tool the ruler simply doesn't have, and repetition can't conjure it. **Where it breaks down:** you *can* draw a circle by adding a second tool — a compass; likewise a network learns XOR by adding more neurons in a hidden layer. The limit is the *single* neuron, not networks in general — that's exactly why we stack them, coming in a later module.
+
+#### Wall 1 — a single neuron can't learn XOR
+[[XOR||"exclusive or": output 1 when the two inputs differ, 0 when they match — the four points can't be split by any single straight line]] is the classic example. A single neuron can only carve the input with *one straight line*, and no straight line splits the XOR pattern. Run the loop for a *million* loops and the loss just **plateaus above zero** — flat, never reaching a good score. More iterations never beat a *representational* ceiling: if the tool can't express the answer, practice can't find it.
+
+#### Wall 2 — getting stuck in a local dip
+The second wall is subtler. The loss landscape isn't always a single clean bowl; it can be lumpy, with small dips scattered around the real valley. This is called a [[non-convex||a bumpy landscape with more than one dip, so the lowest nearby point may not be the lowest point overall]] landscape. Gradient descent only ever feels the slope *right where it stands*, so it can settle into a small dip — a [[local minimum||a spot where every direction is uphill nearby, so the loop stops — even though a deeper valley exists elsewhere]] — think of a hiker who stops in a roadside ditch, sees only uphill all around, and declares "this is the bottom!" while the real valley is over the next ridge. The loss flattens, so it *looks* converged, but it isn't the best possible.
+
+%%% svg
+<svg viewBox="0 0 520 176" role="img" aria-label="A bumpy loss landscape with two dips. A ball has rolled into the shallower left dip, a local minimum, and stopped, with uphill on both sides. The deeper right dip, the global minimum, is lower but unreached. Labels mark local minimum stuck here and global minimum the real best."><g font-family="monospace" font-size="9.5"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">A bumpy landscape: the loop can stop in a shallow dip</text><path d="M30 60 C 90 130, 150 120, 190 96 C 230 72, 270 150, 340 152 C 400 154, 440 90, 500 60" fill="none" stroke="#B8AEA2" stroke-width="2.2"/><circle cx="170" cy="108" r="7" fill="#C99A12" stroke="#fff" stroke-width="1.5"/><text x="170" y="88" text-anchor="middle" fill="#9A7208" font-size="9">🛑 stuck here</text><text x="150" y="130" text-anchor="middle" fill="#9A7208" font-size="8.5">local minimum</text><circle cx="320" cy="150" r="6" fill="none" stroke="#2D8B55" stroke-width="2"/><text x="360" y="150" fill="#1a5c38" font-size="9">← global minimum</text><text x="330" y="168" text-anchor="middle" fill="#6B645E" font-size="8.5">the real best (deeper), unreached</text></g></svg>
+%%%
+
+**The honest takeaway:** a flat, converged loss curve is *good news* but not a *guarantee* you found the lowest possible loss — you found the bottom of *whatever bowl you happened to roll into*. (Good news for later: in the huge networks behind real models, these dips are usually shallow and not a big problem in practice — but it's an honest limit worth knowing.) Now let's gather the whole day onto one page.
+
+@@@ concept id=c9 tag="Recap" title="Today in one page" gotit="Got the recap"
+Take a breath — you just built the engine that makes every neural network learn. Here's the whole day held in one picture: our **free-throw** drill, now labelled with real training words. Read the beats as one lap of practice, and keep the cheat-sheets below as your map. **Where the free-throw picture finally breaks down:** a player fixes one thing per shot, but the loop nudges every knob at once, thousands of times — that scale is the only reason it can learn things a person never could.
+
+The loop you built, in order:
+- **Step 1 · Forward** — take the shot: run the input to a prediction.
+- **Step 2 · Loss** — measure the miss: one number for how wrong the guess is.
+- **Step 3 · Backward** — which way off: backprop hands every weight its gradient.
+- **Step 4 · Update** — nudge the aim: `w ← w − lr × gradient`; the **minus** walks downhill.
+- **Repeat** over **iterations** (one update) and **epochs** (one full pass), watching the **loss curve** fall and flatten (**converge**).
+- The **learning rate** sets the stride; the **perceptron** (1958) was the crude, fixed-nudge ancestor.
+
+Here's the one picture to keep — the four steps, the knob, the curve, and where each trap strikes.
+
+%%% svg
+<svg viewBox="0 0 520 220" role="img" aria-label="Recap diagram. Top: the four-step loop forward, loss, backward, update in a ring with a repeat arrow, and a learning-rate dial feeding the update step. Middle: a loss curve falling and flattening at convergence. Bottom: a row listing the six traps and their one-line cures."><g font-family="monospace" font-size="9"><text x="260" y="14" text-anchor="middle" fill="#2C2A28" font-size="12">The whole day: the loop, the stride, the curve, the traps</text><rect x="16" y="26" width="86" height="26" rx="4" fill="#E7F0F5" stroke="#2A7B9B"/><text x="59" y="43" text-anchor="middle" fill="#1F6280">1 forward</text><rect x="120" y="26" width="70" height="26" rx="4" fill="#FDECEC" stroke="#C93B3B"/><text x="155" y="43" text-anchor="middle" fill="#C93B3B">2 loss</text><rect x="208" y="26" width="94" height="26" rx="4" fill="#EDE9F8" stroke="#7C6DAA"/><text x="255" y="43" text-anchor="middle" fill="#5E5191">3 backward</text><rect x="320" y="26" width="82" height="26" rx="4" fill="#EAF5EE" stroke="#2D8B55"/><text x="361" y="43" text-anchor="middle" fill="#1a5c38">4 update</text><g stroke="#B8AEA2" stroke-width="1.6" fill="#B8AEA2"><path d="M102 39 l16 0"/><polygon points="118,39 111,35 111,43"/><path d="M190 39 l16 0"/><polygon points="206,39 199,35 199,43"/><path d="M302 39 l16 0"/><polygon points="318,39 311,35 311,43"/></g><path d="M361 52 C 361 70, 59 70, 59 54" fill="none" stroke="#C99A12" stroke-width="1.6" stroke-dasharray="3,2"/><polygon points="59,54 55,62 63,62" fill="#C99A12"/><text x="210" y="66" text-anchor="middle" fill="#9A7208">↻ repeat</text><rect x="418" y="26" width="86" height="26" rx="4" fill="#FDF3D6" stroke="#C99A12"/><text x="461" y="40" text-anchor="middle" fill="#9A7208">learning rate</text><text x="461" y="49" text-anchor="middle" fill="#9A7208" font-size="7.5">(stride into update)</text><line x1="46" y1="86" x2="46" y2="140" stroke="#B8AEA2"/><line x1="46" y1="140" x2="250" y2="140" stroke="#B8AEA2"/><path d="M50 92 C 90 132, 160 138, 246 139" fill="none" stroke="#2D8B55" stroke-width="2"/><text x="150" y="100" fill="#1a5c38">loss curve → converges (flat)</text><text x="280" y="100" fill="#6B645E">read the curve:</text><text x="280" y="114" fill="#C93B3B">zig-zag up → lr too high</text><text x="280" y="128" fill="#2A7B9B">barely moves → lr too low</text><text x="280" y="142" fill="#9A7208">val loss turns up → overfit</text><line x1="16" y1="152" x2="504" y2="152" stroke="#E5DFD6"/><text x="16" y="168" fill="#C93B3B">lr high → lower it / schedule</text><text x="270" y="168" fill="#C93B3B">lr low → raise it</text><text x="16" y="182" fill="#C93B3B">no reset → zero the gradients</text><text x="270" y="182" fill="#C93B3B">fixed order → shuffle each epoch</text><text x="16" y="196" fill="#C93B3B">too few epochs → train longer</text><text x="270" y="196" fill="#C93B3B">too many → early stopping</text><text x="16" y="212" fill="#6B645E">limit: one neuron can't learn XOR · GD can stop in a local dip</text></g></svg>
+%%%
+
+#### Cheat-sheet · the loop, its knobs, and the six traps
+%%% table
+:: Piece / trap :: In one line :: Remember
+forward → loss → backward → update :: one lap of the loop :: repeat until the loss flattens
+update rule :: w ← w − lr × gradient :: the MINUS walks downhill
+learning rate (lr) :: the step size each loop :: too big overshoots, too small crawls
+epoch vs iteration :: full data pass vs one update :: many iterations make one epoch
+lr too high :: loss zig-zags up, → NaN :: cure: lower lr / schedule (decay)
+lr too low :: loss barely moves :: cure: raise lr
+forgot to reset gradients :: they pile up silently :: cure: zero the gradients each loop
+fixed data order :: updates biased by order :: cure: shuffle each epoch
+too few epochs :: underfit, loss still high :: cure: train longer, watch convergence
+too many epochs :: overfit, memorizes :: cure: early stopping on validation loss
+one-neuron limit :: can't learn XOR, plateaus :: cure: more neurons (later module)
+local minimum :: stops in a shallow dip :: converged ≠ globally best
+%%%
+
+#### Cheat-sheet · the words you met today
+%%% jargon
+training loop | the four-step cycle — forward, loss, backward, update — repeated until the loss gets small
+forward pass | run the input through the network to get a prediction (a guess)
+loss | one number saying how wrong the guess is; lower is better
+backward pass | backpropagation: hands every weight its gradient (which way to nudge)
+update | w ← w − lr × gradient; the minus sign steps downhill toward less loss
+learning rate | the step size each loop; too big overshoots, too small crawls
+learning-rate schedule | shrinking the learning rate over time — big steps early, small steps late (decay)
+epoch | one full pass over all the training data
+iteration | one loop / one weight update, from one example (or small batch)
+loss curve | a plot of the loss over loops; a falling, flattening curve means it's learning
+convergence | the loss levels off near a low value — the loop has mostly finished
+perceptron | Rosenblatt's 1958 machine: a fixed nudge, only on mistakes — the crude ancestor
+zero the gradients | reset every gradient to 0 each loop so nudges don't pile up
+shuffle | mix the data order each epoch so order doesn't bias the weights
+overfitting | memorizing the training data instead of the pattern — great on seen data, bad on new
+validation set | held-out data used only to check generalization, never to train
+early stopping | halt when the validation loss stops improving, before overfitting takes over
+XOR | a target no single straight line (one neuron) can split, no matter how long you train
+local minimum | a shallow dip the loop can settle in that isn't the globally lowest loss
+%%%
+
+That's the whole day. Tomorrow you keep the loop but swap Step 4 for something smarter than a plain nudge — **optimizers** like Momentum and Adam, which take the same downhill idea and make it faster and steadier.
+
+@@@ quiz id=quiz tag="Quiz" title="Click an answer — instant feedback on each" gotit="answer all four first"
+Four quick questions, with instant feedback on each — answer all four to complete today. (If one trips you up, that's a cue to scroll back, not a failing grade.)
+%%% quiz
+q: What are the four steps of the training loop, in order? | a:2 | loss → forward → update → backward | update → backward → loss → forward | forward pass → loss → backward pass → update | backward → update → forward → loss | fb: One lap is forward (take the shot) → loss (measure the miss) → backward (which way off?) → update (nudge the aim), then repeat. It's the free-throw drill: try, measure, correct, again.
+q: In the update rule w ← w − lr × gradient, what does the MINUS sign do, and what does lr control? | a:1 | Minus makes training faster; lr sets how many layers | The gradient points uphill, so minus steps the weight downhill (toward less loss); lr is the step size — how big each nudge is | Minus deletes bad weights; lr is the number of epochs | Minus is just notation with no effect; lr is the loss value | fb: The gradient points UPHILL (toward more loss), so subtracting it walks the weight downhill toward less loss. The learning rate (lr) scales that step: too big overshoots and the loss diverges, too small and training crawls.
+q: Your loss curve zig-zags upward and blows up to NaN. What's wrong, and what's the fix? | a:2 | The learning rate is too low; fix: lower it more | You have too few epochs; fix: shuffle the data | The learning rate is too high — each step overshoots the bottom, so the loss diverges; fix: lower the learning rate (or use a schedule that shrinks it over time) | The gradients weren't reset; fix: train for more epochs | fb: A loss that grows and oscillates means each step is bigger than the distance to the minimum — the classic too-high learning rate. Lower it, or use a learning-rate schedule (decay) so early steps are big for speed and late steps are small to settle.
+q: Training loss keeps falling but validation loss starts rising. What is happening, and what's the remedy? | a:1 | The learning rate is too low; remedy: raise it | The network is overfitting — memorizing the training data instead of the pattern; remedy: early stopping (halt when validation loss stops improving) | The gradients are piling up; remedy: zero them each loop | The neuron can't represent the target; remedy: shuffle the data | fb: When the two curves fork — training loss down, validation loss up — the network has stopped learning the pattern and started memorizing the training examples. That's overfitting. Early stopping halts right at the fork, keeping the version that generalizes best.
+%%%
+
+@@@ produce id=produce tag="Produce" title="Run a real training loop and watch the loss fall" gotit="Done"
+Time to run the engine yourself. You'll build the full four-step loop for one neuron and **watch** the loss drop, loop after loop, then poke the learning rate to *feel* the too-high and too-low failures. **Predict first:** with a sensible learning rate, will the loss fall smoothly to near zero, or jump around? Then set the learning rate way too high and predict again — will it fall, or blow up? Run it and **watch** which prediction was right. Pick one path.
+
+#### Option A · write it yourself
+Create `sessions/m02-the-neuron/day-06-training-loop/experiment.py`. (1) Set up one neuron learning a simple target: pick `x`, a true `target`, start `w` and `b` at small numbers, and a learning rate `lr = 0.1`. (2) Write the loop for, say, 50 iterations: **forward** `pred = w*x + b`; **loss** `L = (pred - target)**2`; **backward** `grad_w = 2*(pred-target)*x` and `grad_b = 2*(pred-target)`; **update** `w = w - lr*grad_w` and `b = b - lr*grad_b`. Print the loss every few loops and **watch** it fall. (3) Now rerun with `lr = 1.5` and **observe** the loss zig-zag and blow up, then with `lr = 0.0005` and **observe** it barely move. Run with `python3 sessions/m02-the-neuron/day-06-training-loop/experiment.py`.
+
+#### Option B · let Claude build it, then read it
+Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+
+%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
+Use /frontier-experiment-lab to build my Module 2 Day 6 artifact.
 
 Create sessions/m02-the-neuron/day-06-training-loop/experiment.py that, with a comment on each step:
-1. Sets a tiny model pred = w*x, with x=2.0, target y=6.0 (ideal w=3).
-2. Runs a training loop: w=1.0; for 20 steps do pred=w*x; loss=(pred-y)**2; grad=2*(pred-y)*x; w = w - 0.05*grad; print step, round(w,4), round(loss,4).
-3. Confirms w converges toward 3.0 and loss toward 0 — the four-step loop (forward, loss, gradient, update) in action.
-4. Adds a comment explaining that scaling this loop to many weights, batches, and chips is how real models train.
-Then run it and paste the output at the bottom as a comment.</pre>
-      </div>
-      <h4>What you should see (check your prediction)</h4>
-      <ul>
-        <li>Your loop prints <b>labeled columns</b> — the step number, <code>w</code>, and <code>loss</code> — at every iteration for the <code>pred=w·x</code>, <code>x=2, y=6</code> problem, so you can watch the loop run rather than just its final answer.</li>
-        <li>Over ~20 steps <code>w → 3</code> and <code>loss → 0</code>, with the loss decreasing (no blow-up).</li>
-        <li>You can name which of the four loop steps maps to which earlier lesson (forward, loss, backprop, update).</li>
-      </ul>
-      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m02-the-neuron/day-06-training-loop/log.md</code>: (1) the four steps of the loop in order; (2) what "overfit one batch" proves and why you'd run it first; (3) what happens to the loss if the learning rate is too big.</div></div>
-      <button class="gotit" type="button">Done</button>
-    </div>
-</section>
-@@@ region name=fin
-<div class="fin" id="fin" role="status" aria-hidden="true">
-      <span class="em" aria-hidden="true">🎉</span>
-      <h3>Module 2 · Day 6 complete! 🏆</h3>
-      <p>Nice work — you've completed <b>The Training Loop</b>.<br>Next up: <b>Optimizers (SGD, Momentum, Adam)</b>.</p>
-    </div>
-@@@ region name=DEMOS
-var DEMOS = {
-  onestep:{html:'<span class="prompt">&gt;&gt;&gt;</span> x, y = <span class="num">2.0</span>, <span class="num">6.0</span>      <span class="dim"># want pred = w*x to equal 6</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">1.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> pred = w * x            <span class="dim"># 1) forward → 2.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> loss = (pred - y)**<span class="num">2</span>     <span class="dim"># 2) loss → 16.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> grad = <span class="num">2</span>*(pred - y)*x     <span class="dim"># 3) gradient → -16.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> w = w - <span class="num">0.05</span>*grad       <span class="dim"># 4) update → 1.8</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> w, (w*x - y)**<span class="num">2</span>          <span class="dim"># new w, new loss</span>\n'+
-    '<span class="ok">(1.8, 5.76)</span>',
-    take:'<b>①  One full loop step.</b> forward (2.0) → loss (16) → gradient (−16) → update (w: 1.0 → 1.8). The loss fell 16 → 5.76. All four steps, once.'},
-  loop:{html:'<span class="prompt">&gt;&gt;&gt;</span> w = <span class="num">1.0</span>\n'+
-    '<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">5</span>):\n'+
-    '<span class="dim">...</span>     pred = w*x\n'+
-    '<span class="dim">...</span>     grad = <span class="num">2</span>*(pred-y)*x\n'+
-    '<span class="dim">...</span>     w = w - <span class="num">0.05</span>*grad\n'+
-    '<span class="dim">...</span>     print(step, round(w,<span class="num">3</span>), round((w*x-y)**<span class="num">2</span>,<span class="num">3</span>))\n'+
-    '<span class="ok">0 1.8   5.76</span>\n<span class="ok">1 2.28  2.074</span>\n<span class="ok">2 2.568 0.746</span>\n<span class="ok">3 2.741 0.269</span>\n<span class="ok">4 2.844 0.097</span>',
-    take:'<b>②  Repeat → it learns.</b> w climbs toward the ideal 3.0 and the loss falls toward 0. The model is fitting the data, one gradient step at a time.'},
-  epochs:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> epoch <span class="kw">in</span> range(num_epochs):     <span class="dim"># one epoch = one full pass over the data</span>\n'+
-    '<span class="dim">...</span>     <span class="kw">for</span> batch <span class="kw">in</span> data:            <span class="dim"># process a chunk at a time</span>\n'+
-    '<span class="dim">...</span>         pred  = forward(batch.x)\n'+
-    '<span class="dim">...</span>         loss  = loss_fn(pred, batch.y)\n'+
-    '<span class="dim">...</span>         grads = backprop(loss)      <span class="dim"># gradients for every weight</span>\n'+
-    '<span class="dim">...</span>         weights = weights - lr*grads  <span class="dim"># update</span>',
-    take:'<b>③  Real training, same four steps.</b> Wrap them in two loops: over epochs (full passes through the data) and over batches (chunks). Scale to many chips and trillions of tokens → frontier training.'}
-};
-@@@ region name=BUILD
-var BUILD=[
- {viz:"<svg viewBox='0 0 520 150' role='img' aria-label='The training loop as a four-step cycle: forward, loss, backprop, update'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='200' y='16' width='120' height='28' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='260' y='34' fill='#1F6280'>1 · forward</text><rect x='360' y='58' width='120' height='28' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='420' y='76' fill='#C93B3B'>2 · loss</text><rect x='200' y='104' width='120' height='28' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='260' y='122' fill='#9A7208'>3 · backprop</text><rect x='40' y='58' width='120' height='28' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='100' y='76' fill='#1a5c38'>4 · update</text><path d='M320 30 Q 400 40 405 56' fill='none' stroke='#6B645E' stroke-width='1.5' marker-end='url(#a)'/><path d='M400 86 Q 360 110 322 116' fill='none' stroke='#6B645E' stroke-width='1.5' marker-end='url(#a)'/><path d='M200 118 Q 120 110 118 88' fill='none' stroke='#6B645E' stroke-width='1.5' marker-end='url(#a)'/><path d='M110 56 Q 150 30 198 28' fill='none' stroke='#6B645E' stroke-width='1.5' marker-end='url(#a)'/><defs><marker id='a' markerWidth='7' markerHeight='7' refX='5' refY='3' orient='auto'><path d='M0 0 L6 3 L0 6 z' fill='#6B645E'/></marker></defs></g></svg>",
-  note:"<b>The loop is a four-step cycle.</b> Forward pass → loss → backprop → update, then back to the top. Each piece is a lesson you've already done; here they connect into a circle that runs over and over."},
- {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='One step lowers the loss from 16 to 5.76'><g font-family='monospace' font-size='13' text-anchor='middle'><rect x='90' y='36' width='120' height='30' rx='6' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='150' y='56' fill='#C93B3B'>loss 16.0</text><text x='260' y='56' fill='#6B645E'>→ one step →</text><rect x='340' y='36' width='120' height='30' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='400' y='56' fill='#9A7208'>loss 5.76</text></g></svg>",
-  note:"<b>Run it once.</b> A single trip round the loop already lowers the loss (16 → 5.76 in our toy). The weight moved a little toward the value that fits the data."},
- {viz:"<svg viewBox='0 0 520 130' role='img' aria-label='Repeating the loop drives the loss down toward zero'><g font-family='monospace'><line x1='60' y1='105' x2='460' y2='105' stroke='#E5DFD6' stroke-width='1.5'/><path d='M75 35 C 160 60, 240 95, 440 100' fill='none' stroke='#2D8B55' stroke-width='2.5'/><text x='250' y='122' font-size='11' fill='#6B645E' text-anchor='middle'>training steps →</text><text x='40' y='65' font-size='11' fill='#6B645E' text-anchor='middle' transform='rotate(-90 40 65)'>loss</text><text x='400' y='60' font-size='12' fill='#1a5c38' font-family='monospace'>→ 0</text></g></svg>",
-  note:"<b>Repeat and it learns.</b> Many steps drive the loss down toward 0; the weight settles at the value that fits the data. Repetition is the whole trick — one step barely helps, thousands do."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='A batch is a chunk of data; an epoch is one full pass over all of it'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='45' width='40' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><rect x='84' y='45' width='40' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><rect x='128' y='45' width='40' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><rect x='172' y='45' width='40' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='60' y='90' font-size='10' fill='#6B645E'>batch</text><text x='300' y='62' fill='#2C2A28'>4 batches = 1 epoch (one full pass)</text></g></svg>",
-  note:"<b>Batches and epochs.</b> The data is split into <b>batches</b> (chunks); one step processes one batch. One full pass over every batch is an <b>epoch</b>. Real training runs many epochs."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Overfit one batch until loss reaches zero as a sanity check'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='90' y='40' width='150' height='32' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='165' y='61' fill='#1F6280'>loop on ONE batch</text><text x='265' y='61' fill='#6B645E'>→</text><rect x='300' y='40' width='150' height='32' rx='6' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='375' y='61' fill='#1a5c38'>loss ≈ 0 ✓</text><text x='260' y='96' fill='#6B645E'>proves gradients flow and the model can learn</text></g></svg>",
-  note:"<b>The engineer's first check: overfit one batch.</b> Run the loop on a single batch until the loss hits ~0. If it can't, gradients aren't flowing — a bug. This is the very first thing you do with a new model (you'll see it in the JAX modules)."},
- {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The same loop scaled to a datacenter trains frontier models'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='40' y='42' width='150' height='30' rx='6' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='115' y='62' fill='#1F6280'>same 4-step loop</text><text x='210' y='62' fill='#6B645E'>×</text><rect x='240' y='42' width='240' height='30' rx='6' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='360' y='62' fill='#9A7208'>1000s of chips · trillions of tokens</text><text x='260' y='96' fill='#2C2A28'>= how every frontier model is trained</text></g></svg>",
-  note:"<b>Why it runs the field.</b> This exact loop, scaled to thousands of accelerators and trillions of tokens, is how frontier models are trained — and the scaling laws (M1 Day 5) predict how the loss falls as you add compute. You've now assembled the core engine: represent → forward → loss → gradients → loop. Still ahead: sharper ways to take the step (optimizers, learning rate) and how to tell it truly learned (Days 7–9)."}
-];
-@@@ region name=QS
-var QS=[
- {q:'1. The training loop\'s four core steps, in order?',
-  opts:['loss, update, forward, backprop','forward pass, loss, backprop, update','update, forward, loss, backprop','backprop, forward, update, loss'],
-  ans:1, fb:'Right. Forward → loss → backprop (gradients) → update weights, then repeat.'},
- {q:'2. What is one epoch?',
-  opts:['one weight update','one full pass over the training data','one layer','one batch'],
-  ans:1, fb:'Right. An epoch = one complete pass over all the training data (usually many batches).'},
- {q:'3. Your training loop runs with no error, but the loss jumps around wildly and the model learns badly. You are using PyTorch, and you notice the loop never calls <code>optimizer.zero_grad()</code>. What is the most likely cause?',
-  opts:['The learning rate is negative, which is the only thing that makes loss unstable','Gradients accumulate across steps by default, so without resetting them each step the update uses a growing sum of every past batch\'s gradient — the loop runs fine but training misbehaves','The data has too few examples, which always makes loss jump','A jumping loss with no error means training is finished'],
-  ans:1, fb:'Right. In frameworks like PyTorch, each backward pass adds to the existing gradients instead of replacing them. Forgetting to zero them means the update uses a stale, growing sum. Nothing crashes — you look at whether the loop clears gradients before each backward pass.'},
- {q:'4. "Overfit a single batch" is a sanity check that:',
-  opts:['the data is large enough','gradients flow and the model can actually learn','the GPU is fast','the loss is cross-entropy'],
-  ans:1, fb:'Right. If the loop can drive one batch\'s loss to ~0, gradients are flowing and the model can learn. If not, there\'s a bug.'}
-];
+1. Trains ONE neuron with a full training loop. Setup: x=2.0, target=1.0, w=0.0, b=0.0, lr=0.1.
+2. Loops 50 iterations doing the four steps: forward pred=w*x+b; loss L=(pred-target)**2; backward grad_w=2*(pred-target)*x and grad_b=2*(pred-target); update w=w-lr*grad_w, b=b-lr*grad_b. Store the loss each loop and print it every 10 loops so we can watch it fall toward ~0 (convergence).
+3. Re-runs the same loop twice more to show the learning-rate failures: once with lr=1.5 (watch the loss oscillate and blow up / diverge) and once with lr=0.0005 (watch the loss barely move — crawling). Print the final loss for each lr and a one-line comment naming the failure.
+Then run it and paste the output at the bottom as a comment.
+%%%
+
+#### What you should see (the loop, learning)
+- With `lr = 0.1` the **loss falls fast at first, then flattens near zero** — a healthy loss curve, converging. That flattening is the network having (roughly) learned it.
+- With `lr = 1.5` the **loss zig-zags and blows up** — each step overshoots the bottom. That's the too-high failure, live; the cure is a smaller `lr`.
+- With `lr = 0.0005` the **loss barely moves** after 50 loops — the too-low failure; the cure is a bigger `lr`. Seeing all three back to back is exactly how engineers pick a learning rate by eye.
+
+!!! c-info 📓
+<b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in `sessions/m02-the-neuron/day-06-training-loop/log.md`: (1) the four steps of the loop, in order; (2) what the learning rate controls, and what happens if it's too high or too low; (3) one trap from today (reset, shuffle, underfit, overfit, or a capability limit) and its one-line cure.
+!!!
+
+@@@ fin
