@@ -2,7 +2,7 @@
 quest_id: wf5-d04-training
 mode: concept
 donor: v9-base.donor
-page_title: "Module 5 · Day 4 — Full Training: The Loss & Dropout"
+page_title: "Module 5 · Day 4 — Full Training: The Loss &amp; Dropout"
 module_label: "Module 5 · Train · Day 4"
 title: "Full Training"
 subtitle: "The Loss Score &amp; Dropout"
@@ -16,289 +16,370 @@ fin_title: "Module 5 · Day 4 complete! 🏆"
 fin_body: "You did it! You finished <b>Full Training: The Loss Score &amp; Dropout</b>. Look at what you can now do: you can say exactly what a <b>loss</b> is — one number for how wrong a guess was — and why <b>cross-entropy</b> punishes a confident-and-wrong answer so hard. You know training is nothing more than pushing the <i>average</i> loss down, and that the number that actually matters is the <b>held-out</b> loss, not the training one. You can name the failure — <b>overfitting</b> — say what causes it, and reach for its famous cure: <b>dropout</b>. You understand why dropout is on in practice but off at test time, and the exact <b>1/(1−p)</b> scaling that makes those two settings agree. And you know the one bug that silently wrecks predictions: leaving dropout on at test time.<br>Take a breath — that is the honesty and the safety net of every real training run. Next up: <b>The Same Model in PyTorch</b>."
 notebook_yardstick: 00-neural-networks/fundamentals/08_training_loop.ipynb
 coverage_topics:
-  - {topic: the loss is one number measuring how wrong the model is, keywords: [loss, one number, how wrong, single number, wrongness]}
-  - {topic: the loss is the training signal that gradient descent minimizes, keywords: [signal, gradient descent, the number the loop pushes down, minimize the loss, what training pushes]}
-  - {topic: cross-entropy is the standard classification loss, keywords: [cross-entropy, cross entropy, classification loss, standard loss for]}
-  - {topic: cross-entropy punishes confident and wrong predictions much harder, keywords: [confident and wrong, confidently wrong, punishes, penalizes, harsh, strong learning signal]}
-  - {topic: the training objective is minimizing the average loss over the training data, keywords: [average loss, average the loss, over the training data, objective, mean loss]}
-  - {topic: train loss vs validation held-out loss, keywords: [validation, held-out, held out, data it did not train on, unseen data, two numbers]}
-  - {topic: generalization vs memorization, keywords: [generalize, generalization, memorize, memorization, new data, unseen, answer key]}
-  - {topic: overfitting failure cause and symptom, keywords: [overfitting, overfit, too much capacity, memorizes noise, train loss keeps dropping while validation, validation loss rises, the gap]}
-  - {topic: dropout is the named remedy for overfitting, keywords: [dropout, randomly set, zero, turn off neurons, drop a fraction, no single neuron]}
-  - {topic: dropout rate p is the one knob, keywords: [dropout rate, drop rate, the rate p, fraction of units dropped, p is 0.5, stronger regularization]}
-  - {topic: train mode vs eval mode dropout is off at inference, keywords: [train mode, eval mode, evaluation, turned off at test, off at inference, forgetting to switch, call eval, predictions become random]}
-  - {topic: inference scaling why dropout is off at test time, keywords: [scaled, scaling, expected signal, inverted dropout, all neurons are used, 1/(1-p), magnitudes match]}
-  - {topic: capability limit dropout cannot invent missing information, keywords: [capability limit, cannot invent, missing information, falling training loss alone, does not prove a good model, the gap is the real test]}
+  - {topic: loss function is one number for how wrong a guess was, keywords: [loss, one number, how wrong, how far off, single score]}
+  - {topic: mean squared error MSE for regression, keywords: [mean squared error, mse, regression, squared, distance]}
+  - {topic: cross-entropy for classification paired with softmax/sigmoid, keywords: [cross-entropy, cross entropy, classification, softmax, sigmoid, probability, confident and wrong]}
+  - {topic: training is pushing the average loss down, keywords: [average loss, average the loss, push the loss down, shrink the loss, lower loss]}
+  - {topic: watching the loss curve fall across epochs, keywords: [loss curve, per epoch, trending down, dashboard, learning is happening]}
+  - {topic: train and validation split with held-out data, keywords: [train/validation split, validation, held-out, holding out, generalize, never trains on]}
+  - {topic: overfitting is memorizing training-set noise, keywords: [overfitting, memoriz, training loss keeps dropping while validation loss rises, diverge, noise]}
+  - {topic: dropout headline regularizer randomly switches off units at training time, keywords: [dropout, randomly switch off, drop units, dropout rate, regularizer, remedy]}
+  - {topic: dropout as a cheap approximation of averaging many networks ensemble, keywords: [ensemble, averaging many networks, cheap approximation, many networks, no single unit]}
+  - {topic: dropout on at train time off at inference with scaling, keywords: [only at training, off at inference, off at test, keep all units, scale, 1/(1-p)]}
+  - {topic: train vs eval mode switch model.train model.eval, keywords: [train mode, eval mode, model.train, model.eval, switch, turns dropout off, silent bug]}
+  - {topic: early stopping as a second remedy for overfitting, keywords: [early stopping, stop training, validation loss stops improving, halt]}
+  - {topic: underfitting is the opposite failure model too small or trained too little, keywords: [underfitting, too small, trained too little, loss stays high, both train and validation, dropout does not fix]}
+  - {topic: loss not decreasing stuck learning rate too small, keywords: [not decreasing, stuck, learning rate too small, poor initialization, raise the learning rate]}
+  - {topic: loss diverging to NaN learning rate too large, keywords: [diverging, nan, blows up, learning rate too large, lower the learning rate]}
+  - {topic: capability limit low loss alone does not prove a good model, keywords: [low loss alone, does not prove, held-out, dropout is not free, slows convergence, can hurt]}
 require_artifact: true
 ---
 
 @@@ hero
-@lede You have a loop that runs, and yesterday you watched a number fall as it ran. But what *is* that number? And here is the uncomfortable question nobody asked you yet: if that number keeps falling, does that mean your model is actually getting *good* — or could it be quietly cheating? Today you meet the number by name (the **loss**), learn why one flavor of it punishes an over-confident wrong answer so hard, and learn to spot the moment a model stops *learning to read* and starts *memorizing the answer key*.
+@lede Think about a round of **mini-golf**. You take a swing, the ball stops somewhere, and you measure one thing: *how far is it from the hole?* Two feet is a good shot. Twenty feet is a bad one. That single distance is the only number you need to know whether to be happy or to try again. A neural network learns the exact same way. After it makes a guess, we measure one number — how far the guess landed from the right answer — and call it the **loss**. The whole of "training" is just this: take a swing, read the distance, nudge your aim, swing again, until the ball keeps landing close. It is the same rhythm you built yesterday, but today you finally get to *read the scorecard* — and to catch the sneakiest way a model can fool you: it can ace the practice course and then fall apart on a course it has never seen. That trap has a name, **overfitting**, and it has a famous, almost silly-sounding cure called **dropout** — the same kind of trick that quietly steadies the big models behind tools like ChatGPT. By the end of today you will read a model's honesty the way a coach reads a scorecard.
 @goal Here's what we'll figure out together today, one small idea at a time:
-- what a **loss** really is — one number for "how wrong," and the thing the whole loop pushes down;
-- **cross-entropy** — the classification loss, and why it comes down hardest on confident-and-wrong guesses;
-- why learning is just **minimizing the average loss** over your data;
-- the split that keeps you honest — **training loss vs. held-out loss**, and **memorizing vs. generalizing**;
-- the failure with a name — **overfitting** — what causes it, and its famous cure, **dropout** (with the one bug that silently breaks it).
+- what a **loss** really is — one number for how wrong a guess was — and its two everyday flavors (**MSE** and **cross-entropy**);
+- why training is nothing more than pushing the *average* loss **down**, and how to read the falling **loss curve**;
+- the honest test — **held-out** data — and the failure it exposes: **overfitting**;
+- the headline cure — **dropout** — why it works, and why it's *on* in practice but *off* at test time;
+- and the small bugs that quietly wreck a run: a wrong learning rate, and forgetting to flip one switch.
 
-@@@ concept id=c1 tag="The loss" title="The loss: one number for how wrong the guess was" gotit="Got the loss"
-Yesterday you watched a number fall and called it "the loss." Let's stop and actually meet it. The **loss** is one single number that measures *how wrong* the model's guesses are on a batch of examples. Low loss means the guesses were close to the right answers. High loss means they were way off. That's the whole idea — it is a wrongness score.
+@@@ concept id=c1 tag="The loss" title="The loss: one number for how wrong a guess was" gotit="Got the loss"
+Yesterday you ran the loop — guess, correct, repeat. But to *correct* a guess, you first have to say how wrong it was. Not "a bit wrong" or "pretty good" — an actual **number**. That number is the whole idea of today, so let's meet it gently.
 
-First, plain words on every term you'll meet today, so nothing sneaks up on you:
-
-%%% jargon
-loss | one number that says how wrong the model's guesses were — low is good, high is bad
-cross-entropy | the standard loss for classification (choosing a category); it looks at how confident the model was in the right answer
-training loss | the loss measured on the examples the model is practicing on
-validation loss | the loss measured on held-back examples the model has NEVER practiced on
-generalize | do well on new, unseen examples — not just the ones you practiced
-overfitting | when the model memorizes the practice examples instead of learning the general pattern
-dropout | a fix for overfitting: randomly switch off some neurons during each practice step
-dropout rate (p) | the fraction of neurons switched off — the one knob you set (e.g. 0.5)
-eval mode | the switch that turns dropout OFF so predictions are steady at test time
-%%%
-
-Now the picture. Think of the loss as a single wrongness score the model gets after every guess.
+**Back to the mini-golf hole.** You want the ball in the cup. It lands two feet short. How bad is that? You measure the gap: two feet. Land it twenty feet away and the gap is twenty. The gap *is* your score — small gap, good shot; big gap, bad shot. A neural network does the same. It makes a guess (say, "this pixel-blob is a 7"), we know the true answer, and we measure the gap between them. That gap, boiled down to one number, is the **[[loss||one number that says how far the model's guess landed from the right answer — smaller is better]]**.
 
 %%% svg
-<svg viewBox="0 0 520 150" role="img" aria-label="A model makes guesses about a batch of images. The true labels and the guesses feed into a box labeled loss, which outputs one number. A low number is labeled good, close; a high number is labeled bad, far off."><g font-family="monospace" font-size="11" text-anchor="middle"><rect x="24" y="44" width="96" height="40" rx="6" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><text x="72" y="60" fill="#5E5191" font-weight="bold">model guess</text><text x="72" y="76" fill="#6B645E" font-size="9">"probably a 7"</text><rect x="24" y="94" width="96" height="34" rx="6" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><text x="72" y="115" fill="#1a5c38" font-weight="bold">true answer</text><path d="M124 74 L168 84" stroke="#6B645E" stroke-width="1.4"/><path d="M124 108 L168 96" stroke="#6B645E" stroke-width="1.4"/><rect x="172" y="66" width="118" height="48" rx="8" fill="#FDF3E8" stroke="#C99A12" stroke-width="2.5"/><text x="231" y="86" fill="#8A6D3B" font-weight="bold">loss</text><text x="231" y="102" fill="#6B645E" font-size="9">compare → 1 number</text><text x="298" y="94" fill="#6B645E">→</text><rect x="316" y="60" width="88" height="26" rx="5" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="360" y="77" fill="#1a5c38" font-size="10">0.04 = good</text><rect x="316" y="96" width="88" height="26" rx="5" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="360" y="113" fill="#C93B3B" font-size="10">3.9 = bad</text><text x="450" y="94" fill="#6B645E" font-size="10">how wrong</text></g></svg>
+<svg viewBox="0 0 520 170" role="img" aria-label="A mini-golf green. A hole (the cup) sits on the right. A ball landed short of it, and a measuring tape shows the distance from ball to cup. A label says this distance is the loss: small distance is a good shot, big distance is a bad shot."><g font-family="monospace" font-size="10" text-anchor="middle"><rect x="20" y="30" width="480" height="110" rx="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><circle cx="430" cy="85" r="14" fill="#2b2b2b" stroke="#1a5c38" stroke-width="1.5"/><text x="430" y="60" font-size="9" fill="#1a5c38">the cup</text><text x="430" y="72" font-size="9" fill="#1a5c38">(right answer)</text><circle cx="150" cy="85" r="8" fill="#ffffff" stroke="#C93B3B" stroke-width="1.8"/><text x="150" y="112" font-size="9" fill="#C93B3B">the guess</text><line x1="158" y1="85" x2="416" y2="85" stroke="#C99A12" stroke-width="1.6" stroke-dasharray="5 3"/><text x="287" y="78" font-size="11" fill="#8A6D3B">gap = the loss</text><text x="120" y="132" font-size="9" fill="#2D8B55">small gap → good</text><text x="400" y="132" font-size="9" fill="#C93B3B">big gap → bad</text><text x="260" y="22" font-size="10" fill="#6B645E">one number = how far off the guess is</text></g></svg>
 %%%
 
-**Think of a driving test.** The examiner watches you drive and gives you *penalty points*: a small ding for a wobbly turn, a big ding for running a red light. Add them up and you get one number for how badly the drive went. The loss is exactly that — penalty points for how wrong the guesses were, boiled down to a single score.
+**What the golf picture gets right:** wrongness becomes a single distance you can shrink, so "get better" simply means "make that number smaller." **Where it breaks down:** on a golf green the gap is a plain distance you can eyeball; a model's guess is a list of numbers, so we need a formula to turn "how far off" into one clean score — and there is more than one way to do it.
 
-**What the driving-test picture gets right:** many separate mistakes get summarized into one number, and lower is better.
+#### The simplest flavor: measure the distance and square it (MSE)
+When the answer is a plain number — say the model predicts a house price, or tomorrow's temperature — we use the most natural score of all: take the gap, and square it. Averaged over many guesses, that's the **[[mean squared error||MSE: average of the squared gaps between guesses and answers — the go-to loss when the answer is a number]]**, or **MSE**. Squaring does two friendly things: it makes every gap positive (a miss is a miss, left or right), and it makes *big* misses count for a lot more than small ones. This is the loss you reach for in **regression** — any time the answer is a quantity, not a category.
 
-**Where it breaks down:** a driving examiner is a person with opinions. The loss is a fixed formula — the *same* rule every time — so it is perfectly consistent, and (this is the part that matters next) you can do calculus on it.
+Let's *watch* the squaring turn misses into a score. Predict which guess gets punished hardest, then reveal it:
 
-#### Why the loop needs one single number
-Here's the deep reason the loss is *one* number, not a report card. Remember the loop from Day 3: forward → **loss** → backward → update. The backward pass needs something to push *down*. You can only push one number down at a time. So the loss squeezes "how wrong were all these guesses" into a single value, and that value is exactly the thing [[gradient descent||The method that nudges each weight in the direction that lowers the loss. It needs one single number to push down.]] tries to make smaller. The loss is the *signal* the whole training loop is chasing.
+%%% demo id=mse label="see the squared gaps"
+code: gaps = [0.5, 1.0, 2.0, 4.0];  squared = [g*g for g in gaps]
+out: gaps      = [0.5, 1.0, 2.0, 4.0]
+out: squared   = [0.25, 1.0, 4.0, 16.0]   # each gap × itself
+out: MSE = mean(squared) = 5.31
+take: <b>Squaring is not fair — on purpose.</b> A gap of 4 isn't 8× worse than a gap of 0.5, it's 64× worse (16 vs 0.25). Big misses scream; the model rushes to fix them first.
+%%%
 
-That is your first win of the day: the mysterious falling number now has a name and a job. Everything else today is about *which* loss to use, and how to read it honestly. This is the heart of how a model *practices* — every step, it gets one honest score and pushes it down.
+So a loss is just a rule for turning "how wrong" into one number. MSE is the rule when the answer is a quantity. But your MNIST model isn't guessing a price — it's picking a *category* (which digit, 0–9). Categories need a different, cleverer score, and that's next.
 
-@@@ concept id=c2 tag="Cross-entropy" title="Cross-entropy: the loss that hates an over-confident wrong answer" gotit="Got cross-entropy"
-Not every loss is the same. For our job — sorting an image into one of ten digit classes — the standard choice is [[cross-entropy||The standard loss for classification. It reads off the probability the model gave to the correct class, and the loss is high when that probability is low. Confident-and-wrong is punished hardest.]] loss. Here is the one thing to hold onto about it: cross-entropy doesn't just check *whether* you were right — it checks *how confident* you were, and it comes down brutally hard on a guess that was **confident and wrong** (sure of itself, but backing the wrong answer).
+@@@ concept id=c2 tag="Cross-entropy" title="Cross-entropy: the loss that hates being confidently wrong" gotit="Got cross-entropy"
+Your MNIST model doesn't guess a number on a number line — it picks a *category*. So it doesn't say "7.0", it says something more honest: "I'm 80% sure it's a 7, 15% a 1, 5% a 9." Those percentages are a set of **[[probabilities||numbers between 0 and 1 that say how sure the model is of each choice, and add up to 1]]**. To score a guess like that, we need a loss built for confidence — and the everyday feel of it is the surprise of a weather forecaster.
 
-Picture the model handing in probabilities for the ten digits, and the true answer is "7." Cross-entropy looks only at the probability it put on the *correct* class (the 7) and turns that into a penalty: high probability on the right answer → tiny loss; low probability on the right answer → big loss.
+**Picture a TV weather forecaster.** On Monday they say "99% chance of sun" — and it pours rain. Everyone is furious: they were *so sure* and *so wrong*. On Tuesday they hedge, "50% sun, 50% rain" — and it rains. Nobody minds much; they never promised. The punishment fits the confidence: being sure *and* wrong is embarrassing; being unsure and wrong is forgivable. **[[Cross-entropy||the standard loss for classification: it grows gently when the model hedges and is wrong, and explodes when the model is confident and wrong]]** — the standard loss when the answer is a category — scores a model the exact same way.
 
 %%% svg
-<svg viewBox="0 0 520 210" role="img" aria-label="A curve of cross-entropy loss against the probability the model gave to the correct answer. When that probability is near 1 the loss is near 0. As the probability drops toward 0 the loss shoots up steeply. Three points are marked: confident and right sits near the baseline (low loss), unsure sits clearly above the baseline (medium loss), and confident and wrong sits near the top (very high loss)."><g font-family="monospace" font-size="11"><line x1="60" y1="170" x2="470" y2="170" stroke="#E5DFD6" stroke-width="1.5"/><line x1="60" y1="30" x2="60" y2="176" stroke="#E5DFD6" stroke-width="1.5"/><text x="265" y="200" fill="#6B645E" font-size="10" text-anchor="middle">probability the model gave the CORRECT answer →</text><text x="30" y="100" fill="#6B645E" font-size="10" text-anchor="middle" transform="rotate(-90 30 100)">loss →</text><path d="M70 42 C 120 118, 175 150, 250 158 C 340 166, 400 169, 460 170" fill="none" stroke="#C99A12" stroke-width="2.5"/><circle cx="440" cy="170" r="5" fill="#2D8B55"/><text x="418" y="160" fill="#1a5c38" font-size="10" text-anchor="middle">confident + right</text><text x="418" y="150" fill="#1a5c38" font-size="9" text-anchor="middle">≈ 0 loss</text><circle cx="222" cy="150" r="5" fill="#8A6D3B"/><text x="222" y="135" fill="#8A6D3B" font-size="10" text-anchor="middle">unsure</text><text x="222" y="125" fill="#8A6D3B" font-size="9" text-anchor="middle">medium loss</text><circle cx="82" cy="55" r="5" fill="#C93B3B"/><text x="140" y="52" fill="#C93B3B" font-size="10" text-anchor="middle">confident + WRONG</text><text x="140" y="64" fill="#C93B3B" font-size="9" text-anchor="middle">huge loss ↑↑</text></g></svg>
+<svg viewBox="0 0 520 180" role="img" aria-label="Two weather forecasters. Left: one says 99 percent sun with a big confident face, but it rains, so a huge penalty arrow points up. Right: one says 50-50, it rains, and only a small penalty arrow. The caption: cross-entropy punishes confident-and-wrong far harder than unsure-and-wrong."><g font-family="monospace" font-size="10" text-anchor="middle"><rect x="20" y="24" width="230" height="130" rx="10" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.6"/><text x="135" y="44" fill="#C93B3B" font-size="11">"99% SUN!"  ☀️</text><text x="135" y="62" fill="#6B645E" font-size="9">…it rains 🌧️</text><line x1="135" y1="140" x2="135" y2="78" stroke="#C93B3B" stroke-width="6"/><path d="M135 74 l-7 12 l14 0 z" fill="#C93B3B"/><text x="135" y="132" fill="#C93B3B" font-size="10">HUGE penalty</text><rect x="270" y="24" width="230" height="130" rx="10" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.6"/><text x="385" y="44" fill="#8A6D3B" font-size="11">"50% sun, 50% rain"</text><text x="385" y="62" fill="#6B645E" font-size="9">…it rains 🌧️</text><line x1="385" y1="140" x2="385" y2="118" stroke="#C99A12" stroke-width="6"/><path d="M385 114 l-7 12 l14 0 z" fill="#C99A12"/><text x="385" y="132" fill="#8A6D3B" font-size="10">small penalty</text><text x="260" y="172" fill="#6B645E">confident + wrong = punished hard · unsure + wrong = forgiven</text></g></svg>
 %%%
 
-**Think of a game show where you bet chips on your answer.** If you're *sure* and you're right, you barely lose anything. If you shrug and split your chips evenly, you lose a modest amount. But if you shove *all* your chips on one answer and it's wrong — you're wiped out. Cross-entropy is that betting rule: the more confidently you back a wrong answer, the more it costs you.
+**What the forecaster picture gets right:** the penalty depends on *how sure you were*, not just on being wrong — so the model learns to be honest about its confidence, not just to pick the top answer. **Where it breaks down:** a forecaster feels social embarrassment; cross-entropy is a cold formula — it just gets very large when the probability you put on the *true* answer gets close to zero.
 
-**What the game-show picture gets right:** the penalty depends on your confidence, not just on right-or-wrong, and betting everything on a wrong answer is the worst outcome.
+#### Where the probabilities come from: softmax
+Your network's last layer spits out raw scores, not tidy percentages. A small function called **[[softmax||turns a row of raw scores into probabilities that are all positive and add up to 1]]** squeezes those scores into probabilities that are all positive and sum to 1. Then cross-entropy reads off the one probability the model gave to the *true* class and scores it. This is a rule worth remembering: a probability-style loss (cross-entropy) is almost always paired with a softmax output for many classes, or its cousin the sigmoid for a yes/no answer. Full softmax math is a later day — today, just hold the picture: **scores → softmax → probabilities → cross-entropy reads the true class's probability.**
 
-**Where it breaks down:** in the game show you *choose* how much to bet. The model doesn't choose to be over-confident — its confidence falls out of its weights, and cross-entropy is simply the rule that makes over-confidence expensive so the loop learns to be calibrated.
+Now let's *feel* why "confident and wrong" is so much worse. Predict which row hurts most, then reveal:
 
-#### Why "confident and wrong" gets hit so hard
-The formula for one example is short: `loss = −log(p)`, where `p` is the probability the model gave the *correct* class. Say it in words: take the probability of the right answer, take its logarithm, and flip the sign. You don't need to compute logs by hand — you only need to feel the shape:
+%%% demo id=ce label="watch confidence get punished"
+code: # true answer is "7". loss = -log(probability the model gave to 7)
+code: cross_entropy(prob_on_true=0.90)   # confident AND right
+code: cross_entropy(prob_on_true=0.50)   # hedging
+code: cross_entropy(prob_on_true=0.01)   # confident AND wrong
+out: prob 0.90 → loss 0.11    # barely punished
+out: prob 0.50 → loss 0.69    # mild
+out: prob 0.01 → loss 4.61    # OUCH
+take: <b>The pain explodes as the true-class probability heads to zero.</b> Confident-and-right ≈ 0.11; confident-and-wrong ≈ 4.61 — about 40× the pain. That steep punishment is a strong, clear signal that yanks the model away from cocky mistakes.
+%%%
 
-- Right answer got `p = 0.99` (confident, correct): `−log(0.99) ≈ 0.01` — almost no penalty.
-- Right answer got `p = 0.5` (unsure): `−log(0.5) ≈ 0.69` — a real but modest penalty.
-- Right answer got `p = 0.01` (confident in the *wrong* one, so the true class got almost nothing): `−log(0.01) ≈ 4.6` — a big, sharp penalty.
-
-That steep climb as `p` heads toward 0 is the whole point. A weak loss (one that gives the same flat signal — call it *wishy-washy*, meaning it never commits to a strong opinion — whether the model was mildly wrong or catastrophically, arrogantly wrong, like just counting mistakes) teaches the model nothing about *how badly* it erred. Cross-entropy gives a *much stronger* learning signal exactly where the model is most confidently mistaken — so the loop fixes its worst habits first. That is what makes it such good *practice*: every correction lands hardest where the model is most sure and most wrong.
-
-!!! c-info 🔗
-<b>Where do those probabilities come from?</b> The raw model outputs are just scores (called logits). A function named <b>softmax</b> turns those scores into probabilities that add up to 1 — and cross-entropy eats those probabilities. You'll meet softmax properly in a later lesson; today, just trust that the model hands cross-entropy a clean list of probabilities.
+!!! c-info 🧮
+<b>Optional (skippable) — the one-line formula.</b> For a single example, cross-entropy is `loss = −log(p)`, where `p` is the probability the model assigned to the *correct* class. When `p` is near 1 (confident and right), `−log(p)` is near 0. When `p` is near 0 (confident and wrong), `−log(p)` shoots toward infinity. That single `log` is the whole "explode when confidently wrong" behavior. You never have to derive it today — just know the shape.
 !!!
 
-@@@ concept id=c3 tag="The objective" title="Learning = pushing the average loss down" gotit="Got the objective"
-So the model gets a loss on every example. But what does it actually mean to "train"? Here's the clean answer, and it's smaller than you'd think. Training is nothing more than this: make the **average loss** over the training data as small as you can. That's it. That single sentence is the *objective* — the goal the whole loop is grinding toward.
+@@@ concept id=c3 tag="Loss curve" title="Training = pushing the average loss down (and watching it fall)" gotit="Got the loss curve"
+Here's the quietly huge idea: once wrongness is a single number, "learn" stops being mysterious. To learn is simply to make that number **smaller**. Practice, over and over, until the loss keeps dropping. That's it — that's the whole job.
 
-Why the *average*, not the total? Because you want a fair, size-independent score. Add up the loss over 32 examples and you get a number that grows just because there are more examples. Take the *mean* instead and you get the typical wrongness per example — a number that means the same thing whether the batch has 32 images or 320.
-
-%%% svg
-<svg viewBox="0 0 520 165" role="img" aria-label="A row of five per-example losses being combined by an average into one batch loss, which then feeds a downhill arrow into a valley labeled gradient descent pushes this average down over time."><g font-family="monospace" font-size="11" text-anchor="middle"><text x="150" y="26" fill="#6B645E" font-size="10">loss on each example in the batch</text><rect x="24" y="36" width="42" height="26" rx="4" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="45" y="53" fill="#8A6D3B">0.2</text><rect x="72" y="36" width="42" height="26" rx="4" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="93" y="53" fill="#8A6D3B">1.1</text><rect x="120" y="36" width="42" height="26" rx="4" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="141" y="53" fill="#8A6D3B">0.5</text><rect x="168" y="36" width="42" height="26" rx="4" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="189" y="53" fill="#8A6D3B">3.0</text><rect x="216" y="36" width="42" height="26" rx="4" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="237" y="53" fill="#8A6D3B">0.7</text><text x="150" y="86" fill="#6B645E" font-size="11">average them ↓</text><rect x="96" y="96" width="108" height="34" rx="6" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2.5"/><text x="150" y="117" fill="#5E5191" font-weight="bold">mean = 1.1</text><path d="M212 113 L268 113" stroke="#6B645E" stroke-width="1.5"/><path d="M300 44 Q346 140 392 44" fill="none" stroke="#B8B0C8" stroke-width="2"/><path d="M322 78 L336 100 L346 118" fill="none" stroke="#2D8B55" stroke-width="2"/><circle cx="346" cy="118" r="4" fill="#1a5c38"/><text x="346" y="152" fill="#1a5c38" font-size="10">gradient descent pushes</text><text x="346" y="163" fill="#1a5c38" font-size="10">this average down</text></g></svg>
-%%%
-
-**Think of a class of students grading their homework.** You don't judge the class by the *sum* of everyone's mistakes — a bigger class would always look worse. You judge it by the *average* mistakes per student. Bring that average down and the whole class got better. Training brings down the average loss the same way.
-
-**What the class-average picture gets right:** the average is a fair per-example score, and lowering it means the model got better across the board, not just on a lucky few.
-
-**Where it breaks down:** students improve on their own; here a single knob (the weights) controls *every* "student" at once, and one nudge to the weights shifts the whole class's scores together.
-
-#### The one honest catch, hiding in plain sight
-Read the objective one more time: minimize the average loss *over the training data*. Notice the quiet phrase — **the training data**. The loop only ever lowers the loss on the examples it *practices on*. Nobody said anything about examples it has never seen. Hold that thought tightly, because the next unit is where it turns into the single most important idea of the day: doing well on the practice examples is *not* the same as being a good model. Good *practice* is not the same as being good at the real thing.
-
-@@@ concept id=c4 tag="Two losses" title="The honest split: training loss vs. held-out loss" gotit="Got the split"
-Here's the trap the last unit set up. If you only ever look at the loss on the examples the model practiced on, you can be fooled completely. A model can drive its *training* loss to almost zero and still be useless on anything new — because it might have just *memorized* the practice answers instead of learning the real pattern.
-
-So we keep ourselves honest with a split. Before training, we hide away a chunk of examples the model will *never* practice on — the [[validation set||A stack of examples held back from training, used to measure the model on data it has never practiced on. Also called held-out data.]] (also called **held-out** data). Then we watch *two* numbers: the **training loss** (on the practice examples) and the **validation loss** (on the held-out ones). The training loss tells you the model is fitting what it sees. The validation loss tells you the truth — whether it learned anything that transfers.
+**Think of a heart-rate monitor at the gym.** One beep tells you almost nothing. But watch the line over ten minutes and the *trend* tells you everything — going down means you're recovering, flat means you've stalled, spiking means something's wrong. Training has the same dashboard. Each swing gives one loss number (jumpy, like one heartbeat), but we average the loss over each **[[epoch||one full pass through all the training data — from yesterday's loop]]** and plot it. A line that slides **down** across epochs is your live proof that learning is happening.
 
 %%% svg
-<svg viewBox="0 0 520 175" role="img" aria-label="All the data is split into a large training set the model practices on and a smaller held-out validation set it never sees during training. An arrow from the trained model measures loss on both, producing a training loss and a validation loss."><g font-family="monospace" font-size="11" text-anchor="middle"><text x="260" y="22" fill="#6B645E" font-size="10">all your labeled data</text><rect x="40" y="34" width="300" height="42" rx="6" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><text x="190" y="55" fill="#1a5c38" font-weight="bold">TRAINING set — the model practices on this</text><text x="190" y="69" fill="#6B645E" font-size="9">→ gives the TRAINING loss</text><rect x="352" y="34" width="128" height="42" rx="6" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="416" y="52" fill="#C93B3B" font-weight="bold">HELD-OUT set</text><text x="416" y="66" fill="#6B645E" font-size="9">never practiced on</text><text x="416" y="90" fill="#C93B3B" font-size="9">→ gives the VALIDATION loss</text><path d="M190 78 L190 108" stroke="#2D8B55" stroke-width="1.4"/><path d="M416 100 L300 128" stroke="#C93B3B" stroke-width="1.4" stroke-dasharray="4 3"/><rect x="150" y="110" width="120" height="30" rx="6" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><text x="210" y="130" fill="#5E5191" font-weight="bold">the model</text><text x="260" y="165" fill="#6B645E" font-size="10">watch BOTH numbers — the held-out one is the honest one</text></g></svg>
+<svg viewBox="0 0 520 190" role="img" aria-label="A dashboard-style chart. The x-axis is epochs, the y-axis is average loss. A green curve starts high on the left and slides down toward the right, flattening near the bottom. A dashed target line sits near the floor. Labels point out the steep early drop as fast learning and the flat tail as converging."><g font-family="monospace" font-size="10" text-anchor="middle"><line x1="55" y1="20" x2="55" y2="150" stroke="#6B645E" stroke-width="1.2"/><line x1="55" y1="150" x2="490" y2="150" stroke="#6B645E" stroke-width="1.2"/><text x="30" y="30" fill="#6B645E" font-size="9">loss</text><text x="30" y="90" fill="#6B645E" font-size="9">high</text><text x="30" y="148" fill="#6B645E" font-size="9">low</text><text x="270" y="176" fill="#6B645E" font-size="9">epochs (full passes) →</text><polyline points="60,34 90,52 120,74 150,96 185,112 225,124 270,132 320,138 380,142 470,144" fill="none" stroke="#2D8B55" stroke-width="2.2"/><circle cx="60" cy="34" r="3" fill="#2D8B55"/><circle cx="150" cy="96" r="3" fill="#2D8B55"/><circle cx="470" cy="144" r="3" fill="#2D8B55"/><line x1="55" y1="150" x2="490" y2="150" stroke="#C99A12" stroke-width="1" stroke-dasharray="4 3"/><text x="130" y="52" fill="#1a5c38" font-size="9">steep drop = fast learning</text><text x="400" y="132" fill="#8A6D3B" font-size="9">flattening = converging</text></g></svg>
 %%%
 
-**Think of studying for a test with a practice packet.** If you study the practice packet so hard that you memorize *its* answers, you might ace the practice packet and still bomb the real test — because the real test has *different* questions. The smart move is to set aside a few practice problems, never look at their answers while studying, and use them as a mini-mock-test. That's the held-out set: your private mock test that the model never gets to peek at.
+**What the heart-rate picture gets right:** you judge progress by the *trend* over time, not by any single reading. **Where it breaks down:** a heart rate has a healthy target you know in advance; with a loss you rarely know the "right" floor — you mostly watch whether it's still dropping, and (as you'll see) whether it's dropping for the *right* reasons.
 
-**What the mock-test picture gets right:** the only fair measure of learning is performance on questions you didn't study, and memorizing the study set proves nothing.
+#### It's the *average* loss, not any single one
+One swing's loss bounces around — that's the mini-batch shakiness you met yesterday. So we don't chase single numbers. Training minimizes the **average** loss over the training data: add up the loss on every example, divide by how many there are, and push *that* down. Below, three noisy per-batch losses smooth into one honest epoch average — the number we actually plot:
 
-**Where it breaks down:** a student *could* accidentally see a held-out answer. We enforce it strictly — the held-out examples touch the loss *only* for measuring, never for the weight update, so there is zero leakage.
+%%% demo id=avg label="smooth the noise into one number"
+code: batch_losses = [0.71, 0.44, 0.63]     # three jumpy per-batch reads
+code: epoch_avg = sum(batch_losses) / len(batch_losses)
+out: batch_losses = [0.71, 0.44, 0.63]      # bouncy
+out: epoch_avg    = 0.60                     # the steady number we track
+take: <b>Average, then track.</b> Any single batch is noisy; the epoch average is the calm signal. Training's whole aim is to drag that average down, epoch after epoch.
+%%%
 
-#### Memorizing vs. generalizing — the two things a low training loss could mean
-This gives us the two words that name the whole tension of machine learning:
+So far, so good: pick a loss, average it, push it down, watch the curve fall. It feels like winning. But here's the plot twist that the rest of the day is about — a falling training loss can be **lying to you**. Let's find out how.
 
-- **Memorizing** — the model records the training examples (and their quirks) like a lookup table. Great training loss. Useless on anything new.
-- **[[Generalizing||Doing well on new, unseen examples — capturing the real pattern rather than the specific training examples. This is the actual goal of training.]]** — the model captures the *general pattern* behind the examples. Slightly worse training loss, but it does well on new data too.
+@@@ concept id=c4 tag="Held-out data" title="The honest test: hold some data back" gotit="Got held-out data"
+Here is the twist. A falling training loss only proves the model got good at the exact examples it practiced on. But we don't care about those — we already know their answers! We care whether it can handle *new* pictures it has never seen. So we run an honest test: hide some data from it, and check the loss there.
 
-Generalizing is the *entire goal*. A model that only memorizes is like a student who learned the answer key by heart but can't answer a single new question. The held-out loss is exactly the number that tells the two apart: if training loss and validation loss fall together, you're generalizing. If they split apart — training down, validation up — you're memorizing. That split has a name, and it's next.
-
-@@@ concept id=c5 tag="Overfitting" title="Overfitting: when practice quietly becomes memorizing" gotit="Got the failure"
-The split from the last unit has a famous name when it goes wrong: **overfitting**. This is the central failure of today, so let's be precise about *what it is*, *what causes it*, and *how you spot it*.
-
-**What it is:** [[overfitting||A failure where the model memorizes the training set — including its noise and quirks — instead of learning the general pattern. The tell-tale symptom: training loss keeps falling while validation loss turns and rises.]] is when the model fits the training examples *too* well — it starts memorizing their noise and quirks instead of the real pattern.
-
-**What causes it:** the model has more *capacity* (more weights, more freedom) than the data can pin down. With that spare freedom, the easiest way to shrink the training loss further is to memorize individual examples — including their random noise. So it does. Too much capacity for too little data is the root cause.
-
-**How you spot it — the symptom to burn into memory:** the **training loss keeps dropping**, but the **validation loss stops improving and turns upward**. The two lines, which fell together at first, split apart. That fork is the exact moment "learning to read" became "memorizing the answer key."
+**Think of studying for an exam with a stack of practice questions.** The smart move is to *not* study all of them. You set a handful aside, unopened, and only try those the night before the real test. If you ace the ones you studied but bomb the set you saved, you learned the answers, not the subject. If you do well on the saved set too, you actually *get* it. Neural networks do exactly this. We split the data: most of it becomes the **[[training set||the examples the model learns from — it sees these over and over]]** the model practices on, and a slice becomes the **[[validation set||held-out examples the model never trains on — used only to check if it truly learned, not memorized]]** — held-out examples it *never* trains on, used only to check honest progress. That check is the **held-out loss**, and it is the number that actually matters.
 
 %%% svg
-<svg viewBox="0 0 520 240" role="img" aria-label="Two loss curves plotted against training epochs. The training loss falls steadily toward zero the whole time. The validation loss falls at first, reaches a lowest point, then turns and rises. A vertical dashed line at the turning point is labeled the overfitting turn, and the growing vertical gap between the two curves after that point is labeled the generalization gap."><g font-family="monospace" font-size="11"><line x1="60" y1="200" x2="480" y2="200" stroke="#E5DFD6" stroke-width="1.5"/><line x1="60" y1="30" x2="60" y2="206" stroke="#E5DFD6" stroke-width="1.5"/><text x="270" y="230" fill="#6B645E" font-size="10" text-anchor="middle">training epochs →</text><text x="28" y="115" fill="#6B645E" font-size="10" text-anchor="middle" transform="rotate(-90 28 115)">loss →</text><path d="M66 70 C 160 130, 260 168, 470 188" fill="none" stroke="#2D8B55" stroke-width="2.5"/><text x="430" y="180" fill="#1a5c38" font-size="10" text-anchor="end">training loss ↓ (keeps falling)</text><path d="M66 90 C 150 130, 220 150, 250 150 C 330 150, 400 118, 470 78" fill="none" stroke="#C93B3B" stroke-width="2.5"/><text x="470" y="72" fill="#C93B3B" font-size="10" text-anchor="end">validation loss ↑ (turns up)</text><line x1="250" y1="40" x2="250" y2="200" stroke="#9A938A" stroke-width="1.2" stroke-dasharray="4 3"/><text x="250" y="52" fill="#3A342E" font-size="10" text-anchor="middle" font-weight="bold">the overfitting turn</text><circle cx="250" cy="150" r="4.5" fill="#C93B3B"/><path d="M410 130 L410 176" stroke="#7C6DAA" stroke-width="1.2"/><path d="M410 130 L406 138 M410 130 L414 138 M410 176 L406 168 M410 176 L414 168" stroke="#7C6DAA" stroke-width="1.2"/><text x="405" y="120" fill="#5E5191" font-size="9" text-anchor="middle">the gap grows</text></g></svg>
+<svg viewBox="0 0 520 175" role="img" aria-label="A stack of practice questions being split into two piles. A large left pile labeled training set with an open-book icon, and a small right pile labeled validation set, sealed, labeled do not study. An arrow shows the sealed pile is only opened at test time to give the honest score."><g font-family="monospace" font-size="10" text-anchor="middle"><rect x="30" y="30" width="250" height="110" rx="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><text x="155" y="52" fill="#1a5c38" font-size="11">TRAINING SET (~80%)</text><text x="155" y="72" fill="#6B645E" font-size="9">📖 practice on these, over and over</text><text x="155" y="94" fill="#6B645E" font-size="9">the loss here always falls —</text><text x="155" y="108" fill="#6B645E" font-size="9">it just means "learned these"</text><rect x="300" y="30" width="190" height="110" rx="10" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.6" stroke-dasharray="6 4"/><text x="395" y="52" fill="#8A6D3B" font-size="11">VALIDATION (~20%)</text><text x="395" y="72" fill="#C93B3B" font-size="9">🔒 never trained on</text><text x="395" y="94" fill="#6B645E" font-size="9">the honest score:</text><text x="395" y="108" fill="#6B645E" font-size="9">"does it work on NEW data?"</text><text x="260" y="164" fill="#6B645E">split once, keep the sealed pile sealed</text></g></svg>
 %%%
 
-**Think of a student cramming a specific practice exam.** For the first few hours, studying helps on *both* the practice exam and any real test. But past a point, the only way to improve on *that one practice exam* is to memorize its exact questions and answers — which does nothing (or worse) for a real test with new questions. Their practice-exam score keeps climbing while their true readiness quietly slides. That slide is overfitting.
+**What the practice-exam picture gets right:** the only fair test uses questions you kept sealed away — the score on studied questions can be faked by memorizing. **Where it breaks down:** a student might accidentally peek; a model literally cannot see the validation set during training, so the wall between the two piles is airtight — as long as you split *once* and never train on the held-out slice.
 
-**What the cramming picture gets right:** past a turning point, extra effort spent on the practice set stops helping and starts hurting real-world performance.
+#### Now you watch *two* curves, not one
+From here on, the dashboard plots two lines: the training loss and the validation loss. When both slide down together, you're genuinely learning. Below, an early snapshot where both are still falling — the happy case. Watch how close they stay:
 
-**Where it breaks down:** a student can *decide* to stop cramming; the model has no such judgment — it will happily overfit forever unless *you* watch the validation loss and step in.
+%%% demo id=twoloss label="read both curves"
+code: # after a few epochs of healthy training
+code: train_loss      = [0.9, 0.6, 0.45, 0.38]
+code: validation_loss = [0.95, 0.65, 0.50, 0.44]
+out: epoch:            1     2     3     4
+out: train_loss:      0.90  0.60  0.45  0.38   ↓ falling
+out: validation_loss: 0.95  0.65  0.50  0.44   ↓ falling too
+take: <b>Both curves falling together = real learning.</b> The small gap between them is normal and fine. The moment to worry is when they stop moving together — which is exactly the failure we meet next.
+%%%
 
-!!! c-warn 😕
-<b>为什么 loss 一直降反而可能是坏事 · Why a falling loss can be bad news.</b> It feels wrong the first time: how can the loss going *down* be a problem? In plain terms — a falling *training* loss only proves the model is fitting the examples in front of it. It says nothing about new examples. The number that tells the truth is the *validation* loss, and when it turns upward while training loss keeps dropping, "learning" has quietly become "memorizing." Watching the wrong number is the most common beginner mistake there is — and now you won't make it.
-!!!
+That gap between the two lines is about to become the single most important thing on the whole dashboard. When it starts to *grow*, your model has caught the disease every practitioner fears.
 
-@@@ concept id=c6 tag="Dropout" title="Dropout: the famous cure for overfitting" gotit="Got dropout"
-Overfitting has a cause (too much capacity memorizing quirks), so it has a cure. The simplest and most famous one is [[dropout||A regularizer: during each training step, randomly set a fraction p of a layer's neuron outputs to zero, so no single neuron can be relied on. It fights overfitting.]]. The idea sounds almost silly at first: during each training step, you *randomly switch off* a fraction of the neurons in a layer — set their outputs to zero — and train on what's left. Different neurons get dropped each step.
+@@@ concept id=c5 tag="Overfitting" title="Overfitting: when the model memorizes instead of learns" gotit="Got overfitting"
+This is the trap the whole day has been walking toward. It's sneaky because it *looks* like success — the training loss keeps dropping, and you feel great — right up until you check the held-out data and the floor falls out.
 
-Why on earth would breaking your own network help? Because it stops any single neuron from becoming a *crutch* — something the rest of the network leans on so heavily it can't stand without it. If a neuron might vanish at any moment, no other neuron can afford to *lean* on it — every neuron has to carry real, useful signal on its own. That forces the network to learn sturdy, spread-out features instead of a fragile memorized lookup, and sturdy spread-out features are exactly what generalizes.
+**Think of a student who memorizes the answer key.** Give them the practice test again and they score 100% — flawless, instant. But it's a trick: they didn't learn the *subject*, they memorized *which letter goes with which question number*. Hand them the real exam with new questions and they crash. That's **[[overfitting||the model memorizes the exact training examples, even their random noise, instead of learning the general pattern — so it fails on new data]]**: the model has so much room that it starts memorizing the training examples — even their meaningless quirks and noise — instead of the real pattern. It aces what it has seen and fails what it hasn't.
 
 %%% svg
-<svg viewBox="0 0 520 210" role="img" aria-label="Three copies of the same small hidden layer of six neurons across three training steps. In each step a different random subset of two neurons is drawn with an X to show it is switched off, and the rest stay active. The caption notes a different random set is dropped every step."><g font-family="monospace" font-size="10" text-anchor="middle"><text x="90" y="24" fill="#6B645E">step 1</text><text x="260" y="24" fill="#6B645E">step 2</text><text x="430" y="24" fill="#6B645E">step 3</text>
-<g><circle cx="55" cy="60" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="55" cy="100" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="55" y="104" fill="#C93B3B" font-size="12">✕</text><circle cx="55" cy="140" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="125" cy="60" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="125" cy="100" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="125" cy="140" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="125" y="144" fill="#C93B3B" font-size="12">✕</text></g>
-<g><circle cx="225" cy="60" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="225" y="64" fill="#C93B3B" font-size="12">✕</text><circle cx="225" cy="100" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="225" cy="140" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="295" cy="60" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="295" cy="100" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="295" y="104" fill="#C93B3B" font-size="12">✕</text><circle cx="295" cy="140" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/></g>
-<g><circle cx="395" cy="60" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="395" cy="100" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="395" cy="140" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="395" y="144" fill="#C93B3B" font-size="12">✕</text><circle cx="465" cy="60" r="12" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="465" y="64" fill="#C93B3B" font-size="12">✕</text><circle cx="465" cy="100" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="465" cy="140" r="12" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/></g>
-<text x="260" y="192" fill="#6B645E" font-size="10">a DIFFERENT random set of neurons is switched off every step — green = active, red ✕ = dropped</text></g></svg>
+<svg viewBox="0 0 520 190" role="img" aria-label="A loss dashboard showing overfitting. Two curves start together on the left and both fall. Partway across, the green training curve keeps falling toward zero, but the amber validation curve bottoms out and turns back UP. The widening gap between them is shaded and labeled overfitting, with a marker at the point where validation starts rising labeled best model was here."><g font-family="monospace" font-size="10" text-anchor="middle"><line x1="55" y1="18" x2="55" y2="150" stroke="#6B645E" stroke-width="1.2"/><line x1="55" y1="150" x2="495" y2="150" stroke="#6B645E" stroke-width="1.2"/><text x="30" y="28" fill="#6B645E" font-size="9">loss</text><text x="275" y="176" fill="#6B645E" font-size="9">epochs →</text><path d="M60 40 L120 70 L180 92 L240 108 L300 118 L360 126 L420 132 L485 137" fill="none" stroke="#2D8B55" stroke-width="2.2"/><text x="450" y="128" fill="#1a5c38" font-size="9">train ↓</text><path d="M60 46 L120 76 L180 96 L235 104 L270 106 L320 118 L380 130 L485 143" fill="none" stroke="#C99A12" stroke-width="2.2"/><text x="450" y="150" fill="#8A6D3B" font-size="9">validation ↑</text><line x1="235" y1="104" x2="235" y2="150" stroke="#C93B3B" stroke-width="1" stroke-dasharray="3 3"/><circle cx="235" cy="104" r="4" fill="#C93B3B"/><text x="235" y="96" fill="#C93B3B" font-size="9">best model was HERE</text><path d="M320 118 L320 128 M380 130 L380 143" stroke="#C93B3B" stroke-width="0.8"/><text x="405" y="112" fill="#C93B3B" font-size="9">growing gap = overfitting</text></g></svg>
 %%%
 
-**Think of a soccer team that trains with two random players sitting out each session.** Nobody knows in advance who will be benched, so every single player has to build real skill — you can't just pass everything to your one star and *coast* (glide along on someone else's effort). When the whole team plays the real match together, they're deeper and harder to break. Dropout benches random neurons in practice for the exact same reason.
+**What the answer-key picture gets right:** a perfect score on seen material can be pure memorization, worthless on anything new — so a low *training* loss is not the goal. **Where it breaks down:** a student chooses to cheat; a model doesn't choose — it slides into memorizing automatically whenever it has more capacity (more weights) than the data can pin down.
 
-**What the benched-players picture gets right:** randomly removing members during practice forces everyone to become independently capable, so the full group is more robust.
+#### How to *spot* it: the two curves split apart
+You never have to guess whether you're overfitting — the dashboard tells you. The tell-tale sign: **training loss keeps dropping while validation loss stops and turns back up.** The moment those two lines split and the gap grows, memorizing has begun. Below, six full epochs, numbered plainly 1 to 6. Read the validation row and find where it stops falling:
 
-**Where it breaks down:** a benched player *rests*; a dropped neuron isn't resting — its output is forced to a hard zero for that step, and a *fresh* random set is dropped on the very next step, thousands of times over.
-
-#### The one knob: the dropout rate p
-Dropout has exactly one setting a beginner touches: the [[dropout rate||The fraction p of neurons switched off each step. Higher p = more neurons dropped = stronger regularization. A common starting value is 0.5 in a hidden layer.]] `p` — the *fraction* of neurons you switch off each step. Set `p = 0.5` and, on average, half the layer goes dark each step. The bigger `p` is, the more neurons vanish, and the *stronger* the regularization: more pressure against memorizing, but also less of the network working at once. A common starting point for a hidden layer is `p = 0.5`; smaller layers often use less. You tune it by watching that train-vs-validation gap from the last unit — wider gap, raise `p`; can't get the training loss down at all, lower `p`.
-
-@@@ concept id=c7 tag="On, then off" title="Dropout is ON in practice, OFF at test time" gotit="Got the switch"
-Here's a piece that trips up almost everyone the first time. Dropout is only meant to be **on during training**. At test time — when you actually make predictions — you turn it **off** and use *all* the neurons. The switch that does this is called putting the model in [[eval mode||The mode that turns dropout OFF (and freezes similar training-only behaviors) so every neuron is used and predictions are steady. You must switch to it before measuring or predicting.]], versus **train mode** where dropout is on. Let's take this slowly, one felt reason at a time.
-
-Why off at test time? The plainest reason: at prediction time you *want* all your hard-won knowledge working at once. Dropout exists to make *practice* harder so the network learns robustly — but there's no reason to keep handicapping yourself on the real quiz. So when the exam comes, you bring your whole team.
-
-%%% svg
-<svg viewBox="0 0 520 175" role="img" aria-label="Two side-by-side pictures of the same hidden layer. On the left, train mode: some neurons switched off with an X, labeled dropout ON, random neurons dropped. On the right, eval mode: every neuron active, labeled dropout OFF, all neurons used. A caption says you must flip the switch to eval before you measure or predict."><g font-family="monospace" font-size="10" text-anchor="middle"><text x="140" y="22" fill="#2D8B55" font-weight="bold">TRAIN mode</text><text x="140" y="36" fill="#6B645E" font-size="9">dropout ON — random neurons dropped</text><circle cx="90" cy="72" r="13" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="140" cy="72" r="13" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="140" y="76" fill="#C93B3B" font-size="13">✕</text><circle cx="190" cy="72" r="13" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="90" cy="112" r="13" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="90" y="116" fill="#C93B3B" font-size="13">✕</text><circle cx="140" cy="112" r="13" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><circle cx="190" cy="112" r="13" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><line x1="270" y1="40" x2="270" y2="150" stroke="#E5DFD6" stroke-width="1.5"/><text x="400" y="22" fill="#5E5191" font-weight="bold">EVAL mode</text><text x="400" y="36" fill="#6B645E" font-size="9">dropout OFF — every neuron used</text><circle cx="350" cy="72" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><circle cx="400" cy="72" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><circle cx="450" cy="72" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><circle cx="350" cy="112" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><circle cx="400" cy="112" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><circle cx="450" cy="112" r="13" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><text x="260" y="168" fill="#6B645E" font-size="10">same layer, two modes — flip the switch to eval before you measure or predict</text></g></svg>
+%%% demo id=overfit label="catch the split"
+code: # six epochs, numbered 1..6 — watch where the two curves diverge
+code: epoch:            1     2     3     4     5     6
+code: train_loss:      0.60  0.40  0.25  0.14  0.07  0.03
+code: validation_loss: 0.62  0.44  0.35  0.36  0.42  0.51
+out: train keeps falling:  0.60 → 0.03 across epochs 1→6  (looks amazing!)
+out: validation LOWEST:    0.35 at epoch 3  ← the bottom
+out: validation RISES:     epoch 4: 0.36 → epoch 5: 0.42 → epoch 6: 0.51   ⚠️ overfitting
+take: <b>The split is the alarm.</b> Validation is lowest at <b>epoch 3</b> (0.35). From <b>epoch 4</b> on it turns UP (0.36 → 0.42 → 0.51) while training keeps diving. Everything after epoch 3 is the model memorizing training noise — so the best model was back at <b>epoch 3</b>, the bottom of the validation curve, not at the end.
 %%%
-
-**Think of a fire drill versus the real fire.** During drills you deliberately block a random exit each time, so people learn every route out of the building and don't all crowd one door. But when a real fire happens, you open *every* exit — you would never keep a door locked during the actual emergency. Train mode is the drill with a blocked exit; eval mode is the real event with all doors open.
-
-**What the fire-drill picture gets right:** you practice with something deliberately removed to build robustness, then remove that handicap for the real event when every resource should be available.
-
-**Where it breaks down:** in a fire drill *people* remember the extra routes; in dropout there's no memory of "which door was blocked" — the network simply switches to using all neurons, and (as the next unit shows) a small piece of arithmetic quietly makes the two settings line up.
-
-#### The switch, in one line of habit
-In code this is a single call — you flip the model to eval mode before you measure or predict, and back to train mode before you keep training. That's the whole ritual: **train mode while learning, eval mode while judging.** It sounds trivial, and it is — right up until you forget it, which is exactly the bug two units from now. But first, one honest loose end: if training runs with half the neurons off and testing runs with all of them on, don't the output numbers come out *different sizes*? That's the puzzle the next unit solves.
-
-@@@ concept id=c8 tag="The (1−p) fix" title="Why the survivors get scaled up by 1/(1−p)" gotit="Got the scaling"
-Let's give the loose end from the last unit its own moment, because it's the one piece of dropout arithmetic worth truly feeling. The worry was fair: in training, half the neurons are off, so a layer's total output is roughly *half* its full size. At test time every neuron is on, so the total is *full* size. If nothing fixed this, the model would see one typical magnitude while practicing and a completely different, bigger one at test — and it would guess badly for no reason other than a size mismatch.
-
-The fix is a small multiplication, and here's the felt version first: **when you switch some neurons off, turn the ones that are left slightly louder to make up for it.** Do exactly enough turning-up that the *total* signal averages out to the same size as if nobody had been dropped. Then training's typical magnitude already matches the full-strength test magnitude — and test time needs no adjustment at all. This trick is called *inverted dropout*: put the scaling in **training** so eval stays a plain, untouched forward pass.
-
-%%% svg
-<svg viewBox="0 0 520 165" role="img" aria-label="A hidden layer of four neurons each outputting 4. Two are dropped to zero, leaving two survivors. An arrow labeled divide by (1 minus p) equals 0.5 turns each survivor from 4 into 8, so the total returns to 16, the same as the full undropped layer."><g font-family="monospace" font-size="11" text-anchor="middle"><text x="90" y="22" fill="#6B645E" font-size="10">full layer</text><rect x="40" y="34" width="34" height="26" rx="4" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.5"/><text x="57" y="51" fill="#5E5191">4</text><rect x="40" y="66" width="34" height="26" rx="4" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.5"/><text x="57" y="83" fill="#5E5191">4</text><rect x="40" y="98" width="34" height="26" rx="4" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.5"/><text x="57" y="115" fill="#5E5191">4</text><rect x="40" y="130" width="34" height="26" rx="4" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.5"/><text x="57" y="147" fill="#5E5191">4</text><text x="57" y="30" fill="#6B645E" font-size="9">sum 16</text><text x="120" y="98" fill="#6B645E">drop→</text><text x="200" y="22" fill="#6B645E" font-size="10">after dropout</text><rect x="180" y="34" width="34" height="26" rx="4" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="197" y="51" fill="#1a5c38">4</text><rect x="180" y="66" width="34" height="26" rx="4" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="197" y="83" fill="#C93B3B">0</text><rect x="180" y="98" width="34" height="26" rx="4" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="197" y="115" fill="#1a5c38">4</text><rect x="180" y="130" width="34" height="26" rx="4" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="197" y="147" fill="#C93B3B">0</text><text x="197" y="30" fill="#C93B3B" font-size="9">sum 8 — too small</text><text x="266" y="90" fill="#8A6D3B" font-size="9">÷ (1−p)</text><text x="266" y="104" fill="#8A6D3B" font-size="9">= ÷ 0.5</text><path d="M236 98 L300 98" stroke="#8A6D3B" stroke-width="1.5"/><text x="360" y="22" fill="#6B645E" font-size="10">survivors scaled up</text><rect x="342" y="34" width="34" height="26" rx="4" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><text x="359" y="51" fill="#1a5c38" font-weight="bold">8</text><rect x="342" y="66" width="34" height="26" rx="4" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="359" y="83" fill="#C93B3B">0</text><rect x="342" y="98" width="34" height="26" rx="4" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><text x="359" y="115" fill="#1a5c38" font-weight="bold">8</text><rect x="342" y="130" width="34" height="26" rx="4" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="359" y="147" fill="#C93B3B">0</text><text x="359" y="30" fill="#1a5c38" font-size="9">sum 16 — back to full</text><text x="450" y="94" fill="#6B645E" font-size="9">= same size</text><text x="450" y="106" fill="#6B645E" font-size="9">as full layer</text></g></svg>
-%%%
-
-**Think of a choir where, at each rehearsal, half the singers are randomly told to stay silent.** To keep the room just as loud, the remaining singers are told to sing *twice as strong*. So the total volume in rehearsal matches a full choir — and on concert night, when everyone sings together at their normal level, the sound is already the right loudness. Nobody touches the volume dial on concert night. The "sing twice as strong" instruction is dividing the survivors by `(1 − p)`.
-
-**What the choir picture gets right:** boosting whoever is left keeps the *total* output at full strength, so the practice loudness and the performance loudness already agree without a last-minute change.
-
-**Where it breaks down:** the choir's boost is a rough judgment call by ear; dropout's boost is an exact multiplier — divide by `(1 − p)` — applied automatically, and it matches the *average* signal, not any single note.
-
-#### The scaling, made concrete
-Here is the arithmetic, built up one rung at a time so the `1/(1−p)` isn't a mystery symbol:
-
-%%% mathladder
-title: why survivors get divided by (1 − p)
-words: after zeroing a fraction p of neurons, the total signal would be too small; dividing the survivors by (1 − p) scales it back up so the average matches full strength — and it's done in training, so eval needs no scaling.
-formula: kept output = (original output) / (1 − p)
-numbers: layer outputs [4, 4, 4, 4], p = 0.5, drop two → [4, 0, 4, 0] sums to 8 (half of the full 16); divide survivors by (1 − 0.5) = 0.5 → [8, 0, 8, 0] sums to 16 — back to full strength. At eval, everything is on with no divide → [4, 4, 4, 4] sums to 16 too, so train and eval magnitudes already agree.
-sanity: skip the train-time divide and training signals are systematically half-size versus the plain eval pass — a silent, accuracy-eating mismatch. The (1 − p) scale during training is the whole reason eval needs no scaling.
-%%%
-
-So the two settings you met last unit — dropout on in training, off at eval — line up *because* of this one divide. Scale the survivors up while you practice, and the full-strength test pass comes out the right size all by itself. That's the entire secret to why eval mode can be a plain, do-nothing-extra forward pass.
-
-@@@ concept id=c9 tag="The classic bug" title="The bug that silently wrecks predictions: dropout left on at test time" gotit="Got the bug"
-Now the payoff of the last two units — and a bug that has burned nearly every beginner (and plenty of professionals). You know dropout must be **off** at test time. So what happens if you forget to flip that switch? The answer is nasty precisely because *nothing breaks*. No error message. No crash. The program runs happily and hands you numbers — they're just quietly, randomly *wrong*.
-
-Here's the felt version. If dropout is still on while you predict, then every time you run the *same* input, a *different* random set of neurons gets zeroed. So the same picture of a "7" can come out "7" one run and "9" the next — pure luck of which neurons happened to survive that pass. Your accuracy sags a percent or two below where it should be, and worse, it *jitters*: run your evaluation twice on the exact same data and you get two different scores.
-
-%%% svg
-<svg viewBox="0 0 520 175" role="img" aria-label="The same input image of a seven fed three times into a model that still has dropout on. Each run drops a different random set of neurons, so the three predictions disagree: seven, then nine, then seven. A caption warns that the same input gives different answers because dropout was left on at test time."><g font-family="monospace" font-size="10" text-anchor="middle"><rect x="30" y="66" width="46" height="46" rx="6" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><text x="53" y="96" fill="#5E5191" font-size="22" font-weight="bold">7</text><text x="53" y="128" fill="#6B645E" font-size="9">same input</text><text x="53" y="140" fill="#6B645E" font-size="9">3 times</text><path d="M80 74 L120 50" stroke="#6B645E" stroke-width="1.2"/><path d="M80 89 L120 89" stroke="#6B645E" stroke-width="1.2"/><path d="M80 104 L120 128" stroke="#6B645E" stroke-width="1.2"/><rect x="124" y="36" width="120" height="30" rx="5" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="184" y="55" fill="#8A6D3B" font-size="9">run 1 · dropped {2,5}</text><rect x="124" y="74" width="120" height="30" rx="5" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="184" y="93" fill="#8A6D3B" font-size="9">run 2 · dropped {1,4}</text><rect x="124" y="112" width="120" height="30" rx="5" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.5"/><text x="184" y="131" fill="#8A6D3B" font-size="9">run 3 · dropped {3,6}</text><path d="M248 51 L286 51" stroke="#6B645E" stroke-width="1.2"/><path d="M248 89 L286 89" stroke="#6B645E" stroke-width="1.2"/><path d="M248 127 L286 127" stroke="#6B645E" stroke-width="1.2"/><rect x="290" y="38" width="60" height="26" rx="5" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="320" y="55" fill="#1a5c38">"7" ✓</text><rect x="290" y="76" width="60" height="26" rx="5" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.5"/><text x="320" y="93" fill="#C93B3B">"9" ✗</text><rect x="290" y="114" width="60" height="26" rx="5" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="320" y="131" fill="#1a5c38">"7" ✓</text><text x="440" y="80" fill="#C93B3B" font-size="10">same input,</text><text x="440" y="94" fill="#C93B3B" font-size="10">different answers!</text><text x="440" y="112" fill="#6B645E" font-size="9">dropout left ON</text><text x="440" y="124" fill="#6B645E" font-size="9">at test time</text></g></svg>
-%%%
-
-**Think of a chef tasting a dish while wearing a blindfold that randomly covers one taste at a time.** During training the blindfold is on purpose — it forces the chef to rely on smell and texture too, so they become a better all-round cook. But if the chef forgets to take the blindfold off when serving customers, each plate gets judged with a *different* random sense missing — so the same soup gets called "perfect" one moment and "too salty" the next. The dish never changed; the blindfold did.
-
-**What the blindfold picture gets right:** a handicap that helps during practice becomes pure randomness when it's accidentally left on for the real judging, so identical inputs get inconsistent verdicts.
-
-**Where it breaks down:** a chef would *notice* the blindfold on their face; the computer gives you no such warning — the code runs silently, which is exactly why this bug is so easy to ship without realizing.
 
 !!! c-warn ⚠️
-<b>The classic bug (silent, no crash): dropout left ON at test time.</b> The cause is almost always the same — leaving the model in train mode / not calling <code>eval()</code> before measuring. The fix is one line: switch to eval mode before you predict or score. The senior habit that catches it: before you report any number, confirm the model is in eval mode, and check that evaluating twice on the same fixed data gives the <i>exact same</i> result. If two identical runs disagree, dropout (or another train-only behavior) is still on.
+<b>The failure — overfitting (cause):</b> the model has more capacity (weights) than the data constrains, so it fits the training examples' random noise, not the true pattern. <b>The symptom:</b> training loss falls, validation loss rises — the gap between the two curves grows. <b>Coming up:</b> two named cures — the headline one, dropout, and a simple one, early stopping.
 !!!
 
-@@@ concept id=c10 tag="The limit" title="What dropout can't do — and the number you must never trust alone" gotit="Got the limit"
-Let's end honestly, because a good tool used with the wrong expectations is dangerous. Start with the *felt* idea before any mechanism: dropout is a way to stop your model from over-trusting the examples it *did* see — but it has no power at all over the examples it *never* saw. It can make the model use its data more fairly; it cannot hand the model data it was never given. A cure for over-reliance is not a cure for *missing knowledge*. Hold that feeling, then here is the precise version.
+Now for the good part — how do we *fight* it? There's a famous, almost silly-sounding trick that beat overfitting so well it's now in nearly every big model. Let's meet dropout.
 
-Dropout is a real cure for overfitting, but it has a hard **capability limit**: it can shrink the gap between memorizing and generalizing, but it **cannot invent information the training data never had**. If your dataset has too few examples, or is missing whole cases the real world contains — a digit written in a style nobody in your training set ever wrote — no amount of dropout will conjure that missing knowledge. Dropout changes *how* the model leans on the data it has; it does not give it *more* data.
+@@@ concept id=c6 tag="Dropout" title="Dropout: the headline cure for overfitting" gotit="Got dropout"
+This is today's star. **Dropout** sounds almost too simple to work: while the network is practicing, at every single step you randomly *switch off* a fraction of its neurons — you set their outputs to zero, as if they weren't there. Different neurons each step, chosen at random. It feels like sabotage. It is actually one of the most beloved cures for overfitting ever invented (Srivastava & Hinton, 2014).
 
-%%% svg
-<svg viewBox="0 0 520 175" role="img" aria-label="On the left, a training set of neatly written digits with a note that a whole style of handwriting is missing. In the middle, a dropout box. On the right, a slanted messy 7 from the real world that the model gets wrong, with a caption that dropout cannot fix a gap the data never contained."><g font-family="monospace" font-size="10" text-anchor="middle"><text x="90" y="22" fill="#6B645E" font-size="10">what the model trained on</text><rect x="34" y="34" width="112" height="70" rx="6" fill="#E8F5EE" stroke="#2D8B55" stroke-width="2"/><text x="90" y="60" fill="#1a5c38" font-size="20" font-weight="bold">1 2 3</text><text x="90" y="84" fill="#1a5c38" font-size="20" font-weight="bold">7 8 9</text><text x="90" y="120" fill="#C93B3B" font-size="9">(all neat &amp; upright —</text><text x="90" y="132" fill="#C93B3B" font-size="9">slanted styles MISSING)</text><path d="M150 68 L196 68" stroke="#6B645E" stroke-width="1.4"/><rect x="200" y="50" width="86" height="36" rx="8" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="2"/><text x="243" y="66" fill="#5E5191" font-weight="bold">dropout</text><text x="243" y="80" fill="#6B645E" font-size="8.5">helps use data</text><path d="M290 68 L336 68" stroke="#6B645E" stroke-width="1.4"/><text x="400" y="22" fill="#6B645E" font-size="10">a real-world slanted 7</text><rect x="356" y="34" width="88" height="70" rx="6" fill="#FDE8E8" stroke="#C93B3B" stroke-width="2"/><text x="400" y="78" fill="#C93B3B" font-size="30" font-weight="bold" transform="rotate(20 400 68)">7</text><text x="400" y="120" fill="#C93B3B" font-size="9">still guessed wrong —</text><text x="400" y="132" fill="#C93B3B" font-size="9">that style was never seen</text><text x="260" y="162" fill="#6B645E" font-size="10">dropout can't invent a case the training data never contained</text></g></svg>
-%%%
-
-**Think of a student who studies only in English, then sits an exam that turns out to have questions in French.** You can drill that student in the best study habits in the world — spaced practice, no cramming, never leaning on a single memorized fact. Those habits are exactly what dropout is: they make the student a sturdier, less brittle learner. But not one of those habits will help with a French question, because the student was never taught any French. The gap isn't in *how* they studied; it's in *what they were given to study*. Dropout is the good study habit. It cannot teach a language that was never in the syllabus.
-
-**What the study-habit picture gets right:** better learning discipline (dropout) makes a learner more robust on the material they were exposed to, but it does nothing for a topic that was simply absent from what they were given.
-
-**Where it breaks down:** a student can go *find* a French textbook and close the gap themselves; a model can't fetch its own missing examples — closing a data gap is *your* job (collect more or more varied data), not something any regularizer can do for you.
-
-#### The one number you must never trust alone
-That limit points straight at the takeaway that pulls the whole day together: **a falling training loss, by itself, proves nothing about whether your model is good.** You saw exactly why — a model can drive training loss to the floor by memorizing, and dropout can't even see the data it was never given. So the training loss alone is a number you can never trust on its own. The real test is the *gap* between training and held-out performance. Read the training loss alone and you can be completely fooled; read both, and the truth has nowhere to hide.
-
-So here is the finished picture of the day, in one honest sentence: you train by pushing the *average* loss down, you use *cross-entropy* so the model is punished hardest when it's confidently wrong, you reach for *dropout* (on in train, off in eval, survivors scaled by `1/(1−p)`) when the train-vs-validation gap starts to open — and through all of it, the number you actually believe is the *held-out* loss, never the training loss standing alone.
+**Picture a group project where the teacher randomly sends one teammate home every day.** If your group always leans on the one genius kid, you're in trouble the day *they* stay home. So the teacher rolls a die each morning and benches a random member. Now *everyone* has to learn a bit of everything — nobody can coast, and no single person is a make-or-break crutch. The team gets robust: it works no matter who shows up. **[[Dropout||during training, randomly switch off a fraction of neurons each step so no single neuron becomes a crutch — a cheap way to fake averaging many networks]]** does this to neurons. By randomly benching some each step, it stops the network from leaning too hard on any one neuron. No neuron gets to be the irreplaceable genius, so the network spreads its knowledge out — and a spread-out network generalizes instead of memorizes.
 
 %%% svg
-<svg viewBox="0 0 520 165" role="img" aria-label="Two panels. Left: only a falling training loss curve alone, with a question mark, labeled looks great but proves nothing. Right: the same training curve plus a held-out curve that turns up, labeled the gap tells the truth, with the gap highlighted."><g font-family="monospace" font-size="10"><text x="130" y="20" fill="#6B645E">training loss ALONE</text><line x1="40" y1="120" x2="230" y2="120" stroke="#E5DFD6" stroke-width="1.3"/><line x1="40" y1="34" x2="40" y2="124" stroke="#E5DFD6" stroke-width="1.3"/><path d="M46 50 C 110 100, 170 114, 226 118" fill="none" stroke="#2D8B55" stroke-width="2.5"/><text x="150" y="70" fill="#C99A12" font-size="26" text-anchor="middle">?</text><text x="135" y="150" fill="#8A6D3B" font-size="9" text-anchor="middle">falling — but is it learning or memorizing?</text><line x1="290" y1="34" x2="290" y2="124" stroke="#E5DFD6" stroke-width="1.3"/><line x1="290" y1="120" x2="480" y2="120" stroke="#E5DFD6" stroke-width="1.3"/><text x="380" y="20" fill="#6B645E">BOTH losses</text><path d="M296 56 C 360 104, 420 116, 476 119" fill="none" stroke="#2D8B55" stroke-width="2.5"/><path d="M296 70 C 350 100, 380 104, 400 104 C 440 104, 460 82, 476 62" fill="none" stroke="#C93B3B" stroke-width="2.5"/><path d="M450 72 L450 110" stroke="#7C6DAA" stroke-width="1.2"/><path d="M450 72 L446 80 M450 72 L454 80 M450 110 L446 102 M450 110 L454 102" stroke="#7C6DAA" stroke-width="1.2"/><text x="440" y="150" fill="#5E5191" font-size="9" text-anchor="middle">the GAP is the honest test</text></g></svg>
+<svg viewBox="0 0 520 185" role="img" aria-label="Two side-by-side network snapshots for dropout at training time. Left: a small network with all four hidden neurons active and connected. Right: the same network on a different training step with two neurons crossed out and greyed, their connections faded. A caption says each step randomly benches some neurons so no single one becomes a crutch."><g font-family="monospace" font-size="9" text-anchor="middle"><text x="130" y="20" fill="#6B645E" font-size="10">step A: bench neurons 2 &amp; 4</text><text x="390" y="20" fill="#6B645E" font-size="10">step B: bench neurons 1 &amp; 3</text><g stroke="#cfc8bd" stroke-width="0.8"><line x1="55" y1="100" x2="115" y2="45"/><line x1="55" y1="100" x2="115" y2="80"/><line x1="55" y1="100" x2="115" y2="115"/><line x1="55" y1="100" x2="115" y2="150"/><line x1="115" y1="45" x2="185" y2="100"/><line x1="115" y1="80" x2="185" y2="100"/><line x1="115" y1="115" x2="185" y2="100"/><line x1="115" y1="150" x2="185" y2="100"/></g><circle cx="55" cy="100" r="9" fill="#E8EEF6" stroke="#4a6fa5"/><circle cx="115" cy="45" r="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><circle cx="115" cy="80" r="10" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="115" y="83" fill="#C93B3B">✕</text><circle cx="115" cy="115" r="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><circle cx="115" cy="150" r="10" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="115" y="153" fill="#C93B3B">✕</text><circle cx="185" cy="100" r="9" fill="#F6EEF6" stroke="#a54a8f"/><g stroke="#cfc8bd" stroke-width="0.8"><line x1="315" y1="100" x2="375" y2="45"/><line x1="315" y1="100" x2="375" y2="80"/><line x1="315" y1="100" x2="375" y2="115"/><line x1="315" y1="100" x2="375" y2="150"/><line x1="375" y1="45" x2="445" y2="100"/><line x1="375" y1="80" x2="445" y2="100"/><line x1="375" y1="115" x2="445" y2="100"/><line x1="375" y1="150" x2="445" y2="100"/></g><circle cx="315" cy="100" r="9" fill="#E8EEF6" stroke="#4a6fa5"/><circle cx="375" cy="45" r="10" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="375" y="48" fill="#C93B3B">✕</text><circle cx="375" cy="80" r="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><circle cx="375" cy="115" r="10" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="375" y="118" fill="#C93B3B">✕</text><circle cx="375" cy="150" r="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><circle cx="445" cy="100" r="9" fill="#F6EEF6" stroke="#a54a8f"/><text x="260" y="178" fill="#6B645E">different neurons benched each step → nobody becomes a crutch</text></g></svg>
 %%%
 
-#### Why a frontier lab cares
-This exact discipline scales all the way up. Whether it's a 10-line MLP or a model training across thousands of GPUs, someone is watching *training loss beside held-out loss* to decide whether to keep spending money — and the overfitting turn is where those decisions get made (how much data, how much regularization, when to stop). Dropout is one member of a family of cures you'll meet later: **weight decay** (penalize large weights), **early stopping** (halt when validation loss turns up), and **batch normalization** (which also nudges toward generalizing). They all serve the same master — closing the gap between what the model memorized and what it truly learned. It is the same honest question all the way down: did the model really learn from its *practice*, or just memorize it?
+**What the group-project picture gets right:** benching a random member each day forces every member to be useful, so the team never depends on one person — exactly what makes the network robust. **Where it breaks down:** in a real group the benched kid genuinely goes home; in dropout the "benched" neuron is only zeroed for that one step, and it's fully back — with its learning intact — on the very next step.
 
-!!! c-ok 🎤
-<b>Once it clicks, here's how you'd explain it (say, in an interview):</b> "The loss is one scalar for how wrong the model is on a batch — the thing gradient descent minimizes. For classification I use cross-entropy, which is −log of the probability on the true class, so it punishes confident-and-wrong predictions hardest and gives a strong learning signal. Training minimizes the <i>average</i> loss on the training set — but that alone is meaningless, so I watch held-out loss too. Overfitting is when training loss keeps falling while validation loss turns up: too much capacity memorizing noise. My first reach is dropout — zero a fraction p of activations each step and scale the survivors by 1/(1−p) (inverted dropout), on in train mode, off in eval where the pass is plain full-strength — and the classic silent bug is leaving it on at eval, which makes predictions random. But dropout can't create missing data; the train-vs-validation gap, not the training loss, is the real test." Notice you can already say every piece of that.
+#### Why it really works: it's a cheap way to average many networks
+Here's the deeper reason, and it's beautiful. Every step, dropout switches off a *different* random set of neurons — so it's really training a slightly *different* network each time. Over thousands of steps, you've quietly trained a huge crowd of overlapping networks that all share the same weights. The old, expensive way to fight overfitting was to train *many* separate networks and average their answers — a so-called **[[ensemble||a crowd of models whose answers are averaged; averaging cancels out each model's private mistakes]]**. Averaging cancels each one's private mistakes, like asking a big crowd to guess and taking the average. Dropout gives you that ensemble magic for almost free, inside one network. That ancestry is *why* dropout works.
+
+#### The one knob, and the catch that makes it correct
+Dropout has a single dial: the **dropout rate `p`**, the fraction you switch off each step (a common choice is `p = 0.5` — bench half). Bigger `p` means stronger medicine. But there's a catch you have to get right, and it's where beginners trip. During training, if you drop half the neurons, only half the signal flows through — the total is *quieter* than it will be at test time when everyone's back. If you did nothing about that, the network would see one signal strength while practicing and a *different, louder* one when predicting, and it would misbehave. The fix is a small scaling. Watch the numbers line up:
+
+%%% mathladder
+title: why we scale by 1/(1−p) at training time
+words: dropping neurons makes the signal quieter; scale the survivors up so the average signal matches what test time will see
+formula: kept-signal is scaled by 1 / (1 − p)
+numbers: p = 0.5 → survivors ×(1/0.5) = ×2; so 4 neurons each worth 1, drop 2, keep 2 → 2×(1×2) = 4 — same total as all 4 kept
+sanity: at test time you keep ALL neurons and do NOT scale; because training already scaled up, the two settings now produce the same average signal
+%%%
+
+So the rule is a pair: **train time — randomly drop, and scale the survivors up by 1/(1−p); test time — keep everyone, no scaling.** Get that pair right and the model behaves identically whether dropout is on or off. Which raises the obvious question we tackle next: how does the code know *which* mode it's in?
+
+@@@ concept id=c7 tag="Train vs eval" title="The switch: dropout on for practice, off for real" gotit="Got the switch"
+Dropout must be **on** while the model practices and **off** when it makes real predictions. So the code needs a switch — one flip that says "we're practicing" versus "this is for real." Getting this switch wrong is the single most common dropout bug, and it's silent: nothing crashes, the predictions just quietly go wrong.
+
+**Think of a light dimmer with two labelled positions.** There's a "rehearsal" setting where the stage lights flicker on and off at random (that's practice — dropout on), and a "showtime" setting where every light is steady and full (that's the real performance — dropout off). Flick it to *rehearsal* and run the actual show, and the audience sees a flickering, random mess. **[[Train mode||model.train() — the setting where dropout is ON: neurons are randomly switched off each step]]** and **[[eval mode||model.eval() — the setting where dropout is OFF: every neuron is kept so predictions are steady and repeatable]]** are exactly those two positions. You call `model.train()` before practicing (dropout on) and `model.eval()` before predicting (dropout off). Flip the wrong one and your show flickers.
+
+%%% svg
+<svg viewBox="0 0 520 175" role="img" aria-label="A two-position switch drawn as a dimmer. Left position labeled train mode / rehearsal shows a network with some neurons flickering off and the words dropout ON. Right position labeled eval mode / showtime shows all neurons steady and lit with the words dropout OFF. A red warning shows the bug: switch stuck on rehearsal during the real show gives random, flickering predictions."><g font-family="monospace" font-size="9" text-anchor="middle"><rect x="25" y="28" width="220" height="115" rx="10" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.6"/><text x="135" y="48" fill="#8A6D3B" font-size="11">model.train()  — rehearsal</text><circle cx="90" cy="88" r="9" fill="#E8F5EE" stroke="#2D8B55"/><circle cx="135" cy="88" r="9" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="135" y="91" fill="#C93B3B">✕</text><circle cx="180" cy="88" r="9" fill="#eee" stroke="#bbb" stroke-dasharray="3 2"/><text x="180" y="91" fill="#C93B3B">✕</text><text x="135" y="122" fill="#8A6D3B" font-size="10">dropout ON (flickering)</text><rect x="275" y="28" width="220" height="115" rx="10" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.6"/><text x="385" y="48" fill="#1a5c38" font-size="11">model.eval()  — showtime</text><circle cx="340" cy="88" r="9" fill="#E8F5EE" stroke="#2D8B55"/><circle cx="385" cy="88" r="9" fill="#E8F5EE" stroke="#2D8B55"/><circle cx="430" cy="88" r="9" fill="#E8F5EE" stroke="#2D8B55"/><text x="385" y="122" fill="#1a5c38" font-size="10">dropout OFF (all steady)</text><text x="260" y="164" fill="#C93B3B">bug: run the real show in rehearsal mode → flickering, random predictions</text></g></svg>
+%%%
+
+**What the dimmer picture gets right:** it's one switch with two clear settings, and using the rehearsal setting for the real show gives a flickering, unreliable result. **Where it breaks down:** a stage dimmer only changes brightness; the mode switch changes *behavior* — it decides whether neurons get randomly zeroed at all, and (from the last concept) whether that 1/(1−p) scaling is applied.
+
+#### The silent bug, seen side by side
+Forgetting `model.eval()` doesn't throw an error. The model still runs — it just keeps randomly zeroing neurons while predicting, so the *same input* gives a *different* answer each time. Watch what "on" versus "off" does to one fixed prediction:
+
+%%% demo id=evalbug label="predict on vs off"
+code: x = same_image           # feed the identical picture three times
+code: # --- WRONG: forgot model.eval(), dropout still ON ---
+code: model.train(); [model(x) for _ in range(3)]
+code: # --- RIGHT: model.eval(), dropout OFF ---
+code: model.eval();  [model(x) for _ in range(3)]
+out: dropout ON  → [ "7", "1", "7" ]    # same image, different answers ⚠️
+out: dropout OFF → [ "7", "7", "7" ]    # steady, repeatable ✓
+take: <b>Same picture, different answers = the eval-mode bug.</b> With dropout left on, prediction is random and worse. `model.eval()` flips it off so predictions are steady and correct. Always switch to eval before you measure or deploy.
+%%%
+
+!!! c-warn ⚠️
+<b>The bug (silent):</b> leaving the model in train mode at prediction time keeps dropout ON, so predictions are noisy and worse — and nothing errors out. <b>The remedy:</b> call `model.eval()` before validating, testing, or deploying, and `model.train()` again before you resume practicing. Flip the switch every time you change what you're doing.
 !!!
+
+@@@ concept id=c8 tag="Reading the curves" title="Reading the curves like a doctor: four diagnoses" gotit="Got the diagnoses"
+You now have a dashboard and know its worst disease. The last skill is reading it like a doctor reads a chart — a handful of tell-tale patterns, each with a cause and a cure. This is the part that turns you from "ran a training loop" into "can fix a training loop." We'll add the readings one at a time, so each shape sinks in before the next.
+
+**Think of a nurse reading a patient's vital-signs monitor.** A steady falling fever means recovery. A line that won't budge means the medicine isn't working. A wild spike off the chart means an emergency. And "feels fine on paper but can't walk" means the chart wasn't telling the whole story. Your loss curves have the same readings — let's collect them one shape at a time, then see all four side by side.
+
+%%% svg
+<svg viewBox="0 0 520 120" role="img" aria-label="A nurse's vital-signs monitor with a heartbeat line, and a caption saying a loss curve is read the same way, by shape."><g font-family="monospace" font-size="9" text-anchor="middle"><rect x="20" y="18" width="480" height="70" rx="10" fill="#0f1720" stroke="#2D8B55" stroke-width="1.4"/><polyline points="35,60 90,60 105,35 120,80 140,52 200,52 215,30 230,78 250,55 320,55 340,25 360,82 380,58 470,58" fill="none" stroke="#39d98a" stroke-width="1.6"/><text x="260" y="106" fill="#6B645E" font-size="9">a loss curve is read like a vital sign — by its SHAPE, not one reading</text></g></svg>
+%%%
+
+**What the vital-signs picture gets right:** each pattern has one likely cause and one first move, so you diagnose by *shape* instead of guessing. **Where it breaks down:** a nurse has textbook thresholds; loss curves rarely give clean numbers — you read the *trend and the gap*, not an exact value.
+
+#### Reading 1 — healthy: both curves fall together
+The good news first. When training loss and validation loss slide **down together**, staying close, the model is genuinely learning. This is the shape you're aiming for — no action needed, keep going.
+
+%%% svg
+<svg viewBox="0 0 520 120" role="img" aria-label="Healthy diagnosis: a green training curve and a blue dashed validation curve both fall together from top-left toward the bottom-right, staying close. Labeled healthy, both fall together, no action needed."><g font-family="monospace" font-size="9" text-anchor="middle"><rect x="20" y="14" width="480" height="92" rx="8" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.4"/><text x="260" y="30" fill="#1a5c38" font-size="10">✓ HEALTHY — both curves fall together</text><polyline points="45,50 140,66 250,78 470,86" fill="none" stroke="#2D8B55" stroke-width="2"/><polyline points="45,54 140,70 250,82 470,90" fill="none" stroke="#4a6fa5" stroke-width="1.5" stroke-dasharray="3 2"/><text x="360" y="66" fill="#2D8B55" font-size="9">train ↓</text><text x="360" y="102" fill="#4a6fa5" font-size="9">validation ↓ (close behind)</text></g></svg>
+%%%
+
+That's the target. Now the three things that can go wrong — one reading at a time.
+
+#### Reading 2 — stuck and high: underfitting → raise the learning rate
+Sometimes both curves just **sit flat and high** and barely move. The model isn't improving even on the data it *can* see. That's **[[underfitting||the opposite of overfitting: the model is too weak or trained too little, so it does poorly even on the training data]]** — the model is too small, trained too little, or the **learning rate is too small** so each step barely nudges the weights. Here's the twist that trips people up: **dropout does NOT fix this.** Dropout fights *memorizing*; if the model isn't even memorizing yet, adding dropout only makes a too-weak model weaker. Cure: raise the learning rate, train longer, or grow the model. Watch a stuck run refuse to budge:
+
+%%% demo id=underfit label="a stuck run"
+code: # both losses barely move, epoch after epoch
+code: epoch:            1     2     3     4     5
+code: train_loss:      2.29  2.27  2.26  2.26  2.25
+code: validation_loss: 2.30  2.29  2.28  2.28  2.27
+out: train stays HIGH:      2.29 → 2.25   (flat)
+out: validation stays HIGH: 2.30 → 2.27   (flat)
+out: diagnosis: UNDERFITTING — dropout would NOT help
+take: <b>Flat and high on BOTH = underfitting.</b> The model barely learns even the training data. Cure: raise the learning rate, train longer, or grow the model — NOT dropout.
+%%%
+
+#### Reading 3 — shooting off the chart: diverging to NaN → lower the learning rate
+The opposite of stuck: the loss **blows up**, climbing fast and often landing on `NaN` (not-a-number, meaning the math overflowed). The cause is the mirror image of Reading 2 — the **learning rate is too large**, so each step overshoots so hard the numbers explode. Cure: **lower the learning rate.** Watch a run detonate:
+
+%%% demo id=diverge label="a diverging run"
+code: # learning rate far too big — each step overshoots harder
+code: epoch:        1      2       3        4       5
+code: train_loss:  2.3    9.8     140.0    8.7e6   NaN
+out: loss climbs:   2.3 → 9.8 → 140 → 8,700,000
+out: then overflows: → NaN  💥
+out: diagnosis: DIVERGING — learning rate too large
+take: <b>Loss shooting UP toward NaN = the learning rate is too big.</b> Each step overshoots and the numbers explode. Cure: lower the learning rate (a common first move: cut it by 10×).
+%%%
+
+#### Reading 4 — the overfitting bottom: early stopping
+Back to the disease you already know — overfitting, where training loss keeps falling but validation turns back up. Besides dropout, it has a second, dead-simple cure: **[[early stopping||just stop training at the point where validation loss stopped improving — the model was at its best there]]**. Literally stop at the epoch where the validation curve hit its lowest point, before the gap grew, and keep the model from *that* moment. Below, the run from before — the star marks where you should have stopped:
+
+%%% svg
+<svg viewBox="0 0 520 130" role="img" aria-label="Overfitting with an early-stopping marker. A green training curve keeps falling to the bottom-right. A blue validation curve falls, reaches a lowest point marked with a star labeled stop HERE, then turns back up. Everything after the star is shaded and labeled wasted / memorizing."><g font-family="monospace" font-size="9" text-anchor="middle"><rect x="20" y="14" width="480" height="102" rx="8" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.4"/><text x="260" y="30" fill="#8A6D3B" font-size="10">⚠ OVERFIT — early stopping: keep the model at the validation bottom</text><path d="M45 46 L140 62 L240 80 L470 96" fill="none" stroke="#2D8B55" stroke-width="2"/><path d="M45 50 L140 66 L235 78 L320 84 L470 104" fill="none" stroke="#4a6fa5" stroke-width="1.8"/><rect x="235" y="40" width="235" height="70" fill="#C93B3B" opacity="0.06"/><line x1="235" y1="40" x2="235" y2="110" stroke="#C93B3B" stroke-width="0.8" stroke-dasharray="3 3"/><text x="235" y="76" fill="#C93B3B" font-size="13">★</text><text x="205" y="102" fill="#C93B3B" font-size="9">stop HERE</text><text x="380" y="60" fill="#C93B3B" font-size="9">everything after = wasted (memorizing)</text></g></svg>
+%%%
+
+#### All four readings, side by side
+Now that you've met each shape on its own, here they are on one chart — this is the picture to keep. Glance at the shape, name the diagnosis, reach for the cure:
+
+%%% svg
+<svg viewBox="0 0 520 210" role="img" aria-label="A 2 by 2 chart of four loss-curve diagnoses. Top-left healthy: both curves fall together. Top-right overfitting: train falls but validation rises. Bottom-left stuck/underfitting: both curves stay flat and high. Bottom-right diverging: the curve shoots up off the chart to NaN."><g font-family="monospace" font-size="8.5" text-anchor="middle"><rect x="20" y="18" width="235" height="85" rx="6" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.3"/><text x="137" y="32" fill="#1a5c38" font-size="9">✓ HEALTHY — both fall together</text><polyline points="35,48 90,62 150,74 240,82" fill="none" stroke="#2D8B55" stroke-width="1.8"/><polyline points="35,52 90,66 150,79 240,88" fill="none" stroke="#4a6fa5" stroke-width="1.4" stroke-dasharray="3 2"/><rect x="265" y="18" width="235" height="85" rx="6" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.3"/><text x="382" y="32" fill="#8A6D3B" font-size="9">⚠ OVERFIT — cure: dropout / stop early</text><polyline points="280,48 330,62 400,78 490,92" fill="none" stroke="#2D8B55" stroke-width="1.8"/><polyline points="280,52 330,64 380,66 440,80 490,94" fill="none" stroke="#C99A12" stroke-width="1.6"/><rect x="20" y="113" width="235" height="85" rx="6" fill="#F0EFEC" stroke="#8a857c" stroke-width="1.3"/><text x="137" y="127" fill="#5c584f" font-size="9">— STUCK / UNDERFIT — raise LR / grow model</text><polyline points="35,150 100,149 170,151 240,150" fill="none" stroke="#8a857c" stroke-width="1.8"/><text x="137" y="185" fill="#5c584f">flat &amp; high on BOTH</text><rect x="265" y="113" width="235" height="85" rx="6" fill="#FDE8E8" stroke="#C93B3B" stroke-width="1.3"/><text x="382" y="127" fill="#C93B3B" font-size="9">✕ DIVERGING (NaN) — lower LR</text><polyline points="280,190 330,180 370,150 400,110 415,120" fill="none" stroke="#C93B3B" stroke-width="1.8"/><text x="450" y="150" fill="#C93B3B">→ ∞</text></g></svg>
+%%%
+
+#### The honest limits — hold these two
+Two truths to carry out of today, because they keep you humble:
+
+!!! c-info 🎯
+<b>1. A low loss number alone does NOT prove a good model.</b> The loss only measures the examples you scored. A tiny *training* loss can hide a memorizer; you can only trust a model after checking its *held-out* loss — and even that is a proxy for real-world quality, not a guarantee. <br><b>2. Dropout is not free.</b> Because it hides neurons each step, the network learns more slowly (it needs more epochs), and if a model already generalizes fine, adding dropout can *hurt* — you'd be treating a disease it doesn't have. Reach for dropout when you actually see the overfitting gap, not by reflex.
+!!!
+
+That's the full toolkit: measure honestly, read the curves, and apply the right cure. Let's gather the whole day onto one page.
+
+@@@ concept id=c9 tag="Recap" title="Today in one page" gotit="Got the recap"
+Take a breath — you just learned to read a model's honesty. Here's the whole day in one picture. Follow the arc left to right: a guess becomes one **loss** number, training pushes the *average* loss **down**, but the number that matters is the **held-out** loss — because a model can **overfit** (memorize), which **dropout** cures at train time and **eval mode** turns off at test time.
+
+%%% svg
+<svg viewBox="0 0 520 235" role="img" aria-label="A one-page recap of the day. Top row: a guess becomes a loss number (a golf gap), MSE for numbers and cross-entropy for categories. Middle: a two-curve dashboard where training loss falls but validation is the honest score, and when they split it is overfitting. Bottom: dropout benches random neurons at train time to cure it, the train/eval switch turns it off for real predictions, and a reminder that low loss alone is not proof."><g font-family="monospace" font-size="8.5" text-anchor="middle"><text x="260" y="15" fill="#6B645E" font-size="10">guess → measure the gap → one LOSS number → push its AVERAGE down</text><rect x="35" y="26" width="210" height="34" rx="5" fill="#E8F5EE" stroke="#2D8B55" stroke-width="1.3"/><text x="140" y="41" fill="#1a5c38">MSE — for numbers</text><text x="140" y="54" fill="#6B645E">square the gap (regression)</text><rect x="275" y="26" width="210" height="34" rx="5" fill="#FDF3E8" stroke="#C99A12" stroke-width="1.3"/><text x="380" y="41" fill="#8A6D3B">cross-entropy — for categories</text><text x="380" y="54" fill="#6B645E">−log(p); hates confident+wrong</text><line x1="55" y1="78" x2="55" y2="140" stroke="#6B645E" stroke-width="1"/><line x1="55" y1="140" x2="270" y2="140" stroke="#6B645E" stroke-width="1"/><polyline points="60,84 100,104 150,120 210,132 265,136" fill="none" stroke="#2D8B55" stroke-width="1.6"/><polyline points="60,88 100,108 150,116 200,124 240,132 265,138" fill="none" stroke="#C99A12" stroke-width="1.4"/><text x="150" y="156" fill="#6B645E">train ↓ vs VALIDATION (the honest score)</text><text x="150" y="168" fill="#C93B3B">curves SPLIT = overfitting</text><rect x="290" y="78" width="200" height="62" rx="6" fill="#EDE9F8" stroke="#7C6DAA" stroke-width="1.3"/><text x="390" y="94" fill="#5E5191">CURE · dropout</text><text x="390" y="108" fill="#6B645E">bench random neurons each step</text><text x="390" y="121" fill="#6B645E">= cheap ensemble; scale ×1/(1−p)</text><text x="390" y="134" fill="#6B645E">also: early stopping</text><line x1="20" y1="182" x2="500" y2="182" stroke="#E5DDD0" stroke-width="1"/><text x="105" y="200" fill="#2D8B55">train() = dropout ON</text><text x="260" y="200" fill="#1a5c38">eval() = dropout OFF (real)</text><text x="425" y="200" fill="#C93B3B">low loss ≠ good model</text><text x="150" y="220" fill="#8a857c">flat+high = underfit → raise LR/grow</text><text x="390" y="220" fill="#C93B3B">→ NaN = LR too big → lower LR</text></g></svg>
+%%%
+
+**Where the golf/exam pictures finally break down:** a golfer reads one gap and a student takes one exam, but a model juggles all of this at once across thousands of tiny nudges — pushing a loss down, watching two curves, benching random neurons, flipping a mode switch — and that machinery running together is what lets it learn things no person hand-tuned. Keep the two cheat-sheets below as your map back into today.
+
+#### Cheat-sheet · the ideas, failures, and cures
+%%% table
+:: Piece / failure :: In one line :: Remember
+loss :: one number for how wrong a guess is :: smaller = better; it's what training shrinks
+MSE :: average of squared gaps :: use for numbers (regression); big misses hurt most
+cross-entropy :: −log(p) on the true class :: use for categories; explodes on confident+wrong
+average loss :: mean over the data, not one batch :: the calm number you plot per epoch
+validation (held-out) loss :: score on data never trained on :: THE number that matters, not train loss
+overfitting :: memorizes training noise (too much capacity) :: symptom = train ↓ while validation ↑
+dropout :: bench random neurons each step :: headline cure; cheap ensemble; only at train time
+1/(1−p) scaling :: scale survivors up while training :: so train and test see the same signal
+train() vs eval() :: switch: dropout ON vs OFF :: eval() before predicting — or predictions flicker
+early stopping :: stop where validation bottomed :: second, simplest cure for overfitting
+underfitting :: flat+high on BOTH curves :: too small / too little; dropout does NOT fix it
+loss stuck :: barely moves :: cause: LR too small → raise it (or grow model)
+loss → NaN :: shoots off the chart :: cause: LR too large → lower it
+low loss alone :: proves nothing about new data :: check held-out; dropout isn't free
+%%%
+
+#### Cheat-sheet · the words you met today
+%%% jargon
+loss | one number for how far a guess landed from the right answer — smaller is better
+MSE (mean squared error) | average of the squared gaps — the loss for number answers (regression)
+cross-entropy | −log(p) on the true class — the loss for category answers; punishes confident-and-wrong hardest
+softmax | turns raw scores into probabilities that are positive and add up to 1 (paired with cross-entropy)
+average loss | the mean loss over the data — the steady number you push down each epoch
+epoch | one full pass through all the training data
+training set | the examples the model practices on
+validation (held-out) set | examples the model never trains on — the honest test of real learning
+overfitting | memorizing the training examples (even their noise) instead of the pattern
+dropout | randomly switch off a fraction of neurons each training step so none becomes a crutch
+dropout rate p | the fraction switched off each step — bigger = stronger regularization
+ensemble | a crowd of models whose answers are averaged; dropout fakes this cheaply
+train mode / model.train() | dropout ON — the practice setting
+eval mode / model.eval() | dropout OFF — the real-prediction setting
+early stopping | halt training at the epoch where validation loss stopped improving
+underfitting | model too weak or trained too little — does poorly even on the training data
+%%%
+
+That's the whole day. Tomorrow you rebuild this exact model in **PyTorch**, where `loss`, `model.train()`, `model.eval()`, and `Dropout` are all one-line tools you now understand from the inside.
 
 @@@ quiz id=quiz tag="Quiz" title="Click an answer — instant feedback on each" gotit="answer all four first"
-Four quick questions, with instant feedback on each — answer all four to complete today. (If one trips you up, that's a cue to scroll back, not a failing grade.)
+Four quick questions, with instant feedback on each. If one trips you up, that's just a cue to scroll back up — not a grade, and definitely not a failure. Getting one wrong is how the ideas actually stick.
 %%% quiz
-q: What is the loss, in one line? | a:2 | the number of neurons in the model | how fast the model runs | one number measuring how wrong the model's guesses are | the number of training examples | fb: The loss is a single wrongness score — low means the guesses were close, high means far off. It's the number the training loop pushes down.
-q: Why is cross-entropy the go-to loss for classification? | a:1 | it is the fastest loss to compute | it punishes confident-and-wrong guesses much harder than unsure ones, giving a strong learning signal | it never overfits | it works only on images | fb: Cross-entropy is −log(p) on the true class, so a confident wrong answer (tiny p on the right class) gets a huge penalty — a strong signal to fix the model's worst habits.
-q: Training loss keeps falling but validation loss has turned upward. What's happening, and what do you reach for? | a:2 | the model has converged and you're done | the GPU is out of memory | the model is overfitting — memorizing the training set — so you reach for dropout (or another regularizer) | the learning rate is too small | fb: Training-down-while-validation-up is the signature of overfitting: too much capacity memorizing noise. Dropout is the classic cure — randomly zero a fraction of neurons each step so no neuron becomes a crutch.
-q: You add dropout, train, and evaluate — but your test accuracy jumps around by a percent or two every time you re-run on the SAME data. Most likely cause and fix? | a:1 | dropout is always broken; remove it | you forgot to switch to eval mode, so dropout is still randomly zeroing neurons at test time — switching to eval turns it off and makes predictions stable | your dataset is too small; add data | cross-entropy is the wrong loss; use accuracy instead | fb: Dropout must be OFF at test time. Left on, it randomly drops neurons while predicting, so the same input gives different answers each run. Switching to eval mode uses all neurons in a plain full-strength pass (the 1/(1−p) scaling already happened during training), giving a stable number.
+q: Your model predicts a digit and puts 99% on "1" — but the true answer is "7". Which loss punishes this the HARDEST, and why? | a:1 | MSE, because it squares the gap | Cross-entropy, because it explodes when the model is confident and wrong | Neither — 99% is a great guess | Both punish it equally | fb: Cross-entropy is −log(p) on the TRUE class. Here p(true)=p(7) is tiny, so the loss is huge. That steep punishment for being confident-and-wrong is exactly why cross-entropy is the go-to loss for categories.
+q: Over many epochs your TRAINING loss keeps falling toward zero, but your VALIDATION loss bottomed out and is now rising. What is happening? | a:2 | The model is underfitting | The learning rate is too large | The model is overfitting — memorizing training noise instead of learning the pattern | Training is finished and the model is great | fb: Train ↓ while validation ↑ is the classic overfitting signature. The growing gap means it's memorizing the training set. The best model was at the bottom of the validation curve — cures: dropout, or early stopping there.
+q: Why is dropout switched ON during training but OFF (with all neurons kept) when the model makes real predictions? | a:2 | It's a bug — dropout should always be on | Dropout is only for speed | Dropping neurons forces the network not to rely on any one unit while learning; at prediction time you want the full, steady network, and the 1/(1−p) train-time scaling makes the two agree | Turning it off saves memory | fb: On during training = the ensemble/anti-crutch effect. Off at test = steady, repeatable predictions. Training already scales survivors by 1/(1−p), so keeping everyone at test time gives the same average signal. Flip to eval mode with model.eval().
+q: Your loss sits flat and HIGH on BOTH the training and validation curves and barely moves. Will adding dropout fix it? | a:1 | Yes — dropout always helps | No — this is underfitting (too small / LR too low / trained too little); dropout fights memorizing, so it would only make a too-weak model weaker | Yes, if you set p = 0.9 | No, you must switch to MSE | fb: Flat-and-high on BOTH curves is underfitting, the opposite of overfitting. Dropout cures memorizing; there's no memorizing here. The real fixes are raising the learning rate, training longer, or growing the model.
 %%%
 
-@@@ produce id=produce tag="Produce" title="Predict the overfitting turn, then watch dropout fight it" gotit="Done"
-Understanding is not the same as being able to write it. Train for real, plot the two loss curves, and add dropout yourself — that's what makes it stick. **Before you write any code, predict three things:** (1) will the *validation* loss keep falling forever, or turn upward at some epoch? (2) when you add dropout, does the *training* loss get lower or higher, and does the train-vs-validation gap get wider or narrower? (3) if you leave dropout ON at eval, will accuracy on the same data be stable or noisy across re-runs? Write your guesses, then find out. Pick one path.
+@@@ produce id=produce tag="Produce" title="Predict the two curves, then run it and watch them split" gotit="Done"
+Now it's your turn to *see* overfitting happen and then cure it with your own hands. Watching the validation curve peel away from the training curve — and then watching dropout pull it back — is what makes today truly stick.
+
+**Before you write any code, make three predictions.** Guessing first is what turns "I watched it" into "I understand it," so don't skip this:
+
+1. If you train a big model on a *small* dataset for many epochs with NO dropout, what will the training loss and the validation loss each do?
+2. When the two curves split, which one keeps falling and which one turns back up?
+3. After you add dropout, will the *gap* between the two curves get bigger or smaller?
+
+Write your three guesses down. Then run it and **watch** whether you were right. Pick one path.
 
 #### Option A · write it yourself
-Create `sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`. Train your MNIST MLP with cross-entropy loss for enough epochs to reveal overfitting; each epoch, record and print both the **training loss** and the **validation loss** (on a held-out split), and **notice** the epoch where validation loss turns upward — that's the overfitting turn. Then add dropout (`p = 0.5`) after the hidden layer — on during training with the `1/(1−p)` scaling on the survivors, off at eval (a plain full-strength pass) — and re-run. **Watch** the train-vs-validation gap shrink and the final held-out accuracy hold or improve. As a bonus, leave dropout ON at eval and **observe** the accuracy jump around across repeated runs on the same data. Run with `python3 sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`.
+Create `sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`. Take your Day 3 mini-batch loop and split the data into a training set and a held-out **validation** set. Each epoch, record BOTH the average training loss and the average validation loss (remember to switch to eval mode — dropout off — before scoring validation). Train a deliberately over-powered model on a small slice with **no dropout** and watch the two curves **split** — training loss diving while validation loss turns back up (that's overfitting). Then add a dropout layer (`p = 0.5`, on only in train mode, off in eval mode) and re-run: the validation curve should stay lower for longer. Run with `python3 sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`.
 
 #### Option B · let Claude build it, then read it
 Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
@@ -306,22 +387,27 @@ Copy the prompt below back into Claude Code. It triggers the <b>frontier-experim
 %%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
 Use /frontier-experiment-lab to build my Module 5 Day 4 artifact.
 
-Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py that, with a comment on each step:
-1. Trains the MNIST MLP with cross-entropy loss for enough epochs to reveal overfitting; records train and validation loss each epoch on a held-out split and prints both. Print the epoch where validation loss turns upward (the overfitting turn).
-2. Adds dropout with p=0.5 after the hidden layer: during training draw a random 0/1 mask and scale the survivors by 1/(1-p) (inverted dropout); at eval disable dropout entirely and run a plain full-strength pass with no extra scaling.
-3. Re-trains and compares: show the train-vs-validation gap shrinks and final held-out accuracy holds or improves with dropout.
-4. Bonus: leave dropout ON at eval and show accuracy becomes noisy across repeated runs on the same fixed data, then confirm eval mode makes it stable.
-Then run it and paste the with/without-dropout held-out accuracies at the bottom as a comment.
+Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py that, with a comment on each step, demonstrates the loss, overfitting, and dropout:
+1. Split the data into a TRAINING set and a held-out VALIDATION set (e.g. 80/20). Use a deliberately small training slice so overfitting shows up fast.
+2. Use cross-entropy as the classification loss. Each epoch, record the AVERAGE training loss AND the average validation loss. Before scoring validation, switch to eval mode (dropout OFF); switch back to train mode before the next epoch.
+3. Run A — NO dropout, an over-powered model, many epochs: print both losses per epoch and point out the epoch where the validation loss stops falling and turns UP while the training loss keeps diving (this is overfitting).
+4. Run B — add a dropout layer (p = 0.5, applied only in train mode, and remember the 1/(1-p) scaling so train and test signals match): re-run and show the validation loss stays lower for longer / the train-vs-validation gap is smaller.
+5. Add a tiny sanity demo: feed the SAME input through the model twice with dropout left ON vs with eval mode ON, and show the ON version gives different answers each time while eval mode is steady — the model.eval() bug.
+6. End with a printed reminder: a low TRAINING loss alone does not prove a good model — the held-out loss is the honest number, and dropout is not free (slower to train, can hurt an already-generalizing model).
+Then run it and paste the per-epoch train/validation losses (Run A vs Run B) at the bottom as a comment.
 %%%
 
-#### What you should see (check your predictions)
-- Without dropout: the training loss keeps falling, but the validation loss bottoms out and then rises — that's the overfitting turn you predicted (or didn't).
-- With dropout: the training loss falls a bit *slower* (dropout makes practice harder on purpose), but the train-vs-validation gap narrows and validation loss stays lower for longer. Did you predict both effects?
-- Dropout left ON at eval makes accuracy jump around by a percent or two each run on the same data; switch to eval mode and it's rock-steady. Was your stability guess right?
-- The one thing to carry forward: the *validation* line, not the training line, told you the truth. A falling training loss alone never proved a thing.
+#### What you should see (check your prediction)
+Here's what to look for when it runs:
+
+- **Run A (no dropout):** the **training loss dives toward zero** while the **validation loss bottoms out and turns back up** — the two curves visibly split. Did you predict which one rose?
+- **The gap:** the growing distance between the curves *is* overfitting, drawn live. The best model was at the bottom of the validation curve, not at the end.
+- **Run B (with dropout):** the validation curve stays lower for longer and the gap shrinks — dropout working. Did you guess the gap would get smaller?
+- **The eval-mode demo:** the same picture gives different answers with dropout left on, and steady answers in eval mode. That's the silent bug you now know to avoid.
+- **The thing worth sitting with:** a tiny training loss felt like winning in Run A — and it was hiding a model that memorized. The *held-out* loss is the only honest scorecard. That honesty is the whole point of today.
 
 !!! c-info 📓
-<b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in `sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md`: (1) the epoch where your validation loss turned upward; (2) your held-out accuracy with vs. without dropout; (3) one thing you're still unsure about.
+<b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in `sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md`: (1) what a loss is, and how MSE and cross-entropy differ, one sentence each; (2) how you SPOT overfitting on the two curves, and its two cures; (3) why dropout is on at train time but off (with model.eval()) at test time.
 !!!
 
 @@@ fin
