@@ -16,13 +16,23 @@ Your job is to make the learner want to continue while still building staff-leve
 
 No formula before felt intuition.
 
+The opening (hero) leads with a **concrete everyday analogy** — a physical thing the reader has done — before any aspiration or relevance line.
+
+Math restraint: heavy or multi-step math goes in an **optional, skippable box**; the main flow carries intuition + a picture + an analogy, and any main-flow formula is one line, narrated in words.
+
+Visualize the build-up: a heavy or multi-step build-up (worked example, derivation, numeric ladder, matrix/shape change, or math demoted to an optional box) is itself SHOWN in a picture — a **second figure, a run-demo, or a math ladder** — not left as text + equations under only the opening analogy visual. Humans read a graph far faster than a paragraph.
+
+Draw the analogy: each concept's OPENING visual ILLUSTRATES the everyday analogy itself — a picture of the concrete thing (a one-way valve, a dimmer, a see-saw, a pizza sliced into shares, a weather forecaster) — so the *meaning* lands before any math. The equation/mechanism picture comes AFTER, in the build-up. A concept whose opening picture is the math (a curve, an axis plot, an equation) while the analogy lives only in words has it backwards.
+
+Jargon is glossed **define-before-use, inline** — never a front-loaded wall. The cheat-sheet + a one-page recap live at the END.
+
 No checklist before invitation in foundation lessons.
 
 No decorative analogy. Use a narrative spine.
 
 ## Beginner Intuition Register (per concept — the notebook's tone)
 
-Match the register of a strong beginner notebook: warm, plain-language, analogy-first, heavy on *why*. A staff-depth lesson is NOT an excuse to go straight into mechanism — the intuition layer must carry every concept, not just the hero. This is the difference between "correct but cold" and a lesson a beginner actually wants to read. The eval gate for this is the **beginner-friendliness judge** (`coverage_judge.py` tone axis), which grades the lesson against the notebook on warmth / analogy_quality / intuition_depth / plain_language / curiosity / pace — drive it to MATCHES_NOTEBOOK.
+Match the register of a strong beginner notebook: warm, plain-language, analogy-first, heavy on *why*. A staff-depth lesson is NOT an excuse to go straight into mechanism — the intuition layer must carry every concept, not just the hero. This is the difference between "correct but cold" and a lesson a beginner actually wants to read. The eval gate for this is the **beginner-friendliness judge** (`coverage_judge.py` tone axis), which grades the lesson against the notebook on warmth / analogy_quality (incl. the opening hook) / intuition_depth / math_restraint / plain_language / progressive_disclosure / curiosity / pace — drive it to MATCHES_NOTEBOOK.
 
 Every concept unit opens with **felt intuition before any formula, range, or notation**, in this order:
 
@@ -47,7 +57,7 @@ Every concept unit opens with **felt intuition before any formula, range, or not
 
 **Plain language & pace:**
 - Short sentences, one idea each. Break run-ons. Active voice. No idioms.
-- Front-load a Jargon Ladder (`%%% jargon`) glossing every scary term the day uses (saturation, sparsity, XOR, …) BEFORE those terms appear — mirror the notebook's Jargon Buster.
+- Introduce each term define-before-use with an inline `[[term||plain gloss]]` the FIRST time it appears — NOT a front-loaded jargon wall the reader hits before any intuition. Collect the full glossary as a reference cheat-sheet in the CLOSING recap unit (see the Recap Rule), not at the top. (This reverses the old "front-load a Jargon Ladder" rule, per direct user review 2026-07-20 — the inline `[[term||…]]` glosses ARE the define-before-use mechanism.)
 - Let ideas breathe: a short recap or a one-line "so far…" between big concepts; don't pour them out in one stream.
 
 Mark **P0 (intuition-inverted)** if a concept opens with a formula, a range like `(0,1)`, `max(0,z)`, or notation before the felt picture; if a concept is all mechanism with no analogy and no "why"; if an analogy is given WITHOUT its "where it breaks down" beat; or if the dominant voice is interview/textbook rather than warm-beginner. The inline visual anchors the *intuition*, not the algebra. See repo `CLAUDE.md` §5 (analogy scaffold, simple words, no idioms) and §7 (curiosity hook, normalize confusion, victory laps).
@@ -97,6 +107,7 @@ Mark P0 if:
 - artifact feels like homework before curiosity.
 - a concept unit that introduces a visual object (curve, distribution, boundary, shape) but is text-only (no inline visual),
 - a concept's picture deferred to a later unit, or all visuals dumped in one late "build" section.
+- a concept with a HEAVY or multi-step build-up (worked example, derivation, numeric ladder, matrix/shape change, or math demoted to an "Optional (skippable)" box) that is NOT itself visualized — left as text + equations under only the opening analogy figure (violates the Visualize-the-Build-Up Rule).
 
 Mark seed-stabilization P1 if this issue exists in a seed module and is likely to be copied forward.
 
@@ -134,34 +145,64 @@ Reordering reader flow is moving a block, not splicing HTML. Do not hand-edit `l
 
 A lesson body is a sequence of **concept units**, not a fixed template. Author `source.md` (mode: concept) as:
 
-    hero (curiosity hook)
+    hero (curiosity hook — a concrete everyday analogy)
     → concept unit 1  (plain-words intro → its OWN inline visual → build-up)
     → concept unit 2  (…)
     → … as many concept units as the topic needs
+    → recap unit  (tag="Recap"; day summary in a few beats + reference cheat-sheet + its own visual)
     quiz (one section, all questions)
     produce (discovery artifact)
     fin
 
-Each concept unit MUST carry its own inline visual, placed immediately after the intro and before the build-up. Never defer a concept's picture to a later unit or to one shared "build" section. Front-load a jargon gloss; introduce each term defined-before-use. Keep the narrative spine word running through hero + most concepts.
+Each concept unit MUST carry its own inline visual, placed immediately after the intro and before the build-up. Never defer a concept's picture to a later unit or to one shared "build" section. Introduce each term define-before-use with an inline `[[term||gloss]]` — NOT a front-loaded jargon wall — and end with a recap unit that holds the cheat-sheet (see the Jargon Rule + Recap Rule). Keep the narrative spine word running through hero + most concepts.
 
 WITHIN a single concept unit, order the beats like this (this is unit-level ordering, not fixed body sections):
 
 ```text
-plain-words intro → inline visual (its own) → worked example → mechanism →
-frontier payoff → failure/misconception → build-up
+plain-words intro → opening inline visual that DRAWS THE ANALOGY (the everyday object
+itself — anchors the intuition) → worked example → mechanism (+ a BUILD-UP visual that
+DRAWS the transformation/worked-example/ladder) → frontier payoff → failure/misconception → build-up
 ```
 
-## Jargon Ladder Rule
+## Draw the Analogy Rule
 
-Front-load a plain-English gloss of every term used today.
+Every concept states an everyday analogy in words; **also draw it.** The concept's OPENING visual (the intuition anchor, beat 2) must ILLUSTRATE THE ANALOGY OBJECT ITSELF — a picture of the concrete thing the analogy names — so the reader sees the *meaning* before any math:
 
-Then introduce each term once, defined-before-use. No term appears before its gloss.
+- ReLU → a **one-way valve** (positives flow, negatives blocked); sigmoid → a **dimmer knob**; tanh → a **see-saw**; linear collapse → a **ruler / two straight rulers**; softmax → a **pizza sliced into shares**; forward pass → an **assembly-line conveyor**; MSE → a **golf score / dartboard**; cross-entropy → a **weather forecaster's surprise**; dead ReLU → a **jammed valve**; XOR → a **rope that can't split the room**.
 
-This is the checkable form of "no formula before felt intuition."
+Draw the object with labelled parts (a beginner should look and think "oh — it's like a ___"), NOT the equation, a bare axis plot, or a curve — that math picture is the *mechanism* visual and belongs in the build-up (see the Visualize the Build-Up Rule). So a full concept typically carries the analogy picture FIRST, then the math/interactive picture. Interactive explorable widgets (drag/slide) are the gold standard for the mechanism visual; keep the analogy picture as the anchor before it.
+
+Checkable form: the Concept-Structure Judge's `analogy` axis grades GOOD only when the analogy is DRAWN (opening visual pictures the everyday object) — an analogy carried only in words while the opening visual jumps to the math is WEAK (a P0 in the build loop, since analogy WEAK/MISSING gates).
+
+## Visualize the Build-Up Rule
+
+The opening inline visual anchors the concept's *opening intuition* only — it does NOT discharge the duty to visualize the *build-up*. Whenever a concept's build-up is heavy or multi-step — a worked numeric example, a derivation, a growth/decay ladder (e.g. the `0.25×0.25×…` vanishing-signal fade), a matrix/shape transformation, a multi-symbol formula, or anything demoted into an "Optional (skippable)" box — that build-up MUST itself be SHOWN in a picture placed at the build-up (after the opening visual):
+
+- a **second `%%% svg`** that draws the transformation itself — the shape/curve/value changing as each term is added; a **before→after in ONE figure** when a step fixes a problem (CLAUDE.md §6 rule 4);
+- a **`%%% demo`** whose printed `out:` makes the numeric build-up watchable (predict-then-run);
+- a draggable **`%%% viz`**, or a **`%%% mathladder`** (words→formula→numbers→sanity).
+
+Humans read a graph far faster than a paragraph of algebra — bias toward MORE visuals: graph every transformation you ask the reader to follow, prefer a per-step figure that assembles left-to-right over one busy final diagram, and never leave a numeric ladder or worked example as monospace text when an SVG of bars/curves would let the reader SEE it. Match the notebook yardstick, which plots in about half its code cells. Net: a concept with a real build-up ships **at least two** visual elements (opening anchor + build-up figure); a light/definitional concept needs only its one opening visual, and is never penalized for it.
+
+Checkable form: the **Concept-Structure Judge**'s `buildup_visualized` axis (in `coverage_judge.py`) grades this — MISSING (heavy build-up, no build-up visual) is a **P0** in the build loop, WEAK is P1, and a LIGHT build-up returns NA (never penalized). The deterministic `concept_structure_gate.py` adds an offline advisory warn keyed off `%%% mathladder` / "Optional (skippable)" boxes.
+
+## Jargon Rule (define-before-use inline; cheat-sheet at the bottom)
+
+Introduce each term the first time it appears, define-before-use, with an inline `[[term||plain gloss]]`. No term appears before its gloss.
+
+Do NOT front-load a `%%% jargon` wall in the first concept — a screen of definitions before any intuition overwhelms a beginner (direct user review 2026-07-20). Collect the full glossary as a reference **cheat-sheet in the closing recap unit** instead.
+
+Checkable form: the reader_flow gate HARD-FAILS a `%%% jargon` block in the first concept unit; the tone judge grades `progressive_disclosure`.
+
+## Recap Rule
+
+Every lesson ends with a one-page **recap unit** — the FINAL `@@@ concept` before the quiz, `tag="Recap"`. It gathers the day in a few beats (the arc, not new material), PLUS a reference cheat-sheet: a `%%% jargon` glossary and/or a `%%% table`, and its own recap visual. This is the "recap everything we learned today" the reader comes back to.
+
+Checkable form: the reader_flow gate HARD-FAILS if the final concept is not a recap (recognized by a recap-ish `tag`/`title` — recap|summary|cheat-sheet|review|… — or a `%%% jargon` cheat-sheet in the last unit).
 
 ## Curiosity-before-Rigor Rule
 
-First contact is wonder — never a definition or a prerequisites checklist.
+First contact is wonder, grounded in a **concrete everyday analogy** — a physical thing the reader has done (drawing a face with a ruler, a light switch, a see-saw) — never a definition, a bare aspiration, or a prerequisites checklist. Ground in the everyday picture FIRST, then connect it to something exciting (e.g. "this is the trick behind ChatGPT").
 
 Prerequisites read as "just curiosity."
 

@@ -17,7 +17,8 @@
 #   python3 sessions/_compiler/compile_lesson.py <source.md>
 #       [--donor <html>] [--out <html>] [--check-only] [--quiet]
 #   exit 0 = compiled + gates pass ; 2 = reader-flow gate failed (nothing written)
-#          ; 3 = shell-invariant gate failed ; 1 = usage / parse error
+#          ; 3 = shell-invariant gate failed ; 4 = visual integrity failed
+#          ; 1 = usage / parse error
 # =============================================================================
 import sys, os, argparse
 
@@ -53,6 +54,7 @@ def main():
     log('   donor:', os.path.relpath(donor_path), '| mode:', meta.get('mode'))
 
     concept_mode = (meta.get('mode') == 'concept')
+    vok = True   # Visual Integrity Gate result (concept mode only; True in V8 branch)
 
     # -- Reader Flow Gate (source) : block write on failure --
     rok, rmsgs = reader_flow_gate.run(meta, blocks)
@@ -88,6 +90,19 @@ def main():
             for m in cmsgs: log('  ', m)
         except Exception as e:
             log('   coverage gate skipped:', e)
+        # -- Visual Integrity Gate (HARD) : block a visual that would render blank --
+        # Catches viz embeds whose file/JS-dep is missing, whose height-sender
+        # protocol drifted, or inline SVGs that draw nothing — the "compiles green
+        # but renders blank" hole concept_shell_gate can't see. Cannot verify pixels
+        # (no browser); a nested file:// iframe may still be blocked by the browser
+        # regardless (serve over http to view) — that residual is out of scope here.
+        try:
+            import visual_integrity_gate
+            vok, vmsgs = visual_integrity_gate.run(os.path.abspath(args.source), donor_path=donor_path)
+            log('\n-- Visual Integrity Gate --')
+            for m in vmsgs: log('  ', m)
+        except Exception as e:
+            log('   visual integrity gate skipped:', e)
     else:
         sok, smsgs = shell_invariant_gate.run(html, meta, donor=donor)
         log('\n-- Shell Invariant Gate (output vs donor) --')
@@ -102,6 +117,8 @@ def main():
 
     if not sok:
         log('\n%s FAILED.' % ('Concept Shell Gate' if concept_mode else 'Shell Invariant Gate')); sys.exit(3)
+    if not vok:
+        log('\nVisual Integrity Gate FAILED — a visual would render blank at runtime.'); sys.exit(4)
     log('\nOK — compiled and all gates pass.')
 
 

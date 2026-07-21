@@ -66,9 +66,17 @@ def inline(t):
     t = re.sub(r'\[\[(.+?)\|\|(.+?)\]\]',
                lambda m: '<span class="term" data-tip="%s">%s</span>' % (attr_esc(m.group(2)), m.group(1)),
                t)
-    t = re.sub(r'`([^`]+)`', r'<code>\1</code>', t)
+    # Protect `code` spans: stash them behind placeholders so later inline rules
+    # (** bold, * em) can never reach INTO code — e.g. `(x-y)**2` must not start a
+    # <strong> that runs to the next ** elsewhere in the paragraph.
+    _code = []
+    def _stash(m):
+        _code.append('<code>%s</code>' % m.group(1))
+        return '\x00%d\x00' % (len(_code) - 1)
+    t = re.sub(r'`([^`]+)`', _stash, t)
     t = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'<em>\1</em>', t)
+    t = re.sub(r'\x00(\d+)\x00', lambda m: _code[int(m.group(1))], t)
     return t
 
 # ---------------------------------------------------------------------------

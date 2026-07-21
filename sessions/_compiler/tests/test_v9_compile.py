@@ -12,16 +12,16 @@ def _compile_mini():
 
 def test_concept_mode_assembles_all_sections():
     html, _ = _compile_mini()
-    assert html.count('class="module-section"') == 5
-    for cid in ('c1','c2','c3','quiz','produce'):
+    assert html.count('class="module-section"') == 6
+    for cid in ('c1','c2','c3','c4','quiz','produce'):
         assert 'id="%s"' % cid in html
-    assert html.count('class="gotit"') == 5
+    assert html.count('class="gotit"') == 6
     assert '<!--V9_CONTENT-->' not in html
     assert '<!--V9_NAV-->' not in html
     assert '__QUEST_ID__' not in html
     import re
     targets = set(re.findall(r'data-target="([^"]+)"', html))
-    assert targets == {'home','c1','c2','c3','quiz','produce'}
+    assert targets == {'home','c1','c2','c3','c4','quiz','produce'}
 
 def test_concept_mode_shows_visual_in_every_concept():
     html, _ = _compile_mini()

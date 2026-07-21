@@ -26,6 +26,51 @@ def test_extract_returns_none_on_garbage():
 
 
 # ---------------------------------------------------------------------------
+# _salvage_truncated_json — recover the completed array items when the model
+# response was cut off at max_tokens (the coverage-judge PARSE_ERROR bug: three
+# large arrays overran the token budget, JSON was truncated mid-object, and the
+# whole verdict was discarded). Salvage must return the entries that DID finish.
+# ---------------------------------------------------------------------------
+def test_salvage_recovers_completed_execution_entries():
+    # Truncated exactly the way the bridge cut it off: mid-way through the last
+    # intuition object, no closing brackets.
+    truncated = (
+        '{\n'
+        '  "execution": [\n'
+        '    {"concept": "layer", "verdict": "TAUGHT", "evidence": "row of graders"},\n'
+        '    {"concept": "weight matrix", "verdict": "TAUGHT", "evidence": "timetable grid"}\n'
+        '  ],\n'
+        '  "intuition": [\n'
+        '    {"concept": "layer", "verdict": "INTUITION_FIRST", "note": "graders first"},\n'
+        '    {"concept": "weight matrix", "verdict": "INTUITION_FIRST", "note": "timetable before'
+    )
+    assert cj._extract_json(truncated) is None  # plain parse fails on the truncation
+    d = cj._salvage_truncated_json(truncated)
+    assert d is not None
+    # both fully-formed execution entries survive; the half-written intuition entry is dropped
+    assert len(d['execution']) == 2
+    assert d['execution'][0]['concept'] == 'layer'
+    # the completed intuition entry survives, the truncated one does not
+    assert len(d.get('intuition', [])) == 1
+
+def test_salvage_returns_none_when_nothing_completed():
+    # Cut off before any element finished -> nothing safe to salvage.
+    assert cj._salvage_truncated_json('{"execution": [{"concept": "layer", "verdi') is None
+
+def test_salvage_handles_brackets_inside_strings():
+    # A '}' or ']' inside a string value must NOT be counted as a real close.
+    truncated = (
+        '{"skill_gaps": ['
+        '{"concept": "a [weird] name", "why": "has } and ] in text"},'
+        '{"concept": "next", "why": "truncated here'
+    )
+    d = cj._salvage_truncated_json(truncated)
+    assert d is not None
+    assert len(d['skill_gaps']) == 1
+    assert d['skill_gaps'][0]['concept'] == 'a [weird] name'
+
+
+# ---------------------------------------------------------------------------
 # _prompt — includes spec, curation, notebook concepts, lesson text (no network)
 # ---------------------------------------------------------------------------
 def test_prompt_contains_all_sections():
@@ -74,7 +119,17 @@ def test_struct_prompt_contains_concepts_and_axes():
     p = cj._struct_prompt('lesson body about relu and sigmoid', ['ReLU', 'Sigmoid'])
     assert 'ReLU' in p and 'Sigmoid' in p
     assert 'intuition_first' in p and 'analogy' in p and 'buildup' in p
+    # the 4th axis (visualize-the-build-up) is present and additive (existing three intact)
+    assert 'buildup_visualized' in p
     assert 'lesson body about relu' in p
+
+def test_struct_prompt_buildup_visualized_rule():
+    p = cj._struct_prompt('lesson body', ['ReLU'])
+    # the rule must define HEAVY, exempt LIGHT build-ups via NA, and count a Math Ladder /
+    # run-demo as a build-up visual while a bare formula callout is not.
+    assert 'HEAVY' in p and 'NA' in p
+    assert 'Math Ladder' in p
+    assert 'never' in p.lower() and 'light' in p.lower()  # never-penalize-light clause
 
 def test_struct_prompt_truncates_long_lesson():
     long_text = 'y' * (cj._STRUCT_MAX + 5000)
@@ -99,15 +154,48 @@ def test_judge_structure_empty_concepts_is_na():
     assert res['status'] == 'N/A'
 
 
+# --- interest / curiosity judge ---------------------------------------------
+def test_interest_prompt_contains_levers_and_texts():
+    p = cj._interest_prompt('lesson body about relu', 'notebook gold-standard prose')
+    for lever in ('aspiration_hook', 'relevance', 'invites_play', 'momentum',
+                  'breadth_spark', 'delight_voice', 'payoff'):
+        assert lever in p, 'interest prompt missing lever %r' % lever
+    assert 'lesson body about relu' in p and 'notebook gold-standard prose' in p
+    # grades relative to the notebook, on the same enum as tone (parallel routing)
+    assert 'MATCHES_NOTEBOOK' in p and 'BELOW_NOTEBOOK' in p
+
+def test_interest_prompt_truncates_long_lesson():
+    long_text = 'z' * (cj._INTEREST_MAX + 5000)
+    p = cj._interest_prompt(long_text, 'nb')
+    assert long_text[:cj._INTEREST_MAX] in p
+    assert long_text not in p
+
+def test_judge_interest_no_notebook_is_na():
+    res = cj.judge_interest('lesson text', '')
+    assert res['status'] == 'N/A' and res['overall'] == 'N/A'
+
+def test_judge_interest_graceful_when_sdk_missing(monkeypatch):
+    import builtins
+    real_import = builtins.__import__
+    def fake_import(name, *a, **k):
+        if name == 'openai':
+            raise ImportError('simulated missing sdk')
+        return real_import(name, *a, **k)
+    monkeypatch.setattr(builtins, '__import__', fake_import)
+    res = cj.judge_interest('lesson text', 'notebook md')
+    assert res['status'] == 'BRIDGE_UNAVAILABLE'
+    assert res['dimensions'] == [] and res['overall'] == 'N/A'
+
+
 # ---------------------------------------------------------------------------
-# CLI panel-header contract — the lesson_build.js coverage/tone/structure lenses
-# parse coverage_judge.py's printed panel headers by exact string. Pin that
+# CLI panel-header contract — the lesson_build.js coverage/tone/interest/structure
+# lenses parse coverage_judge.py's printed panel headers by exact string. Pin that
 # contract so a header rename can't silently break a lens (final-review finding).
 # ---------------------------------------------------------------------------
 def test_cli_panel_headers_match_orchestrator_lens_prompts():
     cj_src = open(os.path.join(HERE, '..', 'gates', 'coverage_judge.py'), encoding='utf-8').read()
     lb_src = open(os.path.join(HERE, '..', 'workflows', 'lesson_build.js'), encoding='utf-8').read()
-    for header in ('Coverage Judge', 'Beginner-Friendliness Judge', 'Concept-Structure Judge',
-                   'skill gaps (notebook teaches; spec missed)'):
+    for header in ('Coverage Judge', 'Beginner-Friendliness Judge', 'Interest / Curiosity Judge',
+                   'Concept-Structure Judge', 'skill gaps (notebook teaches; spec missed)'):
         assert header in cj_src, 'coverage_judge.py CLI must print %r' % header
         assert header in lb_src, 'lesson_build.js lens must reference %r' % header

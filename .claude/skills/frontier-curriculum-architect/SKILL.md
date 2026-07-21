@@ -249,7 +249,7 @@ fix P0 in source.md and recompile (never hand-edit lesson.html)
 
 ## Lesson Build Engine (v9)
 
-The author + compile + QA steps of the Autonomous Rollout Loop are executed by the Workflow `sessions/_compiler/workflows/lesson_build.js` (run with the Workflow tool; `args {module, day, maxRounds, seedFindings}`). It chains: blind coverage-draft → author (ONE write-capable sub-agent, full regeneration into V9 concept structure) → compile → parallel judge panel (coverage · tone · concept-structure · correctness) → deterministic router → self-correcting loop until P0-clear or `maxRounds`, then a per-lesson checkpoint.
+The author + compile + QA steps of the Autonomous Rollout Loop are executed by the Workflow `sessions/_compiler/workflows/lesson_build.js` (run with the Workflow tool; `args {module, day, maxRounds, seedFindings}`). It chains: blind coverage-draft → author (ONE write-capable sub-agent, full regeneration into V9 concept structure) → compile → parallel judge panel (coverage · tone · interest · concept-structure · correctness) → deterministic router → self-correcting loop until P0-clear or `maxRounds`, then a per-lesson checkpoint.
 
 Rules the engine enforces:
 

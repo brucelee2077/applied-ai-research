@@ -75,6 +75,28 @@ def _run_concept(meta, blocks, msgs, ok, fail, pas):
     present = sum(1 for t in texts if spine_word in t)
     pas("spine ('%s') in %d blocks" % (spine_word, present)) if present >= 3 else fail("spine ('%s') in <3 blocks (%d)" % (spine_word, present))
 
+    # --- beginner-friendliness (user directive 2026-07-20): jargon placement + recap ---
+    # Terms are introduced define-before-use via inline [[term||gloss]], NOT dumped as a
+    # front-loaded glossary WALL the reader hits before any intuition. The full glossary
+    # belongs in a CLOSING one-page recap (day summary + reference cheat-sheet).
+    if concepts:
+        first = concepts[0]
+        if '%%% jargon' in '\n'.join(first['lines']):
+            fail("first concept %s front-loads a jargon WALL — introduce terms define-before-use "
+                 "via inline [[term||gloss]] and move the glossary to a closing recap"
+                 % first['args'].get('id', 'c1'))
+        else:
+            pas('no front-loaded jargon wall in the first concept')
+        last = concepts[-1]
+        label = (last['args'].get('tag', '') + ' ' + last['args'].get('title', '')).lower()
+        is_recap = (bool(re.search(r'recap|summar|one[ -]?page|cheat|review|takeaway|wrap', label))
+                    or '%%% jargon' in '\n'.join(last['lines']))
+        if is_recap:
+            pas('closing recap / cheat-sheet unit present')
+        else:
+            fail("no closing RECAP unit — the final concept (before the quiz) must be a one-page "
+                 "recap: the day's summary + a reference cheat-sheet (%%% jargon and/or %%% table)")
+
     prod = next((b for b in blocks if b['type']=='produce'), None)
     ptxt = '\n'.join(prod['lines']).lower() if prod else ''
     cues = ['predict','guess','observe','notice','watch','what you should see','before you']

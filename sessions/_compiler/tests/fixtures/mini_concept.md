@@ -24,7 +24,7 @@ notebook_yardstick: null
 @@@ concept id=c1 tag="The collapse" title="Straight + straight is still straight" gotit="Got it"
 Two straight rulers stacked are still one straight ruler — a bend is missing.
 %%% svg
-<svg viewBox="0 0 10 10" role="img" aria-label="collapse"><path d="M0 0"/></svg>
+<svg viewBox="0 0 10 10" role="img" aria-label="collapse"><path d="M0 5 L10 5"/></svg>
 %%%
 So depth without a bend buys nothing.
 
@@ -46,6 +46,16 @@ out: array([0, 0, 0, 2, 5])
 take: ReLU zeros negatives, passes positives.
 %%%
 One cheap max — the modern default.
+
+@@@ concept id=c4 tag="Recap" title="Today in one page" gotit="Got the recap"
+It all came down to one idea — the bend. Straight+straight stays straight; a bend makes depth matter; ReLU is the cheap default bend. Come back to this any time.
+%%% svg
+<svg viewBox="0 0 10 10" role="img" aria-label="recap"><path d="M0 8 L4 8 L8 2"/></svg>
+%%%
+%%% jargon
+bend | the small non-linearity (activation) added at the end of a neuron
+ReLU | a one-way valve: passes positives, zeroes negatives
+%%%
 
 @@@ quiz id=quiz tag="Check" title="Four questions" gotit="Checked"
 %%% quiz

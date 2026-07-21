@@ -20,6 +20,17 @@ _MIN_PROSE = 40  # chars of real prose required on each side of the visual (tuna
 _VIS_OPEN = re.compile(r'^%%%\s+(svg|viz)\b', re.MULTILINE)
 _SVG_CLOSED = re.compile(r'<svg[\s>].*?</svg>', re.DOTALL)
 _WIDGET = re.compile(r'%%%.*?%%%', re.DOTALL)  # strip any widget when measuring prose
+# --- "visualize the build-up" ADVISORY (warn-only) markers ------------------
+# A build-up is HEAVY (should be DRAWN, not just written) iff it carries a Math
+# Ladder or math demoted into an "Optional (skippable)" callout box. Keyed off
+# these EXPLICIT author markers so the warn ~never false-positives. A build-up
+# visual is any svg/viz/demo/mathladder that sits AFTER the opening anchor visual.
+_MATHLADDER = re.compile(r'(?m)^%%%\s+mathladder\b')
+_BUILDUP_VIS = re.compile(r'(?m)^%%%\s+(svg|viz|demo|mathladder)\b')
+# an "Optional…" demoted-math box: a `!!! c-… <emoji>` callout whose body's first
+# line (after any leading HTML tags) begins with the word "Optional". `.` excludes
+# newlines, so it matches ONLY when "Optional" is the box's immediate first line.
+_OPT_BOX = re.compile(r'(?im)^!!!\s+\S.*\n\s*(?:<[^>]+>\s*)*Optional\b')
 
 
 def _concept_blocks(body):
@@ -65,6 +76,23 @@ def run(source_text):
             after = text[first.end():]
         buildup = _WIDGET.sub('', after).strip()
         chk(len(buildup) >= _MIN_PROSE, 'concept %s has build-up after its visual' % cid)
+
+        # -- ADVISORY (warn-only; NEVER flips ok[0] / exit code): visualize the build-up --
+        # If this concept's build-up is HEAVY (a Math Ladder, or math demoted into an
+        # "Optional (skippable)" box), the build-up should itself be SHOWN in the build-up
+        # region (a 2nd svg/demo/viz after the anchor, or the Math Ladder itself). The LLM
+        # buildup_visualized judge axis is the real enforcer; this is the cheap offline floor.
+        after_start = len(text) - len(after)
+        ml = _MATHLADDER.search(text)
+        opt = _OPT_BOX.search(text)
+        if ml or opt:
+            why = 'Math Ladder' if ml else "'Optional (skippable)' box"
+            ladder_in_buildup = bool(ml) and ml.start() >= after_start
+            vis_in_buildup = any(mm.start() >= after_start for mm in _BUILDUP_VIS.finditer(text))
+            if not (ladder_in_buildup or vis_in_buildup):
+                msgs.append('warn concept ' + cid + ': heavy build-up (' + why + ') has no build-up '
+                            'visual in the build-up region — add a %%% svg/demo/viz that draws the '
+                            'mechanism/worked example (advisory)')
 
     return ok[0], msgs
 

@@ -82,6 +82,10 @@ Concept-mode uses these block types (in body order):
 @@@ concept id=c3 tag="…" title="…" gotit="…"
 <…>   (you need at least 3 concept units)
 
+@@@ concept id=cN tag="Recap" title="Today in one page" gotit="Got the recap"
+<REQUIRED final concept: the day's summary in a few beats + a reference cheat-sheet
+ (%%% jargon and/or %%% table) + its own visual>
+
 @@@ quiz id=quiz tag="Quiz" title="Section heading" gotit="answer all first"
 %%% quiz
 <exactly 4 question lines — see §4>
@@ -270,6 +274,50 @@ a later unit or a single shared "build" section.
 Keep the `spine` word running through the hero and most concepts (gate needs it in
 ≥3 blocks). Keep failure modes / frontier relevance AFTER the hook and mechanism.
 
+**Beginner-mentality structural rules (user directive 2026-07-20 — enforced by the
+Reader Flow Gate + tone/interest/structure judges + the concept_structure gate):**
+
+1. **Everyday-analogy hero.** The `@@@ hero` `@lede` opens with a concrete everyday
+   analogy (a physical thing a 12-year-old has done) BEFORE any aspiration/relevance.
+2. **Jargon as-you-go, not a wall.** Introduce each term define-before-use with an
+   inline `[[term||plain gloss]]` the first time it appears. Do NOT put a `%%% jargon`
+   block in the FIRST concept — the gate hard-fails a front-loaded jargon wall there.
+3. **A closing recap unit is REQUIRED.** The FINAL concept before the quiz is a
+   one-page recap (`tag="Recap"`): the day's arc in a few beats + a reference
+   cheat-sheet (`%%% jargon` and/or `%%% table`) + its own visual. The gate hard-fails
+   if the last concept is not a recap.
+4. **Math restraint.** Lead each concept with intuition + its visual + the analogy.
+   Keep any main-flow formula to a single narrated line; DEMOTE heavy or multi-step
+   math (derivations, matrix algebra, closed forms) into an `!!! c-info` box whose
+   first words mark it "Optional (skippable)".
+5. **Visualize the build-up.** The concept's opening inline visual (beat 2) anchors the
+   OPENING intuition only — it does NOT discharge the duty to visualize the *build-up*.
+   Whenever a concept's build-up is heavy or multi-step — a worked numeric example, a
+   derivation, a growth/decay ladder (e.g. the `0.25×0.25×…` vanishing-signal fade), a
+   matrix/shape transformation, a multi-symbol formula, or anything you put in an
+   "Optional (skippable)" box — SHOW that build-up as a picture placed AT the build-up
+   (after the opening visual): a **second `%%% svg`** that draws the transformation itself
+   (the shape/curve/value changing as each term is added; a before→after in ONE figure
+   when a step fixes a problem), a **`%%% demo`** whose `out:` makes the numbers watchable
+   (predict-then-run), a draggable **`%%% viz`**, or a **`%%% mathladder`** (words→formula
+   →numbers→sanity). Humans read a graph far faster than algebra — never leave a numeric
+   ladder or worked example as monospace text when an SVG of bars/curves would let the
+   reader SEE it. Net: a concept with a real build-up ships ≥2 visual elements (opening
+   anchor + build-up figure); a light/definitional concept needs only its one opening
+   visual. Enforced by the Concept-Structure Judge's `buildup_visualized` axis (MISSING
+   → P0, WEAK → P1) and warned by the `concept_structure` gate (advisory, offline floor).
+6. **Draw the analogy.** Each concept states an everyday analogy in words — *also draw it.*
+   The concept's OPENING visual (beat 2) ILLUSTRATES the everyday THING the analogy names —
+   a one-way valve (ReLU), a dimmer (sigmoid), a see-saw (tanh), a ruler (linear collapse),
+   a pizza sliced into shares (softmax), an assembly-line conveyor (forward pass), a golf
+   score (MSE), a weather forecaster's surprise (cross-entropy) — drawn with labelled parts,
+   NOT the equation or a bare axis/curve plot. The reader should look and think "oh — it's
+   like a ___" before meeting the math. The math/mechanism picture (a curve, a worked
+   example, an interactive explorable widget) is the BUILD-UP visual (rule 5) and comes
+   AFTER. So a full concept typically ships the analogy picture FIRST, then the mechanism
+   picture. Enforced by the Concept-Structure Judge's `analogy` axis: GOOD requires the
+   analogy be DRAWN; analogy-in-words-only is WEAK, which gates the build loop.
+
 ---
 
 ## 7. Coverage is skill-drafted; the notebook is a test
@@ -324,6 +372,7 @@ Exit codes:
 - `0` — compiled and all gates pass.
 - `2` — Reader Flow Gate failed (nothing written).
 - `3` — Concept Shell Gate (or Notebook Smoothness) failed.
+- `4` — Visual Integrity Gate failed (a visual would render blank).
 - `1` — usage / parse error.
 
 Gates that run in concept mode (`mode: concept`):
@@ -333,6 +382,9 @@ Gates that run in concept mode (`mode: concept`):
   (`GPT-3`, `49,152`, "billions of", "frontier model", …);
 - **≥3 concept units**;
 - **every concept ships a visual** (`%%% svg` / `%%% viz` / a closed `<svg>…</svg>`);
+- **no front-loaded jargon wall** — a `%%% jargon` block in the FIRST concept fails;
+- **a closing recap unit** — the LAST concept must be a recap (recap-ish `tag`/`title`,
+  or a `%%% jargon` cheat-sheet in it);
 - the `spine` word appears in ≥3 blocks (hero + concepts);
 - the produce block is discovery-framed (contains a cue: predict / observe / notice /
   watch / "what you should see" / before you …).
@@ -361,6 +413,18 @@ Principle: **the skills draft coverage; the notebook is a held-out TEST of the s
 - **Check B — skill eval** (only when `notebook_yardstick` is set): does the notebook teach a concept the spec never listed / deferred / scoped-out? If so it is a **SKILL-GAP** → the architect skill's coverage-derivation missed it; fix the skill, re-draft `covers`, regenerate, re-eval. Matching is whole-concept and token-aware, so a spec entry `relu` does NOT account for `leaky relu`, and out-of-scope `elu` does NOT swallow `relu`.
 - **N/A** only when there is neither a spec nor a notebook. Where there is no notebook, only check A runs and the skill is trusted (validated by check B on topics that do have notebooks).
 - The gate is advisory: you **drive its status to PASS** by authoring a complete skill-drafted spec and recording legitimate curation, but it never blocks compilation.
+
+**Visual Integrity Gate (HARD — blocks the build, exit 4)**:
+`concept_shell_gate` proves a visual *marker* exists; this proves the visual will
+actually *render*. It runs in concept mode and checks: every `%%% viz src=` file
+EXISTS; each viz file's local `<script src=>` deps EXIST (the missing-`d3.v7.min.js`
+case); each viz carries a `postMessage` height-sender whose message `type` matches
+the donor receiver (`viz-height`); and every inline `%%% svg` is NON-degenerate (has a
+`viewBox` and a real shape, not a bare `M0 0` path). It CANNOT verify pixels — there is
+no browser, and a nested `file://` iframe may be blocked by the browser regardless of
+content (serve over http to view). Run it standalone with
+`python3 gates/visual_integrity_gate.py <source.md>`; the test suite also guards every
+shipped concept lesson.
 
 ---
 
@@ -429,6 +493,16 @@ out: array([0, 0, 0, 2, 5])
 take: ReLU zeros negatives, passes positives.
 %%%
 One cheap max.
+
+@@@ concept id=c4 tag="Recap" title="Today in one page" gotit="Got the recap"
+It all came down to the bend: straight+straight stays straight, a bend makes depth matter, and ReLU is the cheap default bend. Come back to this any time.
+%%% svg
+<svg viewBox="0 0 10 10" role="img" aria-label="recap"><path d="M0 8 L4 8 L8 2"/></svg>
+%%%
+%%% jargon
+bend | the small non-linearity (activation) at the end of a neuron
+ReLU | a one-way valve: passes positives, zeroes negatives
+%%%
 
 @@@ quiz id=quiz tag="Check" title="Four questions" gotit="answer all first"
 %%% quiz
