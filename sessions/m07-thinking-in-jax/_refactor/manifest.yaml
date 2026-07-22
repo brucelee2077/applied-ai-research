@@ -1,0 +1,140 @@
+# =============================================================================
+# Module Refactor Manifest — m07-thinking-in-jax
+# =============================================================================
+# V9 concept-lesson rollout (2026-07-21). Authoring mode: Reference (JAX docs;
+# no companion notebook -> notebook_yardstick: null; tone + interest judges
+# return N/A; coverage check A + concept-structure + correctness gate).
+#
+# Learner-facing labels are FROZEN (this module keeps the ORIGINAL week-based
+# scheme, NOT the M2+M3 merge scheme — do not "modernize" it):
+#   quest-ids    w01-d0X   (w01-d01-jax .. w01-d06-vit)
+#   module_label "Thinking in JAX · Week 1 · Day N"  (sidebar group + hero kicker)
+#   brand_sub    "Frontier Lab · Week 1 Day N"
+#   nav chain    m06 review -> d01..d06 -> m08 day-01 (d06 is the Weekend Lab capstone)
+#
+# The `coverage.<day>` blocks are the SKILL-DRAFTED spec (Coverage Spec Rule)
+# so the coverage judge respects forward-pointers (jit/vmap/grad are taught on
+# their own days) instead of false-flagging a deferred concept as an exec-gap.
+# =============================================================================
+
+module: m07-thinking-in-jax
+code: M7
+learner_facing_label: "Thinking in JAX · Week 1"
+authoring_mode: reference
+skill_version: v9
+status: in_progress
+lessons: 6
+
+constraints:
+  do_not_modify:
+    - quest-ids (w01-d01-jax .. w01-d06-vit)
+    - nav prev/next chain (d01.prev = m06 review; d06.next = m08 day-01)
+    - localStorage keys, quiz mechanics (q:4 o:16), DEMOS/BUILD/QS, .fin banner
+    - experiment.py guided stubs (untouched)
+  spine: "recipe — JAX is functional: pure functions in, transformed functions out"
+
+spine_map:
+  day-01-jax-immutability: "stone-tablet — a JAX array is carved, never edited in place; you make a new one"
+  day-02-prng-keys: "key — you must carry and hand over an explicit key to get randomness"
+  day-03-vmap: "cookie-cutter — write the recipe for one, stamp it across a whole batch"
+  day-04-jit: "blueprint — trace the function once, compile it, then run at full speed"
+  day-05-flax-optax: "toolkit — build and train a neural net while keeping params on the outside"
+  day-06-vit-capstone: "assembly — put the whole week together: build and train a ViT from scratch"
+
+# -----------------------------------------------------------------------------
+# COVERAGE SPEC  (skill-drafted; the coverage judge reads deferred/out_of_scope
+# from here so forward-pointers are NOT scored as gaps)
+# -----------------------------------------------------------------------------
+coverage:
+  day-01-jax-immutability:
+    covers:
+      - {topic: a JAX array is immutable — it cannot be changed in place, keywords: [immutable, cannot change, in place, read-only, carved]}
+      - {topic: NumPy in-place assignment (arr(i)=x) fails in JAX — the contrast, keywords: [numpy, in-place assignment, error, breaks, cannot assign]}
+      - {topic: the functional update .at(idx).set(val) returns a NEW array, keywords: [.at, .set, new array, functional update, returns a copy]}
+      - {topic: pure functions — same input gives same output, no side effects, keywords: [pure function, same input, no side effect, deterministic]}
+      - {topic: why immutability — it is the foundation JAX's transforms rely on, keywords: [foundation, transforms, why immutable, enables, safe to]}
+    deferred:
+      jit compilation: day-04-jit
+      vmap automatic vectorization: day-03-vmap
+      grad / automatic differentiation mechanics: reused across the week, detailed in day-05-flax-optax
+      explicit PRNG keys: day-02-prng-keys
+    out_of_scope:
+      - {topic: XLA buffer donation / donate_argnums, reason: "an advanced performance knob; the beginner needs the immutability idea, not memory reuse tricks"}
+      - {topic: full functional-programming theory (monads, referential transparency proofs), reason: "the intuition 'same in, same out, make a new copy' is enough at this level"}
+
+  day-02-prng-keys:
+    covers:
+      - {topic: why a hidden global random state breaks under JAX, keywords: [global state, hidden, side effect, not reproducible, breaks]}
+      - {topic: an explicit PRNG key carries the randomness as a value you pass around, keywords: [explicit key, prng key, carry, pass, value]}
+      - {topic: jax.random.PRNGKey(seed) creates a key from a seed, keywords: [prngkey, seed, create a key, from a seed]}
+      - {topic: you must pass a key into every random function, keywords: [pass a key, must give, every random, hand over]}
+      - {topic: jax.random.split makes new independent keys, keywords: [split, independent keys, new keys, fresh key]}
+      - {topic: reusing a key gives identical draws (the failure) so you split instead, keywords: [reuse, identical, same numbers, never reuse, split instead]}
+    deferred:
+      vmap over a batch of keys: day-03-vmap
+      using randomness inside a jitted function: day-04-jit
+    out_of_scope:
+      - {topic: the Threefry counter-based RNG algorithm internals, reason: "implementation detail; the beginner needs the explicit-key discipline, not the bit-mixing math"}
+      - {topic: distributed / sharded RNG across devices, reason: "a scaling concern beyond a first randomness lesson"}
+
+  day-03-vmap:
+    covers:
+      - {topic: the problem — hand-writing batch loops is slow and error-prone, keywords: [batch loop, for loop, slow, error-prone, by hand]}
+      - {topic: vmap auto-vectorizes — write for ONE example, run on a whole batch, keywords: [vmap, one example, whole batch, vectorize, automatic]}
+      - {topic: in_axes chooses which argument axis to map over, keywords: [in_axes, which axis, map over, argument]}
+      - {topic: out_axes chooses where the batch axis lands in the output, keywords: [out_axes, output axis, where the batch]}
+      - {topic: vmap vs a Python for-loop (faster and clearer), keywords: [vs for loop, faster, cleaner, no loop]}
+      - {topic: vmap composes with the other JAX transforms, keywords: [compose, stack with, combine, jit and vmap]}
+    deferred:
+      wrapping vmap in jit for speed: day-04-jit
+      pmap / multi-device parallelism: later curriculum content
+    out_of_scope:
+      - {topic: the batching-rule implementation for each primitive, reason: "internals of how vmap is built; a beginner needs what it does, not how it is implemented"}
+      - {topic: ragged / variable-length batch handling, reason: "an edge case beyond the core write-for-one, run-on-many idea"}
+
+  day-04-jit:
+    covers:
+      - {topic: jit compiles a function with XLA so it runs much faster, keywords: [jit, compile, xla, faster, speed up]}
+      - {topic: tracing — JAX runs the function once with abstract values to record the graph, keywords: [trace, tracing, abstract values, record, graph, once]}
+      - {topic: the compiled function is cached and reused on later calls, keywords: [cache, reuse, compiled, later calls, remembers]}
+      - {topic: first call is slow (compile), later calls are fast, keywords: [first call slow, warm-up, later fast, one-time cost]}
+      - {topic: pure functions are required — side effects only happen during the trace, keywords: [pure, side effect, only during trace, print once, requires pure]}
+      - {topic: the control-flow gotcha — a Python if on a traced value fails, keywords: [python if, control flow, traced value, gotcha, lax.cond, fails]}
+    deferred:
+      composing grad with jit: day-05-flax-optax
+      static_argnums for shape-dependent branching: later / awareness
+    out_of_scope:
+      - {topic: XLA HLO and its optimization passes, reason: "compiler internals; the beginner needs trace-compile-cache, not the pass pipeline"}
+      - {topic: ahead-of-time (AOT) compilation and donate_argnums, reason: "advanced deployment knobs beyond a first jit lesson"}
+
+  day-05-flax-optax:
+    covers:
+      - {topic: Flax defines neural nets in JAX the functional way, keywords: [flax, neural net, functional, define a model, module]}
+      - {topic: parameters live OUTSIDE the model as a pytree of arrays, keywords: [params outside, pytree, not inside, separate, dictionary of arrays]}
+      - {topic: module.init(key, x) makes params and module.apply(params, x) runs the model, keywords: [init, apply, make params, run the model]}
+      - {topic: Optax provides composable gradient transformations (optimizers), keywords: [optax, optimizer, gradient transform, sgd, adam]}
+      - {topic: the optimizer state is explicit (opt_state), keywords: [opt_state, optimizer state, explicit, carried]}
+      - {topic: the functional training step — grad, update, apply_updates, keywords: [grad, update, apply_updates, training step, functional loop]}
+      - {topic: pytrees — nested containers of arrays that transforms map over, keywords: [pytree, nested, dict of arrays, tree, leaves]}
+    deferred:
+      assembling and training a full ViT: day-06-vit-capstone
+    out_of_scope:
+      - {topic: Haiku / Equinox as alternative NN libraries, reason: "the lesson teaches one functional library well; alternatives are mention-only"}
+      - {topic: learning-rate schedule internals and exotic optimizers, reason: "the beginner needs the params-outside + grad/update loop, not a scheduler catalog"}
+
+  day-06-vit-capstone:
+    covers:
+      - {topic: assemble a full Vision Transformer in Flax (patch embed, blocks, head), keywords: [vit, assemble, patch embed, transformer blocks, head, from scratch]}
+      - {topic: the full functional training loop ties together jit + grad + optax + flax, keywords: [training loop, jit, grad, optax, flax, tie together]}
+      - {topic: the week's ideas combine — immutability, keys, vmap, jit, flax/optax, keywords: [combine, whole week, immutability, keys, vmap, jit]}
+      - {topic: train end-to-end on a small dataset, keywords: [train, end-to-end, small dataset, epochs, batches]}
+      - {topic: read the loss curve and accuracy to confirm it learns, keywords: [loss curve, accuracy, going down, learning, confirm]}
+      - {topic: why JAX's design (pure functions + transforms) pays off, keywords: [pays off, why jax, design, scales, clean]}
+    deferred:
+      transformer / attention math details: taught earlier in m05
+      scaling to multiple devices (pmap/sharding): later curriculum content
+    out_of_scope:
+      - {topic: production training infrastructure (checkpointing, logging, sweeps), reason: "an MLOps concern beyond a from-scratch capstone"}
+      - {topic: full ViT hyperparameter tuning, reason: "the capstone shows the assembly and a working train loop, not a tuning study"}
+
+loop_history: []
