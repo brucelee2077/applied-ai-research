@@ -62,6 +62,16 @@ Every concept unit opens with **felt intuition before any formula, range, or not
 
 Mark **P0 (intuition-inverted)** if a concept opens with a formula, a range like `(0,1)`, `max(0,z)`, or notation before the felt picture; if a concept is all mechanism with no analogy and no "why"; if an analogy is given WITHOUT its "where it breaks down" beat; or if the dominant voice is interview/textbook rather than warm-beginner. The inline visual anchors the *intuition*, not the algebra. See repo `CLAUDE.md` §5 (analogy scaffold, simple words, no idioms) and §7 (curiosity hook, normalize confusion, victory laps).
 
+## Interest, Reader-Separation & Real Play (2026-07-23 — first-class, not byproducts)
+
+Interest is now gated independent of any notebook (an ALWAYS-ON absolute floor in `coverage_judge.judge_interest_absolute` P0-gates the build loop; the notebook is an added ceiling, not the only bar). So author to these as NON-NEGOTIABLES, not as side-effects of warmth:
+
+- **Aspiration/relevance opening (P1 gate):** each concept OPENS with wonder / what-it-unlocks + a thing the reader already cares about (ChatGPT, face unlock, games) — never problem-first ("without this, X is useless"). Relevance RETURNS mid-lesson, not one mention in the hero.
+- **Breadth/payoff tease (P1 gate):** tease the family/landscape ahead; end with a payoff + recap.
+- **Reader-separation (P0 — CLAUDE.md §1):** a foundation lesson body is Reader A only. Do NOT write scripted "here's how you'd say it in an interview" monologues, and do NOT drop Reader-B notation (bare matrix identities like `(x·W₁)·W₂=x·(W₁·W₂)`, terms like "non-convex"/"representational ceiling") without a plain gloss. Keep the required staff depth as ONE plain-language empowerment line ("now you can explain *why* deep nets need a bend") — depth stays, interview *scripting* goes to a separate file.
+- **Momentum — no failure-mode wall (P1):** teach every failure + remedy (coverage still requires it), but do NOT stack ≥3 "Puzzle→Cause→Remedy"/limit units back-to-back with no play/payoff between — INTERLEAVE a win or a live widget. `concept_structure_gate` warns on a ≥3 failure cluster. **Length is fine — never cut coverage to fix momentum; interleave and enrich instead.**
+- **Real play, honestly labelled:** ship ≥2 genuinely interactive `%%% viz` widgets, front-loaded (not one, late). A `%%% demo` only reveals a pre-baked output — its button says "reveal", NOT "run it"; do not imply computation the widget doesn't do.
+
 ## Three-layer architecture
 
 ```text

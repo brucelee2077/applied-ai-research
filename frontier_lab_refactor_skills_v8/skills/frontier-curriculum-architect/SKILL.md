@@ -129,6 +129,10 @@ To draft `covers` for a topic, enumerate — from what the topic *is*, not from 
 
 Where a notebook exists, the coverage gate's **check B** uses it as a **held-out test** of this spec: a notebook concept absent from `covers` / `deferred` / `out_of_scope` is a **SKILL GAP** — the enumeration above missed a step. The fix is to improve THIS rule (add the missing derivation step, e.g. "failure → remedy"), re-draft `covers`, regenerate the lesson, and re-eval — loop until the skill-drafted spec reproduces the notebook's concepts **without reading it**. That reproduction is the proof the skill drives coverage. See `frontier-refactor-qa` → Coverage feedback loop and `sessions/_compiler/AUTHORING.md` §8.
 
+### Momentum counterweight (2026-07-23) — keep full coverage, but don't wall it up
+
+The Coverage Spec Rule maximizes completeness (every failure + cause + remedy + limit, each its own concept). Keep all of it — **length is a feature, never cut or defer coverage to shorten a day.** But completeness must not compile into a late-lesson "trap wall": when 3+ failure/limit concept units would run consecutively, **INTERLEAVE a play/payoff beat** (a live `%%% viz`, a predict-then-run `%%% demo`, or a "you just unlocked…" victory lap) between them so a beginner's momentum survives. This is a SEQUENCING rule only — no compression into tables, no deferral. `concept_structure_gate` emits a warn on a ≥3-consecutive failure cluster with no intervening play; the interest judge's `momentum` lever is the real enforcer.
+
 ## Seed Propagation Risk Rule
 
 A seed module P1 can become required-to-fix before future rollout if:
