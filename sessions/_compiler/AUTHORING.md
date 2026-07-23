@@ -150,6 +150,17 @@ take: <b>ReLU = max(0, z).</b> Zeroes negatives, passes positives.
 %%%
 ```
 
+**`hint`** — a tiered, OFFLINE progressive-disclosure hint ladder for a STUCK learner
+(get-unstuck). `t1:` a gentle nudge, `t2:` a worked micro-step, `t3:` the idea in one
+sentence (`t4:` optional). Tiers ship hidden; donor JS un-hides ONE per click. No network.
+```text
+%%% hint
+t1: What is the slope doing right where the ball sits?
+t2: Read the ground under your boots — a steeper tilt means a bigger step.
+t3: The gradient IS that local slope; you step the opposite way (downhill).
+%%%
+```
+
 **`quiz`** — one question per body line, `|`-separated:
 `q: <ask> | a:<IDX> | <opt0> | <opt1> | <opt2> | <opt3> | fb: <feedback>`.
 `a:IDX` is the **0-based** index of the correct option (only counts as the answer

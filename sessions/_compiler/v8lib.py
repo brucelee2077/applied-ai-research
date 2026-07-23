@@ -253,6 +253,20 @@ def render_quiz(lines):
         blocks.append('<div class="q" data-correct="%d"><div class="q-ask">%s</div><div class="q-opts">%s</div><div class="q-fb" data-fb="%s"></div></div>' % (ans, inline(q), optshtml, attr_esc(fb)))
     return '<div class="quiz">' + ''.join(blocks) + '</div>'
 
+def render_hint(lines):
+    """Tiered hint ladder (%%% hint): 't1:/t2:/t3:' lines -> progressive-disclosure hints
+    for a stuck learner. Tiers ship hidden; donor JS un-hides ONE per click. Offline —
+    no network. t1 = a gentle nudge, t2 = a worked micro-step, t3 = the idea in one sentence."""
+    d = _kv(lines)
+    tiers = [d[k] for k in ('t1', 't2', 't3', 't4') if d.get(k)]
+    if not tiers:
+        return ''
+    items = ''.join('<div class="hint-tier" data-hint-tier="%d" hidden>%s</div>' % (i + 1, inline(t))
+                    for i, t in enumerate(tiers))
+    return ('<div class="hint" data-hint-total="%d">'
+            '<button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button>'
+            '%s</div>' % (len(tiers), items))
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -264,6 +278,7 @@ def render_widget(typ, args, lines):
     if typ == 'svg':        return render_svg(lines)
     if typ == 'demo':       return render_demo(args, lines)
     if typ == 'quiz':       return render_quiz(lines)
+    if typ == 'hint':       return render_hint(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
