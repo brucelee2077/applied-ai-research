@@ -549,10 +549,10 @@ Time to see today's big idea with your own eyes: *the full transformer is just t
 Create `sessions/m05a-text-transformer/day-08-full-transformer/experiment.py`. **Notice** four things: (1) build the **on-ramp** — a tiny `embed(tokens)` (look up a small vector per word) plus `add_position(x)`, and print the shape going in; (2) build one `block(x, mask=None)` = a Pre-LN wrapped attention sub-layer then a wrapped feed-forward sub-layer, then make an **encoder** = a few blocks with *no* mask and a **decoder** = a few blocks *with* a causal mask, and add a `cross_attention(dec, enc_out)` step in the decoder — print the shape after each stack and **observe** it's preserved; (3) build the **output head** = a linear projection to a small vocabulary + softmax, and print that the next-word chart sums to 1.0; (4) run the **autoregressive loop**: read the input once, then generate up to N words, each time appending the picked word and feeding it back — **watch** the reply grow one word per step and stop at a chosen EOS token. Run with `python3 sessions/m05a-text-transformer/day-08-full-transformer/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 8 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 8 artifact.
 
 Create sessions/m05a-text-transformer/day-08-full-transformer/experiment.py that, with a comment on each step, assembles a tiny end-to-end transformer from the parts already built and runs it:
 1. ON-RAMP: a tiny embed(tokens) that maps each of ~6 vocabulary words to a d_model=8 vector, plus add_position(x) that adds a simple positional signal. Print the (seq_len, 8) shape going in.

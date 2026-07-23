@@ -435,10 +435,10 @@ Time to run the detection clean-up yourself and *watch* it work. You'll compute 
 Create `sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py` and **print values at every step**. (1) **A box as four numbers:** represent boxes as `[x1, y1, x2, y2]` (two corners) — write `cat_true = [50,50,150,140]` and `cat_pred = [60,55,158,150]` and a far-away `dog = [300,200,380,300]`; **print** them. (2) **IoU function:** write `iou(a,b)` that computes the intersection rectangle, its area, each box's area, the union `areaA + areaB - inter`, and returns `inter/union`; **print** `iou(cat_true, cat_pred)` (should be high, near 0.7–0.8) and `iou(cat_true, dog)` (should be `0.0`), and **notice** overlap → high IoU, no overlap → 0. (3) **A pile of boxes with scores:** make `boxes = [([55,52,152,142],0.95), ([58,50,150,140],0.88), ([52,55,156,145],0.81), ([60,48,148,138],0.77), ([300,200,380,300],0.90)]` — four cats + one dog. (4) **NMS:** sort by score (highest first); repeatedly take the top box, keep it, and drop every remaining box whose `iou` with it is above `0.5`; **print** the surviving boxes and **observe** the four overlapping cat-boxes collapse to *one* while the dog box survives — final count = 2. (5) **Threshold demo:** filter `boxes` by `score > 0.85` before NMS and **notice** which boxes disappear. Run with `python3 sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 7 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 7 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-07-object-detection-intuition/experiment.py that demonstrates IoU and Non-Maximum Suppression (NMS) for object detection using plain Python/NumPy (no real model needed), with a comment on each step and printing values at every step:
 1. Represent boxes as [x1, y1, x2, y2] (top-left and bottom-right corners). Define cat_true=[50,50,150,140], cat_pred=[60,55,158,150], dog=[300,200,380,300]. Print all three.

@@ -428,10 +428,10 @@ Time to see today's big idea with your own eyes. You'll build two linear layers 
 Create `sessions/m02-the-neuron/day-02-activations/experiment.py`. Write `step`, `relu`, `leaky_relu`, `sigmoid`, and `tanh`, and print all five as a table over the grid `np.linspace(-6, 6, 13)`. **Notice** that the step is a flat 0/1 jump, ReLU zeros negatives, leaky_relu lets a small trickle through the negatives, sigmoid stays in `(0,1)`, and tanh stays in `(−1,1)` and is 0 at 0. Also print `sigmoid'(0) ≈ 0.25` and note that ReLU's slope is `0` for every negative input while leaky_relu's is a small `α` — the seed of both the "dead ReLU" failure and its cure. Then use the anchor pair `W1=[[1,2],[0,1]]`, `W2=[[1,0],[3,1]]` and show that `(x@W1)@W2` equals `x@(W1@W2)` for a random `x` — print `W1@W2` (expect `[[7,2],[3,1]]`), proving two linear layers = one. Run with `python3 sessions/m02-the-neuron/day-02-activations/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 2 artifact.
 
 Create sessions/m02-the-neuron/day-02-activations/experiment.py that, with a comment on each step:
 1. Defines step(z)=(z>=0).astype(float), relu(z)=np.maximum(0,z), leaky_relu(z,a=0.01)=np.where(z>0,z,a*z), sigmoid(z)=1/(1+np.exp(-z)), and tanh(z)=np.tanh(z); prints all five as a table over grid = np.linspace(-6,6,13) (step is a 0/1 jump, ReLU zeros negatives, leaky_relu lets a small trickle through, sigmoid in (0,1), tanh in (-1,1) and 0 at 0). Also prints sigmoid'(0)=0.25 and notes ReLU's slope is 0 for negative inputs while leaky_relu's is a small alpha.

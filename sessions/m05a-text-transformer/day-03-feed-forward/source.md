@@ -320,10 +320,10 @@ Time to see today's big idea with your own eyes. You'll push a word's vector thr
 Create `sessions/m05a-text-transformer/day-03-feed-forward/experiment.py`. Start with one word `x = np.random.randn(4)` and set `hidden = 4 * 4`. **Notice** three things: (1) build an up-projection `W1` of shape `[4, 16]` and a down-projection `W2` of shape `[16, 4]`, compute `h = x @ W1`, apply ReLU (`np.maximum(0, h)`), then `out = relu_h @ W2`, and print the width at each step — **watch** it go `4 → 16 → 4`; (2) run the *same two matrices with NO bend* (`(x @ W1) @ W2`) and confirm it equals multiplying by the single collapsed matrix `x @ (W1 @ W2)` (use `np.allclose`) — proof that without the bend, depth buys nothing; (3) count how many negative values ReLU zeroed in `h`, then swap ReLU for a GELU-like smooth curve and **observe** that the small negatives are no longer a hard 0. Run with `python3 sessions/m05a-text-transformer/day-03-feed-forward/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 3 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 3 artifact.
 
 Create sessions/m05a-text-transformer/day-03-feed-forward/experiment.py that, with a comment on each step:
 1. Defines a position-wise feed_forward(x, W1, W2) with d_model=4 and hidden=16: h = x @ W1 (up-projection), a = np.maximum(0, h) (ReLU bend), out = a @ W2 (down-projection). Print the shape at each step to show 4 -> 16 -> 4.

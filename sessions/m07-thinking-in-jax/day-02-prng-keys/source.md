@@ -289,10 +289,10 @@ Time to feel today's rule for yourself. You'll make a key, draw numbers, watch t
 Create `sessions/m07-thinking-in-jax/day-02-prng-keys/experiment.py`. Start with `import jax` and `import jax.numpy as jnp`. **Print every result so you can see it happen.** (1) Make `key = jax.random.PRNGKey(0)` and **print** it — notice it's just two numbers. (2) Call `jax.random.normal(key, (3,))` twice with the **same** key, print both, and **observe** they are identical — that's the "same key, same draw" rule. (3) Show the trap: make two "batches" reusing one key and **notice** they're secretly the same. (4) Fix it: `key, subkey = jax.random.split(key)`, draw with `subkey`, then split again for another draw, and **observe** the two draws are now different. (5) Try `jax.random.fold_in(key, 7)` twice and **notice** it gives the same key both times, but `fold_in(key, 8)` gives a different one. Run with `python3 sessions/m07-thinking-in-jax/day-02-prng-keys/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Week 1 Day 2 (JAX PRNG keys) artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Week 1 Day 2 (JAX PRNG keys) artifact.
 
 Create sessions/m07-thinking-in-jax/day-02-prng-keys/experiment.py that, with a comment on each step and printing every result:
 1. import jax and jax.numpy as jnp; make key = jax.random.PRNGKey(0) and PRINT it (it should be two integers).

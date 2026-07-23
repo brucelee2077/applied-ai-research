@@ -327,10 +327,10 @@ Time to trust the tape-measure with your own eyes. You'll write a tiny function 
 Create `sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment.py`. Write `out_size(N, K, P, S)` that returns `(N - K + 2*P) // S + 1` (the `//` is Python's floor divide — that's the `⌊ ⌋`). **Print** its prediction for several settings: `(28,3,0,1)`, `(28,3,1,1)`, `(28,3,1,2)`, `(32,5,2,1)`. **Predict** each on paper first, then let the function confirm. Then make it real: build a `28 × 28` array (e.g. `img = np.zeros((28,28))`), write a small `conv2d(img, K, P, S)` that slides a `K×K` kernel with padding `P` (use `np.pad`) and stride `S`, and **print the actual feature-map shape at every step**. **Observe** the real shape equals your `out_size` prediction. Finally, add a channel check: make a fake "bank" of `12` filters and **notice** the output depth is `12` no matter what `K`, `P`, `S` are — depth is the separate ruler. Run with `python3 sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 2 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-02-output-dim-arithmetic/experiment.py that, with a comment on each step and printing values at every step:
 1. Defines out_size(N, K, P, S) returning (N - K + 2*P) // S + 1 (floor divide = the floor in the formula). Add a docstring naming each argument.

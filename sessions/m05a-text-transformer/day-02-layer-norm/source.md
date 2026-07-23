@@ -310,10 +310,10 @@ Time to see today's big idea with your own eyes. You'll take a token whose numbe
 Create `sessions/m05a-text-transformer/day-02-layer-norm/experiment.py`. Start with a drifted token, for example `x = np.array([10.0, 20.0, 30.0])`. **Notice** four things: (1) compute the mean `μ` and standard deviation `σ`, subtract the mean and divide by the spread, and print that the result's mean is ~`0` and its spread is ~`1`; (2) add a tiny `eps = 1e-5` inside the square root and confirm the answer barely changes for normal spreads; (3) make a *degenerate* token where every value is equal (for example `np.full(4, 7.0)`) and **observe** that *without* `eps` you get NaN/inf, but *with* `eps` you get a finite result; (4) apply learned knobs `gamma` and `beta` (`out = gamma * norm + beta`) and show that picking `gamma = σ` and `beta = μ` recovers the original `x` — the "undo" trick. Assert the normalized mean is close to 0 with `np.allclose`. Run with `python3 sessions/m05a-text-transformer/day-02-layer-norm/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 2 artifact.
 
 Create sessions/m05a-text-transformer/day-02-layer-norm/experiment.py that, with a comment on each step:
 1. Defines layer_norm(x, gamma, beta, eps=1e-5) that computes mean and variance across the last axis, normalizes as (x - mean)/sqrt(var + eps), then returns gamma * norm + beta.

@@ -446,10 +446,10 @@ Write your three guesses down. Then run it and **watch** whether you were right.
 Create `sessions/m04-first-model-mlp/day-03-minibatch-loop/experiment.py`. Wrap your Day 1–2 MLP in a mini-batch loop. Each epoch: **shuffle** the training indices, **slice** into batches of 32 (and handle the ragged final batch), and per batch run forward → loss → backward → update — **averaging** (mean, not sum) the loss and gradient over the batch. Print the number of iterations per epoch and the average loss per epoch, and confirm it trends down. Then, as a contrast, run one epoch on label-sorted data **without** shuffling and watch the jerkier loss. Run with `python3 sessions/m04-first-model-mlp/day-03-minibatch-loop/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5 Day 3 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5 Day 3 artifact.
 
 Create sessions/m04-first-model-mlp/day-03-minibatch-loop/experiment.py that, with a comment on each step, wraps the Day 1–2 MNIST MLP (NumPy) in a mini-batch training loop:
 1. Print the vocabulary as a sanity check: N_train, batch_size, and iterations_per_epoch = N_train // batch_size (and mention the ragged final batch when N is not divisible).

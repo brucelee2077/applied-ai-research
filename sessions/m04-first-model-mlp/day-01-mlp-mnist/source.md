@@ -300,10 +300,10 @@ Time to see today's model with your own eyes — no training yet, just the forwa
 Create `sessions/m04-first-model-mlp/day-01-mlp-mnist/experiment.py`. Load MNIST, flatten each image to shape `(784,)`, and scale pixels to `[0,1]`. Initialize random weights `W1 (784,128), b1 (128,), W2 (128,10), b2 (10,)` using **He initialization** (scale each weight by roughly `sqrt(2/n_in)`). Write the forward pass `logits = relu(x @ W1 + b1) @ W2 + b2`, print the shape at every step (expect `(batch, 784) → (batch, 128) → (batch, 10)`), take `argmax` for the guesses, and print the accuracy of this untrained model. Run with `python3 sessions/m04-first-model-mlp/day-01-mlp-mnist/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5 Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5 Day 1 artifact.
 
 Create sessions/m04-first-model-mlp/day-01-mlp-mnist/experiment.py that, with a comment on each step, builds an UNTRAINED 2-layer MLP for MNIST in NumPy (no training yet — forward pass only):
 1. Loads MNIST, flattens each 28x28 image to shape (784,), scales pixels to [0,1].

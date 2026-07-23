@@ -398,10 +398,10 @@ Time to be the matchmaker yourself and *watch* the contrastive idea work. You'll
 Create `sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py` and **print values at every step**. (1) **Fake embeddings:** with NumPy, make `img = np.array([[1.,0.,0.],[0.,1.,0.],[0.,0.,1.]])` (3 image vectors) and `txt = np.array([[0.9,0.1,0.],[0.05,0.95,0.1],[0.,0.1,0.9]])` (3 caption vectors, each roughly matching the image on its own row); **print** their shapes. (2) **L2 normalize:** write `normalize(x)` that divides each row by its length (`np.linalg.norm(x, axis=1, keepdims=True)`); normalize both and **print** that every row now has length ≈ 1. (3) **Similarity matrix:** compute `S = img_n @ txt_n.T` (cosine similarities, since rows are unit length); **print** the 3×3 matrix and **notice** the diagonal values are the biggest in each row — the true pairs win. (4) **Temperature:** multiply `S` by a temperature like `20`, apply a row-wise softmax, and **print** the result; **observe** the diagonal probabilities get much closer to 1 (the winner sharpens). (5) **Zero-shot:** take image row 0, compute its similarity to all 3 captions, and **print** `argmax` — check it picks caption 0. Print a one-line takeaway. Run with `python3 sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 8 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 8 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-08-clip-contrastive/experiment.py that demonstrates the core of CLIP — a shared embedding space, cosine similarity, the batch similarity matrix, a temperature, and zero-shot classification — using plain NumPy (no real model), with a comment on each step and printing values at every step:
 1. Make fake embeddings: img = np.array([[1.,0.,0.],[0.,1.,0.],[0.,0.,1.]]) (3 image vectors) and txt = np.array([[0.9,0.1,0.],[0.05,0.95,0.1],[0.,0.1,0.9]]) (3 caption vectors, each roughly matching the image on its own row). Print both shapes.

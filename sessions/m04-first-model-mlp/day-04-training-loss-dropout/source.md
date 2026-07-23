@@ -382,10 +382,10 @@ Write your three guesses down. Then run it and **watch** whether you were right.
 Create `sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`. Take your Day 3 mini-batch loop and split the data into a training set and a held-out **validation** set. Each epoch, record BOTH the average training loss and the average validation loss (remember to switch to eval mode — dropout off — before scoring validation). Train a deliberately over-powered model on a small slice with **no dropout** and watch the two curves **split** — training loss diving while validation loss turns back up (that's overfitting). Then add a dropout layer (`p = 0.5`, on only in train mode, off in eval mode) and re-run: the validation curve should stay lower for longer. Run with `python3 sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5 Day 4 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5 Day 4 artifact.
 
 Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py that, with a comment on each step, demonstrates the loss, overfitting, and dropout:
 1. Split the data into a TRAINING set and a held-out VALIDATION set (e.g. 80/20). Use a deliberately small training slice so overfitting shows up fast.

@@ -493,10 +493,10 @@ Time to watch the verdict get read with your own eyes. You'll take a tiny fake `
 Create `sessions/m05b-vision-transformer/day-04-vit-classifier/experiment.py`. Make a fake `[CLS]` summary `cls = np.random.randn(8)` (length `D = 8`) and print its shape. Tidy it with a simple LayerNorm-style step (subtract the mean, divide by the standard deviation) and print the result. Make a random head matrix `W = np.random.randn(8, 4)` (so `C = 4` classes) and compute `logits = cls_tidied @ W`; print the logits and their shape `(4,)` — **one score per class**. Apply softmax: `probs = np.exp(logits) / np.exp(logits).sum()`; print `probs`, print `probs.sum()` and **observe** it is `1.0`, and print `np.argmax(probs)` as the predicted class index. Finally, as a one-line note, print what the *true-class* cross-entropy loss would be with `-np.log(probs[true_class])` for some chosen `true_class`, and **notice** the loss is small when the true class already got a big percentage. Run with `python3 sessions/m05b-vision-transformer/day-04-vit-classifier/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5b Day 4 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5b Day 4 artifact.
 
 Create sessions/m05b-vision-transformer/day-04-vit-classifier/experiment.py that, with a comment on each step and printing shapes and values at every step:
 1. Makes a fake [CLS] summary vector cls = np.random.randn(8) (length D=8) and prints its shape — note this stands in for the [CLS] token's final vector.

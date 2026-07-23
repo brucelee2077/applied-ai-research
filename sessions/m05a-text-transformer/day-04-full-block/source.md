@@ -283,10 +283,10 @@ Time to see today's big idea with your own eyes. You'll build one tiny transform
 Create `sessions/m05a-text-transformer/day-04-full-block/experiment.py`. Build a `transformer_block(x)` that wraps two sub-layers in the Pre-LN order. **Notice** three things: (1) write a `sublayer(x, fn)` helper that does `x + fn(layer_norm(x))` — a fake `attention(x)` (any function that mixes across the 3 words, e.g. a small averaging) and a fake `ffn(x)` (widen to 32, ReLU, shrink back to 8, applied per word) — then run attention-sublayer then ffn-sublayer and print the shape after each; **watch** the output stay `(3, 8)`, same as the input; (2) because the shape is preserved, loop the *same* block 4 times (`for _ in range(4): x = transformer_block(x)`) and print the shape after each block — confirm it's `(3, 8)` every time, proof you can stack it; (3) shuffle the 3 input words' order, run one block, and **observe** that the outputs come out in the *same shuffled order* (permutation-equivariant) — the block has no built-in sense of position. Run with `python3 sessions/m05a-text-transformer/day-04-full-block/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 4 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 4 artifact.
 
 Create sessions/m05a-text-transformer/day-04-full-block/experiment.py that, with a comment on each step:
 1. Defines layer_norm(x), a toy attention(x) that mixes across the sequence (e.g. blends each word with the sequence mean), and a position-wise ffn(x) with d_model=8 and hidden=32 (widen with W1, np.maximum(0,·) ReLU bend, shrink with W2).

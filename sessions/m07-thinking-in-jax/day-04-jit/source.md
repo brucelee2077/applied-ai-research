@@ -396,10 +396,10 @@ Time to feel today's rule for yourself. You'll wrap a function in `jit`, watch i
 Create `sessions/m07-thinking-in-jax/day-04-jit/experiment.py`. Start with `import jax`, `import jax.numpy as jnp`, and `import time`. **Print what you observe at each step.** (1) Define `f(x) = jnp.sin(x) + jnp.cos(x) * 2.0 - jnp.tanh(x)`, wrap it with `jax.jit`, and **peek** at the blueprint with `jax.make_jaxpr(f)(jnp.arange(3.))`. (2) Time eager `f` versus the `jit`ted version on a big array (e.g. `jnp.ones((1_000_000,))`) — warm up once, and call `.block_until_ready()` inside a 100-call loop — and **observe** the `jit` version is faster. (3) Catch 1: put a plain `print("tracing!")` inside a `jit`ted function, call it 3 times with the same shape, and **notice** it prints only once. (4) Catch 2: try a plain `if x > 0` inside `jit` (see the error), then fix it two ways — `static_argnums` for a flag, and `lax.cond` for data. (5) Catch 3: call a `jit`ted function (with a `print` inside) on shapes `(5,)`, `(5,)`, `(6,)`, `(5,)` and **notice** it traces twice. Run with `python3 sessions/m07-thinking-in-jax/day-04-jit/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Week 1 Day 4 (JAX jit) artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Week 1 Day 4 (JAX jit) artifact.
 
 Create sessions/m07-thinking-in-jax/day-04-jit/experiment.py that, with a comment on each step and printing what it observes:
 1. import jax, jax.numpy as jnp, time. Define f(x) = jnp.sin(x) + jnp.cos(x) * 2.0 - jnp.tanh(x); wrap fast_f = jax.jit(f); print jax.make_jaxpr(f)(jnp.arange(3.)) to show the recorded blueprint (jaxpr).

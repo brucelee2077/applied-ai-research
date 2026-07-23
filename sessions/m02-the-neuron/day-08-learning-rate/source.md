@@ -302,8 +302,8 @@ Write it in `experiment.py` and run it. Then poke it: nudge `1.0` up to `1.1` an
 
 **Option B — hand it to the lab.** Paste this into the experiment lab and let it build `experiment.py` for you:
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my artifact.
 Create experiment.py for Day 8 (learning-rate intuition). Use the toy valley
 loss = weight**2 with gradient = 2*weight, starting at weight = 2.0, for 40 steps.
 Write train(lr) that runs the update weight = weight - lr * (2*weight) for 40 steps

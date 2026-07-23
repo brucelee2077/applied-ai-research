@@ -236,10 +236,10 @@ Time to watch the recipe run with your own eyes. You'll take a tiny fake sequenc
 Create `sessions/m05b-vision-transformer/day-03-transformer-for-vision/experiment.py`. Make a fake sequence of `N = 4` tile tokens, each length `D = 8`, with `tiles = np.random.randn(4, 8)`. Prepend a random `[CLS]` vector of length `D` so the sequence is `(N+1, D) = (5, 8)` — print the shape. Write a tiny stand-in "block" as a function that (for this toy) just returns an array of the **same shape** (a real block would mix the tokens with attention, but the *shape* is what we're watching): `block(x)` returns `x` reshaped/copied to `(5, 8)`. Confirm the block's output is still `(5, 8)` — **the shape is preserved**, which is exactly why you can stack many blocks in a relay. Now take **only row 0** (the `[CLS]` token's output, shape `(8,)`) and multiply it by a random head matrix of shape `(8, 3)` to get `3` class scores — print them, and print which class index is the max. **Observe** that the whole-image answer came from *one* row out of five. Run with `python3 sessions/m05b-vision-transformer/day-03-transformer-for-vision/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5b Day 3 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5b Day 3 artifact.
 
 Create sessions/m05b-vision-transformer/day-03-transformer-for-vision/experiment.py that, with a comment on each step and printing shapes at every step:
 1. Makes a fake sequence of N=4 tile tokens each of length D=8 with tiles = np.random.randn(4, 8) and prints its shape.

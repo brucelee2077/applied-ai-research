@@ -466,10 +466,10 @@ Time to feel today's rule for yourself. You'll define a Flax model, `init` its p
 Create `sessions/m07-thinking-in-jax/day-05-flax-optax/experiment.py`. Start with `import jax`, `import jax.numpy as jnp`, `import flax.linen as nn`, `import optax`, and `from jax import random`. **Print what you observe at each step.** (1) Define a tiny `MLP(nn.Module)` with `@nn.compact` `__call__`: `nn.Dense(4)` → `nn.relu` → `nn.Dense(3)`. Make `model = MLP()`. (2) Build the box: `params = model.init(random.PRNGKey(0), jnp.ones((1, 2)))`, then **observe** the leaf shapes with `jax.tree_util.tree_map(lambda a: a.shape, params)` — check the kernels are `(2,4)` and `(4,3)`. (3) Run `y = model.apply(params, jnp.ones((1, 2)))` twice and **notice** the same input gives the same output (it's pure). (4) Write `loss_fn(params, x, target) = jnp.mean((model.apply(params, x) - target)**2)`. Make `optimizer = optax.sgd(0.1)` and `opt_state = optimizer.init(params)`. (5) Write a `train_step` that does `loss, grads = jax.value_and_grad(loss_fn)(...)`, then `updates, opt_state = optimizer.update(grads, opt_state)`, then `params = optax.apply_updates(params, updates)`, and **returns** the new `params, opt_state, loss`. Loop it ~10 times, threading the boxes, and **watch** the loss fall. (6) On purpose, break it: call `optax.apply_updates(params, updates)` WITHOUT catching the result, keep using the old `params`, and **notice** the loss stops moving — then fix it by reassigning. Run with `python3 sessions/m07-thinking-in-jax/day-05-flax-optax/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Week 1 Day 5 (Flax & Optax) artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Week 1 Day 5 (Flax & Optax) artifact.
 
 Create sessions/m07-thinking-in-jax/day-05-flax-optax/experiment.py that, with a comment on each step and printing what it observes:
 1. import jax, jax.numpy as jnp, flax.linen as nn, optax, and from jax import random. Define class MLP(nn.Module) with @nn.compact __call__: x = nn.Dense(4)(x); x = nn.relu(x); x = nn.Dense(3)(x); return x. model = MLP().

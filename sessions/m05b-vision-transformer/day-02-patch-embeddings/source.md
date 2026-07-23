@@ -254,10 +254,10 @@ Time to see today's big idea with your own eyes. You'll take a tiny fake "image"
 Create `sessions/m05b-vision-transformer/day-02-patch-embeddings/experiment.py`. Make a fake grayscale image with `img = np.arange(4*4).reshape(4, 4)` (`H = W = 4`). Cut it into `P × P` tiles with `P = 2` and **flatten** each tile to a length-`P*P` vector (here `4`). Make a shared random matrix `W` of shape `(P*P, D)` with `D = 8` and multiply every flattened tile by the **same** `W` to get its length-`D` patch embedding — print the shape at each step. Stack the passports into a `(N, D)` sequence and print `N` from the formula `(H//P)*(W//P)`. Now **prepend** a random `[CLS]` vector of length `D` (sequence becomes `(N+1, D)`) and **add** a random positional-embedding array of shape `(N+1, D)` to the whole sequence. **Observe** that `N = (4/2)*(4/2) = 4` and the final sequence shape is `(5, 8)` — five tokens, each length 8. Run with `python3 sessions/m05b-vision-transformer/day-02-patch-embeddings/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5b Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5b Day 2 artifact.
 
 Create sessions/m05b-vision-transformer/day-02-patch-embeddings/experiment.py that, with a comment on each step and printing shapes at every step:
 1. Makes a fake grayscale image img = np.arange(4*4).reshape(4, 4) and prints its shape.

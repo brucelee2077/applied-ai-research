@@ -500,10 +500,10 @@ Create `sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py`. Build
 4. The collapse demo: build the SAME 2-layer network but with **no** activation on the hidden layer either (use `f = identity` throughout). Show that its output equals a single layer with `W_combined = W2 @ W1` and `b_combined = W2 @ b1 + b2` — proving two linear layers = one. Then switch the hidden bend back to `relu` and show the outputs **no longer match** any single layer. Run with `python3 sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 3 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 3 artifact.
 
 Create sessions/m02-the-neuron/day-03-layers-forward-pass/experiment.py that, with a comment on each step:
 1. Defines relu(z)=np.maximum(0,z) and a layer(x, W, b, f) that returns f(W @ x + b); prints the shape of W @ x + b at each call.

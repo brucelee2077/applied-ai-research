@@ -241,10 +241,10 @@ Time to feel today's rule for yourself. You'll try the forbidden move, watch JAX
 Create `sessions/m07-thinking-in-jax/day-01-jax-immutability/experiment.py`. Start with `import jax.numpy as jnp` and `arr = jnp.array([3, 1, 4, 1])`. **Print `arr` at every step so you can see it happen.** (1) Try the NumPy habit `arr[1] = 9` inside a `try/except` and **print** the error message JAX gives — notice it names `.at[i].set()`. (2) Do it the right way: `new = arr.at[1].set(9)`; print both `arr` and `new` and **observe** that `arr` is unchanged while `new` has the 9. (3) Show the silent trap: run `arr.at[1].set(9)` with **no** `new =` in front, print `arr`, and notice nothing changed. Then fix it with `arr = arr.at[1].set(9)` and print again. (4) Write a small pure function `def double(x): return x * 2`, call it twice on the same array, and **notice** you get the same answer both times AND the original array is untouched — that's purity. Run with `python3 sessions/m07-thinking-in-jax/day-01-jax-immutability/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Week 1 Day 1 (JAX immutability) artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Week 1 Day 1 (JAX immutability) artifact.
 
 Create sessions/m07-thinking-in-jax/day-01-jax-immutability/experiment.py that, with a comment on each step and printing arr at every step:
 1. import jax.numpy as jnp and make arr = jnp.array([3, 1, 4, 1]); print arr.

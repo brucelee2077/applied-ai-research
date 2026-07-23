@@ -281,10 +281,10 @@ Time to see the coach with your own eyes — a real backward pass, checked for b
 Create `sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py`. Build a tiny 2-layer network in NumPy on made-up data: forward pass `h = relu(x @ W1 + b1)`, `out = h @ W2 + b2`, and a squared loss `L = ((out - target)**2).mean()`. **Save** `x` and the ReLU mask (`z1 > 0`) on the way forward. Then write the backward pass by hand: seed δ at the output, use `dL/dW = δ · (saved input)ᵀ`, `dL/db = δ`, and push δ back through layer 2, through the ReLU gate (multiply by the saved mask), and into layer 1. Print the shape of each gradient and confirm `dW1.shape == W1.shape`. Finally, **gradient-check** one weight: recompute the loss at `w+h` and `w-h`, form `(L(w+h) - L(w-h)) / (2h)`, and print it next to your analytic gradient — they should match. Run with `python3 sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5 Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5 Day 2 artifact.
 
 Create sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py that, with a comment on each step, wires a backward pass BY HAND for a tiny 2-layer MLP in NumPy (no autograd, no frameworks):
 1. Make small random data x and a target. Init W1,b1,W2,b2 small and random.

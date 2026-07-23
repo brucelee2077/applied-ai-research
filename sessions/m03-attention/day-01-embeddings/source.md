@@ -298,10 +298,10 @@ Here's the fun part — you get to see today's big idea prove itself in a few li
 Create `sessions/m03-attention/day-01-embeddings/experiment.py`. Make a tiny `vocab` dict (`cat`, `dog`, `car`, `the`), a small embedding table `E` with hand-set rows — use cat `[0.9, 0.8, 0.0, 0.3]`, dog `[0.8, 0.9, 0.0, 0.4]`, car `[0.0, 0.0, 0.9, 0.3]` so cat/dog are close and car is far — look up a word by its token id (that's just grabbing a row), and compute the cosine similarity of cat-and-dog versus cat-and-car. Then, to *observe* the context-free limit, look up "bank" for two different sentences from the same frozen table and print `cosine(bank, bank)` — watch it come out `1.00`. Print each step. Run with `python3 sessions/m03-attention/day-01-embeddings/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 4 Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 4 Day 1 artifact.
 
 Create sessions/m03-attention/day-01-embeddings/experiment.py that, with a comment on each step:
 1. Defines vocab = {"cat":0,"dog":1,"car":2,"the":3} and maps the sentence "the cat" to token ids.

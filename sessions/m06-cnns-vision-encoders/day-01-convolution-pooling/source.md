@@ -333,10 +333,10 @@ Time to see today's big idea with your own eyes. You'll build a tiny fake "image
 Create `sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py`. Make a small fake image with a bright vertical stripe, e.g. `img = np.zeros((6,6)); img[:, 3:] = 9` (left half dark, right half bright — a clean vertical edge). Define the edge kernel `k = np.array([[-1,0,1],[-1,0,1],[-1,0,1]])` (right minus left). Write a `convolve(img, k)` that slides the kernel with stride 1 and no padding, computing the dot product `np.sum(patch * k)` at each spot, and **print the shape at every step**. **Observe** that the feature map is `4 × 4` (from `(6−3)/1 + 1 = 4`) and that it is near 0 over the flat halves but *spikes* along the edge column — the stencil found the edge. Then write a `max_pool(fmap, 2)` that takes the max of each non-overlapping `2 × 2` window and **notice** the map shrinks to `2 × 2`. Run with `python3 sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 1 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-01-convolution-pooling/experiment.py that, with a comment on each step and printing shapes at every step:
 1. Makes a 6×6 fake image with a vertical edge: img = np.zeros((6,6)); img[:, 3:] = 9. Prints its shape.

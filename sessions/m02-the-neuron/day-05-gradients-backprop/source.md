@@ -373,10 +373,10 @@ Time to see today's big idea with your own eyes. You'll run a tiny neuron forwar
 Create `sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py`. (1) Do a forward pass for one neuron: `z = w*x + b` then `a = relu(z)`, and a squared-error loss `L = (a - target)**2`; **save** `x`, `z`, `a` as you go. (2) Backprop by hand with the three rules: the gradient into the neuron is `2*(a-target)`, the ReLU slope is `1` if `z>0` else `0`, then `w_grad = incoming * relu_slope * x` and `b_grad = incoming * relu_slope` — **notice** `w_grad` is `x` times `b_grad`. (3) **Check it:** write `loss_of_w(w)` and compute the measured slope `(loss_of_w(w+1e-5) - loss_of_w(w-1e-5)) / (2e-5)`, then print it next to your `w_grad` and **watch** them match. Run with `python3 sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 5 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 5 artifact.
 
 Create sessions/m02-the-neuron/day-05-gradients-backprop/experiment.py that, with a comment on each step:
 1. Runs a forward pass for one neuron: given x=2.0, w=0.5, b=0.1, target=1.0, compute z=w*x+b, a=relu(z) (relu = max(0,z)), and loss L=(a-target)**2; save x, z, a.

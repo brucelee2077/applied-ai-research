@@ -279,10 +279,10 @@ Time to feel today's rule for yourself. You'll write a function for **one** exam
 Create `sessions/m07-thinking-in-jax/day-03-vmap/experiment.py`. Start with `import jax` and `import jax.numpy as jnp`. **Print every shape so you can see it happen.** (1) Write `def scale(x): return x * 2.0` — a function for ONE vector — and call it on a single vector to see it work. (2) Make a batch of shape `(5, 3)`, wrap `scale` with `jax.vmap`, run it, and **observe** the output shape is `(5, 3)` — the batch rode the front. (3) Add a shared weight: `def predict(x, w): return jnp.dot(x, w)`; make `xb` of shape `(5, 3)` and `w` of shape `(3,)`; call `jax.vmap(predict, in_axes=(0, None))(xb, w)` and **notice** the shape is `(5,)` — `w` stayed whole. (4) Store a batch as shape `(3, 5)` and map over `in_axes=1`; **observe** you get 5 results. (5) Build a pairwise grid with **nested** `vmap` over `jnp.arange(4)` and `jnp.arange(3)`, and **notice** the shape is `(4, 3)`. Run with `python3 sessions/m07-thinking-in-jax/day-03-vmap/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Week 1 Day 3 (JAX vmap) artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Week 1 Day 3 (JAX vmap) artifact.
 
 Create sessions/m07-thinking-in-jax/day-03-vmap/experiment.py that, with a comment on each step and printing every SHAPE:
 1. import jax and jax.numpy as jnp; define scale(x) = x * 2.0 (a function for ONE vector); call it on jnp.array([1., 2., 3.]) and print the result.

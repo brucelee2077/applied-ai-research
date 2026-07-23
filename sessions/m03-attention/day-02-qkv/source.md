@@ -363,10 +363,10 @@ Here's the fun part — you get to watch today's whole mechanism prove itself in
 Create `sessions/m03-attention/day-02-qkv/experiment.py`. Make a tiny embedding matrix `x` (a few word-rows). Make three weight grids `Wq, Wk, Wv` and compute `Q = x@Wq`, `K = x@Wk`, `V = x@Wv`; print their shapes to confirm they're three different views. Take one word's query, score it against every key with a dot product, divide by `sqrt(d_k)`, run `softmax` to get shares (check they sum to 1), then compute the weighted sum of the Values. Print each step and **observe** which word wins the biggest share. Run with `python3 sessions/m03-attention/day-02-qkv/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the **frontier-experiment-lab** skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 4 Day 2 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 4 Day 2 artifact.
 
 Create sessions/m03-attention/day-02-qkv/experiment.py that, with a comment on each step:
 1. Defines a small embedding matrix x (e.g. 4 word-rows, each length 4) standing for a tiny sentence.

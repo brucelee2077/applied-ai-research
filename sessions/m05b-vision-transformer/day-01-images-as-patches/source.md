@@ -255,10 +255,10 @@ Time to see today's big idea with your own eyes. You'll take a small fake "image
 Create `sessions/m05b-vision-transformer/day-01-images-as-patches/experiment.py`. Make a fake image with `img = np.arange(8*8).reshape(8, 8)` (an `8 × 8` grid, so `H = W = 8`). Write a function that cuts it into `P × P` tiles and returns them, and **print the shape at every step** so you can see it happen. For `P = 4`: print the number of tiles from the formula `(H/P) × (W/P)`, print one tile as its `4 × 4` grid, then `flatten` that tile and print the resulting length (`16`). **Observe** that the tile count is `(8/4) × (8/4) = 2 × 2 = 4`. Now re-run with `P = 2` and **notice** the count jumps to `(8/2) × (8/2) = 4 × 4 = 16` — smaller tiles, far more of them. Finally, for a pretend color tile of shape `P × P × 3`, print that its flattened length is `P*P*3`. Run with `python3 sessions/m05b-vision-transformer/day-01-images-as-patches/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5b Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5b Day 1 artifact.
 
 Create sessions/m05b-vision-transformer/day-01-images-as-patches/experiment.py that, with a comment on each step and printing shapes at every step:
 1. Makes a fake image img = np.arange(8*8).reshape(8, 8) and prints its shape.

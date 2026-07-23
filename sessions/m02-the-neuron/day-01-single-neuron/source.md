@@ -510,10 +510,10 @@ Time to see today with your own eyes. You'll code one neuron — weights, bias, 
 Create `sessions/m02-the-neuron/day-01-single-neuron/experiment.py`. Write `sigmoid(z)` and `step(z)`, then a `neuron(x, w, b)` that returns `sigmoid((w*x).sum() + b)`. **Notice** that for `x=[2,3]`, `w=[0.5,−1.0]`, `b=1.0` you get `z = −1.0` and `sigmoid(z) ≈ 0.269` — a soft "probably no." Print `z` and the output so you can see both. Then set up the four XOR points `[0,0]→0, [0,1]→1, [1,0]→1, [1,1]→0` and try to find a single `w, b` that a step-neuron gets all four right — **observe** that you can never beat 3 of 4, because one neuron draws one straight line. Run with `python3 sessions/m02-the-neuron/day-01-single-neuron/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 1 artifact.
 
 Create sessions/m02-the-neuron/day-01-single-neuron/experiment.py that, with a comment on each step:
 1. Defines sigmoid(z)=1/(1+np.exp(-z)) and step(z)=(z>=0).astype(float).

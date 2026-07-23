@@ -413,10 +413,10 @@ Time to see today's big idea with your own eyes: *the causal mask is the only di
 Create `sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py`. **Notice** three things: (1) make one 4×4 grid of made-up attention scores and run row-wise softmax with *no* mask — this is the **encoder view**; print it and **observe** that every cell, including future (above-diagonal) ones, has real non-zero weight; (2) build a causal mask (`0` on and below the diagonal, `-inf` above it), add it to the *same* scores, and run softmax again — this is the **decoder view**; print it and **watch** every above-diagonal (future) weight become `0.00` while each row still sums to `1.0`; (3) print the two grids side by side and **notice** that the *only* difference is the future cells — same block, same scores, one switch. Run with `python3 sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 6 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 6 artifact.
 
 Create sessions/m05a-text-transformer/day-06-encoder-vs-decoder/experiment.py that, with a comment on each step, shows the causal mask is the ONLY difference between an encoder and a decoder:
 1. Makes one 4x4 numpy array of arbitrary attention scores for a 4-word sentence.

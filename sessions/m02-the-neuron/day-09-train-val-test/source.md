@@ -294,8 +294,8 @@ Write it in `experiment.py` and run it. Then poke it: try *not* shuffling before
 
 **Option B — hand it to the lab.** Paste this into the experiment lab and let it build `experiment.py` for you:
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my artifact.
 Create experiment.py for Day 9 (train/val/test & overfitting). Make a small 1-D dataset
 from a smooth true function (e.g. y = sin(x)) plus random noise, about 40 points.
 SHUFFLE it, then split 80/20 into train and validation. Fit a deliberately flexible model

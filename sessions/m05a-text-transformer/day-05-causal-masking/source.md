@@ -205,10 +205,10 @@ Time to see today's big idea with your own eyes. You'll take a tiny row of atten
 Create `sessions/m05a-text-transformer/day-05-causal-masking/experiment.py`. **Notice** three things: (1) make a 4×4 grid of made-up attention scores, and build a `causal_mask` that is `0` on and below the diagonal and `-inf` above it — print it and **watch** the lower-triangle-of-zeros / upper-triangle-of-minus-infinity shape appear; (2) add the mask to the scores and run softmax on each row, then print the weight grid — **observe** that every above-diagonal (future) cell is `0.00` while each row's allowed weights sum to `1.0`; (3) as a control, run softmax *without* the mask and **notice** that now the future cells have real, non-zero weight — that's the "cheating" the mask prevents. Run with `python3 sessions/m05a-text-transformer/day-05-causal-masking/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 5 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 5 artifact.
 
 Create sessions/m05a-text-transformer/day-05-causal-masking/experiment.py that, with a comment on each step:
 1. Makes a 4x4 numpy array of arbitrary attention scores for a 4-word sentence.

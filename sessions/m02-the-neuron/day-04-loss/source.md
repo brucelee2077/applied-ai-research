@@ -397,10 +397,10 @@ Time to see today's big idea with your own eyes. You'll compute MSE and cross-en
 Create `sessions/m02-the-neuron/day-04-loss/experiment.py`. (1) Write `mse(pred, target)` and print it for `pred=[2.5, 0, 2]`, `target=[3, −0.5, 2]` — **notice** it prints `≈ 0.167`; then change the last guess to a wild `102` and reprint, and **watch** MSE explode while MAE (add `mae` too) barely moves. (2) Write `cross_entropy(p)` as `−log(p)` and print it for `p = [0.99, 0.6, 0.1, 1e-7]` — **notice** it falls toward 0 as `p` nears 1 and shoots up as `p` nears 0, and that clamping `p` with `max(p, 1e-7)` keeps a `p=0` case finite (`≈16.1`) instead of `+∞`. Run with `python3 sessions/m02-the-neuron/day-04-loss/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 4 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 4 artifact.
 
 Create sessions/m02-the-neuron/day-04-loss/experiment.py that, with a comment on each step:
 1. Defines mse(pred,target)=np.mean((pred-target)**2) and mae(pred,target)=np.mean(np.abs(pred-target)); prints both for pred=[2.5,0,2], target=[3,-0.5,2] (expect MSE≈0.167). Then changes the last prediction to 102 and reprints — show MSE explodes while MAE stays modest, proving one outlier hijacks MSE.

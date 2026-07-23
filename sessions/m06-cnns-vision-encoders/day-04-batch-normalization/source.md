@@ -304,10 +304,10 @@ Time to build the thermostat yourself and *watch* it work. You'll take a batch o
 Create `sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py`. Build a tiny batch norm step and **print the average and spread at every stage**. Start with a fake batch for one channel, `x = np.array([10., 20., 30., 40., 50.])`, and **print** its average (`x.mean()`) and spread (`x.std()`). Then **steady** it: `mu = x.mean(); sigma = x.std(); eps = 1e-5; x_hat = (x - mu) / np.sqrt(sigma**2 + eps)` — **print** `x_hat`, and **notice** its new average is about `0` and its new spread is about `1`. Then add the two knobs: pick `gamma = 2.0`, `beta = 5.0`, compute `y = gamma * x_hat + beta`, **print** it, and **observe** its average is now about `beta` (5) and its spread about `gamma` (2). Finally, mimic the running memory: keep `running_mean` and `running_var`, blend each batch with `momentum = 0.1` (`running_mean = 0.9*running_mean + 0.1*mu`), and **print** how, in "eval mode", using `running_mean`/`running_var` instead of the live `mu`/`sigma` gives a fixed answer for a single value no matter what batch it arrives in. Run with `python3 sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 4 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 4 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-04-batch-normalization/experiment.py that implements a tiny batch normalization step by hand, with a comment on each step and printing values at every step:
 1. Makes a fake batch for one channel x = np.array([10., 20., 30., 40., 50.]) and prints its mean and std (the "before" — a drifting, off-center signal).

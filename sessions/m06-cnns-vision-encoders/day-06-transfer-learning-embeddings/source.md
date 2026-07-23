@@ -402,10 +402,10 @@ Time to run the hand-me-down idea yourself and *watch* it work. You'll stand in 
 Create `sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py`. Simulate the borrowed eye and **print values at every step**. (1) **Fake embeddings:** make a stand-in feature extractor by writing fixed embeddings, e.g. `cat = np.array([0.8,0.1,0.7,0.2]); kitten = np.array([0.7,0.15,0.79,0.11]); car = np.array([0.1,0.9,0.0,0.8])` — **print** all three and **notice** cat and kitten look alike while car looks different. (2) **Cosine similarity:** write `cosine(a,b) = a@b / (np.linalg.norm(a)*np.linalg.norm(b))` — **print** `cosine(cat, kitten)` (near 1) and `cosine(cat, car)` (near 0), and **notice** near-1 means "same direction = similar." (3) **Euclidean/L2 distance:** write `l2(a,b) = np.linalg.norm(a-b)` — **print** `l2(cat, kitten)` (small) and `l2(cat, car)` (large), and **notice** small distance also means similar — both rulers agree. (4) **Nearest-neighbor search:** put `{"cat":cat,"kitten":kitten,"car":car}` in a small database, take a new query `query = np.array([0.78,0.12,0.74,0.15])`, rank the database by cosine to the query, and **print** the ranking — **observe** the two cats come first, the car last (image search with no training). (5) **Preprocessing-mismatch demo:** make `query_bad = (query - 5.0) / 0.1` (a *wrong* normalization) and rank again — **observe** the ranking is scrambled/nonsense, showing why you must use the model's exact preprocessing. Run with `python3 sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 6 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 6 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-06-transfer-learning-embeddings/experiment.py that demonstrates image embeddings and nearest-neighbor search using tiny FAKE embeddings (no real model needed), with a comment on each step and printing values at every step:
 1. Define fixed stand-in embeddings for three images: cat = np.array([0.8,0.1,0.7,0.2]); kitten = np.array([0.7,0.15,0.79,0.11]); car = np.array([0.1,0.9,0.0,0.8]). Print all three and point out cat and kitten look similar while car is different.

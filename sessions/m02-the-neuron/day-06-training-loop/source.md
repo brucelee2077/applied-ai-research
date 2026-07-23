@@ -340,10 +340,10 @@ Time to run the engine yourself. You'll build the full four-step loop for one ne
 Create `sessions/m02-the-neuron/day-06-training-loop/experiment.py`. (1) Set up one neuron learning a simple target: pick `x`, a true `target`, start `w` and `b` at small numbers, and a learning rate `lr = 0.1`. (2) Write the loop for, say, 50 iterations: **forward** `pred = w*x + b`; **loss** `L = (pred - target)**2`; **backward** `grad_w = 2*(pred-target)*x` and `grad_b = 2*(pred-target)`; **update** `w = w - lr*grad_w` and `b = b - lr*grad_b`. Print the loss every few loops and **watch** it fall. (3) Now rerun with `lr = 1.5` and **observe** the loss zig-zag and blow up, then with `lr = 0.0005` and **observe** it barely move. Run with `python3 sessions/m02-the-neuron/day-06-training-loop/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 2 Day 6 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 2 Day 6 artifact.
 
 Create sessions/m02-the-neuron/day-06-training-loop/experiment.py that, with a comment on each step:
 1. Trains ONE neuron with a full training loop. Setup: x=2.0, target=1.0, w=0.0, b=0.0, lr=0.1.

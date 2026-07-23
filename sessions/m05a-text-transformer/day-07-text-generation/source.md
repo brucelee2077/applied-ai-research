@@ -523,10 +523,10 @@ Time to see today's whole idea with your own eyes: *the same chart of scores can
 Create `sessions/m05a-text-transformer/day-07-text-generation/experiment.py`. **Notice** five things: (1) make one fixed list of logits for a handful of made-up words (e.g. `[3.0, 1.5, 1.0, 0.2, -1.0]`) and a `softmax` — print the probability chart and **observe** it sums to 1; (2) write `greedy` (return the argmax word) and **notice** it prints the same word every run; (3) write `sample(probs, T)` that divides logits by a temperature, re-softmaxes, and draws with `np.random.choice` — run it several times at `T=0.7` and again at `T=1.5` and **watch** the warmer setting surprise you more often; (4) write `top_k(probs, k)` that keeps the k tallest, re-shares, and samples — print which words survive; (5) write `top_p(probs, p)` that keeps the smallest set summing to ≥ p, re-shares, and samples — **notice** its shortlist size changes if you edit the logits to be more or less peaked. Run with `python3 sessions/m05a-text-transformer/day-07-text-generation/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 7 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 7 artifact.
 
 Create sessions/m05a-text-transformer/day-07-text-generation/experiment.py that, with a comment on each step, shows how the SAME next-token scores become different words under different decoding strategies:
 1. Fix one list of logits for ~5 made-up words (e.g. [3.0, 1.5, 1.0, 0.2, -1.0]) and define a softmax. Print the probability chart and confirm it sums to 1.

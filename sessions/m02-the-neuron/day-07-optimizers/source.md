@@ -303,8 +303,8 @@ Write it in `experiment.py` and run it. Then poke it: set Momentum's `0.6` down 
 
 **Option B — hand it to the lab.** Paste this into the experiment lab and let it build `experiment.py` for you:
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my artifact.
 Create experiment.py for Day 7 (optimizers). On the SAME valley
 loss = 0.5*(4*wx**2 + 0.2*wy**2)  (so gx = 4*wx, gy = 0.2*wy), run three
 optimizers, all starting at wx = wy = 1.0, all with learning rate lr = 0.3,

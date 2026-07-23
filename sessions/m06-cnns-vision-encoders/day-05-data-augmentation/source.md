@@ -372,10 +372,10 @@ Time to run the disguise kit yourself and *watch* it work. You'll take one small
 Create `sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py`. Build a tiny disguise kit on a small fake image and **print values at every step**. Start with a fake 4×4 grayscale image, `img = np.arange(16).reshape(4, 4).astype(float)`, and **print** it plus its shape. (1) **Horizontal flip:** `flipped = img[:, ::-1]` — **print** it and **notice** the columns are mirrored while the set of values is unchanged (same "label"). (2) **Normalize:** `norm = (img - img.mean()) / img.std()` — **print** `norm.mean()` (about `0`) and `norm.std()` (about `1`), and **notice** this is the always-on standardizing step. (3) **Train-only demo:** write a `pipeline(img, train=True)` that applies a *random* flip only when `train=True`, then always normalizes; call it twice with `train=True` (**observe** the two outputs can differ) and twice with `train=False` (**observe** they are identical — the plain, repeatable test view). (4) **Label-destroying demo:** make a recognizable little `six = np.array([[0,1,1,1],[1,0,0,0],[1,1,1,1],[1,0,0,1],[1,1,1,1]])` (its loop sits at the bottom), then apply a **180° rotation** with `nine = np.rot90(six, 2)` — **print** both grids (the loop moves to the top, so it now reads as a `9`), check `np.array_equal(six, nine)` is `False`, and note that if you kept the label "6" you'd be teaching the model wrong. Run with `python3 sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 6 Day 5 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 6 Day 5 artifact.
 
 Create sessions/m06-cnns-vision-encoders/day-05-data-augmentation/experiment.py that demonstrates data augmentation on a tiny fake image, with a comment on each step and printing values at every step:
 1. Makes a fake 4x4 grayscale image img = np.arange(16).reshape(4,4).astype(float) and prints it and its shape.

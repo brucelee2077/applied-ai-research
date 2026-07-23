@@ -238,10 +238,10 @@ Time to see today's big idea with your own eyes. You'll push a signal through ma
 Create `sessions/m05a-text-transformer/day-01-residual-connections/experiment.py`. Start a signal vector `x` (for example `np.ones(4)`). Define a simple block `F(x)` that shrinks and reshapes its input a little (for example `0.8 * (W @ x)` for a fixed small matrix `W`). **Notice** three things: (1) run `x` through 30 plain blocks (`x = F(x)` each time) and print how the size of `x` shrinks toward 0; (2) run it through 30 *shortcut* blocks (`x = F(x) + x` each time) and print how the size stays healthy; (3) confirm the identity trick — when `F(x)` returns all zeros, `F(x) + x` returns exactly `x` (use `np.allclose`). Also assert that the shapes of `F(x)` and `x` match so the `+ x` is valid. Run with `python3 sessions/m05a-text-transformer/day-01-residual-connections/experiment.py`.
 
 #### Option B · let Claude build it, then read it
-Copy the prompt below back into Claude Code. It triggers the <b>frontier-experiment-lab</b> skill, which creates the file, writes the code, and runs it for you.
+Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.
 
-%%% prompt id=pp label="triggers <b>frontier-experiment-lab</b>"
-Use /frontier-experiment-lab to build my Module 5a Day 1 artifact.
+%%% prompt id=pp label="ask Claude to build it"
+Help me build my Module 5a Day 1 artifact.
 
 Create sessions/m05a-text-transformer/day-01-residual-connections/experiment.py that, with a comment on each step:
 1. Sets up a fixed small block F(x) = 0.8 * (W @ x) for a fixed 4x4 matrix W and a starting vector x0 = np.ones(4). Asserts F(x0) and x0 have the same shape (so the "+ x" add is valid, element-wise).
