@@ -17,7 +17,7 @@ INDEX_PATH = os.path.join(REPO, "sessions/index.html")
 TITLE_PREFIX_RE = re.compile(
     r'^(Module\s+\d+(?:-\d+)?[a-z]?|Week\s+\d+[a-z]?)\s*(?:·\s*)?(Day\s+\d+|Weekend Lab)'
 )
-FOLDER_MODULE_RE = re.compile(r'/m(\w+?)-')
+FOLDER_MODULE_RE = re.compile(r'(?:^|/)(?:week-)?m(\w+?)(?:-|/)')
 TRAILING_EMOJI_RE = re.compile(
     r'\s*[\U0001F000-\U0001FFFF☀-➿⬀-⯿️]+\s*$'
 )
