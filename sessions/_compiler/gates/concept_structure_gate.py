@@ -94,6 +94,28 @@ def run(source_text):
                             'visual in the build-up region — add a %%% svg/demo/viz that draws the '
                             'mechanism/worked example (advisory)')
 
+    # -- ADVISORY (warn-only; NEVER flips ok[0] / exit code): failure-mode momentum cluster --
+    # >=3 CONSECUTIVE concept units whose title/tag reads as a failure/limit AND that carry no
+    # play/payoff widget (%%% demo / %%% viz) => a late-lesson "trap wall" where a beginner's
+    # momentum dies (observed on 7/9 m02 days). Remedy is to INTERLEAVE a win / live widget
+    # between the traps, NOT to cut or defer coverage. The interest judge's `momentum` lever is
+    # the real enforcer; this is the cheap offline floor. 'problem' is deliberately NOT a token
+    # (too generic); the >=3-consecutive threshold guards against incidental single matches.
+    _FAIL = re.compile(r"(?i)\b(dead|vanish\w*|saturat\w*|explod\w*|diverg\w*|collapse|overfit\w*|"
+                       r"underfit\w*|nan|trap|puzzle|pitfall|wall|cannot|can['’]?t|fails?|"
+                       r"failure|limits?|breaks?)\b")
+    _PLAY = re.compile(r'(?m)^%%%\s+(demo|viz)\b')
+    run_len = 0
+    for args, text in blocks:
+        if _FAIL.search(args) and not _PLAY.search(text):
+            run_len += 1
+            if run_len == 3:
+                msgs.append('warn failure-mode cluster: >=3 consecutive failure/limit concept units '
+                            'with no play/payoff widget between them — interleave a win or a live '
+                            '%%% demo/viz to keep momentum (advisory; do not cut coverage)')
+        else:
+            run_len = 0
+
     return ok[0], msgs
 
 
