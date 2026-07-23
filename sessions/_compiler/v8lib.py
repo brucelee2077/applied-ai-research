@@ -217,9 +217,12 @@ def render_svg(lines):
     return '<div class="build-viz">%s</div>' % svg
 
 def render_demo(args, lines):
-    """Inline run-demo: code line, hidden output + takeaway revealed on click."""
+    """Inline run-demo: code line, hidden output + takeaway revealed on click.
+    NOTE: this widget only UN-HIDES a pre-baked output; it does not compute. So the
+    default button label is a reveal verb, not 'run it' (which oversells execution).
+    Author-supplied `label:` is used verbatim (existing lessons stay byte-identical)."""
     d = _kv(lines)
-    did = args.get('id', 'demo'); label = args.get('label', 'run it')
+    did = args.get('id', 'demo'); label = args.get('label', 'reveal')
     code = attr_esc_text(d.get('code', '')); out = attr_esc_text(d.get('out', '')); take = inline(d.get('take', ''))
     return ('<div class="demo" data-demo="%s">'
             '<div class="demo-code"><code>%s</code>'
