@@ -376,18 +376,26 @@ def render_md(text):
 # ---------------------------------------------------------------------------
 def render_hero(meta, block):
     txt = '\n'.join(block['lines'])
+    # Optional %%% warmup ... %%% recall block (retention): extract BEFORE the lede/goal
+    # split so it isn't swallowed into the goal text; render it after the goal.
+    warm_html = ''
+    mw = re.search(r'(?ms)^%%%\s+warmup\s*\n(.*?)^%%%\s*$', txt)
+    if mw:
+        warm_html = render_warmup(mw.group(1).split('\n'))
+        txt = txt[:mw.start()] + txt[mw.end():]
     lede = goal = ''
     if '@lede' in txt:
         after = txt.split('@lede', 1)[1]
         lede, _, goal = after.partition('@goal')
     lede = inline(' '.join(l.strip() for l in lede.strip().split('\n') if l.strip()))
     goal = inline(' '.join(l.strip() for l in goal.strip().split('\n') if l.strip()))
+    warm_line = ('\n      ' + warm_html) if warm_html else ''
     return ('<section id="home" class="hero">\n'
             '      <span class="kicker">%s</span>\n'
             '      <h1>%s<span class="sub">%s</span></h1>\n'
             '      <p class="lede">%s</p>\n'
-            '      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>%s</div></div>\n'
-            '    </section>' % (meta['module_label'], meta['title'], meta['subtitle'], lede, goal))
+            '      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>%s</div></div>%s\n'
+            '    </section>' % (meta['module_label'], meta['title'], meta['subtitle'], lede, goal, warm_line))
 
 def render_section(block):
     a = block['args']
