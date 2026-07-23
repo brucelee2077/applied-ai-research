@@ -389,6 +389,93 @@ def judge_interest(lesson_text, notebook_md, model=MODEL, timeout=90):
 
 
 # ===========================================================================
+# ABSOLUTE INTEREST FLOOR — notebook-FREE. Runs on EVERY lesson (interest is
+# the #1 goal, and 76% of days have no notebook_yardstick, so the notebook-
+# relative judge above is N/A there). Scores the same 7 levers on their OWN
+# merits against fixed anchors and returns FLOOR_MET | BELOW_FLOOR. Advisory,
+# graceful fallback, never raises. The bridge call is isolated in _chat() so
+# tests can mock it without a network.
+# ===========================================================================
+def _chat(system, user, model=MODEL, timeout=90, max_tokens=2000):
+    """One bridge call -> assistant content string. Raises on failure (caller degrades)."""
+    from openai import OpenAI
+    client = OpenAI(api_key='not-needed', base_url=BRIDGE_URL, timeout=timeout)
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{'role': 'system', 'content': system},
+                  {'role': 'user', 'content': user}],
+        max_tokens=max_tokens,
+    )
+    return (resp.choices[0].message.content or '').strip()
+
+
+_INTEREST_ABS_SYS = (
+    "You judge whether a BEGINNER ML lesson (a curious 12-year-old for whom English may be a second language) "
+    "cultivates INTEREST — makes a first-time learner WANT MORE: lean in, poke at it, come back tomorrow. There "
+    "is NO reference notebook; grade each lever on its OWN merits against the fixed anchors, HARSHLY, defaulting "
+    "to the LOWER grade when in doubt. Judge INTEREST / SPARK ONLY — NOT correctness, coverage, or mere warmth: a "
+    "lesson can be accurate, friendly, and analogy-rich yet still be a dutiful slog that never sparks curiosity. "
+    "Cultivating interest is the #1 goal at this early stage — a bored or overwhelmed beginner learns nothing. "
+    "Credit the lesson's OWN ways of sparking it (interactive %%%viz/%%%demo drag/slide/predict-then-run widgets, "
+    "hands-on @@@produce tasks). Be specific and quote. Return STRICT JSON only (no prose, no markdown fences)."
+)
+_INTEREST_ABS_MAX = 48000
+
+
+def _interest_abs_prompt(lesson_text):
+    return f"""LESSON UNDER REVIEW (plain-text extract; %%%viz / %%%demo / @@@produce blocks are INTERACTIVE —
+runnable or clickable in the real page, so a caption like "drag z / slide the line" means genuine hands-on play):
+\"\"\"
+{lesson_text[:_INTEREST_ABS_MAX]}
+\"\"\"
+
+Score each lever GOOD / WEAK / MISSING against its anchor, with a one-line reason that QUOTES a spot and a FIX:
+- aspiration_hook   GOOD = opens the lesson AND each concept with wonder / what it unlocks, grounded in a
+                    concrete everyday thing, NOT problem-first ("without this, X is useless").
+- relevance         GOOD = ties to things a beginner already cares about (ChatGPT, face unlock, recommendations,
+                    games) and RETURNS to them, not one mention in the hook.
+- invites_play      GOOD = >=1 genuine "change something -> see it change" (live drag/slide widget or predict-
+                    then-run), not only static pictures.
+- momentum          GOOD = light, skimmable, ideas keep moving; NOT a dense wall and NOT >=3 failure-mode/"trap"
+                    beats in a row with no play/payoff between them.
+- breadth_spark     GOOD = teases a landscape / family worth exploring, not one narrow corridor.
+- delight_voice     GOOD = genuine enthusiasm, brilliant-friend voice, memorable lines; not flat or dutiful.
+- payoff            GOOD = concrete wow-moments + victory laps + a satisfying end recap.
+
+Then decide overall against this FLOOR: return FLOOR_MET only if NO lever is MISSING and a curious beginner would
+genuinely want to continue (a single WEAK lever is tolerable; two or more, or any MISSING, is BELOW_FLOOR).
+
+Return STRICT JSON:
+{{
+  "dimensions": [ {{"name":"aspiration_hook","verdict":"GOOD|WEAK|MISSING","reason":"...","fix":"..."}} ],
+  "overall": "FLOOR_MET|BELOW_FLOOR",
+  "top_fixes": ["highest-leverage change 1", "..."],
+  "summary": "<=2 sentences"
+}}"""
+
+
+def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
+    """Notebook-FREE absolute interest floor. Runs on EVERY lesson. Never raises."""
+    try:
+        content = _chat(_INTEREST_ABS_SYS, _interest_abs_prompt(lesson_text), model, timeout)
+    except Exception as e:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e),
+                'dimensions': [], 'overall': 'N/A', 'top_fixes': [], 'summary': ''}
+    data = _extract_json(content) or _salvage_truncated_json(content)
+    if data is None:
+        return {'status': 'PARSE_ERROR', 'raw': content,
+                'dimensions': [], 'overall': 'N/A', 'top_fixes': [], 'summary': ''}
+    data.setdefault('dimensions', [])
+    data.setdefault('top_fixes', [])
+    data.setdefault('summary', '')
+    # Fail safe: FLOOR_MET only when explicitly stated; anything else flags for review.
+    ov = str(data.get('overall') or '').upper().replace(' ', '_')
+    data['overall'] = 'FLOOR_MET' if 'FLOOR_MET' in ov else 'BELOW_FLOOR'
+    data['status'] = 'OK'
+    return data
+
+
+# ===========================================================================
 # CONCEPT-STRUCTURE JUDGE — per-concept intuition-first / analogy / build-up
 # ===========================================================================
 # The deterministic concept_structure_gate proves the triad is STRUCTURALLY
@@ -613,6 +700,7 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
     return {'coverage': judge(lesson_text, spec, nb_concepts, curation),
             'tone': judge_tone(lesson_text, notebook_md),
             'interest': judge_interest(lesson_text, notebook_md),
+            'interest_absolute': judge_interest_absolute(lesson_text),
             'structure': judge_concept_structure(lesson_text, concept_titles)}
 
 
@@ -677,6 +765,23 @@ def main():
         print('\nsummary:', interest['summary'])
     elif interest.get('error'):
         print('  error:', interest['error'])
+
+    interest_abs = out.get('interest_absolute', {'status': 'N/A', 'overall': 'N/A',
+                                                 'dimensions': [], 'top_fixes': [], 'summary': ''})
+    print('\n== Absolute Interest Floor (no notebook — runs on EVERY lesson) ==')
+    print('status:', interest_abs['status'], '| overall:', interest_abs.get('overall'))
+    if interest_abs['status'] == 'OK':
+        print('\n-- interest levers (absolute anchors) --')
+        for d in interest_abs['dimensions']:
+            print('  [%s] %s — %s' % (d.get('verdict', '?'), d.get('name', '?'), d.get('reason', '')))
+            if d.get('fix'):
+                print('        fix: %s' % d['fix'])
+        print('\n-- top fixes --')
+        for f in interest_abs['top_fixes']:
+            print('  * %s' % f)
+        print('\nsummary:', interest_abs['summary'])
+    elif interest_abs.get('error'):
+        print('  error:', interest_abs['error'])
 
     print('\n== Concept-Structure Judge (per concept, advisory) ==')
     print('status:', struct['status'], '| overall:', struct.get('overall'))
