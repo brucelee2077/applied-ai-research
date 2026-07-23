@@ -203,6 +203,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .demo-out{margin:0;padding:.85rem 1rem;background:#080B11;color:#8FE3A0;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;overflow-x:auto}
 .demo-take{padding:.75rem 1rem;font-size:.85rem;color:var(--ink2);line-height:1.5;background:var(--panel2)}
 .demo-take b{color:var(--ink)}
+/* ---------- hint ladder (get-unstuck) + warm-up recall (retention) ---------- */
+.hint{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.6rem .9rem}
+.hint-reveal{font-family:var(--body);font-size:.82rem;font-weight:700;color:var(--accent);background:transparent;border:1px dashed var(--accent);border-radius:var(--r-sm);padding:.35rem .7rem;cursor:pointer}
+.hint-reveal:disabled{opacity:.6;cursor:default;border-style:solid}
+.hint-tier{margin-top:.6rem;padding:.55rem .8rem;background:var(--panel);border-radius:var(--r-sm);font-size:.88rem;color:var(--ink2);line-height:1.5}
+.warmup{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.8rem 1rem}
+.warmup .warmup-h{font-weight:700;color:var(--ink);font-size:.9rem;margin-bottom:.5rem}
+.warmup .q{margin:.6rem 0}
 
 /* ---------- build (scroll reveal) ---------- */
 .build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
@@ -346,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h1>Multi-Head Attention<span class="sub">Many Views at Once</span></h1>
       <p class="lede">Imagine your whole family watches the same movie. Afterward you ask each person what it was about, and you get wonderfully different answers — your little sister only saw the funny dog, your dad followed the mystery, your mum caught the love story hiding underneath. Same movie, several sets of eyes, and together they tell you far more than any one person could alone. That everyday truth — many views of one thing beat a single view — is exactly the trick inside every transformer, and a big reason a model like ChatGPT can follow a long sentence so well. Yesterday you built ONE attention "meeting," where each word listens to the others and blends them into one answer. Today you'll feel why one meeting isn't enough — and how running a whole <strong>panel</strong> of them at once, each looking for something different, is the move that makes attention powerful.</p>
       <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>Together we'll see what one attention head can and can't do, then hand the job to a <strong>panel</strong> of heads working side by side — each with its own way of looking, each on its own slim slice of the vector, so the whole panel costs about the same as one head. We'll watch different heads quietly specialize on different relationships, then stitch their answers back together and mix them with one learned matrix. Every new word gets said in plain English the moment it shows up. No symbol left unexplained.</div></div>
+      <div class="warmup"><div class="warmup-h">🔁 Warm-up — do you still remember? (from earlier days)</div><div class="q" data-correct="1" data-concept="dot-product"><div class="q-ask">From yesterday — how do you get the attention score between one word's Query and another word's Key?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>run them through a big neural network</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>multiply them slot by slot and add it all up (the dot product)</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>count how many letters they share</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>take the average of the two lists</span></button></div><div class="q-fb" data-fb="The score is the dot product: multiply the two lists slot by slot, then add the products into one match number. Bigger total means a stronger match."></div></div><div class="q" data-correct="2" data-concept="softmax-budget"><div class="q-ask">From yesterday — after softmax, what is true about a row of attention shares?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>they can be any size, even negative</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>they are the same as the raw scores</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>they are all positive and add up to exactly 1</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>only the biggest one is kept, the rest are dropped</span></button></div><div class="q-fb" data-fb="Softmax splits one whole attention budget into positive shares that sum to 1 — like slicing a single pizza. The biggest score gets the biggest slice."></div></div><div class="q" data-correct="0" data-concept="scaling"><div class="q-ask">From yesterday — why do we divide the scores by √d_k before softmax?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>to stop long lists from making the scores too loud, which would jam softmax into one spike</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>to add a sense of word order</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>to make some scores negative</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>to speed up the GPU</span></button></div><div class="q-fb" data-fb="Longer Query/Key lists pile on more products, so scores swell. Dividing by √d_k turns the volume back down so softmax can still share the budget nicely."></div></div></div>
     </section>
 
     <section class="module-section" id="c1" data-sec="c1">
@@ -400,6 +409,7 @@ head_2 Query -&gt; "I'm hunting for WHERE I happened"          -&gt; lands on "m
       <p>Now for the surprise that makes multi-head almost free. You might worry: if we run 8 heads instead of 1, doesn't that cost 8 times as much? Happily, no — and the reason is a neat trick. Instead of giving every head the <em>full</em> width of a word's vector, we <strong>cut the width into equal slices</strong> and hand one slice to each head. So the whole panel works on the same total amount of numbers as a single full-width head would. More heads, same budget — just sliced thinner.</p>
       <p>Think of <strong>one pizza cut into slices</strong>. Whether you cut it into 4 big slices or 8 small ones, it's still the same one pizza — you never get more (or less) pizza by slicing. Cutting it into more pieces just means each piece is smaller. The word's vector is the pizza: its full width is called <span class="term" data-tip="The full width of a word's vector — the total number of slots the model gives each word.">d_model</span>. Slice it among <code>h</code> heads and each head gets a thinner piece of width <span class="term" data-tip="The per-head width: the full width d_model split evenly across the heads, so d_k = d_model / h.">d_k</span> <code>= d_model / h</code>. Same pizza, more slices, each slice smaller.</p>
       <div class="build-viz"><svg viewBox="0 0 520 180" role="img" aria-label="A word vector of width d_model equals 12 drawn as one long bar. Below, the same bar is cut into three equal slices of width d_k equals 4, each slice a different color for head 1, head 2, and head 3. The total width is unchanged."><g font-family="monospace" font-size="11"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Same vector width, cut into equal head slices (nothing added)</text><text x="30" y="44" fill="#6B645E" font-size="9">one full vector:  d_model = 12</text><rect x="30" y="50" width="360" height="30" rx="4" fill="#FDF9F3" stroke="#B8AEA2" stroke-width="1.5"/><text x="210" y="70" text-anchor="middle" fill="#9A938A" font-size="9">12 slots, all to one head</text><text x="30" y="116" fill="#6B645E" font-size="9">cut into 3 heads:  d_k = 12 ÷ 3 = 4 each</text><rect x="30" y="122" width="120" height="30" rx="4" fill="#EAF5EE" stroke="#2D8B55" stroke-width="1.5"/><text x="90" y="142" text-anchor="middle" fill="#276b45" font-size="9">head 1 · 4</text><rect x="150" y="122" width="120" height="30" rx="4" fill="#EAF0FA" stroke="#5E5191" stroke-width="1.5"/><text x="210" y="142" text-anchor="middle" fill="#5E5191" font-size="9">head 2 · 4</text><rect x="270" y="122" width="120" height="30" rx="4" fill="#FCF3DC" stroke="#C99A12" stroke-width="1.5"/><text x="330" y="142" text-anchor="middle" fill="#8A6D3B" font-size="9">head 3 · 4</text><text x="430" y="70" fill="#9A938A" font-size="9">total: 12</text><text x="430" y="142" fill="#276b45" font-size="9">total: 12</text><text x="210" y="172" text-anchor="middle" fill="#9A938A" font-size="9">4 + 4 + 4 = 12 — the width never grew</text></g></svg></div>
+      <div class="hint" data-hint-total="3"><button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button><div class="hint-tier" data-hint-tier="1" hidden>Don't reach for the formula yet — just picture the pizza. You start with ONE pizza (the full vector). Cutting it into more slices never gives you more pizza; each slice just gets smaller. So ask yourself: if the total pizza stays the same, and each head only gets a slice, what happens to the size of each slice as you add more heads?</div><div class="hint-tier" data-hint-tier="2" hidden>Put tiny numbers on it. Say the full width is d_model = 12 and you use h = 3 heads. Each head's slice is d_k = 12 ÷ 3 = 4. The work for the panel is (number of heads) × (each head's width) = 3 × 4 = 12. Now double the heads to h = 6: each slice halves to d_k = 12 ÷ 6 = 2, and the work is 6 × 2 = 12 again. The two numbers always multiply back to 12.</div><div class="hint-tier" data-hint-tier="3" hidden>Because d_k = d_model ÷ h, the product h × d_k always lands back on d_model — so adding heads just re-slices one fixed budget instead of buying more, and the total cost stays about the same.</div></div>
       <p><strong>What the pizza picture gets right:</strong> slicing changes how many pieces you have, never how much pizza there is — just like slicing the vector gives more heads without adding width. <strong>Where it breaks down:</strong> pizza slices are separate once cut, but the head slices are still part of one vector — they get stitched back into a full-width vector at the end, something you can't do with actual pizza.</p>
       <h4>Watch the cost stay flat as heads go up</h4>
       <p>The one-line rule: <code>d_k = d_model / h</code>. In words — the per-head width is the full width divided by the number of heads. <strong>Predict first:</strong> if a model has width <code>d_model = 64</code> and we go from 1 head to 8 heads, does the total amount of work roughly grow, shrink, or stay the same? Guess, then reveal.</p>
@@ -639,6 +649,44 @@ Array.prototype.slice.call(document.querySelectorAll('.quiz')).forEach(function(
       });
     });
   });
+});
+
+/* ===== HINT LADDER (get-unstuck; progressive disclosure, offline — no network) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.hint')).forEach(function(h){
+  var btn = h.querySelector('.hint-reveal');
+  var tiers = Array.prototype.slice.call(h.querySelectorAll('.hint-tier'));
+  var shown = 0;
+  if(!btn || !tiers.length) return;
+  btn.addEventListener('click', function(){
+    if(shown < tiers.length){ tiers[shown].hidden = false; shown++; }
+    if(shown >= tiers.length){ btn.disabled = true; btn.textContent = "— that's all the hints —"; }
+    else { btn.textContent = '💡 still stuck? another hint ('+shown+'/'+tiers.length+')'; }
+  });
+});
+/* ===== SM-2 spaced repetition (retention; browser mirror of coach/core.py:667-714) ===== */
+function _srToday(){ return Math.floor(Date.now()/86400000); }
+function srReview(conceptId, quality){
+  if(!state.sr) state.sr = {};
+  var prev = state.sr[conceptId] || {},
+      ease = prev.ease!=null?prev.ease:2.5, interval = prev.interval!=null?prev.interval:1, reps = prev.reps!=null?prev.reps:0;
+  var ne = Math.max(1.3, ease + 0.1 - (5-quality)*(0.08+(5-quality)*0.02)), ni;
+  if(quality>=3){ ni = reps===0?1:(reps===1?6:Math.round(interval*ne)); }
+  else { ni = 1; ne = 2.5; }
+  state.sr[conceptId] = { ease: Math.round(ne*1000)/1000, interval: ni, next: _srToday()+ni, reps: reps+1 };
+  save();
+}
+/* ===== WARM-UP recall (retention; reuses .q markup, records SM-2 on answer) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.warmup .q')).forEach(function(q){
+  var correct = parseInt(q.getAttribute('data-correct'),10), cid = q.getAttribute('data-concept')||'';
+  var fb = q.querySelector('.q-fb'), fbText = fb?fb.getAttribute('data-fb'):'';
+  var opts = Array.prototype.slice.call(q.querySelectorAll('.q-opt')), done=false;
+  opts.forEach(function(o,oi){ o.addEventListener('click', function(){
+    if(done) return; done=true; opts.forEach(function(c){ c.classList.add('locked'); });
+    var right = oi===correct;
+    if(right){ o.classList.add('correct'); if(fb){ fb.className='q-fb good show'; fb.innerHTML='✓ '+fbText; } }
+    else { o.classList.add('wrong'); if(opts[correct]) opts[correct].classList.add('correct'); if(fb){ fb.className='q-fb bad show'; fb.innerHTML='The green one. '+fbText; } }
+    if(cid) srReview(cid, right?5:1);
+  }); });
 });
 
 /* ===== COPY ===== */

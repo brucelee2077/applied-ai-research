@@ -203,6 +203,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .demo-out{margin:0;padding:.85rem 1rem;background:#080B11;color:#8FE3A0;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;overflow-x:auto}
 .demo-take{padding:.75rem 1rem;font-size:.85rem;color:var(--ink2);line-height:1.5;background:var(--panel2)}
 .demo-take b{color:var(--ink)}
+/* ---------- hint ladder (get-unstuck) + warm-up recall (retention) ---------- */
+.hint{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.6rem .9rem}
+.hint-reveal{font-family:var(--body);font-size:.82rem;font-weight:700;color:var(--accent);background:transparent;border:1px dashed var(--accent);border-radius:var(--r-sm);padding:.35rem .7rem;cursor:pointer}
+.hint-reveal:disabled{opacity:.6;cursor:default;border-style:solid}
+.hint-tier{margin-top:.6rem;padding:.55rem .8rem;background:var(--panel);border-radius:var(--r-sm);font-size:.88rem;color:var(--ink2);line-height:1.5}
+.warmup{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.8rem 1rem}
+.warmup .warmup-h{font-weight:700;color:var(--ink);font-size:.9rem;margin-bottom:.5rem}
+.warmup .q{margin:.6rem 0}
 
 /* ---------- build (scroll reveal) ---------- */
 .build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
@@ -348,6 +356,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h1>Attention Scores &amp; Softmax<span class="sub">From Matches to a Weighted Blend</span></h1>
       <p class="lede">You know that moment at a busy dinner table when three people talk at once, and you quietly decide who to listen to? You lean toward the friend with the good story, give a little to the person beside you, almost none to the far end — and, without noticing, your listening always adds up to one whole you. That everyday balancing act — hand out shares of one fixed pot of attention — is exactly the move at the center of every transformer, the same move that lets ChatGPT figure out which words in your sentence matter most to each other. Today you build it by hand: for one word, score how well it matches every other word, then split a single 100% attention <strong>budget</strong> among them. By the end you'll have written the one line at the heart of the transformer — and it'll feel as familiar as choosing who to listen to at dinner.</p>
       <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>Together we'll turn "how well do these two words match?" into a single number with a friendly multiply-and-add, lay every pair's number into a tidy grid, keep those numbers from getting too loud as words grow long, and split one attention <strong>budget</strong> into shares with softmax. You'll meet the clumsy older way of scoring (and see why the modern way is faster), the two puzzles that break raw scores — and their two neat fixes — and the honest limits of a score. Every new word gets said in plain English the moment it shows up. No symbol left unexplained.</div></div>
+      <div class="warmup"><div class="warmup-h">🔁 Warm-up — do you still remember? (from earlier days)</div><div class="q" data-correct="2" data-concept="query-key-value"><div class="q-ask">Yesterday each word split into THREE versions of itself. What were those three roles called?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>past, present, future</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>noun, verb, adjective</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>Query, Key, Value</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>red, green, blue</span></button></div><div class="q-fb" data-fb="A word plays three roles at once — Query (what it asks), Key (what it advertises), Value (what it shares). Today the Query and Key finally meet to make a score."></div></div><div class="q" data-correct="1" data-concept="projection-filters"><div class="q-ask">Yesterday a word made its three versions by passing its one embedding through three learned filter-grids. What were those grids called?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>Q, K, V</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>W_Q, W_K, W_V</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>d_k and √d_k</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>softmax</span></button></div><div class="q-fb" data-fb="The three learned filters are W_Q, W_K, W_V — one per role. Today we use the Query and Key they produced."></div></div></div>
     </section>
 
     <section class="module-section" id="c1" data-sec="c1">
@@ -477,6 +486,7 @@ DOT (modern):   2*3 + 0*0 + 1*1 = 7   (one multiply-and-add, no extra weights)</
       <p>Raw scores are almost the whole story, but two little puzzles can trip them up. The fun part: each has a one-move fix, and you've already met one of them. Let's solve both.</p>
       <p>Think of <strong>a smart speaker in a noisy kitchen</strong>. Puzzle one: if everyone yells, the speaker can't tell voices apart — it just hears one wall of loud. Puzzle two: the speaker might obey the TV in the next room, or a voice it shouldn't be allowed to follow. The two fixes are just as homely: turn the volume down so voices stay distinct, and mute the sources it isn't allowed to hear. Attention's two fixes are exactly these — turn the scores down (scaling), and mute the words a query mustn't listen to (masking).</p>
       <div class="build-viz"><svg viewBox="0 0 520 200" role="img" aria-label="Two puzzles and their fixes. Left puzzle: scores too loud, softmax collapses to one spike; fix is divide by root d_k. Right puzzle: a query listens to a forbidden future or padding word; fix is masking, setting that score to minus infinity so its share becomes zero."><g font-family="monospace" font-size="11"><text x="130" y="16" text-anchor="middle" fill="#C0392B" font-size="11">Puzzle 1: too loud</text><rect x="40" y="34" width="14" height="70" fill="#FBE3E3" stroke="#C0392B"/><rect x="70" y="94" width="14" height="10" fill="#F3D9D9" stroke="#C0392B"/><rect x="100" y="98" width="14" height="6" fill="#F3D9D9" stroke="#C0392B"/><rect x="130" y="100" width="14" height="4" fill="#F3D9D9" stroke="#C0392B"/><text x="95" y="122" text-anchor="middle" fill="#C0392B" font-size="9">one spike, rest ~0</text><text x="95" y="140" text-anchor="middle" fill="#276b45" font-size="9">fix: ÷ √d_k</text><rect x="55" y="150" width="80" height="36" fill="#EAF5EE" stroke="#2D8B55"/><rect x="50" y="160" width="12" height="20" fill="#2D8B55"/><rect x="72" y="164" width="12" height="16" fill="#8Cc4a3"/><rect x="94" y="166" width="12" height="14" fill="#8Cc4a3"/><rect x="116" y="168" width="12" height="12" fill="#8Cc4a3"/><text x="95" y="199" text-anchor="middle" fill="#276b45" font-size="8">distinct again</text><line x1="260" y1="30" x2="260" y2="196" stroke="#E5DED2"/><text x="390" y="16" text-anchor="middle" fill="#C0392B" font-size="11">Puzzle 2: forbidden word</text><circle cx="330" cy="60" r="15" fill="#EAF0FA" stroke="#5E5191"/><text x="330" y="64" text-anchor="middle" fill="#5E5191" font-size="8">now</text><circle cx="450" cy="60" r="15" fill="#FBE3E3" stroke="#C0392B"/><text x="450" y="64" text-anchor="middle" fill="#C0392B" font-size="8">future</text><line x1="345" y1="60" x2="435" y2="60" stroke="#C0392B" stroke-width="2"/><text x="390" y="52" text-anchor="middle" fill="#C0392B" font-size="9">peeking! ✗</text><text x="390" y="110" text-anchor="middle" fill="#276b45" font-size="9">fix: mask → score = −∞</text><circle cx="330" cy="150" r="15" fill="#EAF0FA" stroke="#5E5191"/><text x="330" y="154" text-anchor="middle" fill="#5E5191" font-size="8">now</text><circle cx="450" cy="150" r="15" fill="#EEE" stroke="#B8AEA2" stroke-dasharray="3,2"/><text x="450" y="154" text-anchor="middle" fill="#9A938A" font-size="8">muted</text><line x1="345" y1="150" x2="435" y2="150" stroke="#B8AEA2" stroke-dasharray="4,3"/><text x="390" y="180" text-anchor="middle" fill="#276b45" font-size="9">share → 0</text></g></svg></div>
+      <div class="hint" data-hint-total="3"><button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button><div class="hint-tier" data-hint-tier="1" hidden>Feeling stuck on why setting a score to negative infinity "mutes" a word? Go back to the pizza. Softmax hands out slices by how big each score is — so ask yourself what slice a score way down at the bottom would get.</div><div class="hint-tier" data-hint-tier="2" hidden>Try one tiny example. Scores are [river 3.0, FUTURE 2.0]. Now push FUTURE all the way down: [river 3.0, FUTURE −∞]. Softmax turns each score into a slice, and a score of −∞ turns into a slice of essentially 0 — so river keeps the whole pizza, and FUTURE gets nothing.</div><div class="hint-tier" data-hint-tier="3" hidden>In one sentence: masking sets a forbidden word's score to −∞ before softmax, so its slice comes out ~0 and the freed budget flows to the words that are allowed.</div></div>
       <p><strong>What the noisy-kitchen picture gets right:</strong> the two troubles really are "can't tell voices apart" and "listening to a source it shouldn't," fixed by lowering volume and muting — a clean map to scaling and masking. <strong>Where it breaks down:</strong> a speaker mutes a source by ignoring a microphone, but attention mutes a word with a number trick — it sets that word's score to negative infinity <em>before</em> softmax, so its slice comes out as essentially zero.</p>
       <h4>Puzzle 1 — scores get too loud (you met the fix already)</h4>
       <p>As lists grow long, scores swell. Feed swollen scores into softmax and it doesn't share nicely — it slams the whole budget onto the single biggest score (a <strong>near one-hot spike</strong>), and every other word gets almost nothing. Worse, when softmax is that lopsided, the learning signal (the gradient) shrinks toward zero, so the model stops improving. <strong>The cause:</strong> a dot product adds one product per slot, so more slots → bigger totals. <strong>The fix you already know:</strong> divide by √d_k. Turn the volume down, and softmax can share again.</p>
@@ -682,6 +692,44 @@ Array.prototype.slice.call(document.querySelectorAll('.quiz')).forEach(function(
       });
     });
   });
+});
+
+/* ===== HINT LADDER (get-unstuck; progressive disclosure, offline — no network) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.hint')).forEach(function(h){
+  var btn = h.querySelector('.hint-reveal');
+  var tiers = Array.prototype.slice.call(h.querySelectorAll('.hint-tier'));
+  var shown = 0;
+  if(!btn || !tiers.length) return;
+  btn.addEventListener('click', function(){
+    if(shown < tiers.length){ tiers[shown].hidden = false; shown++; }
+    if(shown >= tiers.length){ btn.disabled = true; btn.textContent = "— that's all the hints —"; }
+    else { btn.textContent = '💡 still stuck? another hint ('+shown+'/'+tiers.length+')'; }
+  });
+});
+/* ===== SM-2 spaced repetition (retention; browser mirror of coach/core.py:667-714) ===== */
+function _srToday(){ return Math.floor(Date.now()/86400000); }
+function srReview(conceptId, quality){
+  if(!state.sr) state.sr = {};
+  var prev = state.sr[conceptId] || {},
+      ease = prev.ease!=null?prev.ease:2.5, interval = prev.interval!=null?prev.interval:1, reps = prev.reps!=null?prev.reps:0;
+  var ne = Math.max(1.3, ease + 0.1 - (5-quality)*(0.08+(5-quality)*0.02)), ni;
+  if(quality>=3){ ni = reps===0?1:(reps===1?6:Math.round(interval*ne)); }
+  else { ni = 1; ne = 2.5; }
+  state.sr[conceptId] = { ease: Math.round(ne*1000)/1000, interval: ni, next: _srToday()+ni, reps: reps+1 };
+  save();
+}
+/* ===== WARM-UP recall (retention; reuses .q markup, records SM-2 on answer) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.warmup .q')).forEach(function(q){
+  var correct = parseInt(q.getAttribute('data-correct'),10), cid = q.getAttribute('data-concept')||'';
+  var fb = q.querySelector('.q-fb'), fbText = fb?fb.getAttribute('data-fb'):'';
+  var opts = Array.prototype.slice.call(q.querySelectorAll('.q-opt')), done=false;
+  opts.forEach(function(o,oi){ o.addEventListener('click', function(){
+    if(done) return; done=true; opts.forEach(function(c){ c.classList.add('locked'); });
+    var right = oi===correct;
+    if(right){ o.classList.add('correct'); if(fb){ fb.className='q-fb good show'; fb.innerHTML='✓ '+fbText; } }
+    else { o.classList.add('wrong'); if(opts[correct]) opts[correct].classList.add('correct'); if(fb){ fb.className='q-fb bad show'; fb.innerHTML='The green one. '+fbText; } }
+    if(cid) srReview(cid, right?5:1);
+  }); });
 });
 
 /* ===== COPY ===== */

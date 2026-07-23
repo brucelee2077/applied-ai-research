@@ -21,6 +21,11 @@ notebook_yardstick: null
 @lede Think about how you tidy a bookshelf. You put the cookbooks in one stack, the comic books in another, the school books somewhere else. Your hand just *knows* that similar books belong close together — you never write down a rule. Here's a little mystery: a computer cannot read the word `cat` the way you can. To a computer, letters are just shapes, not meaning. So before a model like ChatGPT can do anything clever with language, it has to pull off that same bookshelf trick — give every word a *spot*, and place words with similar meanings close together. Today you build that spot-giving trick from scratch. It's called an **embedding**, and it's the very first thing that happens inside every language model. Get it right and "cat" and "dog" become neighbors, while "cat" and "car" sit rooms apart. Sounds almost too simple to be the foundation of modern AI? Good — hold that feeling. By the end it'll feel obvious, and a little bit magic.
 @goal Together we'll turn a word into a list of numbers, arrange those numbers so meaning becomes *distance* on a map, and measure "how alike are these two words?" with one friendly little score. You'll also meet the two puzzles this simple map can't crack on its own — a word it has never seen, and a word with two meanings — and see the clever fixes waiting ahead. Every new word gets said in plain English the moment it shows up. No symbol left unexplained.
 
+%%% warmup
+q: Deep down, what is the only kind of thing a computer really understands? | a:2 | pictures | letters and words | numbers | sounds | concept: computer-uses-numbers | fb: A computer is basically a calculator — it works with numbers, not letters. That's why a word must become numbers first.
+q: In Module 2 you saw a model get better by slowly adjusting its inner numbers as it learns. What do we call those adjustable inner numbers? | a:0 | weights | letters | pictures | passwords | concept: weights-are-learned | fb: Weights are the tunable numbers a model nudges while it learns — the same idea that will shape today's word-numbers.
+%%%
+
 @@@ concept id=c1 tag="Word to numbers" title="A word becomes a little list of numbers" gotit="Got what an embedding is"
 Let's start where every model starts. A computer is a calculator — it only understands numbers. So the very first job is to turn a word into numbers.
 
@@ -73,6 +78,12 @@ Think of two friends standing in a field, each **pointing at something**. If the
 %%%
 
 **What the pointing-arrows picture gets right:** agreement on a *direction* is exactly what we want — two words are alike when their arrows point the same way, whatever their length. **Where it breaks down:** two friends only point in the flat world you can see, but word-arrows point in a space with hundreds of directions. You can't picture it, but the "same direction = alike" rule works exactly the same there.
+
+%%% hint
+t1: Don't try to picture hundreds of directions at once. Just take TWO short lists and ask one question: do they rise and fall together?
+t2: Take cat [0.9, 0.8] and dog [0.8, 0.9]. Multiply position-by-position: 0.9×0.8 = 0.72, then 0.8×0.9 = 0.72. Add them: 0.72 + 0.72 = 1.44. A big positive total means "same direction." Now try cat vs a made-up opposite like [-0.9, -0.8] and watch the total go negative.
+t3: Cosine similarity is just "multiply the two lists position-by-position, add it up, then divide by their lengths so only the direction counts" — high means alike, near zero means unrelated, negative means opposite.
+%%%
 
 #### The one-line rule (say it in plain words)
 The actual score is one small calculation. In plain words: *multiply the two lists position-by-position, add it all up, then adjust for how long each arrow is.* That's it. A big positive score means "same direction, very alike." A score near zero means "unrelated." A negative score means "pointing opposite ways."

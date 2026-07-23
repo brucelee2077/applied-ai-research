@@ -203,6 +203,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .demo-out{margin:0;padding:.85rem 1rem;background:#080B11;color:#8FE3A0;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;overflow-x:auto}
 .demo-take{padding:.75rem 1rem;font-size:.85rem;color:var(--ink2);line-height:1.5;background:var(--panel2)}
 .demo-take b{color:var(--ink)}
+/* ---------- hint ladder (get-unstuck) + warm-up recall (retention) ---------- */
+.hint{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.6rem .9rem}
+.hint-reveal{font-family:var(--body);font-size:.82rem;font-weight:700;color:var(--accent);background:transparent;border:1px dashed var(--accent);border-radius:var(--r-sm);padding:.35rem .7rem;cursor:pointer}
+.hint-reveal:disabled{opacity:.6;cursor:default;border-style:solid}
+.hint-tier{margin-top:.6rem;padding:.55rem .8rem;background:var(--panel);border-radius:var(--r-sm);font-size:.88rem;color:var(--ink2);line-height:1.5}
+.warmup{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.8rem 1rem}
+.warmup .warmup-h{font-weight:700;color:var(--ink);font-size:.9rem;margin-bottom:.5rem}
+.warmup .q{margin:.6rem 0}
 
 /* ---------- build (scroll reveal) ---------- */
 .build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
@@ -346,6 +354,7 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <h1>Positional Encoding<span class="sub">&amp; the Shuffle Problem</span></h1>
       <p class="lede">Picture the seats in a movie theater, each with a printed number on it. When you buy a ticket it says "row F, seat 12" — so even in the dark, everyone finds exactly where they belong. Now imagine someone scrubbed the numbers off every chair: people could sit anywhere, and "the seat by the aisle" would stop meaning anything. Word order works a lot like those seat numbers. "Dog bites man" and "man bites dog" use the exact same three words — only the <em>order</em> is different, yet they mean opposite things. Here is the surprise that makes today fun: the attention you built all week is like a theater with no seat numbers. It can tell you <em>who</em> is in the room and how the words relate, but it has no idea <em>where</em> each word sits. Today you'll fix that with one clever trick — giving every word its own <strong>seat</strong> number — and it's the very trick humming quietly inside a model like ChatGPT so it can read a long sentence in the right order.</p>
       <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>Together we'll first feel the bug: attention treats a sentence as an unordered pile of words, so shuffling them changes nothing. Then we fix it by stamping each word with a position signal — a <strong>seat</strong> number — so the same word can mean different things depending on where it sits. We'll meet the clever wave-based recipe the first Transformer used, see why it needs many waves and not just one, meet the learned-seat alternative, and finish knowing exactly what this trick does and doesn't do. Every new word gets said in plain English the moment it shows up.</div></div>
+      <div class="warmup"><div class="warmup-h">🔁 Warm-up — do you still remember? (from earlier days)</div><div class="q" data-correct="2" data-concept="multi-head-attention"><div class="q-ask">Yesterday you saw one attention head has to fold every relationship into a single blend. What happens to two clean relationships when one head must do both?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>they stay perfectly sharp</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>one of them is dropped</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>they get averaged into one muddy answer</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>the sentence gets shorter</span></button></div><div class="q-fb" data-fb="One head gives one blend, so it splits the difference (0.50/0.50) — that mush is why we run a panel of heads."></div></div><div class="q" data-correct="1" data-concept="multi-head-dk"><div class="q-ask">In multi-head attention with width d_model and h heads, how wide is each head's slice, d_k?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>d_model × h</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>d_model ÷ h</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>h ÷ d_model</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>always 64</span></button></div><div class="q-fb" data-fb="d_k = d_model / h — the width is split across heads, so more heads cost about the same."></div></div><div class="q" data-correct="0" data-concept="multi-head-concat-wo"><div class="q-ask">After the heads each produce their own answer, how are they brought back into one vector per word?</div><div class="q-opts"><button class="q-opt" type="button" data-opt="0"><span class="mark"></span><span>join them side by side, then mix with the matrix W_O</span></button><button class="q-opt" type="button" data-opt="1"><span class="mark"></span><span>keep only the best head</span></button><button class="q-opt" type="button" data-opt="2"><span class="mark"></span><span>average all the heads into one</span></button><button class="q-opt" type="button" data-opt="3"><span class="mark"></span><span>throw the extra heads away</span></button></div><div class="q-fb" data-fb="Concatenate the head answers, then W_O mixes them into one final vector the next layer expects."></div></div></div>
     </section>
 
     <section class="module-section" id="c1" data-sec="c1">
@@ -407,6 +416,7 @@ cat_in_seat_3 = [0.20+0.14, 0.90-0.99] = [0.34, -0.09]
       <p>So the fix is "add a seat stamp." But what <em>numbers</em> should the stamp contain? The very first Transformer picked a clever answer: build each seat stamp out of <strong>waves</strong> — smooth up-and-down ripples like a jump-rope or a water wave. This is called <span class="term" data-tip="A recipe that builds each seat's stamp from smooth sine and cosine waves at different speeds.">sinusoidal encoding</span> ("sinusoidal" just means "wave-shaped," from <em>sine</em>, the math name for a wave). Here's the neat part: instead of one wave, it uses <em>many</em> waves at different speeds — some wiggling fast, some slow. Each seat reads off one point from every wave, and that bundle of readings becomes its stamp. Because the waves run at different speeds, no two seats ever get the exact same bundle.</p>
       <p>Think of a <strong>clock face with an hour hand and a minute hand</strong>. The minute hand sweeps fast; the hour hand crawls slow. At any single moment, the <em>pair</em> of hand positions names one exact time — 3:47 looks different from 3:48 (minute hand moved) and different from 4:47 (hour hand moved). Neither hand alone is enough — two identical-looking minutes an hour apart would clash — but <em>together</em>, fast plus slow, they pin down one exact moment with no repeats all day. Waves at different speeds do the same for seats: fast waves tell nearby seats apart, slow waves tell far-apart seats apart, and together they give every seat a stamp nothing else shares.</p>
       <div class="build-viz"><svg viewBox="0 0 520 190" role="img" aria-label="A clock face on the left with a fast minute hand and a slow hour hand, labelled together they name one exact time. On the right, two waves are drawn: a fast wiggling wave labelled fast wave tells nearby seats apart, and a slow gentle wave labelled slow wave tells far seats apart. Together they give each seat a unique reading."><g font-family="monospace" font-size="10"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Fast hand + slow hand = one exact time · fast wave + slow wave = one exact seat</text><circle cx="90" cy="105" r="52" fill="#FDF9F3" stroke="#B8AEA2" stroke-width="1.5"/><line x1="90" y1="105" x2="90" y2="66" stroke="#C0392B" stroke-width="2.5"/><text x="118" y="60" fill="#C0392B" font-size="8">minute (fast)</text><line x1="90" y1="105" x2="118" y2="118" stroke="#5E5191" stroke-width="3"/><text x="120" y="132" fill="#5E5191" font-size="8">hour (slow)</text><text x="90" y="176" text-anchor="middle" fill="#9A938A" font-size="9">two speeds → one exact time</text><path d="M210 80 Q222 56 234 80 T258 80 T282 80 T306 80 T330 80 T354 80 T378 80 T402 80 T426 80 T450 80 T474 80" fill="none" stroke="#C0392B" stroke-width="1.6"/><text x="484" y="83" fill="#C0392B" font-size="8">fast</text><path d="M210 130 Q270 96 330 130 T450 130 T570 130" fill="none" stroke="#5E5191" stroke-width="1.8"/><text x="484" y="133" fill="#5E5191" font-size="8">slow</text><text x="330" y="162" text-anchor="middle" fill="#9A7208" font-size="9">fast wave separates NEARBY seats</text><text x="330" y="178" text-anchor="middle" fill="#5E5191" font-size="9">slow wave separates FAR-APART seats</text></g></svg></div>
+      <div class="hint" data-hint-total="3"><button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button><div class="hint-tier" data-hint-tier="1" hidden>Ask yourself one small question first — why would a single wave ever fail? Picture a slow wave and look at two seats right next to each other on it.</div><div class="hint-tier" data-hint-tier="2" hidden>On a slow wave, seat 5 and seat 6 sit almost at the same height, so their readings nearly match — they collide. A fast wave fixes near-neighbors but repeats, so seat 2 and seat 40 can collide instead. So try reading BOTH waves at each seat and bundling the two numbers together.</div><div class="hint-tier" data-hint-tier="3" hidden>Each seat's stamp is its reading from many waves at different speeds bundled together — fast waves tell nearby seats apart, slow waves tell far seats apart, so no two seats ever share the same bundle.</div></div>
       <p><strong>What the clock picture gets right:</strong> two hands at different speeds together name one moment with no repeats, exactly how waves at different speeds together name one seat with no repeats. <strong>Where it breaks down:</strong> a clock has only two hands and <em>does</em> repeat every 12 hours, but the encoding uses many waves and spreads their speeds so widely that a real sentence's seats never come back around to clash.</p>
       <h4>Why one wave isn't enough — the neighbor puzzle</h4>
       <p>Here's a puzzle worth solving. What if we tried just <em>one</em> slow wave for the seat stamps? A slow wave barely moves from one seat to the next — seat 5 and seat 6 would read almost the same value and <strong>collide</strong>, looking like the same seat. And one fast wave alone? It wiggles so fast it repeats quickly, so seat 2 and seat 40 might land on the same value and collide too. The escape is to use <em>both, and more</em> — combine many wave speeds. Fast waves keep neighbors apart; slow waves keep distant seats apart; stack enough of them and every seat gets a fingerprint no other seat can match.</p>
@@ -626,6 +636,44 @@ Array.prototype.slice.call(document.querySelectorAll('.quiz')).forEach(function(
       });
     });
   });
+});
+
+/* ===== HINT LADDER (get-unstuck; progressive disclosure, offline — no network) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.hint')).forEach(function(h){
+  var btn = h.querySelector('.hint-reveal');
+  var tiers = Array.prototype.slice.call(h.querySelectorAll('.hint-tier'));
+  var shown = 0;
+  if(!btn || !tiers.length) return;
+  btn.addEventListener('click', function(){
+    if(shown < tiers.length){ tiers[shown].hidden = false; shown++; }
+    if(shown >= tiers.length){ btn.disabled = true; btn.textContent = "— that's all the hints —"; }
+    else { btn.textContent = '💡 still stuck? another hint ('+shown+'/'+tiers.length+')'; }
+  });
+});
+/* ===== SM-2 spaced repetition (retention; browser mirror of coach/core.py:667-714) ===== */
+function _srToday(){ return Math.floor(Date.now()/86400000); }
+function srReview(conceptId, quality){
+  if(!state.sr) state.sr = {};
+  var prev = state.sr[conceptId] || {},
+      ease = prev.ease!=null?prev.ease:2.5, interval = prev.interval!=null?prev.interval:1, reps = prev.reps!=null?prev.reps:0;
+  var ne = Math.max(1.3, ease + 0.1 - (5-quality)*(0.08+(5-quality)*0.02)), ni;
+  if(quality>=3){ ni = reps===0?1:(reps===1?6:Math.round(interval*ne)); }
+  else { ni = 1; ne = 2.5; }
+  state.sr[conceptId] = { ease: Math.round(ne*1000)/1000, interval: ni, next: _srToday()+ni, reps: reps+1 };
+  save();
+}
+/* ===== WARM-UP recall (retention; reuses .q markup, records SM-2 on answer) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.warmup .q')).forEach(function(q){
+  var correct = parseInt(q.getAttribute('data-correct'),10), cid = q.getAttribute('data-concept')||'';
+  var fb = q.querySelector('.q-fb'), fbText = fb?fb.getAttribute('data-fb'):'';
+  var opts = Array.prototype.slice.call(q.querySelectorAll('.q-opt')), done=false;
+  opts.forEach(function(o,oi){ o.addEventListener('click', function(){
+    if(done) return; done=true; opts.forEach(function(c){ c.classList.add('locked'); });
+    var right = oi===correct;
+    if(right){ o.classList.add('correct'); if(fb){ fb.className='q-fb good show'; fb.innerHTML='✓ '+fbText; } }
+    else { o.classList.add('wrong'); if(opts[correct]) opts[correct].classList.add('correct'); if(fb){ fb.className='q-fb bad show'; fb.innerHTML='The green one. '+fbText; } }
+    if(cid) srReview(cid, right?5:1);
+  }); });
 });
 
 /* ===== COPY ===== */

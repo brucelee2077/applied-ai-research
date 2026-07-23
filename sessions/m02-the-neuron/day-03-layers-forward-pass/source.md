@@ -33,6 +33,11 @@ coverage_topics:
 @@@ hero
 @lede Picture a **car assembly line** in a factory. A bare metal frame rolls in one end. It stops at the first station, where a team bolts on the engine. It rolls to the next station, where another team adds the doors. Station after station, each team does one small job and passes the car along — and a finished car rolls out the far end. A neural network works exactly like this line: your numbers roll in one end, each **layer** is a station full of workers, and a finished **guess** rolls out the other end. That single trip down the line — input to answer — is called the **forward pass**, and it's the exact thing happening every time ChatGPT reads your message and begins to reply. Yesterday you met one worker (a neuron) and the little bend it adds. Today you watch a whole line of them team up.
 @goal Together we'll build the assembly line one piece at a time: line up many neurons into a **layer**, learn the neat trick that runs a whole layer's math in one step, then chain layers into a network and push a real input all the way down to a prediction. You'll catch the two classic ways the line jams — and the simple fix for each — and by the end you'll trace a number from input to answer with your finger. Every formula shows up in plain words first. No symbol left unexplained.
+%%% warmup
+q: Yesterday's puzzle: you stack two straight-line layers with NO bend between them. What do you get? | a:1 | An even more powerful two-layer network | Still just one straight-line layer — the depth folds flat | A curved boundary for free | A network that runs twice as fast | concept: linear-collapse | fb: Straight ∘ straight is still straight. With no activation between them, the two layers' weights fold into one — depth buys nothing until you add a bend.
+q: What does ReLU do to a number? | a:2 | Squashes it into the range 0 to 1 | Turns every number into 0 or 1 | Passes positives straight through, turns negatives into 0 (max(0, z)) | Adds a small bias to it | concept: relu | fb: ReLU = max(0, z), a one-way valve: positives flow through unchanged, negatives become 0. It's the default hidden-layer bend.
+q: Why did deep sigmoid networks stall for years, while ReLU rescued them? | a:0 | Sigmoid's slope tops out near 0.25, so multiplying it through many layers shrinks the learning signal toward 0 (vanishing gradient); ReLU's positive slope is 1, so the signal survives | Sigmoid uses too much memory | ReLU has more parameters | Sigmoid can only handle small numbers | concept: vanishing-gradient | fb: The backward signal is multiplied by each layer's slope. With ≈0.25 per layer it fades fast; ReLU's slope of 1 keeps it full strength — that's why swapping to ReLU let people train deep nets.
+%%%
 
 @@@ concept id=c1 tag="A team of workers" title="A layer is a row of neurons doing the same job" gotit="Got the layer"
 Let's start at the first station on our assembly line. Yesterday you built one worker — one neuron — that looks at the input, does a weighted sum, adds a bias, and applies its little bend. One worker, one job.
@@ -349,6 +354,12 @@ The picture says two straight layers fold into one. Let's *prove* it with number
 
 - `W1 = [[1, 2], [0, 1]]` — the first station.
 - `W2 = [[1, 0], [3, 1]]` — the second station.
+
+%%% hint
+t1: Feeling lost on how two grids become one? Start smaller. Forget the whole grid — just track ONE number through both stations and see if a single station could have done the same job.
+t2: Take x = [1, 2]. First station: W1·x = [1·1 + 2·2, 0·1 + 1·2] = [5, 2]. Second station: W2·[5, 2] = [1·5 + 0·2, 3·5 + 1·2] = [5, 17]. Now the shortcut: multiply the two grids first, W2·W1 = [[1, 2], [3, 7]], and run that once on x — you get [5, 17] too. Same answer, one station.
+t3: With no bend, doing W1 then W2 is the exact same math as one combined grid W2·W1 — so the two layers are secretly one, and all the depth is wasted.
+%%%
 
 Here's the whole build-up in one figure — feed `x` through both grids **step by step** on the top path, and through their single combined grid `W₂·W₁` on the bottom path. Watch both paths land on the **same** two numbers:
 

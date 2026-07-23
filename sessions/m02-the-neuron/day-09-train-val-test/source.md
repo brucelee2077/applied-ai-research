@@ -36,6 +36,10 @@ coverage_topics:
 @@@ hero
 @lede Think about studying for a school test. Your teacher gives you a **practice sheet** with the answers on the back so you can learn from it. But the *real* exam has different questions — and the answer key stays locked in the teacher's desk until grading day. Why not just let you practice on the real exam itself? Because then you would not learn the subject at all — you would only memorize those exact questions, and your grade would be a lie. Here is the surprising part: a neural network falls into the exact same trap. If we grade it on the very examples it studied, we cannot tell whether it *learned the pattern* or just *memorized the answers*. So we split our data into a practice pile, a check-up pile, and a sealed exam — the same trick every serious model behind ChatGPT uses to prove it really learned. Today you get to run that split with your own hands and catch a model in the act of memorizing.
 @goal Together we will build a real gut feel for splitting data: why we never grade a model on what it studied, what each of the three splits (train, validation, test) is actually *for*, how the gap between two of them lets you *see* overfitting happen, and the sneaky ways a split can go wrong — peeking at the sealed exam, the same question leaking into two piles, an unlucky slice — each with its simple fix. Every idea comes with a picture first. No heavy math — just intuition you can steer.
+%%% warmup
+q: Yesterday you met the learning rate. In "new weight = old weight − learning rate × gradient", what does the learning rate control? | a:1 | which way is downhill | how far you hop each step | how many weights there are | the value of the loss itself | concept: learning-rate | fb: The learning rate is the step size — how far the weight moves each hop. The gradient picks the direction.
+q: You set the learning rate too big and the loss bounced around, then shot up to NaN. What was going on? | a:0 | each hop overshoots the bottom and grows, so training diverges | the hops were too tiny, so it just crawled | the model finished training early | the gradient was exactly zero | concept: lr-too-big | fb: Too-big steps jump past the bottom and grow each update until the numbers blow up to NaN. The fix is to lower the rate.
+%%%
 
 @@@ concept id=c1 tag="Why split?" title="Why we never grade a model on what it studied" gotit="Got why we split"
 Let us start with the one question the whole day answers. Imagine a friend who "studied" for a history test by memorizing the answers to *last year's exact test paper*. On that old paper they score 100%. But hand them *this year's* paper, with fresh questions on the same topic, and they fall apart. Did they learn history? No. They learned *those answers*. A neural network can do the very same thing: it can score perfectly on the examples it trained on by quietly memorizing each one, yet be useless on anything new. The word for succeeding on *new, unseen* examples is [[generalization||doing well on fresh examples the model never saw during training — the real goal, as opposed to just memorizing the ones it studied]] — and generalization is the only thing we actually care about. So here is the rule that fixes everything: **a model must be judged on data it has NOT seen, or the judgement is dishonest.** That is the reason we hold some data back instead of letting the model study all of it. This is the *exam-vs-answer-key* idea at the heart of today.
@@ -144,6 +148,12 @@ Here is the beautiful part: you do not need to *guess* whether a model is overfi
   }
   ep.addEventListener('input',paint);paint();
 })();</script>
+%%%
+
+%%% hint
+t1: Do not try to read both curves at once. Just watch ONE thing: the space between the two lines as you drag the slider to the right.
+t2: Early on, both lines drop together and the space stays small — that is healthy. Keep dragging: the training line keeps falling, but the validation line bottoms out and turns back up. The moment it turns up, the space starts growing.
+t3: The train–val gap IS overfitting made visible, and the best model is exactly where the validation line is lowest — right before the gap opens.
 %%%
 
 **What the two-runners picture gets right:** while the model learns real patterns, both scores improve together and stay close; the moment it starts memorizing, only the training score keeps improving and the two split apart — the widening space is the overfitting. **Where it breaks down:** real runners can only slow down, but a validation curve can actively turn *upward* — the model getting genuinely *worse* on new data even as it looks better on practice.
