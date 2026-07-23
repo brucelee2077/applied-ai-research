@@ -457,178 +457,47 @@ refresh();
 
 
 def render_review(spec):
-    """spec keys: qid, title, nav_title, eyebrow, h1, lead, goal,
-       prev_href, prev_label, checks (list [lesson,text]), quiz (list {q,opts,ans,fb}),
-       verdict_pass, verdict_fail, complete_label, fin (em,h3,p), score_target (int)."""
-    checks_js = "var CHECKS = " + json.dumps(spec["checks"], ensure_ascii=False) + ";"
-    qs_js = "var QS = " + json.dumps(spec["quiz"], ensure_ascii=False) + ";"
+    """Emit a module review gate on the SAME sidebar + Appearance-switcher shell
+    every lesson uses. Delegates to _review_shell_migrate.render() so the
+    generator and the _review_shell_migrate.py finalizer share ONE canonical
+    review shell — mirroring how render_lesson relates to _shell_migrate.py.
+    Spec keys: qid, title, nav_title, eyebrow, h1, lead, goal, prev_href,
+    prev_label, [next_href, next_label,] checks (list [lesson,text]), quiz
+    (list {q,opts,ans,fb}), verdict_pass, verdict_fail, complete_label,
+    fin (em,h3,p), score_target."""
+    import _review_shell_migrate as rm  # lazy: keep the core generator import-light
     nc = len(spec["checks"]); nq = len(spec["quiz"])
+    st = spec.get("score_target", nq - 1)
+    check_body = (
+        "\n      <p>Tick each one you can explain out loud or write from memory. (Click to toggle.)</p>"
+        '\n      <div class="check" id="check"></div>'
+        f'\n      <button class="gotit" type="button" disabled>tick all {_num(nc)} to continue</button>\n    ')
+    quiz_body = (
+        f"\n      <p>Instant feedback on each. <strong>Answer all {_num(nq)}</strong> — aim for {st}/{nq} or better before moving on.</p>"
+        '\n      <div id="quiz"></div>'
+        '\n      <div class="q-score" id="score"></div>'
+        f'\n      <button class="gotit" type="button" disabled>answer all {_num(nq)} first</button>\n    ')
+    verdict_body = (
+        f"\n      <p><strong>If you scored {st}/{nq}+ and every box is ticked:</strong> {spec['verdict_pass']}</p>"
+        f"\n      <p><strong>If not:</strong> {spec['verdict_fail']}</p>"
+        f'\n      <button class="gotit" type="button">{spec["complete_label"]}</button>\n    ')
     fin = spec["fin"]
-    topnav = f"""<nav class="lesson-nav" aria-label="review navigation (top)" style="margin-top:0;margin-bottom:1.75rem">
-  <a class="lnav prev" href="{spec['prev_href']}"><span class="lnav-dir">← Back</span><span class="lnav-t">{spec['prev_label']}</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map"><span>▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../index.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Curriculum Map</span></a>
-</nav>"""
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{spec['title']}</title>
-{FONTS}
-<style>{CSS}</style>
-</head>
-
-<body data-quest-id="{spec['qid']}">
-
-<nav class="nav">
-  <div class="nav-bar" id="bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="review progress"></div>
-  <div class="nav-in">
-    <span class="nav-title">{spec['nav_title']}</span>
-    <div class="nav-meta"><span class="nav-count" id="count">0/3</span><button class="nav-reset" id="reset" type="button">↺ reset</button></div>
-  </div>
-</nav>
-
-<main>
-
-{topnav}
-
-  <header class="hero">
-    <span class="eyebrow">{spec['eyebrow']}</span>
-    <h1>{spec['h1']}</h1>
-    <p class="lead">{spec['lead']}</p>
-    <div class="goal">{spec['goal']}</div>
-  </header>
-
-  <section class="sec" id="s1" data-sec="check">
-    <div class="sec-head"><span class="sec-badge s-check">1 · SELF-CHECK</span><span class="sec-h">Can you honestly say each of these?</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
-      <p>Tick each one you can explain out loud or write from memory. (Click to toggle.)</p>
-      <div class="check" id="check"></div>
-      <button class="gotit" type="button" disabled>tick all {_num(nc)} to continue</button>
-    </div>
-  </section>
-
-  <section class="sec" id="s2" data-sec="quiz">
-    <div class="sec-head"><span class="sec-badge s-quiz">2 · MIXED QUIZ</span><span class="sec-h">{_num(nq).capitalize()} questions across the whole module</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
-      <p>Instant feedback on each. <strong>Answer all {_num(nq)}</strong> — aim for {spec.get('score_target', nq-1)}/{nq} or better before moving on.</p>
-      <div id="quiz"></div>
-      <div class="q-score" id="score"></div>
-      <button class="gotit" type="button" disabled>answer all {_num(nq)} first</button>
-    </div>
-  </section>
-
-  <section class="sec" id="s3" data-sec="verdict">
-    <div class="sec-head"><span class="sec-badge s-produce">3 · VERDICT</span><span class="sec-h">Ready for the next module?</span><span class="sec-tick">✓</span></div>
-    <div class="sec-body">
-      <p><strong>If you scored {spec.get('score_target', nq-1)}/{nq}+ and every box is ticked:</strong> {spec['verdict_pass']}</p>
-      <p><strong>If not:</strong> {spec['verdict_fail']}</p>
-      <button class="gotit" type="button">{spec['complete_label']}</button>
-    </div>
-  </section>
-
-  <div class="fin" id="fin" role="status" aria-hidden="true">
-    <span class="em">{fin['em']}</span>
-    <h3>{fin['h3']}</h3>
-    <p>{fin['p']}</p>
-    <a class="cta" href="../index.html">Back to the map →</a>
-  </div>
-
-</main>
-
-<nav class="lesson-nav" aria-label="review navigation">
-  <a class="lnav prev" href="{spec['prev_href']}"><span class="lnav-dir">← Back</span><span class="lnav-t">{spec['prev_label']}</span></a>
-  <a class="lnav-hub" href="../index.html" title="Back to curriculum map"><span>▦</span><span class="lnav-hub-t">Map</span></a>
-  <a class="lnav next" href="../index.html"><span class="lnav-dir">Next →</span><span class="lnav-t">Curriculum Map</span></a>
-</nav>
-
-<footer>Frontier Lab · Capability Spiral — review gate. Progress saved locally in your browser (localStorage). Self-contained, works offline.</footer>
-
-<script>
-(function(){{
-"use strict";
-var QID = document.body.getAttribute('data-quest-id') || 'quest';
-var KEY = 'frontier-lesson:'+QID;
-var state = load();
-function load(){{ try{{ return JSON.parse(localStorage.getItem(KEY))||{{done:{{}}}} }}catch(e){{ return {{done:{{}}}} }} }}
-function save(){{ try{{ localStorage.setItem(KEY, JSON.stringify(state)) }}catch(e){{}} }}
-var secs = Array.prototype.slice.call(document.querySelectorAll('.sec'));
-var bar = document.getElementById('bar'), count = document.getElementById('count'), fin = document.getElementById('fin');
-function markDone(sec, scrollNext){{
-  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
-  if(scrollNext){{
-    var i = secs.indexOf(sec);
-    if(i>-1 && i+1<secs.length) setTimeout(function(){{ secs[i+1].scrollIntoView({{behavior:'smooth',block:'start'}}); }},180);
-    else setTimeout(function(){{ fin.scrollIntoView({{behavior:'smooth',block:'center'}}); }},180);
-  }}
-}}
-secs.forEach(function(sec){{
-  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
-  var btn = sec.querySelector('.gotit');
-  if(btn) btn.addEventListener('click', function(){{ if(btn.disabled) return; markDone(sec, true); }});
-}});
-function refresh(){{
-  var total = secs.length, done = secs.filter(function(s){{return s.classList.contains('done')}}).length;
-  var pct = Math.round(done/total*100);
-  bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct));
-  count.textContent = done+'/'+total;
-  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
-}}
-document.getElementById('reset').addEventListener('click', function(){{
-  if(!confirm('Reset review progress?')) return;
-  state={{done:{{}}}}; save(); secs.forEach(function(s){{s.classList.remove('done')}});
-  document.querySelectorAll('.check-item.on').forEach(function(c){{c.classList.remove('on'); c.querySelector('.check-box').textContent='';}});
-  refresh();
-}});
-
-/* SELF-CHECK */
-{checks_js}
-var checkWrap=document.getElementById('check'), checkSec=document.getElementById('s1'), ticked=0;
-CHECKS.forEach(function(c){{
-  var el=document.createElement('div'); el.className='check-item';
-  el.innerHTML='<span class="check-box"></span><span class="ct"><span class="check-lesson">'+c[0]+'</span><br>'+c[1]+'</span>';
-  el.addEventListener('click', function(){{
-    el.classList.toggle('on');
-    el.querySelector('.check-box').textContent = el.classList.contains('on') ? '✓' : '';
-    ticked = checkWrap.querySelectorAll('.check-item.on').length;
-    var g=checkSec.querySelector('.gotit');
-    if(ticked>=CHECKS.length){{ g.disabled=false; g.textContent='All ticked — I\\'m ready ✓'; }}
-    else {{ g.disabled=true; g.textContent='tick all to continue'; }}
-  }});
-  checkWrap.appendChild(el);
-}});
-
-/* QUIZ */
-{qs_js}
-var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s2'), scoreEl=document.getElementById('score'), answered={{}}, correct=0;
-QS.forEach(function(item,qi){{
-  var block=document.createElement('div'); block.className='q';
-  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
-  var opts=document.createElement('div'); opts.className='q-opts';
-  var fb=document.createElement('div'); fb.className='q-fb';
-  item.opts.forEach(function(text,oi){{
-    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
-    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
-    o.addEventListener('click', function(){{
-      if(answered[qi]) return; answered[qi]=true;
-      Array.prototype.slice.call(opts.children).forEach(function(c){{c.classList.add('locked')}});
-      if(oi===item.ans){{ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; correct++; }}
-      else {{ o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='Correct answer is green. '+item.fb; }}
-      scoreEl.textContent = 'Score: '+correct+'/'+Object.keys(answered).length+' answered';
-      if(Object.keys(answered).length>=QS.length){{ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='Done — score '+correct+'/'+QS.length+' ✓'; }}
-    }});
-    opts.appendChild(o);
-  }});
-  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
-}});
-
-refresh();
-}})();
-</script>
-</body>
-</html>
-"""
+    d = {
+        "title": spec["title"], "qid": spec["qid"], "nav_title": spec["nav_title"],
+        "kicker": spec["eyebrow"], "h1": spec["h1"], "lead": spec["lead"], "goal": spec["goal"],
+        "prev_href": spec["prev_href"], "prev_label": spec["prev_label"],
+        "next_href": spec.get("next_href", "../index.html"),
+        "next_label": spec.get("next_label", "Curriculum Map"),
+        "fin_em": fin["em"], "fin_h3": fin["h3"], "fin_p": fin["p"],
+        "checks_js": "var CHECKS = " + json.dumps(spec["checks"], ensure_ascii=False) + ";",
+        "qs_js": "var QS = " + json.dumps(spec["quiz"], ensure_ascii=False) + ";",
+        "sections": [
+            {"id": "s1", "key": "check",   "sec_h": "Can you honestly say each of these?", "body": check_body},
+            {"id": "s2", "key": "quiz",    "sec_h": f"{_num(nq).capitalize()} questions across the whole module", "body": quiz_body},
+            {"id": "s3", "key": "verdict", "sec_h": "Ready for the next module?", "body": verdict_body},
+        ],
+    }
+    return rm.render(d)
 
 
 def _num(n):
