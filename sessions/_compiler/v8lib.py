@@ -267,6 +267,36 @@ def render_hint(lines):
             '<button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button>'
             '%s</div>' % (len(tiers), items))
 
+def render_warmup(lines):
+    """%%% warmup — a top-of-lesson RECALL quiz on PRIOR-day concepts (retention / spaced
+    retrieval). Same line format as %%% quiz plus an optional 'concept: <id>' per line;
+    answering records SM-2 in the donor (srReview). Rendered in a .warmup wrapper (NOT
+    .quiz) so the generic quiz engine ignores it and the warm-up engine (which records SR)
+    handles it. Answered BEFORE new content = effortful recall, the strongest retention lever."""
+    blocks = []
+    for ln in lines:
+        if not ln.strip():
+            continue
+        parts = [p.strip() for p in ln.split('|')]
+        q = parts[0][2:].strip() if parts[0].lower().startswith('q:') else parts[0]
+        ans, opts, fb, cid = 0, [], '', ''
+        for p in parts[1:]:
+            m = re.match(r'a\s*:\s*(.*)$', p, re.I)
+            mc = re.match(r'concept\s*:\s*(.*)$', p, re.I)
+            if m and re.fullmatch(r'\d+', m.group(1).strip()):
+                ans = int(m.group(1).strip())
+            elif p.lower().startswith('fb:'):
+                fb = p.split(':', 1)[1].strip()
+            elif mc:
+                cid = mc.group(1).strip()
+            else:
+                opts.append(p)
+        optshtml = ''.join('<button class="q-opt" type="button" data-opt="%d"><span class="mark"></span><span>%s</span></button>' % (i, inline(o)) for i, o in enumerate(opts))
+        blocks.append('<div class="q" data-correct="%d" data-concept="%s"><div class="q-ask">%s</div><div class="q-opts">%s</div><div class="q-fb" data-fb="%s"></div></div>'
+                      % (ans, attr_esc(cid), inline(q), optshtml, attr_esc(fb)))
+    return ('<div class="warmup"><div class="warmup-h">🔁 Warm-up — do you still remember? (from earlier days)</div>'
+            + ''.join(blocks) + '</div>')
+
 def render_widget(typ, args, lines):
     if typ == 'jargon':     return render_jargon(lines)
     if typ == 'table':      return render_table(lines)
@@ -279,6 +309,7 @@ def render_widget(typ, args, lines):
     if typ == 'demo':       return render_demo(args, lines)
     if typ == 'quiz':       return render_quiz(lines)
     if typ == 'hint':       return render_hint(lines)
+    if typ == 'warmup':     return render_warmup(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
