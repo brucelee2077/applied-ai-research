@@ -476,6 +476,85 @@ def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
 
 
 # ===========================================================================
+# BODY-ENGAGEMENT JUDGE — per-concept BUILD-UP voice (the Build-Up Register)
+# ===========================================================================
+# Intros are engaging; the make-or-break gap (user directive 2026-07-24) is that the
+# concept BODY — the build-up (mechanism, math, worked example AFTER the intro/analogy)
+# — reads cold and tedious. The interest/tone judges score the WHOLE lesson, so a warm
+# hero carries a dead body; the structure judge certifies the build-up is PRESENT and
+# VISUALIZED but never grades its PROSE. This judge closes that hole: per concept, does
+# the build-up keep the reader engaged — spine analogy kept ALIVE, a re-hook / "why this
+# bites" beat INSIDE the body, the mechanism NARRATED with causal connectors + semantic
+# step names (not a flat "Step 1/2/3" dump or silent symbol-pushing), predict-then-reveal
+# discovery, struggle normalized mid-hard-part? It is its OWN _chat-seam judge (not a 5th
+# axis on the already-token-crowded structure judge, whose salvage path silently drops the
+# LAST concept). Advisory; graceful fallback; never raises. Mirrors judge_interest_absolute.
+_BODY_MAX = 48000
+_BODY_SYS = (
+    "You are a STRICT BODY-ENGAGEMENT judge for a BEGINNER ML lesson (a curious 12-year-old for whom English "
+    "may be a second language) built as concept units. The lesson's INTROS are already warm; you judge ONLY the "
+    "BUILD-UP of each concept — the prose AFTER the opening intuition/analogy (the mechanism, math, worked "
+    "example). The #1 goal (user directive 2026-07-24): the body must be AS engaging and digestible as the intro, "
+    "never a cold textbook dump. For each concept grade one axis, body_engagement, HARSHLY, defaulting to the "
+    "LOWER grade when in doubt. GOOD = the build-up keeps the reader engaged via the Build-Up Register: it keeps "
+    "the opening analogy ALIVE through the mechanism, has a re-hook / 'why this bites' beat INSIDE the body, "
+    "NARRATES the mechanism with causal connectors (therefore / which means / that's why) and semantic step names "
+    "rather than a flat 'Step 1/2/3' enumeration or silent symbol-pushing, invites prediction/discovery, and "
+    "normalizes struggle mid-hard-part. WEAK = some voice but patches of flat/textbook prose. MISSING = a "
+    "genuinely COLD body: a mechanism/symbol dump with NONE of those beats, the analogy dropped, no re-hook, no "
+    "discovery — the tedious body this judge exists to catch. NA (NEVER penalized) = a concept with essentially "
+    "no build-up to make cold: the RECAP unit (tag/title 'Recap'/'summary'/'cheat-sheet'), or a one-line narrated "
+    "definitional concept. A cold body is ALWAYS fixable by adding voice, NOT by adding length — never reward "
+    "padding. Be specific and quote. Return STRICT JSON only (no prose, no markdown fences)."
+)
+
+
+def _body_prompt(lesson_text, concept_titles):
+    names = '\n'.join('- %s' % c for c in (concept_titles or [])) or '(none)'
+    return f"""CONCEPT UNITS TO JUDGE (by name/title):
+{names}
+
+LESSON TEXT (plain-text extract; the INTRO of each concept is already fine — judge the BUILD-UP prose only):
+\"\"\"
+{lesson_text[:_BODY_MAX]}
+\"\"\"
+
+For EACH concept unit above, grade body_engagement GOOD / WEAK / MISSING / NA (NA only for the recap unit or a
+one-line definitional concept), with a one-line note that QUOTES a spot and a concrete FIX (how to warm the body
+WITHOUT adding length — add a re-hook, keep the analogy alive, narrate the steps, invite a prediction).
+Return STRICT JSON:
+{{
+  "concepts": [ {{"concept":"<name>", "body_engagement":"GOOD|WEAK|MISSING|NA",
+                  "note":"<one line, quote a spot>", "fix":"<concrete warm-the-body rewrite if not GOOD/NA>"}} ],
+  "overall": "GOOD|WEAK|MISSING",
+  "summary": "<=2 sentences"
+}}
+Rules: judge every concept. Reserve MISSING for a genuinely COLD build-up (analogy dropped, flat mechanism/symbol
+dump, no re-hook, no discovery). A build-up with voice via ANY register beat is GOOD/WEAK, never MISSING."""
+
+
+def judge_body_engagement(lesson_text, concept_titles, model=MODEL, timeout=90):
+    """Per-concept BODY-engagement floor. N/A when no concepts. Never raises."""
+    if not concept_titles:
+        return {'status': 'N/A', 'reason': 'no concepts to judge',
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    try:
+        content = _chat(_BODY_SYS, _body_prompt(lesson_text, concept_titles), model, timeout, max_tokens=8000)
+    except Exception as e:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e),
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    data = _extract_json(content) or _salvage_truncated_json(content)
+    if data is None:
+        return {'status': 'PARSE_ERROR', 'raw': content,
+                'concepts': [], 'overall': 'N/A', 'summary': ''}
+    data.setdefault('concepts', [])
+    data.setdefault('overall', 'N/A')
+    data.setdefault('summary', '')
+    data['status'] = 'OK'
+    return data
+
+
+# ===========================================================================
 # CONCEPT-STRUCTURE JUDGE — per-concept intuition-first / analogy / build-up
 # ===========================================================================
 # The deterministic concept_structure_gate proves the triad is STRUCTURALLY
@@ -701,6 +780,7 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
             'tone': judge_tone(lesson_text, notebook_md),
             'interest': judge_interest(lesson_text, notebook_md),
             'interest_absolute': judge_interest_absolute(lesson_text),
+            'body_engagement': judge_body_engagement(lesson_text, concept_titles),
             'structure': judge_concept_structure(lesson_text, concept_titles)}
 
 
@@ -782,6 +862,19 @@ def main():
         print('\nsummary:', interest_abs['summary'])
     elif interest_abs.get('error'):
         print('  error:', interest_abs['error'])
+
+    body = out.get('body_engagement', {'status': 'N/A', 'overall': 'N/A', 'concepts': [], 'summary': ''})
+    print('\n== Concept Body Engagement (per concept build-up voice — advisory) ==')
+    print('status:', body['status'], '| overall:', body.get('overall'))
+    if body['status'] == 'OK':
+        print('\n-- per concept (body_engagement — is the build-up as engaging as the intro?) --')
+        for c in body['concepts']:
+            print('  [be:%s] %s — %s' % (c.get('body_engagement', '?'), c.get('concept', '?'), c.get('note', '')))
+            if c.get('fix'):
+                print('        fix: %s' % c['fix'])
+        print('\nsummary:', body['summary'])
+    elif body.get('error'):
+        print('  error:', body['error'])
 
     print('\n== Concept-Structure Judge (per concept, advisory) ==')
     print('status:', struct['status'], '| overall:', struct.get('overall'))
