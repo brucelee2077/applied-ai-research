@@ -73,20 +73,36 @@ Plus a **P0 rule (body-cold):** mark P0 if a concept's build-up drops voice/anal
 a flat mechanism dump (Step 1/2/3, symbol-pushing) with no re-hook, no narration, no
 discovery. Point the rule at the `body_engagement` judge axis (Layer 2) as its gate.
 
-### Layer 2 — Judge: `body_engagement` axis (per concept)
+### Layer 2 — Judge: a standalone `body_engagement` judge (per concept)
 
-Add a **fifth axis** to the Concept-Structure Judge (`coverage_judge.judge_concept_structure`),
-graded per concept so a strong hero can't carry a dead body. It scores the **build-up
-prose** (not structure): does the body keep the spine analogy alive, re-hook "why this
-matters," narrate the mechanism with voice/causal connectors (vs flat enumeration or
-symbol-pushing), invite prediction/discovery, and normalize struggle?
+**Its own judge, not a 5th axis on the structure judge.** The structure judge already
+emits 4 axes + note + fix across ~13 concepts and its file comments warn it truncated at
+`max_tokens` when the 4th axis was added (the salvage path silently drops the *last*
+concept's verdict). Piling a 5th axis on would re-open that hazard. Instead add
+`judge_body_engagement(lesson_text, concept_titles)` in `coverage_judge.py`, built on the
+existing **`_chat()` mock-seam** (like `judge_interest_absolute`) so it is unit-testable
+without a network and has its own token budget.
 
-- Scale: `GOOD | WEAK | MISSING | NA` (NA only for a concept with essentially no build-up
-  prose — e.g. a one-line narrated definition or the recap unit).
-- Wire into `lesson_build.js`'s `structure` lens: `body_engagement` **MISSING → P0**,
-  **WEAK → P1** (kind `body_engagement`). This is the hard floor, mirroring how `analogy`
-  and `intuition_first` already gate the loop.
-- CLI prints the new axis in the per-concept line.
+It scores each concept's **build-up prose** (not structure): does the body keep the spine
+analogy alive, re-hook "why this matters," narrate the mechanism with voice/causal
+connectors (vs flat "Step 1/2/3" enumeration or silent symbol-pushing), invite
+prediction/discovery, and normalize struggle?
+
+- Scale per concept: `GOOD | WEAK | MISSING | NA`.
+- **`MISSING` is reserved for a genuinely COLD body** — a mechanism/symbol dump with none
+  of the register beats. A body with voice via *any* beat is GOOD/WEAK. This mirrors the
+  interest floor (a single weak lever is tolerable); it never requires padding or added
+  length — a cold body is always fixable by adding voice, not words.
+- **`NA` (never penalized), with explicit triggers spelled out in the prompt:** the recap
+  unit (`tag="Recap"`), or a concept whose body is a single narrated definitional line
+  with no real build-up to make cold.
+- `run_from_paths` adds `'body_engagement': judge_body_engagement(...)`; new CLI section
+  "Concept Body Engagement".
+- Wire into `lesson_build.js` as a **new `body` lens**: `MISSING → P0`, `WEAK → P1`
+  (kind `body_engagement`). Add `body_engagement` to `JUDGE_SCHEMA.kind`'s enum
+  description. This is the hard floor the user asked for; **`MAX_ROUNDS` is the existing
+  backstop** — a dense day that can't clear stops at the round cap as a judge-flagged
+  checkpoint (the lesson still compiles), never an infinite loop.
 
 ### Layer 3 — Widgets: the full body toolkit
 
@@ -101,20 +117,36 @@ minimize donor churn (reuse existing CSS / inline styles where possible):
    and any shipped-output snapshot test).
 3. **`%%% steps`** — a narrated stepped worked-example. Body = repeated `step:` (the work)
    + `why:` (plain-English gloss) pairs. Renders using the **existing dead `.build` /
-   `.build-step` / `.build-num` / `.build-note` CSS** already in the donor — numbered
-   steps, each with its "why" gloss.
-4. **Wire the dead scroll-reveal** — add the missing `window.__revealBuild()` to the donor
-   (an IntersectionObserver that arms `.build` containers and reveals `.build-step`s on
-   scroll; graceful — steps stay visible if JS/IO absent or reduced-motion). This turns
-   the `%%% steps` widget into a satisfying assemble-as-you-scroll device and makes the
-   already-present nav-click call to `__revealBuild()` real.
+   `.build-step` / `.build-num` / `.build-note` CSS** already in the donor — a `.build`
+   wrapper containing one `.build-step` per pair, each with a `.build-num` badge and a
+   `.build-note` (work + gloss). `render_widget` MUST gain a `steps` case (it raises
+   `ValueError` on unknown types today — no silent fallback). Body run through `inline()`.
+   - **Gate fix (required, or the hard gate bounces the loop):** `concept_structure_gate.py`
+     strips every `%%%…%%%` widget before measuring build-up prose (`_MIN_PROSE=40`), so a
+     concept whose build-up is *only* a `%%% steps` block would FAIL "has build-up after
+     its visual" — a hard gate that short-circuits `lesson_build.js` back to the author.
+     Fix: the build-up floor is satisfied if there is ≥40 chars of build-up prose **OR** a
+     build-up widget (`%%% steps` / `%%% demo` / `%%% mathladder`, or a 2nd `svg`/`viz`)
+     appears after the opening visual. A `%%% steps` block IS substantial build-up content.
+4. **Wire the dead scroll-reveal — a NEW multi-container implementation** (not a port). The
+   `__revealBuild()` that ships in other (v8) shells is hardwired to a single
+   `#build`/`#s5` container and couples `.gotit` unlock to scrolling — wrong for v9, where
+   `%%% steps` can appear multiple times, inside arbitrary concept sections, and must not
+   gate `.gotit`. Write a fresh `window.__revealBuild()` in `v9-base.donor`:
+   `querySelectorAll('.build')`, arm each independently, observe its `.build-step`s with an
+   IntersectionObserver, add `.revealed` on scroll-in; **graceful** — if reduced-motion or
+   no IntersectionObserver, reveal all (never arm). Decoupled from `.gotit`/`#s5`. This
+   makes the already-present nav-click call to `__revealBuild()` real. A jsdom test asserts
+   arm→reveal marks every `.build-step` `.revealed`.
 
-**Donor-change consequence:** adding `__revealBuild()` changes the donor's embedded JS,
-so **every concept lesson using `v9-base.donor` must be recompiled** to stay consistent
-(content unchanged; only the donor JS grows). m02+m03 are rebuilt anyway; the other
-concept modules (m06, m07, …) get a mechanical recompile pass, and any shipped-output
-snapshot test is refreshed. Verified safe by recompiling one non-target concept module
-first (gates re-run on identical content).
+**Donor-change consequence:** adding `__revealBuild()` changes the donor's embedded JS, so
+**every concept lesson using `v9-base.donor` must be recompiled** to stay consistent
+(content unchanged; only the donor JS grows). This **re-baselines `test_v8_regression.py`**,
+which (despite its name) recompiles the v9 concept lesson `m02-the-neuron/day-03/source.md`
+and asserts byte-equality with its shipped `lesson.html` — it fails transiently until
+day-03 is recompiled, then re-passes; not a regression. m02+m03 are rebuilt anyway; the
+other concept modules (m06, m07, …) get a mechanical recompile pass. Verified safe by
+recompiling one non-target concept module first (gates re-run on identical content).
 
 ### Layer 4 — Content rerun: full author-loop rebuild of m02 (9) + m03 (5)
 
@@ -137,29 +169,39 @@ pattern from the interest rerun.
 
 ## Testing (TDD)
 
-- `test_insight_widget.py` — `%%% insight` renders the re-hook callout.
-- `test_demo_predict.py` — `predict:` renders the prompt **and** absence is byte-identical
-  to the pre-change demo output (regression guard).
-- `test_steps_widget.py` — `%%% steps` renders `.build`/`.build-step` numbered steps + why.
-- `test_body_engagement.py` — the `body_engagement` axis is present in the judge's system
-  prompt + user prompt, flows through `_extract_json`, and prints in the CLI line.
-- Donor: a node/jsdom check that `window.__revealBuild` is defined and arms `.build`.
+- `test_insight_widget.py` — `%%% insight` renders the re-hook callout (`.takeaway`, 💡),
+  body run through `inline()` (so `[[term||gloss]]`/`**bold**` work).
+- `test_demo_predict.py` — `predict:` renders the prompt **and** a real pre-change demo
+  fixture (no `predict:`) is byte-identical to the pre-change output (regression diff).
+- `test_steps_widget.py` — `%%% steps` renders `.build` > `.build-step` (each with
+  `.build-num` + `.build-note`); `render_widget('steps',…)` no longer raises.
+- `test_concept_structure_buildup_widget.py` — a concept whose build-up is only a
+  `%%% steps` block PASSES the build-up floor (the gate fix).
+- `test_body_engagement.py` — `judge_body_engagement` mocks `_chat`, returns per-concept
+  GOOD/WEAK/MISSING/NA, defaults safely on parse error, and its prompt names the NA
+  triggers; CLI prints a "Concept Body Engagement" section.
+- Donor: a jsdom check that `window.__revealBuild` is defined, arms every `.build`, and
+  reveals every `.build-step` (and that reduced-motion / no-IO reveals all without arming).
+- `lesson_build.js`: `JUDGE_SCHEMA.kind` enum includes `body_engagement`; a `body` lens
+  routes MISSING→P0 / WEAK→P1.
 - Regression: full compiler suite stays green (169 baseline; the 1 pre-existing
-  m02-manifest failure is out of scope); recompile idempotence holds; `test_no_dead_lab`
-  stays 0.
-- Verification on the 14 rebuilt lessons: `body_engagement` GOOD/absent-of-P0 on all 14;
-  interest floor still `FLOOR_MET` on all 14; gates pass; idempotent recompile.
+  m02-manifest failure is out of scope); `test_v8_regression.py` re-passes after the m02
+  day-03 recompile; recompile idempotence holds; `test_no_dead_lab` stays 0.
+- Verification on the 14 rebuilt lessons: `body_engagement` P0-clear on all 14; interest
+  floor still `FLOOR_MET` on all 14; gates pass; idempotent recompile.
 
 ## Files touched
 
 | File | Change |
 |---|---|
 | `.claude/skills/frontier-lesson-builder/SKILL.md` + v8 mirror | + Build-Up Register section, + body-cold P0 rule |
-| `sessions/_compiler/gates/coverage_judge.py` | + `body_engagement` axis (SYS, prompt, setdefault, CLI) |
-| `sessions/_compiler/v8lib.py` | + `render_insight`, `render_steps`, `predict:` in `render_demo`, register in `render_widget` |
-| `sessions/_compiler/shells/v9-base.donor` | + `window.__revealBuild()` scroll-reveal JS |
-| `sessions/_compiler/workflows/lesson_build.js` | + `body_engagement` routing in structure lens, + "keep the body alive" author paragraph |
+| `sessions/_compiler/gates/coverage_judge.py` | + standalone `judge_body_engagement` (via `_chat` seam) + `run_from_paths` + CLI section |
+| `sessions/_compiler/gates/concept_structure_gate.py` | build-up floor satisfied by a build-up widget (`steps`/`demo`/`mathladder`/2nd svg-viz) |
+| `sessions/_compiler/v8lib.py` | + `render_insight`, `render_steps`, `predict:` in `render_demo`, register both in `render_widget` |
+| `sessions/_compiler/shells/v9-base.donor` | + new multi-container `window.__revealBuild()` scroll-reveal JS |
+| `sessions/_compiler/workflows/lesson_build.js` | + `body` lens (body_engagement P0/P1), + `JUDGE_SCHEMA.kind` enum, + "keep the body alive" author paragraph |
 | `sessions/_compiler/AUTHORING.md` | + document `%%% insight`, `%%% steps`, `demo predict:` |
 | `sessions/_compiler/tests/*` | new tests above |
+| `sessions/_compiler/tests/test_v8_regression.py` | re-baseline (m02 day-03 recompiles under new donor) |
 | all concept `lesson.html` using `v9-base.donor` | recompile (m02+m03 rebuilt; others mechanical) |
 | m02 (9) + m03 (5) `source.md` + `lesson.html` | full author-loop rebuild |
