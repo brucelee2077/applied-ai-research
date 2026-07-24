@@ -62,6 +62,47 @@ Every concept unit opens with **felt intuition before any formula, range, or not
 
 Mark **P0 (intuition-inverted)** if a concept opens with a formula, a range like `(0,1)`, `max(0,z)`, or notation before the felt picture; if a concept is all mechanism with no analogy and no "why"; if an analogy is given WITHOUT its "where it breaks down" beat; or if the dominant voice is interview/textbook rather than warm-beginner. The inline visual anchors the *intuition*, not the algebra. See repo `CLAUDE.md` §5 (analogy scaffold, simple words, no idioms) and §7 (curiosity hook, normalize confusion, victory laps).
 
+## Build-Up Register (per concept — keep the BODY as engaging as the intro)
+
+The Beginner Intuition Register above governs the concept OPENING. This is its twin for the
+BUILD-UP — the mechanism / math / worked example AFTER the intro. The failure it prevents
+(direct user review 2026-07-24): the intro is warm and curious, then the body switches into
+a flat textbook register — the spine analogy is dropped once the math starts, worked
+examples are cold symbol-pushing, and dense blocks run with no re-hook. Structure + a visual
+are necessary but NOT sufficient: the body PROSE must be as engaging as the intro. The eval
+gate is the **`judge_body_engagement`** floor (`coverage_judge.py`) — per concept it grades
+`body_engagement` GOOD / WEAK / MISSING (NA for the recap unit or a one-line definitional
+concept); MISSING is a **P0** in the build loop, WEAK a P1. Drive every concept body to GOOD.
+
+Hit these body beats in every concept's build-up:
+
+```text
+1. Bridge from the analogy   the build-up's first move re-invokes the opening analogy
+                             ("let's go back to the ruler and watch what happens when we
+                             stack two") — never a cold switch straight into mechanism.
+2. Re-hook / "why this bites" a one-line stakes beat INSIDE the body so the mechanism
+                             answers a live question ("this collapse is sneaky — the net
+                             runs fine but secretly learns nothing"). Use %%% insight.
+3. Narrate the architecture  causal connectors (therefore / which means / that's why) and
+                             semantic step NAMES ("the collapse", "the fix") — NOT bare
+                             "Step 1 / Step 2 / Step 3" or silent symbol-pushing. Use %%% steps.
+4. Predict-then-reveal       invite a guess before the number in a worked example. Use
+                             %%% demo with a predict: line.
+5. Micro-recap + breath      a one-line "so we've shown that…" landing after a dense run.
+6. Normalize + victory lap   DURING the hard part, not only in the intro ("this is the
+                             tricky bit — totally normal"; "you just did the hard part").
+7. Spine alive to the end    keep the analogy running through the mechanism, and mark
+                             where it breaks down — don't abandon it once math starts.
+```
+
+**Tools (see AUTHORING.md):** `%%% insight` (the re-hook / "why this matters" callout),
+`%%% demo` with a `predict:` line (predict-then-reveal discovery), `%%% steps` (a narrated
+worked-example whose steps assemble as the reader scrolls). Warm a cold body by adding
+VOICE, not length — never pad, never cut coverage.
+
+Mark **P0 (body-cold)** if a concept's build-up drops into a flat mechanism/symbol dump
+with no voice, no re-hook, no discovery, and the opening analogy abandoned.
+
 ## Interest, Reader-Separation & Real Play (2026-07-23 — first-class, not byproducts)
 
 Interest is now gated independent of any notebook (an ALWAYS-ON absolute floor in `coverage_judge.judge_interest_absolute` P0-gates the build loop; the notebook is an added ceiling, not the only bar). So author to these as NON-NEGOTIABLES, not as side-effects of warmth:
@@ -118,6 +159,7 @@ Mark P0 if:
 - a concept unit that introduces a visual object (curve, distribution, boundary, shape) but is text-only (no inline visual),
 - a concept's picture deferred to a later unit, or all visuals dumped in one late "build" section.
 - a concept with a HEAVY or multi-step build-up (worked example, derivation, numeric ladder, matrix/shape change, or math demoted to an "Optional (skippable)" box) that is NOT itself visualized — left as text + equations under only the opening analogy figure (violates the Visualize-the-Build-Up Rule).
+- a concept whose BUILD-UP goes cold — a flat mechanism/symbol dump with no voice, no re-hook, no discovery, the opening analogy abandoned once the math starts (body-cold — violates the Build-Up Register; the `judge_body_engagement` floor flags `body_engagement` MISSING as P0).
 
 Mark seed-stabilization P1 if this issue exists in a seed module and is likely to be copied forward.
 
