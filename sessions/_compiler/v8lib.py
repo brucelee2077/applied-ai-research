@@ -283,6 +283,41 @@ def render_insight(lines):
     text = inline(' '.join(l.strip() for l in lines if l.strip()))
     return '<div class="takeaway">💡 %s</div>' % text
 
+def render_steps(lines):
+    """%%% steps — a narrated stepped worked-example (Build-Up Register). Body is repeated
+    'step:' (the work) + 'why:' (plain-English gloss) pairs. Renders into the .build /
+    .build-step / .build-num / .build-note scaffold the donor's __revealBuild() reveals on
+    scroll — turning a cold "Step 1/2/3" dump into a narrated build a beginner can follow.
+    A 'step:' with no following 'why:' is tolerated; a stray continuation line folds into
+    the last field. Both work and gloss run through inline()."""
+    steps, last = [], None   # last in {'work','why'}
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        m = re.match(r'(step|why)\s*:(.*)$', s, re.I)
+        if m:
+            key, val = m.group(1).lower(), m.group(2).strip()
+            if key == 'step':
+                steps.append({'work': val, 'why': ''}); last = 'work'
+            else:
+                if not steps:
+                    steps.append({'work': '', 'why': val})
+                else:
+                    steps[-1]['why'] = (steps[-1]['why'] + ' ' + val).strip()
+                last = 'why'
+        elif steps and last:
+            steps[-1][last] = (steps[-1][last] + ' ' + s).strip()
+    if not steps:
+        return ''
+    rows = []
+    for i, st in enumerate(steps, 1):
+        work = ('<b>%s</b>' % inline(st['work'])) if st['work'] else ''
+        why = (' — %s' % inline(st['why'])) if st['why'] else ''
+        rows.append('<div class="build-step"><div class="build-note">'
+                    '<span class="build-num">%d</span>%s%s</div></div>' % (i, work, why))
+    return '<div class="build">' + ''.join(rows) + '</div>'
+
 def render_warmup(lines):
     """%%% warmup — a top-of-lesson RECALL quiz on PRIOR-day concepts (retention / spaced
     retrieval). Same line format as %%% quiz plus an optional 'concept: <id>' per line;
@@ -327,6 +362,7 @@ def render_widget(typ, args, lines):
     if typ == 'hint':       return render_hint(lines)
     if typ == 'warmup':     return render_warmup(lines)
     if typ == 'insight':    return render_insight(lines)
+    if typ == 'steps':      return render_steps(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
