@@ -141,12 +141,43 @@ drives.
 ```
 
 **`demo`** — inline run-demo: a code line, hidden output + takeaway revealed on click.
-Args: `id=`, `label=`. Body is `key: value` lines (`code:`, `out:`, `take:`).
+Args: `id=`, `label=`. Body is `key: value` lines (`code:`, `out:`, `take:`). Optional
+`predict:` line (Build-Up Register) prepends a "🤔 Predict first: …" prompt so a worked
+example becomes a discovery — the reader guesses BEFORE revealing. Byte-identical to the
+old output when `predict:` is absent.
 ```text
-%%% demo id=relu label="run it"
+%%% demo id=relu label="predict, then run"
+predict: what does relu([-3, 0, 5]) give? zeros? negatives?
 code: relu(np.array([-3, -1, 0, 2, 5]))
 out: array([0, 0, 0, 2, 5])
 take: <b>ReLU = max(0, z).</b> Zeroes negatives, passes positives.
+%%%
+```
+
+**`insight`** — an inline "why this matters / notice this" RE-HOOK callout for the
+build-up (Build-Up Register's stakes beat). Body is prose (runs through `inline()`, so
+`[[term||gloss]]` / `**bold**` / `` `code` `` all work). Renders as a styled `.takeaway`
+block with a 💡. Use it to keep the reader engaged mid-mechanism instead of letting the
+body go cold.
+```text
+%%% insight
+The sneaky part: the net still trains and looks fine — it just secretly learns nothing.
+That is why we have to SEE the collapse, not just trust the loss.
+%%%
+```
+
+**`steps`** — a narrated stepped worked-example (Build-Up Register). Body is repeated
+`step:` (the work) + `why:` (a plain-English gloss) pairs. Renders numbered `.build-step`
+rows that ASSEMBLE as the reader scrolls (donor `__revealBuild`), turning a cold
+"Step 1/2/3" dump into a build a beginner can follow. A `step:` with no `why:` is fine.
+```text
+%%% steps
+step: (x·W1)·W2
+why: two matmuls back to back — the whole point of stacking layers
+step: = x·(W1·W2)
+why: they collapse into ONE matmul, because there is no bend between them
+step: so depth bought us nothing
+why: this is the linear collapse — the reason an activation exists
 %%%
 ```
 
@@ -328,6 +359,21 @@ Reader Flow Gate + tone/interest/structure judges + the concept_structure gate):
    AFTER. So a full concept typically ships the analogy picture FIRST, then the mechanism
    picture. Enforced by the Concept-Structure Judge's `analogy` axis: GOOD requires the
    analogy be DRAWN; analogy-in-words-only is WEAK, which gates the build loop.
+
+7. **Keep the build-up alive (Build-Up Register).** Structure + a visual are necessary but
+   NOT sufficient — the build-up PROSE must be as engaging as the intro, never a cold
+   textbook dump (user directive 2026-07-24). In every concept's build-up: (a) BRIDGE from
+   the opening analogy and keep it ALIVE to the end (don't drop it once the math starts);
+   (b) put a re-hook / "why this bites" beat INSIDE the body — a `%%% insight` callout is
+   made for this; (c) NARRATE the mechanism with causal connectors (therefore / which means
+   / that's why) and semantic step names — a `%%% steps` block turns a flat "Step 1/2/3"
+   dump into a narrated, scroll-assembled build — NOT bare enumeration or silent
+   symbol-pushing; (d) use PREDICT-THEN-REVEAL (`%%% demo` with a `predict:` line) so a
+   worked example is a discovery; (e) normalize struggle + a victory lap DURING the hard
+   part. Warm a cold body by adding VOICE, never length — never pad, keep coverage.
+   Enforced by the standalone **`judge_body_engagement`** floor (`coverage_judge.py`):
+   per concept `body_engagement` MISSING → P0, WEAK → P1; NA (never penalized) for the
+   recap unit or a one-line definitional concept.
 
 ---
 
