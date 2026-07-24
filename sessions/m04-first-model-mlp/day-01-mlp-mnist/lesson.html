@@ -203,6 +203,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .demo-out{margin:0;padding:.85rem 1rem;background:#080B11;color:#8FE3A0;font-family:var(--mono);font-size:.82rem;line-height:1.6;white-space:pre-wrap;overflow-x:auto}
 .demo-take{padding:.75rem 1rem;font-size:.85rem;color:var(--ink2);line-height:1.5;background:var(--panel2)}
 .demo-take b{color:var(--ink)}
+/* ---------- hint ladder (get-unstuck) + warm-up recall (retention) ---------- */
+.hint{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.6rem .9rem}
+.hint-reveal{font-family:var(--body);font-size:.82rem;font-weight:700;color:var(--accent);background:transparent;border:1px dashed var(--accent);border-radius:var(--r-sm);padding:.35rem .7rem;cursor:pointer}
+.hint-reveal:disabled{opacity:.6;cursor:default;border-style:solid}
+.hint-tier{margin-top:.6rem;padding:.55rem .8rem;background:var(--panel);border-radius:var(--r-sm);font-size:.88rem;color:var(--ink2);line-height:1.5}
+.warmup{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);margin:1rem 0;padding:.8rem 1rem}
+.warmup .warmup-h{font-weight:700;color:var(--ink);font-size:.9rem;margin-bottom:.5rem}
+.warmup .q{margin:.6rem 0}
 
 /* ---------- build (scroll reveal) ---------- */
 .build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
@@ -705,6 +713,44 @@ Array.prototype.slice.call(document.querySelectorAll('.quiz')).forEach(function(
   });
 });
 
+/* ===== HINT LADDER (get-unstuck; progressive disclosure, offline — no network) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.hint')).forEach(function(h){
+  var btn = h.querySelector('.hint-reveal');
+  var tiers = Array.prototype.slice.call(h.querySelectorAll('.hint-tier'));
+  var shown = 0;
+  if(!btn || !tiers.length) return;
+  btn.addEventListener('click', function(){
+    if(shown < tiers.length){ tiers[shown].hidden = false; shown++; }
+    if(shown >= tiers.length){ btn.disabled = true; btn.textContent = "— that's all the hints —"; }
+    else { btn.textContent = '💡 still stuck? another hint ('+shown+'/'+tiers.length+')'; }
+  });
+});
+/* ===== SM-2 spaced repetition (retention; browser mirror of coach/core.py:667-714) ===== */
+function _srToday(){ return Math.floor(Date.now()/86400000); }
+function srReview(conceptId, quality){
+  if(!state.sr) state.sr = {};
+  var prev = state.sr[conceptId] || {},
+      ease = prev.ease!=null?prev.ease:2.5, interval = prev.interval!=null?prev.interval:1, reps = prev.reps!=null?prev.reps:0;
+  var ne = Math.max(1.3, ease + 0.1 - (5-quality)*(0.08+(5-quality)*0.02)), ni;
+  if(quality>=3){ ni = reps===0?1:(reps===1?6:Math.round(interval*ne)); }
+  else { ni = 1; ne = 2.5; }
+  state.sr[conceptId] = { ease: Math.round(ne*1000)/1000, interval: ni, next: _srToday()+ni, reps: reps+1 };
+  save();
+}
+/* ===== WARM-UP recall (retention; reuses .q markup, records SM-2 on answer) ===== */
+Array.prototype.slice.call(document.querySelectorAll('.warmup .q')).forEach(function(q){
+  var correct = parseInt(q.getAttribute('data-correct'),10), cid = q.getAttribute('data-concept')||'';
+  var fb = q.querySelector('.q-fb'), fbText = fb?fb.getAttribute('data-fb'):'';
+  var opts = Array.prototype.slice.call(q.querySelectorAll('.q-opt')), done=false;
+  opts.forEach(function(o,oi){ o.addEventListener('click', function(){
+    if(done) return; done=true; opts.forEach(function(c){ c.classList.add('locked'); });
+    var right = oi===correct;
+    if(right){ o.classList.add('correct'); if(fb){ fb.className='q-fb good show'; fb.innerHTML='✓ '+fbText; } }
+    else { o.classList.add('wrong'); if(opts[correct]) opts[correct].classList.add('correct'); if(fb){ fb.className='q-fb bad show'; fb.innerHTML='The green one. '+fbText; } }
+    if(cid) srReview(cid, right?5:1);
+  }); });
+});
+
 /* ===== COPY ===== */
 Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
   btn.addEventListener('click', function(){
@@ -716,7 +762,27 @@ Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(
 });
 function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
 
+/* ===== BUILD scroll-reveal (the "steps" build-up widget assembles as you scroll;
+   mirror of shells/js/reveal.js) — multi-container + decoupled from .gotit/#s5.
+   Graceful: reduced-motion or no IntersectionObserver reveals every .build-step at
+   once (never hidden). Idempotent. */
+window.__revealBuild = function(){
+  var hasIO = ('IntersectionObserver' in window);
+  var builds = Array.prototype.slice.call(document.querySelectorAll('.build'));
+  builds.forEach(function(c){
+    if(c.classList.contains('armed')) return;
+    var steps = Array.prototype.slice.call(c.querySelectorAll('.build-step'));
+    if(RM || !hasIO){ steps.forEach(function(s){ s.classList.add('revealed'); }); return; }
+    c.classList.add('armed');
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('revealed'); obs.unobserve(e.target); } });
+    }, { threshold: 0.25 });
+    steps.forEach(function(s){ obs.observe(s); });
+  });
+};
+
 refresh();
+window.__revealBuild();
 })();
 </script>
 
