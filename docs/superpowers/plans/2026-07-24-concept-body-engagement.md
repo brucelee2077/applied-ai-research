@@ -64,15 +64,46 @@ Run tests with system `python3` (the `.venv` is broken):
 
 ### Task 5: donor `__revealBuild` (new multi-container scroll-reveal) + recompile
 
-**Files:** Modify `sessions/_compiler/shells/v9-base.donor`; Test `sessions/_compiler/tests/test_reveal_build.mjs` (jsdom, if jsdom present per repo convention); recompile all concept lessons.
+**Files:** Create pure module `sessions/_compiler/shells/js/reveal.js`; Test
+`sessions/_compiler/tests/test_reveal.mjs` (bare `node`, DOM stub — mirrors `test_sr.mjs`,
+NO jsdom); inline-mirror into `sessions/_compiler/shells/v9-base.donor`; recompile concept
+lessons.
 
-- [ ] **Step 1 — failing jsdom test.** Load a fixture HTML with two `.build` containers (each with `.build-step`s) + a stub IntersectionObserver, define the donor's reveal IIFE, call `window.__revealBuild()`; assert each `.build` gains `armed` and, after the observer fires "intersecting", each `.build-step` gains `revealed`. Also assert: with `matchMedia('(prefers-reduced-motion)')=true` OR no `IntersectionObserver`, all steps end `revealed` and no container is `armed`.
-- [ ] **Step 2 — run, expect fail** (`__revealBuild` undefined in v9-base.donor).
-- [ ] **Step 3 — implement.** Add an IIFE in the donor `<script>` (near the demo/quiz handlers) defining `window.__revealBuild = function(){ ... }`: `querySelectorAll('.build')`; if `RM || !('IntersectionObserver' in window)` → add `revealed` to all `.build-step`, return; else for each container add `armed`, create one IntersectionObserver that adds `revealed` to entries that intersect (threshold ~0.25), observe each `.build-step`. Idempotent (skip already-armed). Call `window.__revealBuild()` once at the end of the main IIFE (after `refresh()`), so build steps reveal on load too. Decoupled from `.gotit`/`#s5`.
-- [ ] **Step 4 — run jsdom test, expect pass.**
-- [ ] **Step 5 — recompile every concept lesson** using `v9-base.donor` (content unchanged; donor JS grew). Script: find all `sessions/**/source.md` with `mode: concept` + `donor: v9-base.donor`, run `compile_lesson.py` on each. First recompile ONE non-target concept module (e.g. an m07 day) and confirm exit 0 + gates pass. Then recompile the rest.
-- [ ] **Step 6 — verify** `python3 -m pytest tests/test_v8_regression.py -q` re-passes (m02 day-03 now recompiled) and the full suite is green.
-- [ ] **Step 7 — commit** `feat(engage): wire multi-container __revealBuild scroll-reveal + recompile concept lessons`.
+> **Harness note (from plan review):** there is no jsdom in this repo. The only working
+> `.mjs` test (`test_sr.mjs`) imports a **pure, DOM-free ES module** and runs under bare
+> `node`. So extract the reveal logic into a pure `reveal.js` module operating on a
+> passed-in root + injected deps, test it with a hand-rolled DOM stub, and inline-copy it
+> into the donor — the exact `shells/js/sr.js`↔donor mirror pattern already in use.
+
+- [ ] **Step 1 — failing test** `test_reveal.mjs`: import `{ revealBuild }` from `reveal.js`.
+  Build a fake root with two `.build` containers (each 2 `.build-step`s) using a tiny DOM
+  stub (nodes with `classList.add/contains`, `querySelectorAll`). Pass an injected
+  IntersectionObserver stub + `reducedMotion` flag. Assert: (a) with IO + motion, each
+  `.build` gets `armed` and firing the observer marks each `.build-step` `revealed`;
+  (b) with `reducedMotion:true` OR `hasIO:false`, every `.build-step` is `revealed` and no
+  container is `armed`. Run: `node tests/test_reveal.mjs` → fail (module absent).
+- [ ] **Step 2 — implement `reveal.js`.** `export function revealBuild(root, {IO, reducedMotion})`:
+  `root.querySelectorAll('.build')`; if `reducedMotion || !IO` → reveal all `.build-step`,
+  return; else for each container add `armed`, make one `IO(cb)` that adds `revealed` to
+  intersecting entries, observe each `.build-step`. Idempotent (skip `armed`). No `.gotit`
+  / `#s5` coupling. Run test → pass.
+- [ ] **Step 3 — inline-mirror into the donor.** Add an IIFE to `v9-base.donor`'s main
+  `<script>` that defines `window.__revealBuild = function(){ ... }` wrapping the same
+  logic with real deps (`document`, `window.IntersectionObserver`, the `RM` flag already
+  computed in the donor), and call `window.__revealBuild()` once after `refresh()`. Keep it
+  byte-equivalent in behavior to `reveal.js` (the donor can't `import`, so it is a mirror,
+  like `sr.js`→`srReview`).
+- [ ] **Step 4 — recompile every WIRED concept lesson** (exclude scratch dirs). Enumerate
+  `sessions/m0*/*/source.md` + `sessions/m1*/*/source.md` with `mode: concept` +
+  `donor: v9-base.donor` (do NOT touch `sessions/_coldgen/` or `sessions/_compare/`).
+  First recompile ONE non-target day (an m07 day) and confirm exit 0. Then recompile the
+  rest. **Acceptance:** grep confirms `__revealBuild =` landed in each output, and
+  `git diff` on each `lesson.html` shows ONLY the donor JS/`<script>` region changed (no
+  content diff) — not a blanket "gates pass," since a lesson may carry a benign advisory.
+- [ ] **Step 5 — verify** `python3 -m pytest tests/test_v8_regression.py -q` re-passes (m02
+  day-03 recompiled) and the full suite matches the observed baseline (171 pass / 1
+  pre-existing m02-manifest fail) plus the new tests.
+- [ ] **Step 6 — commit** `feat(engage): reveal.js module + wired multi-container __revealBuild + recompile concept lessons`.
 
 ### Task 6: `judge_body_engagement` (standalone LLM floor)
 
@@ -86,13 +117,18 @@ Run tests with system `python3` (the `.venv` is broken):
 
 ### Task 7: `lesson_build.js` — `body` lens + enum + author paragraph
 
-**Files:** Modify `sessions/_compiler/workflows/lesson_build.js`; Test `sessions/_compiler/tests/test_lesson_build_body_lens.mjs` (or a grep-style node `--check` assertion).
+**Files:** Modify `sessions/_compiler/workflows/lesson_build.js`; Test — grep-style node
+assertion + `node --check` (primary path; `lesson_build.js` is a workflow script with
+top-level `await`/`agent()`, so it can't be `import`ed for a unit test).
 
-- [ ] **Step 1 — failing test.** Read the file; assert it contains a `body` lens whose prompt parses the "Concept Body Engagement" section (`body_engagement` MISSING→P0 kind `body_engagement`, WEAK→P1), that `JUDGE_SCHEMA.kind` description includes `body_engagement`, and that the author prompt contains a "keep the body alive" instruction naming `%%% insight` / `%%% steps` / predict-then-reveal.
-- [ ] **Step 2 — run, expect fail.**
-- [ ] **Step 3 — implement.** (a) Add to `LENSES` a `{ key: 'body', prompt: 'Run coverage_judge.py …; parse "Concept Body Engagement": each concept body_engagement MISSING → P0 finding kind="body_engagement" (a cold mechanism/symbol dump — the user\'s #1 ask 2026-07-24 is a body as engaging as the intro); WEAK → P1; GOOD/NA → no finding. Bridge unavailable → PASS, note it.' }`. (b) Extend `JUDGE_SCHEMA.properties.findings.items.properties.kind.description` to include `body_engagement`. (c) Append a paragraph to the author prompt: "KEEP THE BODY ALIVE (Build-Up Register): the build-up must be as engaging as the intro — bridge from the opening analogy, re-hook 'why this bites' inside the body, narrate the mechanism with causal connectors and semantic step names (NOT flat Step 1/2/3 or bare symbol-pushing), use predict-then-reveal, keep the spine analogy alive to the end. Tools: `%%% insight` (why-this-matters re-hook), `%%% demo` with a `predict:` line (predict-then-reveal), `%%% steps` (narrated worked example). A cold mechanism dump is a P0 body_engagement finding."
-- [ ] **Step 4 — run, expect pass;** `node --check sessions/_compiler/workflows/lesson_build.js`.
-- [ ] **Step 5 — commit** `feat(loop): body_engagement lens + enum + 'keep the body alive' author rule`.
+- [ ] **Step 1 — failing test.** A small node script (or `grep`) asserts `lesson_build.js`
+  contains: a `body` lens (`key: 'body'`) whose prompt parses "Concept Body Engagement"
+  (`body_engagement` MISSING→P0 kind `body_engagement`, WEAK→P1); `body_engagement` in the
+  `JUDGE_SCHEMA` `kind` description; and a "keep the body alive" author instruction naming
+  `%%% insight` / `%%% steps` / predict-then-reveal. Run → fail.
+- [ ] **Step 2 — implement.** (a) Add to `LENSES` a `{ key: 'body', prompt: 'Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Concept Body Engagement" section: each concept body_engagement MISSING → P0 finding kind="body_engagement" (a cold mechanism/symbol dump — the user\'s #1 ask 2026-07-24 is a body as engaging as the intro); WEAK → P1 kind="body_engagement"; GOOD/NA → no finding. Bridge unavailable → verdict PASS, note it.' }`. (b) Add `body_engagement` to `JUDGE_SCHEMA.properties.findings.items.properties.kind.description`. (c) Append the "KEEP THE BODY ALIVE (Build-Up Register)" paragraph (see spec) to the author prompt, naming the three tools.
+- [ ] **Step 3 — run test + `node --check sessions/_compiler/workflows/lesson_build.js`, expect pass.**
+- [ ] **Step 4 — commit** `feat(loop): body_engagement lens + enum + 'keep the body alive' author rule`.
 
 ### Task 8: AUTHORING.md — document the new body grammar
 
@@ -116,13 +152,13 @@ Run tests with system `python3` (the `.venv` is broken):
 **Files:** m02 (9 days) + m03 (5 days) `source.md` + `lesson.html`.
 
 - [ ] **Step 1 — gather frozen front-matter** for each of the 14 days (read each existing `source.md`'s `---` block verbatim; it holds quest_id, mode, donor, nav_*, module_label, page_title, brand_sub, spine, notebook_yardstick).
-- [ ] **Step 2 — run a bounded per-day Workflow** (one `lesson_build.js` invocation per day via `workflow('lesson-build', {module, day, frozen, maxRounds:4})`, or an inline pipeline of 14 author agents), each: author under the new register + body toolkit → compile → judge panel (incl. the `body` lens) → fix until P0-clear → the day's `lesson.html` recompiles clean. Preserve frozen front-matter. **Length is a feature — never cut coverage to fix a body; add voice/widgets.**
+- [ ] **Step 2 — run a bounded per-day Workflow.** Invoke `lesson_build.js` **once per day** via the `workflow({ scriptPath: '<abs>/sessions/_compiler/workflows/lesson_build.js' }, { module, day, frozen, maxRounds: 4 })` helper (string-name resolution is NOT used in this repo — every call site uses `{scriptPath}`). **Pass the day's `frozen` front-matter string in the args** (do NOT reuse `build_module.js`, which drops `frozen` and would let the author reinvent quest-ids/nav/spine). Each run: author under the new register + body toolkit → compile → judge panel (incl. the `body` lens) → fix until P0-clear → the day's `lesson.html` recompiles clean. **Length is a feature — never cut coverage to fix a body; add voice/widgets.**
 - [ ] **Step 3 — independent verification pass** per day: `body_engagement` P0-clear; interest floor `FLOOR_MET`; `concept_structure_gate` + `compile_lesson.py` exit 0; idempotent recompile.
 - [ ] **Step 4 — commit** per module (or per day) `feat(m02|m03): rebuild bodies under Build-Up Register + body_engagement floor`.
 
 ### Task 11: Verify + report + memory
 
-- [ ] **Step 1 — full suite green** (baseline + new tests; 1 pre-existing m02-manifest fail only).
+- [ ] **Step 1 — full suite** matches the observed baseline (171 pass / 1 pre-existing m02-manifest fail) PLUS the new tests all green.
 - [ ] **Step 2 — write** `sessions/concept_body_engagement_rerun.md` (per-day body_engagement + interest verdicts, before/after excerpts).
 - [ ] **Step 3 — update memory** `loop-fix-rollout-state.md` + `MEMORY.md` index with the body-engagement dimension.
 - [ ] **Step 4 — finishing-a-development-branch** (verify tests, present options).
