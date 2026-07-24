@@ -267,6 +267,15 @@ def render_hint(lines):
             '<button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button>'
             '%s</div>' % (len(tiers), items))
 
+def render_insight(lines):
+    """%%% insight — an inline "why this matters / notice this" RE-HOOK callout for the
+    build-up. The Build-Up Register's stakes beat: a one-line pull that keeps the reader
+    engaged mid-mechanism instead of letting the body go cold. Reuses the styled .takeaway
+    block (no donor CSS change); the 💡 is inline text. Body prose runs through inline() so
+    [[term||gloss]] / **bold** / `code` all work inside it."""
+    text = inline(' '.join(l.strip() for l in lines if l.strip()))
+    return '<div class="takeaway">💡 %s</div>' % text
+
 def render_warmup(lines):
     """%%% warmup — a top-of-lesson RECALL quiz on PRIOR-day concepts (retention / spaced
     retrieval). Same line format as %%% quiz plus an optional 'concept: <id>' per line;
@@ -310,6 +319,7 @@ def render_widget(typ, args, lines):
     if typ == 'quiz':       return render_quiz(lines)
     if typ == 'hint':       return render_hint(lines)
     if typ == 'warmup':     return render_warmup(lines)
+    if typ == 'insight':    return render_insight(lines)
     raise ValueError("unknown %%%% widget type: %s" % typ)
 
 # ---------------------------------------------------------------------------
