@@ -220,16 +220,23 @@ def render_demo(args, lines):
     """Inline run-demo: code line, hidden output + takeaway revealed on click.
     NOTE: this widget only UN-HIDES a pre-baked output; it does not compute. So the
     default button label is a reveal verb, not 'run it' (which oversells execution).
-    Author-supplied `label:` is used verbatim (existing lessons stay byte-identical)."""
+    Author-supplied `label:` is used verbatim (existing lessons stay byte-identical).
+    Optional `predict:` field (Build-Up Register) prepends a "predict first" prompt so a
+    worked example becomes a discovery — the reader forms a guess BEFORE revealing. When
+    `predict:` is absent the output is byte-identical to before."""
     d = _kv(lines)
     did = args.get('id', 'demo'); label = args.get('label', 'reveal')
     code = attr_esc_text(d.get('code', '')); out = attr_esc_text(d.get('out', '')); take = inline(d.get('take', ''))
-    return ('<div class="demo" data-demo="%s">'
+    pred = d.get('predict')
+    pred_html = ('<div class="demo-predict" style="padding:.6rem .9rem;font-size:.85rem;'
+                 'color:var(--ink2);background:var(--panel);border-bottom:1px solid var(--line)">'
+                 '🤔 <b>Predict first:</b> %s</div>' % inline(pred)) if pred else ''
+    return ('<div class="demo" data-demo="%s">%s'
             '<div class="demo-code"><code>%s</code>'
             '<button class="demo-run" type="button">%s ▶</button></div>'
             '<pre class="demo-out" hidden>%s</pre>'
             '<div class="demo-take" hidden>%s</div></div>'
-            % (did, code, label, out, take))
+            % (did, pred_html, code, label, out, take))
 
 def render_quiz(lines):
     """Authored quiz: one question per line, '|'-separated. q: ask | a:N | opt | ... | fb: text"""
