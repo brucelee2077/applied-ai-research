@@ -27,6 +27,11 @@ _WIDGET = re.compile(r'%%%.*?%%%', re.DOTALL)  # strip any widget when measuring
 # visual is any svg/viz/demo/mathladder that sits AFTER the opening anchor visual.
 _MATHLADDER = re.compile(r'(?m)^%%%\s+mathladder\b')
 _BUILDUP_VIS = re.compile(r'(?m)^%%%\s+(svg|viz|demo|mathladder)\b')
+# Build-up CONTENT widget (satisfies the "has build-up after its visual" prose FLOOR — a
+# %%% steps narrated worked-example, or any build-up widget, IS substantial build-up even
+# with no surrounding prose). Distinct from _BUILDUP_VIS: `steps` is narration, NOT a
+# visual, so it counts toward the build-up floor but never toward "visualize the build-up".
+_BUILDUP_CONTENT = re.compile(r'(?m)^%%%\s+(steps|demo|mathladder|svg|viz)\b')
 # an "Optional…" demoted-math box: a `!!! c-… <emoji>` callout whose body's first
 # line (after any leading HTML tags) begins with the word "Optional". `.` excludes
 # newlines, so it matches ONLY when "Optional" is the box's immediate first line.
@@ -75,7 +80,11 @@ def run(source_text):
         else:
             after = text[first.end():]
         buildup = _WIDGET.sub('', after).strip()
-        chk(len(buildup) >= _MIN_PROSE, 'concept %s has build-up after its visual' % cid)
+        # The build-up floor is met by ≥_MIN_PROSE chars of narration OR a build-up
+        # content widget (%%% steps / demo / mathladder / a 2nd svg-viz) — a narrated
+        # %%% steps worked-example IS substantial build-up even with no surrounding prose.
+        has_bw = bool(_BUILDUP_CONTENT.search(after))
+        chk(len(buildup) >= _MIN_PROSE or has_bw, 'concept %s has build-up after its visual' % cid)
 
         # -- ADVISORY (warn-only; NEVER flips ok[0] / exit code): visualize the build-up --
         # If this concept's build-up is HEAVY (a Math Ladder, or math demoted into an
