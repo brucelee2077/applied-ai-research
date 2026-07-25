@@ -88,7 +88,7 @@ def scan_day(day_dir):
         per_concept[title] = {'wall': wall, 'breaks': breaks, 'prose_chars': prose_chars}
 
     return {
-        'module': os.path.basename(os.path.dirname(source_md)),
+        'module': os.path.basename(os.path.dirname(day_dir.rstrip('/'))),
         'concepts': len(concepts),
         'max_wall': max(walls) if walls else 0,
         'mean_wall': round(sum(walls) / len(walls)) if walls else 0,
