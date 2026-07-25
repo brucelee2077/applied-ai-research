@@ -59,6 +59,27 @@ def front_matter(src):
     return src[4:end + 1] if end != -1 else None
 
 
+# The FROZEN invariants are the WIRING keys: progress tracking, the prev/next
+# chain, the sidebar group, the narrative-spine gate, the notebook oracle. Prose
+# keys (fin_title/fin_body/title/subtitle) are NOT frozen — the author owns the
+# voice, and a rebuild must be allowed to correct a factual error that is baked
+# into that prose (day-05's fin_body claimed the gradient points DOWNhill).
+FROZEN_KEYS = ('quest_id', 'mode', 'donor', 'nav_prev_href', 'nav_prev_label',
+               'nav_next_href', 'nav_next_label', 'module_label', 'page_title',
+               'brand_sub', 'spine', 'notebook_yardstick', 'require_artifact')
+
+
+def fm_keys(src):
+    """Top-level `key: value` pairs of the front-matter, as a dict."""
+    fm = front_matter(src) or ''
+    out = {}
+    for line in fm.splitlines():
+        m = re.match(r'([a-z_]+):(.*)$', line)
+        if m:
+            out[m.group(1)] = m.group(2).strip()
+    return out
+
+
 def counts(src):
     """Structural inventory of a source.md — what a rebuild must not lose."""
     return {
@@ -141,9 +162,15 @@ def check(day_rel, ref='HEAD'):
     if after_first != after_second:
         fails.append('recompile is not idempotent')
 
-    # frozen front-matter must survive verbatim
-    if front_matter(new_src) != front_matter(old_src):
-        fails.append('front-matter changed (frozen invariants violated)')
+    # frozen WIRING keys must survive verbatim; prose keys may legitimately change
+    new_fm, old_fm = fm_keys(new_src), fm_keys(old_src)
+    for key in FROZEN_KEYS:
+        if old_fm.get(key) != new_fm.get(key):
+            fails.append('frozen front-matter key %r changed: %r -> %r'
+                         % (key, old_fm.get(key), new_fm.get(key)))
+    for key in ('fin_title', 'fin_body', 'title', 'subtitle'):
+        if key in old_fm and old_fm.get(key) != new_fm.get(key):
+            warns.append('prose front-matter key %r rewritten (allowed — review it)' % key)
 
     new_counts, old_counts = counts(new_src), counts(old_src)
     for key, label in (('concepts', 'concept'), ('coverage_topics', 'coverage-topic')):
