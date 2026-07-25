@@ -422,7 +422,16 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent):</b> flattening patches with the reshape axes in the wrong order — the tensor's <i>shape</i> comes out right, but the pixels inside each patch are scrambled, so the "image" is now noise and the model can never learn it. <b>Cause:</b> <code>reshape</code> reorders numbers by raw memory order; mixing up the height/width/patch axes silently shuffles pixels. <b>Remedy:</b> reshape <i>deliberately</i> and <b>print the shape after every step</b> (shape discipline); reconstruct one patch and look at it, or use a named-axis rearrange (einops-style) so the axes can't get crossed.
 
 Watch the shape march below — that print-at-every-step habit is what catches a scramble before it costs you a training run.</div></div>
-      <div class="demo" data-demo="patchify"><div class="demo-code"><code>print("final row    :", patches.shape, "→ 16 patch-vectors of length 49")</code><button class="demo-run" type="button">watch the shapes as an image becomes a row of patches ▶</button></div><pre class="demo-out" hidden>after split : (4, 7, 4, 7)
+      <div class="demo" data-demo="patchify"><div class="demo-code"><code>import jax.numpy as jnp
+img = jnp.ones((28, 28))                 # one grayscale image: 28 tall, 28 wide
+P = 7                                     # patch size: 7×7
+# cut into a grid of patches, then flatten each — PRINT the shape each step
+patches = img.reshape(28 // P, P, 28 // P, P)   # (4, 7, 4, 7): rows, in-row, cols, in-col
+print("after split :", patches.shape)
+patches = patches.transpose(0, 2, 1, 3)         # bring the two patch axes together
+print("after reorder:", patches.shape)
+patches = patches.reshape(-1, P * P)            # (16, 49): 16 patches, 49 pixels each
+print("final row    :", patches.shape, "→ 16 patch-vectors of length 49")</code><button class="demo-run" type="button">watch the shapes as an image becomes a row of patches ▶</button></div><pre class="demo-out" hidden>after split : (4, 7, 4, 7)
 after reorder: (4, 4, 7, 7)
 final row    : (16, 49) → 16 patch-vectors of length 49</pre><div class="demo-take" hidden><b>16 patches, 49 numbers each — and we could SEE every shape on the way.</b> The picture (28×28) became a row of 16 patch-vectors, matching <code>(H/P)×(W/P) = 16</code>. Printing the shape at each line is the whole defense against a silent scramble: if any line prints an unexpected shape, you catch it here — not after a wasted training run.</div></div>
       <p>You've turned a picture into a row of patch-vectors. But those are just raw pixels, and the model has no idea which tile came from where. Two more bricks fix both problems at once: a learned embedding, a position tag, and a summary slot — that's the next concept.</p>
@@ -573,13 +582,36 @@ final row    : (16, 49) → 16 patch-vectors of length 49</pre><div class="demo-
 <text x="392" y="140" fill="#276b45" font-size="7">arr.at[0].set(5) → a NEW array</text>
 <text x="260" y="176" fill="#9A5A12" font-size="9">nothing changes in place — each train step RETURNS a new params tree, same idea</text>
 </g></svg></div>
-      <div class="demo" data-demo="immutable"><div class="demo-code"><code>print("same object?", arr is new_arr)</code><button class="demo-run" type="button">try to edit a JAX array in place (it fails), then update it the functional way ▶</button></div><pre class="demo-out" hidden>in-place edit failed: JAX arrays are immutable and do not support in-place
+      <div class="demo" data-demo="immutable"><div class="demo-code"><code>import jax.numpy as jnp
+arr = jnp.array([1, 2, 3, 4])
+# 1) try to edit in place, the NumPy way — JAX arrays are IMMUTABLE
+try:
+arr[0] = 5                         # poke a new value into slot 0
+except TypeError as e:
+print("in-place edit failed:", str(e)[:52])
+# 2) the functional update: build a NEW array; the old one is untouched
+new_arr = arr.at[0].set(5)
+print("old array (unchanged):", arr)
+print("new array (a copy)   :", new_arr)
+print("same object?", arr is new_arr)</code><button class="demo-run" type="button">try to edit a JAX array in place (it fails), then update it the functional way ▶</button></div><pre class="demo-out" hidden>in-place edit failed: JAX arrays are immutable and do not support in-place
 old array (unchanged): [1 2 3 4]
 new array (a copy)   : [5 2 3 4]
 same object? False</pre><div class="demo-take" hidden><b>You cannot poke a value into a JAX array — you build a new one.</b> The in-place edit <code>arr[0]=5</code> raised an error, and <code>arr.at[0].set(5)</code> returned a fresh array while the original stayed <code>[1 2 3 4]</code>. This is the mechanism the whole training loop rides on: a step never scribbles over the old params — it <b>returns a new params tree</b>, old numbers untouched. That "always a new copy" promise is exactly what lets <code>jit</code>, <code>vmap</code>, and <code>grad</code> trust your code.</div></div>
       <h4>Why one tree? Because you can update every number with one command</h4>
       <p>Keeping all numbers in a single pytree has a lovely payoff: JAX can walk the <em>whole</em> tree at once. <code>jax.tree_util.tree_map(f, params)</code> applies <code>f</code> to <em>every</em> leaf array — so "make a new tree with the update added to every weight" is one line, no matter how deep the tree, and (thanks to immutability) it hands back a <em>fresh</em> tree rather than editing the old one. You don't loop over layers by hand. Let's build a toy params tree for a mini-ViT and see its shape.</p>
-      <div class="demo" data-demo="pytree"><div class="demo-code"><code>print("number of arrays (leaves) in the tree:", n_leaves)</code><button class="demo-run" type="button">build a toy params tree and walk it in one line ▶</button></div><pre class="demo-out" hidden>{'cls_token': (1, 32), 'head': {'b': (3,), 'w': (32, 3)}, 'patch_embed': {'b': (32,), 'w': (49, 32)}, 'pos_embed': (17, 32)}
+      <div class="demo" data-demo="pytree"><div class="demo-code"><code>import jax, jax.numpy as jnp
+# a tiny stand-in for a ViT's params: nested dict of arrays (a pytree)
+params = {
+"patch_embed": {"w": jnp.zeros((49, 32)), "b": jnp.zeros((32,))},  # translator
+"pos_embed":   jnp.zeros((17, 32)),        # 16 patches + 1 summary slot
+"cls_token":   jnp.zeros((1, 32)),         # the summary folder
+"head":        {"w": jnp.zeros((32, 3)),  "b": jnp.zeros((3,))},   # 3 classes
+}
+# walk the WHOLE tree at once — print every leaf's shape
+shapes = jax.tree_util.tree_map(lambda a: a.shape, params)
+print(shapes)
+n_leaves = len(jax.tree_util.tree_leaves(params))
+print("number of arrays (leaves) in the tree:", n_leaves)</code><button class="demo-run" type="button">build a toy params tree and walk it in one line ▶</button></div><pre class="demo-out" hidden>{'cls_token': (1, 32), 'head': {'b': (3,), 'w': (32, 3)}, 'patch_embed': {'b': (32,), 'w': (49, 32)}, 'pos_embed': (17, 32)}
 number of arrays (leaves) in the tree: 6</pre><div class="demo-take" hidden><b>Every number lives in one tree — and one command touched them all.</b> The <code>tree_map</code> call reached every leaf array and reported its shape, without a single hand-written loop. That's why "update every weight" later is just one more <code>tree_map</code> that returns a fresh tree. Note <code>pos_embed</code> has 17 rows: 16 patches plus the 1 summary slot.</div></div>
       <h4>The trap: a hidden side-effect breaks the "pure" promise</h4>
       <p>The whole JAX toolbox — <code>jit</code>, <code>vmap</code>, <code>grad</code> — trusts that <code>forward</code> is <em>pure</em>. If your function secretly reaches out and reads a changing global, or mutates something, or prints as part of its "real" work, it's no longer pure — and JAX can compute a <em>wrong</em> answer without ever complaining. The fix is a discipline: pass <strong>every</strong> input in through the arguments, keep no hidden state, and don't rely on side effects for anything the output depends on.</p>
@@ -613,7 +645,18 @@ number of arrays (leaves) in the tree: 6</pre><div class="demo-take" hidden><b>E
       <p><strong>What the lottery-ticket picture gets right:</strong> a scratched ticket always shows the same number, so you must tear off fresh ones for independent draws — just as a key always gives the same numbers, so you split it for each independent random init. <strong>Where it breaks down:</strong> lottery tickets are truly random, but a JAX key is <em>deterministic</em> — the same key always gives the same numbers, which is a feature (reproducibility), not a flaw.</p>
       <h4>The trap: reusing a key gives identical "random" draws</h4>
       <p>Here's the classic beginner surprise. If you pass the <em>same</em> key to two random draws — say, to init the patch-embed weights <em>and</em> the block weights — they come out <strong>identical</strong>, not independent. Two parts of your model start as clones. The fix is <code>jax.random.split</code>, which tears one key into several fresh, independent keys. Watch it: reuse the same key and the two arrays match; split first and they differ.</p>
-      <div class="demo" data-demo="keys"><div class="demo-code"><code>print("split keys     → identical?", bool(jnp.allclose(c, d)))</code><button class="demo-run" type="button">reuse a key (bad) vs split it (good) ▶</button></div><pre class="demo-out" hidden>same key twice → identical? True
+      <div class="demo" data-demo="keys"><div class="demo-code"><code>from jax import random
+import jax.numpy as jnp
+key = random.PRNGKey(0)
+# BAD: same key twice → identical "random" draws
+a = random.normal(key, (3,))
+b = random.normal(key, (3,))
+print("same key twice → identical?", bool(jnp.allclose(a, b)))
+# GOOD: split into fresh keys → independent draws
+k1, k2 = random.split(key)
+c = random.normal(k1, (3,))
+d = random.normal(k2, (3,))
+print("split keys     → identical?", bool(jnp.allclose(c, d)))</code><button class="demo-run" type="button">reuse a key (bad) vs split it (good) ▶</button></div><pre class="demo-out" hidden>same key twice → identical? True
 split keys     → identical? False</pre><div class="demo-take" hidden><b>Same ticket, same number; fresh tickets, fresh numbers.</b> Reusing <code>key</code> gave two <i>identical</i> arrays — two model parts would start as clones. After <code>random.split</code>, the two draws differ — genuinely independent. Rule: <b>split before each independent random use</b>. For a whole ViT you split once into as many keys as you have random pieces.</div></div>
       <p>Your model's numbers can now start as <em>independent</em> random draws. Next: how do we run this pure function fast, and over a whole batch of images at once, without slow Python loops? Two bricks — <code>jit</code> and <code>vmap</code> — and one recompilation trap. That's the next concept.</p>
       <button class="gotit" type="button">Got keys</button>
@@ -706,7 +749,56 @@ split keys     → identical? False</pre><div class="demo-take" hidden><b>Same t
       <p><strong>What the darts picture gets right:</strong> you measure the miss, nudge the next throw that way, and slowly close in — just as the loss's gradient tells you how to nudge every weight to guess better next time. <strong>Where it breaks down:</strong> a dart player adjusts one aim, but <code>grad</code> nudges <em>thousands</em> of numbers at once, each by its own amount, all in one step.</p>
       <h4>Build a genuinely small image dataset — and train the real ViT on it</h4>
       <p>Talk is cheap; let's actually train. We'll make a <strong>tiny image dataset</strong> we can learn: 32 little 8×8 pictures in two classes — class 0 is <em>bright on top</em>, class 1 is <em>bright on the bottom</em>, each with a little random noise so no two are identical. That's a real (if small) learnable pattern. Then we run the <strong>real ViT forward</strong> — patchify → patch-embed → prepend the class token → add position tags → one real attention <strong>encoder block</strong> → read the summary slot → head — over the whole batch with <code>vmap</code>, and train it with <code>grad</code> + Optax. Predict first: if each step nudges the params toward a lower loss, the printed <strong>loss</strong> should slide <em>down</em> and the <strong>accuracy</strong> (share of images guessed right) should climb toward 1.00. Watch both.</p>
-      <div class="demo" data-demo="train"><div class="demo-code"><code>print(f"epoch {epoch:2d}: loss = {float(loss):.4f}   accuracy = {float(acc):.2f}")</code><button class="demo-run" type="button">build a tiny image dataset, run the real ViT, and train end to end ▶</button></div><pre class="demo-out" hidden>dataset: (32, 8, 8) labels: (32,) classes: 2
+      <div class="demo" data-demo="train"><div class="demo-code"><code>import jax, jax.numpy as jnp, optax
+from jax import random
+# ---- a genuinely small IMAGE dataset: 32 pictures, 8×8, two classes ----
+def make_dataset(key):                       # class 0 = bright TOP, class 1 = bright BOTTOM
+k0, k1 = random.split(key)
+top = jnp.zeros((8, 8)).at[:4, :].set(1.0)   # a functional update → a NEW array
+bot = jnp.zeros((8, 8)).at[4:, :].set(1.0)
+imgs0 = top + 0.1 * random.normal(k0, (16, 8, 8))   # 16 noisy "top" images
+imgs1 = bot + 0.1 * random.normal(k1, (16, 8, 8))   # 16 noisy "bottom" images
+X = jnp.concatenate([imgs0, imgs1], 0)              # (32, 8, 8)
+y = jnp.concatenate([jnp.zeros(16, int), jnp.ones(16, int)])  # labels 0/1
+return X, y
+P, D, C = 4, 16, 2                            # patch 4×4 → 4 patches; model dim 16; 2 classes
+def patchify(img):                            # (8,8) → (4, 16): 4 patches of 16 pixels
+return img.reshape(8//P, P, 8//P, P).transpose(0,2,1,3).reshape(-1, P*P)
+def forward(params, img):                     # the REAL ViT forward, for ONE image → logits (2,)
+emb = patchify(img) @ params["patch_embed"]["w"] + params["patch_embed"]["b"]  # (4,D)
+seq = jnp.concatenate([params["cls_token"], emb], 0) + params["pos_embed"]      # (5,D): +cls +pos
+a = params["attn"]                        # ONE self-attention encoder block:
+q, k, v = seq @ a["wq"], seq @ a["wk"], seq @ a["wv"]
+seq = seq + jax.nn.softmax((q @ k.T) / jnp.sqrt(D), -1) @ v   # attention + residual
+summary = seq[0]                          # read ONLY the class token
+return summary @ params["head"]["w"] + params["head"]["b"]   # → (2,) logits
+batched_forward = jax.vmap(forward, in_axes=(None, 0))   # vmap: run over the whole batch
+def loss_fn(params, X, y):                    # cross-entropy: one "how wrong?" number
+logp = jax.nn.log_softmax(batched_forward(params, X))
+return -jnp.mean(jnp.sum(jax.nn.one_hot(y, C) * logp, -1))
+def accuracy(params, X, y):                   # share of images guessed correctly
+return jnp.mean(jnp.argmax(batched_forward(params, X), -1) == y)
+# ---- init every array from a SPLIT key, run, and train ----
+kd, ki = random.split(random.PRNGKey(0))
+X, y = make_dataset(kd); print("dataset:", X.shape, "labels:", y.shape, "classes:", C)
+ks = random.split(ki, 7); s = 0.3           # a fresh key per random piece — never reuse one
+params = {"patch_embed": {"w": s*random.normal(ks[0], (P*P, D)), "b": jnp.zeros((D,))},
+"cls_token": s*random.normal(ks[1], (1, D)),
+"pos_embed": s*random.normal(ks[2], (5, D)),
+"attn": {"wq": s*random.normal(ks[3],(D,D)), "wk": s*random.normal(ks[4],(D,D)), "wv": s*random.normal(ks[5],(D,D))},
+"head": {"w": s*random.normal(ks[6], (D, C)), "b": jnp.zeros((C,))}}
+print("one image → logits", forward(params, X[0]).shape, "| whole batch →", batched_forward(params, X).shape)
+opt = optax.sgd(0.3); opt_state = opt.init(params)   # fixed shapes → jit compiles once
+@jax.jit
+def train_step(params, opt_state, X, y):
+loss, grads = jax.value_and_grad(loss_fn)(params, X, y)  # loss + which-way nudge
+updates, opt_state = opt.update(grads, opt_state)
+params = optax.apply_updates(params, updates)            # → a NEW params tree (nothing mutated)
+return params, opt_state, loss
+for epoch in range(13):                       # train end to end over the whole dataset
+params, opt_state, loss = train_step(params, opt_state, X, y)  # thread the boxes forward
+acc = accuracy(params, X, y)
+print(f"epoch {epoch:2d}: loss = {float(loss):.4f}   accuracy = {float(acc):.2f}")</code><button class="demo-run" type="button">build a tiny image dataset, run the real ViT, and train end to end ▶</button></div><pre class="demo-out" hidden>dataset: (32, 8, 8) labels: (32,) classes: 2
 one image → logits (2,) | whole batch → (32, 2)
 epoch  0: loss = 0.7195   accuracy = 0.50
 epoch  1: loss = 0.6956   accuracy = 0.50

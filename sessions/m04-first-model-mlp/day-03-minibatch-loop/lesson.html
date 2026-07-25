@@ -391,7 +391,11 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>Don't worry if these blur together at first — everyone mixes them up in the beginning. The one link that keeps them straight: <strong>one epoch contains many iterations.</strong></p>
       <h4>One worked count, so the words stick</h4>
       <p>Say you have <code>N = 60,000</code> training images and you pick <code>batch_size = 32</code>. Before you read on, <em>predict</em>: how many weight updates happen in one epoch? Then run it and see:</p>
-      <div class="demo" data-demo="count"><div class="demo-code"><code>print('total steps over 10 epochs:', 10 * iters_per_epoch)</code><button class="demo-run" type="button">run it — count the steps ▶</button></div><pre class="demo-out" hidden>total steps over 10 epochs: 18750</pre><div class="demo-take" hidden><b>One epoch = 1,875 weight updates</b> (60,000 ÷ 32). Ten epochs = 18,750 tiny nudges. So "we trained for 10 epochs" quietly means <i>nudge every weight 18,750 times</i> — that's the sheer repetition that makes learning happen.</div></div>
+      <div class="demo" data-demo="count"><div class="demo-code"><code>N = 60_000; batch_size = 32
+iters_per_epoch = N // batch_size
+print('iterations per epoch:', iters_per_epoch)
+print('total steps over 10 epochs:', 10 * iters_per_epoch)</code><button class="demo-run" type="button">run it — count the steps ▶</button></div><pre class="demo-out" hidden>iterations per epoch: 1875
+total steps over 10 epochs: 18750</pre><div class="demo-take" hidden><b>One epoch = 1,875 weight updates</b> (60,000 ÷ 32). Ten epochs = 18,750 tiny nudges. So "we trained for 10 epochs" quietly means <i>nudge every weight 18,750 times</i> — that's the sheer repetition that makes learning happen.</div></div>
       <p>Keep the three words distinct and you're set:</p>
       <ul><li><strong>epoch</strong> = one full pass;</li><li><strong>iteration/step</strong> = one update on one batch;</li><li><strong>batch</strong> = the handful, <code>batch_size</code> = how many are in it.</li></ul>
       <p>See? Not so bad once they sit still. You just picked up the exact vocabulary the whole field uses to describe training. From here on, when someone says "we trained for 10 epochs," you'll know exactly what they mean.</p>
@@ -537,7 +541,15 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       <p>**Puzzle 2 — the learning rate too <em>small</em>.** Every update is a grain of sand. The loss <em>does</em> fall, but so slowly training <strong>crawls</strong> — hours for what a sane rate does in seconds. <strong>Cause:</strong> steps too tiny to make headway. <strong>Remedy:</strong> <em>raise the learning rate</em> until the loss falls briskly without zig-zagging.</p>
       <h4>One silent trap: forgetting to reset the gradients</h4>
       <p>There's a third bug, and this one throws <em>no error at all</em>. Most training tools <em>add</em> each step's gradient onto whatever was already there (a default that helps in fancier setups). So if you don't clear it, step 2's gradient piles on top of step 1's, step 3's on top of that — the nudge grows wronger every step. <strong>Cause:</strong> gradients accumulate by default. <strong>Remedy:</strong> <span class="term" data-tip="reset every weight's gradient to 0 at the start of each iteration, before the backward pass, so each update uses only this step's signal — often literally a zero_grad() call">zero the gradients</span> at the start of <em>every</em> iteration. Predict what "used gradient" prints with and without a reset, then run it:</p>
-      <div class="demo" data-demo="zerograd"><div class="demo-code"><code>for i in range(3): used = g; print('with reset -&gt; used', used)</code><button class="demo-run" type="button">run it — reset vs pile-up ▶</button></div><pre class="demo-out" hidden>with reset -&gt; used 2</pre><div class="demo-take" hidden><b>Forget to reset and the gradient piles up: 2 → 4 → 6</b>, so each nudge is more wrong than the last. Reset every iteration and it stays a clean 2. One tiny line — zero the gradients — saves the whole run.</div></div>
+      <div class="demo" data-demo="zerograd"><div class="demo-code"><code>g = 2   # this step's gradient, same every step
+acc = 0
+for i in range(3): acc = acc + g; print('no reset -&gt; used', acc)
+for i in range(3): used = g; print('with reset -&gt; used', used)</code><button class="demo-run" type="button">run it — reset vs pile-up ▶</button></div><pre class="demo-out" hidden>no reset -&gt; used 2
+no reset -&gt; used 4
+no reset -&gt; used 6
+with reset -&gt; used 2
+with reset -&gt; used 2
+with reset -&gt; used 2</pre><div class="demo-take" hidden><b>Forget to reset and the gradient piles up: 2 → 4 → 6</b>, so each nudge is more wrong than the last. Reset every iteration and it stays a clean 2. One tiny line — zero the gradients — saves the whole run.</div></div>
       <div class="callout c-info"><span class="ic">🛠️</span><div><b>How a senior engineer reads the curve:</b> a loss that <i>climbs or NaNs</i> screams learning rate too high (lower it). A loss that <i>barely moves</i> whispers learning rate too low (raise it). A loss that <i>explodes for no reason</i> on a loop you just wrote is very often forgotten gradient-resetting. The curve is the first place experienced engineers look — and now you can read it too.</div></div>
       <button class="gotit" type="button">Got the loss curve</button>
     </div>

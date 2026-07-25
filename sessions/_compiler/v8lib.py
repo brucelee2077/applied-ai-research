@@ -104,7 +104,16 @@ def _kv(lines):
         m = re.match(r'\s*(\w+):', ln)
         if m and not stripped.startswith(('#', '-')):
             last = m.group(1)
-            d[last] = ln.split(':', 1)[1].strip()
+            value = ln.split(':', 1)[1].strip()
+            # A REPEATED key accumulates instead of overwriting. Authors write a
+            # multi-line result as several `out:` lines; overwriting kept only the
+            # last one, so a build-up shipped with its build removed. Flush any
+            # continuation lines gathered so far first, to preserve author order.
+            if last in d:
+                d[last] = _join_cont(d[last], cont_raw.pop(last, None))
+                d[last] += '\n' + value
+            else:
+                d[last] = value
             cont_raw[last] = []
             continue
         # continuation line: fold it into the current field's value so multi-line
@@ -116,11 +125,21 @@ def _kv(lines):
     # append continuation lines, dedented by their common leading indent, so
     # aligned columns stay aligned in the rendered <pre> without a big left gap.
     for k, raws in cont_raw.items():
-        if not raws:
-            continue
-        indent = min(len(r) - len(r.lstrip(' ')) for r in raws)
-        d[k] = d[k] + '\n' + '\n'.join(r[indent:] for r in raws)
+        d[k] = _join_cont(d[k], raws)
     return d
+
+
+def _join_cont(value, raws):
+    """Append continuation lines to a field value, dedented by their common indent.
+
+    Keeping the author's relative column alignment matters for watchable
+    numbers; the shared leading indent is stripped so the block does not render
+    with a big left gap.
+    """
+    if not raws:
+        return value
+    indent = min(len(r) - len(r.lstrip(' ')) for r in raws)
+    return value + '\n' + '\n'.join(r[indent:] for r in raws)
 
 def attr_esc_text(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
