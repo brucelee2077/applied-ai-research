@@ -2,12 +2,12 @@
 #
 # Watch a gradient flow BACKWARD through one tiny neuron, then CHECK your work
 # two different ways. This is the whole day in ~40 lines: forward pass (save the
-# notes), backprop by hand (the three rules), and a gradient check (measure the
+# notes), backprop by hand (the lesson's rules), and a gradient check (measure the
 # same slope with no calculus, just two loss readings).
 #
-# We only need one import — math is not even required, but we bring it in so this
-# is a real, honest script (the gate expects an import; numpy would be fine too).
-import math  # not strictly needed, but keeps this a real, importable module
+# math.isclose does the "are these two numbers the same?" comparisons at the
+# bottom — exactly the judgement a gradient check asks you to make.
+import math
 
 
 # --- the activation from Day 2: ReLU passes positives, zeros out negatives ---
@@ -39,18 +39,24 @@ if __name__ == "__main__":
     z, a, L = forward(x, w, b, target)
     print("forward pass:  z =", z, " a =", a, " loss =", round(L, 4))
 
-    # ---- STEP 2: BACKPROP by hand, using the three rules from the lesson ----
+    # ---- STEP 2: BACKPROP by hand, using the rules from the lesson ----
     # the gradient flowing INTO the neuron from the loss side: d/da of (a-target)^2
     incoming = 2.0 * (a - target)
     # the ReLU's LOCAL slope at the saved z: a clean 1 if z>0, else 0
     relu_slope = 1.0 if z > 0 else 0.0
-    # Rule 1 — a weight's gradient = its input × the gradient reaching it
-    w_grad = incoming * relu_slope * x
-    # Rule 3 — the bias just passes the gradient through (slope 1)
-    b_grad = incoming * relu_slope * 1.0
-    print("backprop:      w_grad =", round(w_grad, 6), " b_grad =", round(b_grad, 6))
+    # Rule 1 — the activation charges a toll: delta is what gets through to the knobs
+    delta = incoming * relu_slope
+    # Rule 2 — the weight's share = delta × its input value
+    w_grad = delta * x
+    # Rule 3 — the bias travels free (slope 1), so delta passes straight through
+    b_grad = delta * 1.0
+    # Rule 4 — one for the road: what gets handed one layer further back is delta × w
+    passed_back = delta * w
+    print("backprop:      delta =", round(delta, 6),
+          " w_grad =", round(w_grad, 6), " b_grad =", round(b_grad, 6))
     # the headline of the day: the weight's blame is exactly x times the bias's
     print("check ratio:   w_grad =", x, "× b_grad =", round(x * b_grad, 6))
+    print("to prev layer: delta × w =", round(passed_back, 6))
 
     # ---- STEP 3: the GRADIENT CHECK — measure the SAME slope a different way ----
     # a loss-as-a-function-of-w helper: redo the forward pass, return just the loss
@@ -65,16 +71,15 @@ if __name__ == "__main__":
 
     # ---- self-checks: the numbers must match the lesson's "what you should see" ----
     # the weight's gradient is exactly x times the bias's gradient
-    assert abs(w_grad - x * b_grad) < 1e-9, "w_grad should equal x * b_grad"
-    # the hand-computed w_grad for this setup is 0.4
-    assert abs(w_grad - 0.4) < 1e-9, "w_grad should be 0.4"
-    # and the bias gradient is 0.2
-    assert abs(b_grad - 0.2) < 1e-9, "b_grad should be 0.2"
+    assert math.isclose(w_grad, x * b_grad, abs_tol=1e-9), "w_grad should equal x * b_grad"
+    # the hand-computed values for this setup
+    assert math.isclose(w_grad, 0.4, abs_tol=1e-9), "w_grad should be 0.4"
+    assert math.isclose(b_grad, 0.2, abs_tol=1e-9), "b_grad should be 0.2"
     # the measured slope must match backprop to ~4 decimals — proof the code is right
-    assert abs(measured - w_grad) < 1e-3, "measured slope should match backprop"
+    assert math.isclose(measured, w_grad, abs_tol=1e-3), "measured slope should match backprop"
 
     # if every check passed, tell the learner they got it
-    if abs(measured - w_grad) < 1e-3 and abs(w_grad - 0.4) < 1e-9:
+    if math.isclose(measured, w_grad, abs_tol=1e-3) and math.isclose(w_grad, 0.4, abs_tol=1e-9):
         print("✅ you got it — w_grad is exactly x times b_grad, and the gradient check matches")
     else:
         print("❌ not yet — expected w_grad 0.4 (= x × b_grad 0.2) matching the measured slope")
