@@ -154,6 +154,30 @@ take: <b>ReLU = max(0, z).</b> Zeroes negatives, passes positives.
 %%%
 ```
 
+**Multi-line `code:` / `out:` values.** Any `key: value` field in a widget body may
+span several lines, in either of two forms — both reach the rendered `<pre>` in full:
+
+```text
+%%% demo id=momentum label="watch speed build"
+code: v = 0.0; keep = 0.9
+code: for g in [1.0]*3: v = keep*v + g; print(round(v,3))
+out: 1.0
+out: 1.9
+out: 2.71
+take: <b>Speed accumulates.</b> Each step keeps 90% of yesterday's velocity.
+%%%
+```
+Repeating the key (above) and indenting continuation lines under one key (below) are
+equivalent; pick whichever reads better in the source.
+```text
+out: 1.0
+     1.9
+     2.71
+```
+> Before 2026-07-24 a repeated key **overwrote** the earlier one, so only the last
+> `out:` line shipped — a build-up with the build removed. Fixed in `_kv()`; if you
+> are reading an older lesson that shows only a final value, this was why.
+
 **`insight`** — an inline "why this matters / notice this" RE-HOOK callout for the
 build-up (Build-Up Register's stakes beat). Body is prose (runs through `inline()`, so
 `[[term||gloss]]` / `**bold**` / `` `code` `` all work). Renders as a styled `.takeaway`
