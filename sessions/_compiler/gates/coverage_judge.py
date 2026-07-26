@@ -43,10 +43,13 @@ import coverage_gate as cg   # reuse spec/notebook/curation extraction (single s
 ROOT = cg.ROOT
 BRIDGE_URL = 'http://localhost:11211/api/openai/v1'
 MODEL = 'aws:anthropic.claude-opus-4-8'
-# 48000 chars (~12k tokens) comfortably holds a full V9 concept lesson; the older
-# 22000 cap silently dropped the LAST ~third of longer lessons, so the final
-# concept units (e.g. sigmoid-drift, XOR) were invisible to every judge below.
-_MAX_LESSON_CHARS = 48000
+# The extract cap must hold the WHOLE lesson. A long V9 concept day (13+ units) extracts
+# to ~55k chars, so the old 48000 cap silently dropped the last ~12% — the end-of-day
+# glossary, the further-reading box and the entire quiz — from EVERY judge below, which
+# made tail-only content read as ABSENT (a false P0). 160000 chars (~40k tokens) is still
+# far inside the model's context. If a lesson ever exceeds it, _readable_text() prints a
+# loud WARN so a tail verdict is never trusted silently.
+_MAX_LESSON_CHARS = 160000
 
 
 def _readable_text(html, max_chars=None):
@@ -174,7 +177,7 @@ def judge(lesson_text, spec, notebook_concepts, curation=None, model=MODEL, time
 # (repo CLAUDE.md §5/§7: analogy scaffold, one idea per sentence, curiosity hooks,
 # normalize confusion, victory laps). It returns per-dimension deltas vs the notebook
 # and concrete rewrite fixes. Advisory; graceful fallback like the coverage judge.
-_TONE_MAX = 48000  # see _MAX_LESSON_CHARS note: hold the whole lesson + notebook
+_TONE_MAX = _MAX_LESSON_CHARS  # see _MAX_LESSON_CHARS note: hold the whole lesson + notebook
 _TONE_SYS = (
     "You are a STRICT BEGINNER-FRIENDLINESS judge for an ML lesson aimed at a curious 12-year-old for "
     "whom English may be a second language. You are given a companion NOTEBOOK that is the GOLD "
@@ -293,7 +296,7 @@ def judge_tone(lesson_text, notebook_md, model=MODEL, timeout=90):
 # genuine energy, low density). This judge grades the lesson's INTEREST relative
 # to the notebook and returns per-lever deltas + concrete fixes. It judges SPARK
 # ONLY — not correctness, coverage, or mere warmth. Advisory; graceful fallback.
-_INTEREST_MAX = 48000  # see _MAX_LESSON_CHARS note: hold the whole lesson + notebook
+_INTEREST_MAX = _MAX_LESSON_CHARS  # see _MAX_LESSON_CHARS note: hold the whole lesson + notebook
 _INTEREST_SYS = (
     "You are a STRICT INTEREST & CURIOSITY judge for a beginner-facing ML lesson (a curious 12-year-old for "
     "whom English may be a second language). At this early stage the single most important thing is whether "
@@ -419,7 +422,7 @@ _INTEREST_ABS_SYS = (
     "Credit the lesson's OWN ways of sparking it (interactive %%%viz/%%%demo drag/slide/predict-then-run widgets, "
     "hands-on @@@produce tasks). Be specific and quote. Return STRICT JSON only (no prose, no markdown fences)."
 )
-_INTEREST_ABS_MAX = 48000
+_INTEREST_ABS_MAX = _MAX_LESSON_CHARS
 
 
 def _interest_abs_prompt(lesson_text):
@@ -489,7 +492,7 @@ def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
 # discovery, struggle normalized mid-hard-part? It is its OWN _chat-seam judge (not a 5th
 # axis on the already-token-crowded structure judge, whose salvage path silently drops the
 # LAST concept). Advisory; graceful fallback; never raises. Mirrors judge_interest_absolute.
-_BODY_MAX = 48000
+_BODY_MAX = _MAX_LESSON_CHARS
 _BODY_SYS = (
     "You are a STRICT BODY-ENGAGEMENT judge for a BEGINNER ML lesson (a curious 12-year-old for whom English "
     "may be a second language) built as concept units. The lesson's INTROS are already warm; you judge ONLY the "
@@ -562,7 +565,7 @@ def judge_body_engagement(lesson_text, concept_titles, model=MODEL, timeout=90):
 # intuition-first IN SPIRIT: leads with a felt picture, carries a real analogy
 # WITH its "where it breaks down" half, and builds up step-by-step. Advisory,
 # graceful fallback, never raises. Mirrors judge_tone.
-_STRUCT_MAX = 48000  # see _MAX_LESSON_CHARS note: hold the whole lesson (all concepts)
+_STRUCT_MAX = _MAX_LESSON_CHARS  # see _MAX_LESSON_CHARS note: hold the whole lesson (all concepts)
 _STRUCT_SYS = (
     "You are a STRICT CONCEPT-STRUCTURE judge for a BEGINNER ML lesson (a curious 12-year-old for whom "
     "English may be a second language) built as concept units. This is the make-or-break beginner-friendliness "
@@ -771,6 +774,12 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
         notebook_md = _notebook_markdown(nb_path)
 
     lesson_text = _readable_text(html)   # real prose (punctuation + breaks) for the LLM judges
+    if len(lesson_text) > _MAX_LESSON_CHARS:
+        # LOUD, never silent: every judge below slices to _MAX_LESSON_CHARS, so anything
+        # past it is invisible and its verdicts (ABSENT / skill-gap) are unreliable.
+        sys.stderr.write('WARN: lesson text truncated, %d chars dropped — coverage/'
+                         'skill-gap verdicts unreliable for the tail\n'
+                         % (len(lesson_text) - _MAX_LESSON_CHARS))
     curation = {'deferred': deferred, 'out_of_scope': list(oos.values())}
     # concept titles come from the source's @@@ concept title="..." args
     import re as _re
