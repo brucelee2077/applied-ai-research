@@ -25,6 +25,9 @@ DAYS = sorted(glob.glob(os.path.join(ROOT, 'sessions', 'm02-the-neuron', 'day-*'
 WIDGET_RE = re.compile(r'(?m)^%%%\s+([a-z]+)\b')
 # a whole widget block, opening line through its closing "%%%" fence
 WIDGET_BLOCK_RE = re.compile(r'(?m)^%%%\s+[a-z]+\b.*?(?:\n%%%\s*$|\Z)', re.DOTALL)
+# a raw-HTML escape block (AUTHORING.md §"Raw HTML escape"): ~~~html … ~~~.
+# Markup, not prose — strip it for the same reason widget bodies are stripped.
+RAW_HTML_RE = re.compile(r'(?m)^~~~\w*\b.*?(?:\n~~~\s*$|\Z)', re.DOTALL)
 # anything that gives the eye a place to rest / breaks a wall into one-idea chunks
 BREAK_RE = re.compile(r'(?m)^(?:####+\s|%%%\s+\w|step:|why:|[-*]\s|\d+\.\s|>\s)')
 
@@ -60,7 +63,7 @@ def longest_wall(text):
     Widget bodies (raw SVG, demo key:value lines, steps rungs) are stripped first —
     a 4k-char inline <svg> is not a wall of text for the reader, it is a picture.
     """
-    prose = WIDGET_BLOCK_RE.sub('\n\n', text)
+    prose = RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', text))
     worst = 0
     for para in re.split(r'\n\s*\n', prose):
         stripped = para.strip()
@@ -83,7 +86,7 @@ def scan_day(day_dir):
         buildup = buildup_of(body)
         wall = longest_wall(buildup)
         breaks = len(BREAK_RE.findall(buildup))
-        prose_chars = len(WIDGET_BLOCK_RE.sub('\n\n', buildup).strip())
+        prose_chars = len(RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', buildup)).strip())
         walls.append(wall)
         per_concept[title] = {'wall': wall, 'breaks': breaks, 'prose_chars': prose_chars}
 
