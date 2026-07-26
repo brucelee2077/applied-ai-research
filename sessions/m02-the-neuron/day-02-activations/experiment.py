@@ -20,7 +20,10 @@ def step(z):
 
 def relu(z):
     # One-way valve: pass positives, block negatives (turn them into 0).
-    return np.maximum(0.0, z)
+    # np.maximum(0, z) keeps the input's dtype, so integer input prints as integers
+    # (relu(np.array([-3, -1, 0, 2, 5])) -> array([0, 0, 0, 2, 5])), which is exactly
+    # what the lesson's demo shows.
+    return np.maximum(0, z)
 
 def leaky_relu(z, alpha=0.01):
     # Like ReLU, but negatives leak through as a tiny trickle (alpha * z),
@@ -64,42 +67,67 @@ if __name__ == "__main__":
     W1 = np.array([[1.0, 2.0], [0.0, 1.0]])
     W2 = np.array([[1.0, 0.0], [3.0, 1.0]])
 
-    # An input row with a negative first feature. We pick this (not a pure
-    # random row) so the pre-activation x@W1 has a NEGATIVE component — then the
-    # ReLU in Part 4 has something to clip, which is what breaks the collapse.
-    x = np.array([[-1.0, 0.5]])   # x@W1 = [-1, -1.5], both negative
+    # Two input rows, chosen so that (a) each one gives a MIXED-SIGN pre-activation
+    # x@W1 — so the ReLU in Part 4 clips one component and keeps the other, leaving a
+    # non-trivial output instead of all zeros — and (b) they add up to exactly zero,
+    # which makes the additivity test in Part 4 easy to read.
+    x_a = np.array([[1.0, -3.0]])    # x_a@W1 = [ 1, -1]  -> relu -> [1, 0]
+    x_b = np.array([[-1.0, 3.0]])    # x_b@W1 = [-1,  1]  -> relu -> [0, 1]
 
     # Path A: push x through layer 1, THEN through layer 2 (no bend between).
-    two_layers = (x @ W1) @ W2
+    two_layers = (x_a @ W1) @ W2
     # Path B: multiply the two weight matrices FIRST, then push x through once.
-    one_layer = x @ (W1 @ W2)
+    one_layer = x_a @ (W1 @ W2)
 
-    print("\nW1 @ W2 =\n", (W1 @ W2).astype(int))   # the single combined matrix
-    print("(x@W1)@W2 =", np.round(two_layers, 4))    # two layers...
-    print("x@(W1@W2) =", np.round(one_layer, 4))     # ...land on the SAME numbers
+    print("\nW1 @ W2 =\n", (W1 @ W2).astype(int))     # the single combined matrix
+    print("(x_a@W1)@W2 =", np.round(two_layers, 4))    # two layers...
+    print("x_a@(W1@W2) =", np.round(one_layer, 4))     # ...land on the SAME numbers
 
     # --- Part 4: slip a ReLU in the middle and break the collapse ---------
-    # With a bend between the layers, no single matrix W can reproduce the output.
-    with_bend = relu(x @ W1) @ W2
-    print("relu(x@W1)@W2 =", np.round(with_bend, 4),
-          "(differs -> the bend can't be folded flat)")
+    # How do we PROVE that no single matrix can reproduce the bent path? Not by showing
+    # that one output changed — a different matrix could still match that one input. We
+    # use the defining property of a linear map: it ADDS UP.
+    #     linear:  g(x_a + x_b) == g(x_a) + g(x_b)   -- always, for every matrix
+    # So if the bent path fails that test even once, NO single matrix can reproduce it.
+    def g(x):
+        return x @ W1 @ W2                 # straight path: no bend
+
+    def f(x):
+        return relu(x @ W1) @ W2           # bent path: a ReLU in the middle
+
+    x_sum = x_a + x_b                      # = [[0., 0.]]
+    lin_adds_up = np.allclose(g(x_sum), g(x_a) + g(x_b))
+    bent_adds_up = np.allclose(f(x_sum), f(x_a) + f(x_b))
+
+    print("\nstraight path  g(x_a)+g(x_b) =", np.round(g(x_a) + g(x_b), 4),
+          " g(x_a+x_b) =", np.round(g(x_sum), 4), " -> adds up:", lin_adds_up)
+    print("bent path      f(x_a)+f(x_b) =", np.round(f(x_a) + f(x_b), 4),
+          " f(x_a+x_b) =", np.round(f(x_sum), 4), " -> adds up:", bent_adds_up)
+    print("f(x_a) =", np.round(f(x_a), 4), " f(x_b) =", np.round(f(x_b), 4),
+          "(each keeps one component and clips the other)")
+    print("-> the bent path does NOT add up, and every single matrix does,",
+          "so no single matrix can reproduce it: the bend cannot be folded flat")
 
     # --- Self-check: assert the lesson's stated expected values -----------
-    expected_W = np.array([[7, 2], [3, 1]])            # the lesson says expect [[7,2],[3,1]]
-    collapse_holds = np.allclose(two_layers, one_layer)  # two linear layers == one
+    expected_W = np.array([[7, 2], [3, 1]])              # the lesson says expect [[7,2],[3,1]]
+    collapse_holds = np.allclose(two_layers, one_layer)   # two linear layers == one
     W_matches = np.array_equal((W1 @ W2).astype(int), expected_W)
-    sigmoid_ok = abs(sigmoid_slope_at_0 - 0.25) < 1e-9  # sigmoid'(0) == 0.25
-    bend_breaks = not np.allclose(with_bend, two_layers)  # ReLU changes the answer
+    sigmoid_ok = abs(sigmoid_slope_at_0 - 0.25) < 1e-9    # sigmoid'(0) == 0.25
+    bend_breaks = lin_adds_up and not bent_adds_up        # only the bent path fails additivity
+    values_match = (np.allclose(f(x_a) + f(x_b), [[4.0, 1.0]])
+                    and np.allclose(f(x_sum), [[0.0, 0.0]]))  # the lesson's printed numbers
 
-    if collapse_holds and W_matches and sigmoid_ok and bend_breaks:
+    if collapse_holds and W_matches and sigmoid_ok and bend_breaks and values_match:
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected W1@W2 == [[7,2],[3,1]], "
-              "(x@W1)@W2 == x@(W1@W2), sigmoid'(0) == 0.25, "
-              "and ReLU to break the match")
+              "(x_a@W1)@W2 == x_a@(W1@W2), sigmoid'(0) == 0.25, the straight path to "
+              "add up, and the bent path to give [[4,1]] vs [[0,0]]")
 
     # These asserts make the check hard (they stop the program if a fact is wrong).
     assert W_matches, "W1@W2 should be [[7,2],[3,1]]"
-    assert collapse_holds, "(x@W1)@W2 must equal x@(W1@W2) — two linear layers are one"
+    assert collapse_holds, "(x_a@W1)@W2 must equal x_a@(W1@W2) — two linear layers are one"
     assert sigmoid_ok, "sigmoid'(0) should be 0.25"
-    assert bend_breaks, "a ReLU between the layers must break the collapse"
+    assert lin_adds_up, "a straight (linear) path must always add up"
+    assert not bent_adds_up, "a ReLU between the layers must break additivity"
+    assert values_match, "expected f(x_a)+f(x_b) == [[4,1]] and f(x_a+x_b) == [[0,0]]"
