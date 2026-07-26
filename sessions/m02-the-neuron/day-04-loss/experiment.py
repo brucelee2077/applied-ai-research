@@ -4,8 +4,8 @@
 # Lower is better; 0 means perfect. Training is just making that number smaller.
 #
 # We will watch two scorecards react:
-#   1. MSE / MAE — the scores for guessing a NUMBER (and how one wild
-#      outlier hijacks MSE but barely moves MAE).
+#   1. MSE / MAE — the scores for guessing a NUMBER (and how ONE wild outlier
+#      gets AMPLIFIED by MSE while MAE merely FEELS it).
 #   2. Cross-entropy — the score for a CONFIDENT guess (and how clamping
 #      keeps a "0% sure and wrong" case finite instead of blowing up to +infinity).
 #
@@ -28,7 +28,8 @@ def mse(pred, target):
 def mae(pred, target):
     # MAE = Mean Absolute Error.
     # Same misses, but we take the PLAIN size |miss| (np.abs) instead of squaring.
-    # A miss of 100 counts as 100, not 100*100 — so one outlier can't dominate.
+    # A miss of 100 counts as 100, not 100*100 — so one outlier stays in
+    # proportion instead of being blown up into a monster.
     return np.mean(np.abs(pred - target))
 
 
@@ -48,7 +49,7 @@ def cross_entropy(p):
 
 
 if __name__ == "__main__":
-    # ================= Part 1: MSE vs MAE, and the outlier trap =============
+    # ================= Part 1: one close guess, scored ======================
     pred = np.array([2.5, 0.0, 2.0])       # the network's three guesses
     target = np.array([3.0, -0.5, 2.0])    # the three true answers
 
@@ -56,16 +57,42 @@ if __name__ == "__main__":
     close_mae = round(float(mae(pred, target)), 3)
     print("close guess  -> MSE", close_mse, " MAE", close_mae)
 
-    # Now break the last guess into a wild outlier: 2.0 becomes 102.0.
-    pred_wild = np.array([2.5, 0.0, 102.0])
-    wild_mse = round(float(mse(pred_wild, target)), 1)   # MSE squares 100 -> huge
-    wild_mae = round(float(mae(pred_wild, target)), 3)   # MAE only feels 100
-    print("wild outlier -> MSE", wild_mse, " MAE", wild_mae)
+    # ================= Part 2: the outlier hijack, on a CROWD ===============
+    # Twenty ordinary houses, each missed by exactly 0.5.
+    clean_target = np.full(20, 3.0)
+    clean_pred = np.full(20, 3.5)
 
-    # ================= Part 2: cross-entropy rewards confidence =============
+    # The SAME twenty houses plus one freak mansion missed by 100.
+    wild_target = np.append(clean_target, 103.0)
+    wild_pred = np.append(clean_pred, 3.0)   # that last miss is -100
+
+    clean_m = round(float(mse(clean_pred, clean_target)), 3)
+    clean_a = round(float(mae(clean_pred, clean_target)), 3)
+    wild_m = round(float(mse(wild_pred, wild_target)), 1)
+    wild_a = round(float(mae(wild_pred, wild_target)), 1)
+    print("20 ordinary misses    -> MSE", clean_m, " MAE", clean_a)
+    print("same 20 + ONE mansion -> MSE", wild_m, " MAE", wild_a)
+
+    # The honest comparison: BOTH scores grow, but by wildly different factors.
+    # MSE squares the 100 (-> 10000), so the score is AMPLIFIED about 1900x.
+    # MAE counts the 100 as 100, so it grows only about 10x — the outlier is
+    # FELT, not amplified, and the twenty honest misses keep their say.
+    grow_m = round(wild_m / clean_m)
+    grow_a = round(wild_a / clean_a, 1)
+    print("growth factor         -> MSE x", grow_m, " MAE x", grow_a)
+
+    # ================= Part 3: cross-entropy rewards confidence =============
     # As p (probability on the CORRECT answer) climbs 0.1 -> 0.99, the loss falls.
     ce_values = [round(float(cross_entropy(p)), 3) for p in [0.99, 0.6, 0.1, 1e-7]]
     print("cross-entropy for p=[0.99, 0.6, 0.1, 1e-7]:", ce_values)
+
+    # WHERE does cross-entropy change fastest? Compare two equal-looking climbs.
+    # Going 0.1 -> 0.6 buys a much bigger drop than 0.6 -> 0.99, so the loss is
+    # steepest down at the CONFIDENT-WRONG end (p -> 0) and flattens as p -> 1.
+    drop_low = round(float(cross_entropy(0.1) - cross_entropy(0.6)), 3)
+    drop_high = round(float(cross_entropy(0.6) - cross_entropy(0.99)), 3)
+    print("drop p=0.1->0.6:", drop_low, " drop p=0.6->0.99:", drop_high,
+          "-> steepest near p=0 (confident + wrong), flat near p=1")
 
     # The p=0 case, clamped, stays FINITE (~16.1) instead of +infinity.
     ce_zero = round(float(cross_entropy(0.0)), 1)
@@ -73,18 +100,24 @@ if __name__ == "__main__":
 
     # ================= The honest limit =====================================
     # A loss only SCORES a guess (and hands over a slope). It never changes a
-    # single weight — that is the optimizer's job, which you meet tomorrow (Day 5).
-    print("reminder: a loss only SCORES; the optimizer (Day 5) changes weights.")
+    # single weight — that is the optimizer's job, and the optimizer gets its
+    # own lesson shortly after tomorrow's gradients.
+    print("reminder: a loss only SCORES; a separate optimizer step changes weights.")
 
     # ================= Self-check against the lesson's stated numbers =======
-    # The lesson says: MSE on the close guess is ~0.167, and the clamped p=0
-    # cross-entropy is ~16.1. Check both, and check the outlier really hijacks MSE.
+    # The lesson says: MSE on the close guess is ~0.167; the crowd test goes
+    # 0.25 -> ~476 for MSE (about 1900x) but only 0.5 -> ~5.2 for MAE (~10x);
+    # and the clamped p=0 cross-entropy is ~16.1.
     try:
         assert close_mse == 0.167, close_mse            # "what you should see"
         assert ce_zero == 16.1, ce_zero                 # clip keeps it finite
-        assert wild_mse > 1000, wild_mse                # outlier explodes MSE
-        assert wild_mae < 40, wild_mae                  # but MAE barely moves
+        assert (clean_m, clean_a) == (0.25, 0.5), (clean_m, clean_a)
+        assert wild_m > 400, wild_m                     # MSE amplified the outlier
+        assert wild_a < 6, wild_a                       # MAE merely felt it
+        assert grow_m > 100 * grow_a, (grow_m, grow_a)  # ~1900x vs ~10x
+        assert drop_low > 3 * drop_high, (drop_low, drop_high)  # steepest near p=0
         print("✅ you got it")
     except AssertionError as bad:
-        print("❌ not yet — expected MSE 0.167 and clamped cross-entropy 16.1, got", bad)
+        print("❌ not yet — expected MSE 0.167, crowd MSE ~476 vs MAE ~5.2, and"
+              " clamped cross-entropy 16.1, got", bad)
         raise
