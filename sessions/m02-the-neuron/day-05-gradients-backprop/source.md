@@ -426,7 +426,20 @@ Now put your own hand on the dial. It sets **what each layer multiplies the grad
 })();</script>
 %%%
 
-Slide to `0.25` and each bar drops by the *same* height as the one before — one equal step shorter, every time. But those equal steps are a **log scale**, and that is the sneaky bit: each equal drop means *four times smaller*. Do it eight times and you have `0.25⁸` — a `65,536×` cut, which is exactly why the printed number ends at about `×1.5e-5` (that notation just means 15 millionths) while the bars only look a few times shorter. Trust the numbers over the picture here — small multiplies **multiply toward 0** far faster than any height can show. Slide to `1.0` and the bars sit flat on the dashed line all the way back to the earliest layer. Push past `1` and they climb instead of drop — and near the top of the dial they run clean off the picture (hold that thought — you'll meet that trap by name shortly).
+Slide to `0.25` and each bar drops by the *same* height as the one before — one equal step shorter, every time. But those equal steps are a **log scale**, and that is the sneaky bit: each equal drop means *four times smaller*.
+
+Do it eight times and you have `0.25⁸` — a `65,536×` cut, which is exactly why the printed number ends at about `×1.5e-5` (that notation just means 15 millionths) while the bars only look a few times shorter. Trust the numbers over the picture here — small multiplies **multiply toward 0** far faster than any height can show.
+
+So far we have shown one setting of the dial. Try the other two and today's whole cast of traps fits on three rungs:
+
+%%% steps
+step: the fade — leave the dial at `0.25`
+why: every bar is one equal height shorter than the last, and the printed numbers collapse toward zero
+step: the flat line — slide to `1.0`
+why: the bars sit level on the dashed line all the way back to the earliest layer, so the signal survives
+step: the runaway — push past `1`
+why: they climb instead of drop, and near the top of the dial they run clean off the picture — hold that thought, you'll meet that trap by name shortly
+%%%
 
 %%% demo id=vanish label="run it — the fade in five numbers"
 predict: after 5 sigmoid layers, is the gradient about 0.1, about 0.01, or about 0.001? Commit to a guess, then reveal.
@@ -477,6 +490,8 @@ why: if yes, your backward pass is right. If no, you have a bug, and you found i
 
 That four-rung recipe is the **numerical gradient check**. Two loss readings and a divide — that's it.
 
+So far we have shown the recipe. Now watch it agree with backprop on a case where you already know the right answer:
+
 %%% demo id=gcheck label="run it — two ways, one slope"
 predict: for the toy loss `f(w) = w²` at `w = 3`, the true slope is `2w = 6`. Will the nudge-and-measure version land on 6.0, or drift noticeably off?
 code: f=lambda w: w**2; w=3.0; eps=1e-5  # toy loss f(w)=w^2, whose true slope at w is 2w=6
@@ -493,7 +508,11 @@ Why this is a habit and not a chore: a wrong gradient does not throw an error. I
 <b>Use it to check, not to train.</b> Measuring the slope needs <i>two</i> full forward passes <i>per weight</i> — one for <code>w+ε</code> and one for <code>w−ε</code> — which is hopelessly slow for millions of weights. Backprop gets them all in one sweep. So you gradient-check on a tiny toy to prove the code is right, then let fast backprop do the real work.
 !!!
 
-**Victory lap: you can now *prove* your own gradients.** That is a genuinely professional habit, it fits on one page, and you picked it up in about five minutes — engineers at every lab run this exact check before trusting a new model. Keep it in your pocket, because the next three beats are the classic ways learning goes wrong even when your math is perfect — and with the check in hand you'll be able to tell "my code is buggy" apart from "my code is fine, my *setup* is bad." That distinction is most of debugging. First up, the sneakiest one, and it hides in the very first line of any training script.
+**Victory lap: you can now *prove* your own gradients.** That is a genuinely professional habit, it fits on one page, and you picked it up in about five minutes — engineers at every lab run this exact check before trusting a new model.
+
+Keep it in your pocket, because the next three beats are the classic ways learning goes wrong even when your math is perfect. With the check in hand you'll be able to tell "my code is buggy" apart from "my code is fine, my *setup* is bad" — and that distinction is most of debugging.
+
+First up, the sneakiest one, and it hides in the very first line of any training script.
 
 @@@ concept id=c8 tag="The twin trap" title="Puzzle — when every neuron becomes the same neuron" gotit="Got symmetry breaking"
 One quick puzzle, and it's the sneakiest of the day because nothing about it looks broken. Picture **identical twins** who copy each other's every move: same breakfast, same route to school, same answer on every quiz. Two people, one behavior. Now think about how you might start a fresh network. Setting every weight to the same tidy value — all `0`, say — feels neat and fair. It is also the twins.
@@ -511,29 +530,52 @@ Follow the blame and you'll see the trap close:
 step: the innocent choice — start every weight in a layer at the same value
 why: this is **zero-initialization** (or any all-same start), and it feels tidy and fair
 step: the collapse — every neuron computes the same thing, so backprop hands them **identical gradients**
-why: same inputs, same weights, same local slopes — therefore the same blame, to the last digit
+why: same inputs, same local slopes, and the same outgoing wire carrying blame back — therefore the same share arrives at each unit, to the last digit
 step: the trap — they update identically and **stay identical** forever
 why: a hundred neurons behave like one; you paid for a layer and got a single unit
 step: the fix — start at **small random** values to **break the symmetry**
-why: a slightly different start means a slightly different gradient, so each unit grows into its own detector
+why: the layer is no longer symmetric, so the units stop being interchangeable and each is free to grow into its own detector
 %%%
 
 %%% svg
-<svg viewBox="0 0 520 196" role="img" aria-label="Left panel: three neurons that all start at the same weight value receive identical gradients of 0.4 and therefore stay identical clones forever, so the whole layer acts like one neuron. Right panel: three neurons initialized to small random values receive different gradients and grow into three different detectors, breaking the symmetry."><g font-family="monospace" font-size="10.5"><text x="130" y="16" text-anchor="middle" fill="#C93B3B" font-size="11">❌ all weights start at the SAME value</text><text x="390" y="16" text-anchor="middle" fill="#2D8B55" font-size="11">✅ small random start</text><rect x="14" y="24" width="232" height="132" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="274" y="24" width="232" height="132" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><g stroke="#C93B3B" fill="#F7E4E4"><circle cx="60" cy="62" r="14"/><circle cx="60" cy="98" r="14"/><circle cx="60" cy="134" r="14"/></g><g fill="#C93B3B" text-anchor="middle" font-size="9"><text x="60" y="65">w=.3</text><text x="60" y="101">w=.3</text><text x="60" y="137">w=.3</text></g><g stroke="#C93B3B" stroke-width="1.8"><line x1="82" y1="62" x2="150" y2="62"/><line x1="82" y1="98" x2="150" y2="98"/><line x1="82" y1="134" x2="150" y2="134"/></g><g fill="#C93B3B" font-size="9.5"><text x="154" y="65">grad 0.4</text><text x="154" y="101">grad 0.4</text><text x="154" y="137">grad 0.4</text></g><text x="130" y="41" text-anchor="middle" fill="#5A544E" font-size="9.5">identical gradients → stay identical</text><text x="130" y="152" text-anchor="middle" fill="#C93B3B" font-size="9.5">3 neurons behaving as 1</text><g stroke="#2D8B55" fill="#E6F2EA"><circle cx="320" cy="62" r="14"/><circle cx="320" cy="98" r="14"/><circle cx="320" cy="134" r="14"/></g><g fill="#2D8B55" text-anchor="middle" font-size="9"><text x="320" y="65">.07</text><text x="320" y="101">-.12</text><text x="320" y="137">.03</text></g><g stroke="#2D8B55" stroke-width="1.8"><line x1="342" y1="62" x2="404" y2="62"/><line x1="342" y1="98" x2="418" y2="98"/><line x1="342" y1="134" x2="392" y2="134"/></g><g fill="#2D8B55" font-size="9.5"><text x="408" y="65">grad .51</text><text x="422" y="101">grad .18</text><text x="396" y="137">grad .33</text></g><text x="390" y="41" text-anchor="middle" fill="#5A544E" font-size="9.5">different gradients → different jobs</text><text x="390" y="152" text-anchor="middle" fill="#2D8B55" font-size="9.5">3 neurons doing 3 things</text><text x="260" y="174" text-anchor="middle" fill="#5A544E" font-size="9">same start → same blame → same forever, however long you train</text><text x="260" y="190" text-anchor="middle" fill="#5A544E" font-size="9">randomness is not sloppiness — it is what lets a layer specialize</text></g></svg>
+<svg viewBox="0 0 520 208" role="img" aria-label="Two panels comparing starting weights. Left panel: three tanh neurons whose incoming weights all start at 0.30 and whose wires out are also equal, so their local slopes match and backprop hands all three the identical gradient minus 0.45; they stay clones forever and the whole layer acts like one neuron. Right panel: three tanh neurons whose incoming weights start at three different small values, minus 0.10, 0.45 and 0.65, so their local slopes differ and the gradients coming back differ too, minus 0.59, minus 0.40 and minus 0.26; the three units grow into three different detectors. Every wire out is 0.5 in both panels, so the weight in is the only thing that changed."><g font-family="monospace" font-size="10.5"><text x="130" y="16" text-anchor="middle" fill="#C93B3B" font-size="11">❌ all weights start at the SAME value</text><text x="390" y="16" text-anchor="middle" fill="#2D8B55" font-size="11">✅ small random start</text><rect x="14" y="24" width="232" height="136" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="274" y="24" width="232" height="136" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><text x="130" y="39" text-anchor="middle" fill="#5A544E" font-size="9">same weight in → same steepness → same blame</text><text x="390" y="39" text-anchor="middle" fill="#5A544E" font-size="9">own weight in → own steepness → own blame</text><g stroke="#C93B3B" fill="#F7E4E4"><circle cx="60" cy="66" r="15"/><circle cx="60" cy="102" r="15"/><circle cx="60" cy="138" r="15"/></g><g fill="#C93B3B" text-anchor="middle" font-size="8.5"><text x="60" y="69">.30</text><text x="60" y="105">.30</text><text x="60" y="141">.30</text></g><g stroke="#C93B3B" stroke-width="1.8"><line x1="75" y1="66" x2="143" y2="66"/><line x1="75" y1="102" x2="143" y2="102"/><line x1="75" y1="138" x2="143" y2="138"/></g><g fill="#C93B3B" font-size="9.5"><text x="147" y="69">grad −0.45</text><text x="147" y="105">grad −0.45</text><text x="147" y="141">grad −0.45</text></g><text x="130" y="156" text-anchor="middle" fill="#C93B3B" font-size="9.5">3 neurons behaving as 1</text><g stroke="#2D8B55" fill="#E6F2EA"><circle cx="320" cy="66" r="15"/><circle cx="320" cy="102" r="15"/><circle cx="320" cy="138" r="15"/></g><g fill="#2D8B55" text-anchor="middle" font-size="8.5"><text x="320" y="69">−.10</text><text x="320" y="105">.45</text><text x="320" y="141">.65</text></g><g stroke="#2D8B55" stroke-width="1.8"><line x1="335" y1="66" x2="403" y2="66"/><line x1="335" y1="102" x2="403" y2="102"/><line x1="335" y1="138" x2="403" y2="138"/></g><g fill="#2D8B55" font-size="9.5"><text x="407" y="69">grad −0.59</text><text x="407" y="105">grad −0.40</text><text x="407" y="141">grad −0.26</text></g><text x="390" y="156" text-anchor="middle" fill="#2D8B55" font-size="9.5">3 neurons doing 3 things</text><text x="260" y="177" text-anchor="middle" fill="#5A544E" font-size="8.5">every wire out is .5 in both panels — the weight IN is the only thing that changed (tanh units)</text><text x="260" y="191" text-anchor="middle" fill="#5A544E" font-size="9">symmetric all through — same weights in AND same wires out → same forever</text><text x="260" y="204" text-anchor="middle" fill="#5A544E" font-size="9">randomness is not sloppiness — it is what lets a layer specialize</text></g></svg>
 %%%
 
-%%% demo id=twins label="run it — watch the clones refuse to differ"
-predict: three neurons start at the same weight `0.3` and get the same input. After one update, will their weights be different, or still all the same?
-code: ws=[0.3,0.3,0.3]; x=1.5; delta=0.2; lr=0.1        # same start, same input, same incoming gradient
-code: grads=[delta*x for _ in ws]                       # Rule 2 for each neuron: delta × its input
-code: ws=[round(w-lr*g,4) for w,g in zip(ws,grads)]     # take one step downhill
-code: print("gradients",grads," weights after the step",ws)
-out: gradients [0.30000000000000004, 0.30000000000000004, 0.30000000000000004]  weights after the step [0.27, 0.27, 0.27]
-take: <b>Identical in, identical out.</b> All three gradients are the same number, so all three weights land on the same new value — and they will again next step, forever. Change any one starting weight to `0.31` and the three gradients immediately differ. That tiny difference is the whole point of random initialization.
+So far we have shown the trap as a picture. Now let's settle it with arithmetic. We'll use **tanh** units here — the smooth S-curve from Day 2 — because a tanh unit's local slope changes as its `z` changes, so a hair of difference in the weight *going in* has somewhere to show up. Let's find out whether that is enough to break the tie.
+
+%%% demo id=twins label="run it — does a hair of difference break the tie?"
+predict: three hidden units start with the same weight `0.3` and see the same input. You nudge just ONE of those starting weights to `0.31`. Does that unit's share of the blame change — or do all three stay identical?
+code: import math; x=1.5; t=1.0                                        # one input, one true answer
+code: def hid(w):    return [math.tanh(wi*x) for wi in w]              # 3 hidden units, each bends its OWN weighted input
+code: def guess(w,v): return sum(vi*hi for vi,hi in zip(v,hid(w)))     # the single output adds up what it hears
+code: def blame(w,v): return [round(2*(guess(w,v)-t)*vi*(1-hi*hi)*x,4)+0.0 for vi,hi in zip(v,hid(w))]
+code: #   ↑ one unit's share = 2·(guess−t) · its wire out v · tanh's slope at ITS OWN z · the input x
+code: print("A  all three start the same  ", blame([0.30,0.30,0.30], [0.5,0.5,0.5]))
+code: print("B  one weight nudged to 0.31 ", blame([0.31,0.30,0.30], [0.5,0.5,0.5]))
+code: print("C  every weight its own value", blame([-0.10,0.45,0.65], [0.5,0.5,0.5]))
+code: print("D  every weight starts at 0  ", blame([0.00,0.00,0.00], [0.0,0.0,0.0]))
+out: A  all three start the same   [-0.4527, -0.4527, -0.4527]
+out: B  one weight nudged to 0.31  [-0.4395, -0.4451, -0.4451]
+out: C  every weight its own value [-0.5938, -0.3971, -0.2649]
+out: D  every weight starts at 0   [0.0, 0.0, 0.0]
+take: <b>Start a whole layer the same and it gets one shared answer back; give the units different weights and they stop being interchangeable.</b> Row A is the twins: identical weights bend the input identically, so all three units get the very same `-0.4527` and move as one forever. Row B breaks the tie with a hair — the nudged unit now sits at a different place on the tanh curve, where the curve has a different steepness, so its share is `-0.4395`, while the two you left alone still match each other at `-0.4451` (they still share a weight). Row C does the cure properly: give every weight its own small random value and all three shares differ. Row D is the tidiest-looking start and the worst of the four — every share is exactly `0`.
 %%%
+
+!!! c-info 🔬
+<b>Optional (skippable) — what if the units use ReLU or sigmoid instead of tanh?</b> The one rule that holds for every activation is the trap itself: start a layer completely symmetric — same weights in <i>and</i> same wires out — and it stays symmetric forever. How fast the CURE bites is what varies.<br>
+<b>Sigmoid behaves like tanh:</b> its steepness also changes with `z`, so a nudged weight gives that unit a different share on the very first step.<br>
+<b>ReLU is slower:</b> its slope is a flat `1` for every positive `z`, so the nudge moves all three shares together — from `-0.4875` to `-0.4763` — changing them without making them differ.<br>
+<b>What breaks it anyway:</b> a unit sitting at a positive `z` still <i>outputs</i> something different, so the wire leading out of it picks up its own gradient on the first step, and the layer stops being a set of clones.<br>
+<b>Careful with "different is always enough":</b> it isn't. Shove a ReLU unit's `z` negative and it outputs `0` whatever its weight is — which is exactly the dead unit you meet next.
+!!!
+
+#### One extra beat — why the all-zero start is the worst of all
+Row D deserves its own sentence. Rule 4 said the blame reaching a hidden unit travels through the wire leading *out* of it. Start every weight at `0` and every one of those wires is `0` too, so on the first step every weight in the hidden layer gets a gradient of exactly `0`. For a `tanh` or `ReLU` unit — whose output is `0` when `z` is `0` — it stays stuck there: the hidden layer never learns anything at all.
+
+The only thing left that can still move is the output's own bias (Rule 3), so the network quietly settles on predicting one constant number for every input. And note which trap this is: it is the twins in their most extreme form, so the cure is a **small random start** — not Leaky ReLU. Nothing here is a dead unit; the whole layer is simply mute. A small random start fixes both sides at once: each unit gets its own weight in *and* its own wire out.
 
 %%% insight
-Why this one bites hardest: a same-start network trains without a single error message. The loss even goes down a little — one neuron's worth. You would stare at that code for hours. Knowing this trap by name is worth an entire afternoon of debugging, today.
+Why this one bites hardest: a same-start network trains without a single error message. The loss even goes down a little — one neuron's worth (and from an all-zero start with `tanh` or `ReLU` units the hidden layer learns nothing at all, yet the loss usually *still* creeps down, because that one output bias is drifting toward the average answer). You would stare at that code for hours. Knowing this trap by name is worth an entire afternoon of debugging, today.
 %%%
 
 **One line of code, one whole class of bug avoided.** Every framework already hands you small random starting weights by default, and now you know *why* that default exists — you'd have invented it yourself. Two more cousins to meet, and they are the loud ones.
@@ -564,7 +606,7 @@ why: a trickle of gradient always gets through, so a shoved unit can climb back 
 Now go break both of them yourself. The left dial shoves a unit's `z` around (tick **Leaky** to change the rules of the road); the right dial cranks the weight size that every layer multiplies by (tick **clip** to put a ceiling on it). **Predict first:** on the left, what gradient does the unit get once `z` goes negative? On the right, what does a weight of `3` do to the gradient after six layers?
 
 %%% svg
-<svg id="tc-svg" viewBox="0 0 520 236" role="img" aria-label="Two interactive panels. The left panel is a unit dashboard: a light switch drawing shows on or off, and readouts show the unit's z, its output, its slope, and a bar for the gradient reaching its weight. When z is negative with plain ReLU the bar is empty and the verdict reads dead. Ticking Leaky ReLU leaves a small non-zero bar and the verdict reads it can recover. The right panel shows six bars for the gradient after travelling back one to six layers as the weight size changes. Small weights keep the bars low, a weight of three makes them run off the top and the verdict reads exploded, and ticking clip caps every bar at a ceiling line."><g font-family="monospace" font-size="10"><text x="132" y="20" text-anchor="middle" fill="#2C2A28" font-size="11.5">🔌 the stuck switch</text><text x="388" y="20" text-anchor="middle" fill="#2C2A28" font-size="11.5">🎤 the squeal</text><rect x="14" y="28" width="236" height="178" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="270" y="28" width="236" height="178" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="34" y="44" width="40" height="60" rx="6" fill="#EDEAE4" stroke="#9A938A"/><rect id="tc-knob" x="40" y="74" width="28" height="24" rx="3" fill="#C93B3B"/><text id="tc-state" x="54" y="118" text-anchor="middle" fill="#C93B3B" font-size="9">OFF</text><text id="tc-z" x="92" y="58" fill="#5A544E">z = -1.0</text><text id="tc-out" x="92" y="76" fill="#5A544E">output = 0.00</text><text id="tc-slope" x="92" y="94" fill="#5A544E">slope = 0.00</text><text x="34" y="140" fill="#6B645E" font-size="9">gradient reaching its weight (bar stretched, so a sliver still shows)</text><rect x="34" y="146" width="196" height="14" rx="3" fill="#EFE9DF"/><rect id="tc-bar" x="34" y="146" width="2" height="14" rx="3" fill="#C93B3B"/><text id="tc-verdict" x="132" y="180" text-anchor="middle" fill="#C93B3B" font-size="10">dead — zero gradient, forever</text><text id="tc-verdict2" x="132" y="196" text-anchor="middle" fill="#6B645E" font-size="9">a rescue would need a gradient it cannot get</text><line x1="284" y1="176" x2="496" y2="176" stroke="#E5DFD6" stroke-width="1.5"/><line id="tc-clipline" x1="284" y1="96" x2="496" y2="96" stroke="#2D8B55" stroke-width="1.2" stroke-dasharray="4,3" stroke-opacity="0"/><text id="tc-cliplab" x="496" y="92" text-anchor="end" fill="#2D8B55" font-size="8.5" opacity="0">clip ceiling</text><g id="tc-bars"><rect id="tc-e0" x="292" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e1" x="326" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e2" x="360" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e3" x="394" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e4" x="428" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e5" x="462" y="174" width="26" height="2" fill="#2D8B55"/></g><g font-size="7.5" text-anchor="middle" fill="#6B645E"><text id="tc-ev0" x="305" y="170">·</text><text id="tc-ev1" x="339" y="170">·</text><text id="tc-ev2" x="373" y="170">·</text><text id="tc-ev3" x="407" y="170">·</text><text id="tc-ev4" x="441" y="170">·</text><text id="tc-ev5" x="475" y="170">·</text></g><text x="388" y="188" text-anchor="middle" fill="#9A938A" font-size="8.5">layers travelled back: 1 · 2 · 3 · 4 · 5 · 6</text><text id="tc-everdict" x="388" y="202" text-anchor="middle" fill="#2D8B55" font-size="10">healthy — the signal survives</text></g></svg>
+<svg id="tc-svg" viewBox="0 0 520 236" role="img" aria-label="Two interactive panels. The left panel is a unit dashboard: a light switch drawing shows on or off, and readouts show the unit's z, its output, its slope, and a bar for the gradient reaching its weight. When z is negative with plain ReLU the bar is empty and the verdict reads dead. Ticking Leaky ReLU leaves a small non-zero bar and the verdict reads it can recover. The right panel shows six bars for the gradient after travelling back one to six layers as the weight size changes. Small weights keep the bars low, a weight of three makes every bar taller than the last and the verdict reads exploded. Ticking clip holds any bar that reaches the ceiling at the ceiling line, leaving the smaller earlier bars alone, so the held bars end up level with each other, and the verdict then reports the size the gradient would have reached and the smaller size clipping passed on instead."><g font-family="monospace" font-size="10"><text x="132" y="20" text-anchor="middle" fill="#2C2A28" font-size="11.5">🔌 the stuck switch</text><text x="388" y="20" text-anchor="middle" fill="#2C2A28" font-size="11.5">🎤 the squeal</text><rect x="14" y="28" width="236" height="178" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="270" y="28" width="236" height="178" rx="8" fill="#FDF9F3" stroke="#E5DFD6"/><rect x="34" y="44" width="40" height="60" rx="6" fill="#EDEAE4" stroke="#9A938A"/><rect id="tc-knob" x="40" y="74" width="28" height="24" rx="3" fill="#C93B3B"/><text id="tc-state" x="54" y="118" text-anchor="middle" fill="#C93B3B" font-size="9">OFF</text><text id="tc-z" x="92" y="58" fill="#5A544E">z = -1.0</text><text id="tc-out" x="92" y="76" fill="#5A544E">output = 0.00</text><text id="tc-slope" x="92" y="94" fill="#5A544E">slope = 0.00</text><text x="34" y="140" fill="#6B645E" font-size="9">gradient reaching its weight (bar stretched, so a sliver still shows)</text><rect x="34" y="146" width="196" height="14" rx="3" fill="#EFE9DF"/><rect id="tc-bar" x="34" y="146" width="2" height="14" rx="3" fill="#C93B3B"/><text id="tc-verdict" x="132" y="180" text-anchor="middle" fill="#C93B3B" font-size="10">dead — zero gradient, forever</text><text id="tc-verdict2" x="132" y="196" text-anchor="middle" fill="#6B645E" font-size="9">a rescue would need a gradient it cannot get</text><line x1="284" y1="176" x2="496" y2="176" stroke="#E5DFD6" stroke-width="1.5"/><g id="tc-bars"><rect id="tc-e0" x="292" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e1" x="326" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e2" x="360" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e3" x="394" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e4" x="428" y="174" width="26" height="2" fill="#2D8B55"/><rect id="tc-e5" x="462" y="174" width="26" height="2" fill="#2D8B55"/></g><line id="tc-clipline" x1="284" y1="130.7" x2="496" y2="130.7" stroke="#1a5c38" stroke-width="1.6" stroke-dasharray="4,3" stroke-opacity="0"/><text id="tc-cliplab" x="496" y="126.7" text-anchor="end" fill="#1a5c38" font-size="8.5" opacity="0">clip ceiling</text><g font-size="7.5" text-anchor="middle" fill="#6B645E" paint-order="stroke" stroke="#FDF9F3" stroke-width="1.5" stroke-linejoin="round"><text id="tc-ev0" x="305" y="170">·</text><text id="tc-ev1" x="339" y="170">·</text><text id="tc-ev2" x="373" y="170">·</text><text id="tc-ev3" x="407" y="170">·</text><text id="tc-ev4" x="441" y="170">·</text><text id="tc-ev5" x="475" y="170">·</text></g><text x="388" y="188" text-anchor="middle" fill="#9A938A" font-size="8.5">layers travelled back: 1 · 2 · 3 · 4 · 5 · 6</text><text id="tc-everdict" x="388" y="202" text-anchor="middle" fill="#2D8B55" font-size="10">healthy — the signal survives</text></g></svg>
 <div style="margin-top:8px;font-family:monospace;font-size:.9em;color:#5A544E">
 <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
 <label>shove z <input id="tc-zs" type="range" min="-4" max="4" step="0.2" value="-1" style="width:150px;accent-color:#C99A12;vertical-align:middle"></label>
@@ -574,7 +616,7 @@ Now go break both of them yourself. The left dial shoves a unit's `z` around (ti
 <label>weight size <input id="tc-ws" type="range" min="0.5" max="3" step="0.1" value="1" style="width:150px;accent-color:#C99A12;vertical-align:middle"></label>
 <label><input id="tc-clip" type="checkbox"> <b>clip</b> the gradient at 5</label>
 </div>
-<div style="margin-top:6px;color:#6B645E;font-size:.92em">Left: drag `z` below 0 with plain ReLU and the gradient bar empties — that unit is finished. Tick Leaky and the same unit keeps a sliver. Right: the bars are the gradient after 1…6 layers when each layer multiplies by the weight size; the printed numbers are the true values.</div>
+<div style="margin-top:6px;color:#6B645E;font-size:.92em">Left: drag `z` below 0 with plain ReLU and the gradient bar empties — that unit is finished. Tick Leaky and the same unit keeps a sliver. Right: the bars are the gradient after 1…6 layers when each layer multiplies by the weight size; the printed numbers are the true values. With clip ticked, only the bars that actually reach the ceiling are held there — the earlier, smaller ones are left alone — and the numbers then show the clipped size the optimizer would really use, not the raw one.</div>
 </div>
 <script>(function(){
   var zs=document.getElementById('tc-zs');if(!zs)return;
@@ -588,7 +630,7 @@ Now go break both of them yourself. The left dial shoves a unit's `z` around (ti
   var LEAK=0.01, INCOMING=1.0, BASE=176, H=120, CLIP=5;
   function hgt(p){var h=H*(Math.log(p)/Math.LN10+1)/4.5;return Math.max(2,Math.min(H,h));}
   function paintUnit(){
-    var z=+zs.value, on=(z>0), lk=leaky.checked;
+    var z=+zs.value, on=(z>=0), lk=leaky.checked;   /* c5 shows slope 1 at z=0 — match it */
     var out=on?z:(lk?LEAK*z:0), slope=on?1:(lk?LEAK:0), grad=INCOMING*slope;
     knob.setAttribute('y',on?'50':'74');knob.setAttribute('fill',on?'#2D8B55':'#C93B3B');
     state.textContent=on?'ON':'OFF';state.setAttribute('fill',on?'#2D8B55':'#C93B3B');
@@ -605,25 +647,45 @@ Now go break both of them yourself. The left dial shoves a unit's `z` around (ti
       ver.textContent='dead — zero gradient, forever';ver2.textContent='a rescue would need a gradient it cannot get';}
   }
   function paintChain(){
-    var w=+ws.value, doClip=clip.checked, p=1, last=1;
+    var w=+ws.value, doClip=clip.checked, p=1, raw=1, last=1, didClip=false;
     cline.setAttribute('stroke-opacity',doClip?'1':'0');clab.setAttribute('opacity',doClip?'1':'0');
     for(var i=0;i<6;i++){
-      p=p*w;
-      if(doClip&&p>CLIP)p=CLIP;
+      p=p*w; raw=raw*w;
+      if(doClip&&p>CLIP){p=CLIP;didClip=true;}
       last=p;
-      var h=hgt(p),col=(p>=CLIP&&doClip)?'#2D8B55':(p>50?'#C93B3B':(p>3?'#C99A12':'#2D8B55'));
+      // Colour by the SAME bands as the verdict below and as the c6 ladder, on the value the
+      // bar actually shows. No special case for a clipped bar: clipping bounds the step, it
+      // does not turn a big gradient into a healthy one, so a bar pinned at the ceiling stays
+      // in the band its number falls in. Otherwise a clipped bar reads green while the
+      // verdict quoting that same number reads red.
+      var h=hgt(p),col=(p>3||p<0.05)?'#C93B3B':(p<0.5?'#C99A12':'#2D8B55');
       eb[i].setAttribute('y',(BASE-h).toFixed(1));eb[i].setAttribute('height',h.toFixed(1));
       eb[i].setAttribute('fill',col);
-      ev[i].setAttribute('y',(BASE-h-3).toFixed(1));
-      ev[i].textContent=(p>=100?p.toExponential(1):p.toFixed(p<10?2:1));
-      ev[i].setAttribute('fill',col);
+      // With the ceiling showing, a tall bar's value label would land on the same line as
+      // the "clip ceiling" text (both at y ~ 127), so print it INSIDE the bar. Use dark ink,
+      // not white: white on the amber fill (#C99A12) is only ~2.6:1 at this size. The group
+      // carries a light halo (paint-order stroke) so dark ink stays legible on green, amber
+      // and red alike.
+      var crowded=doClip&&(BASE-h-3)<135;
+      ev[i].setAttribute('y',(crowded?(BASE-h+10):(BASE-h-3)).toFixed(1));
+      ev[i].textContent=(p>=100?p.toExponential(1):p.toFixed(p<0.1?3:(p<10?2:1)));   /* 3dp under 0.1 so 0.046656 prints 0.047, not a "0.05" that straddles the band edge */
+      ev[i].setAttribute('fill',crowded?'#1F1B16':col);
     }
-    if(doClip){ever.setAttribute('fill','#2D8B55');
-      ever.textContent='clipped at '+CLIP+' — the step stays sane';}
-    else if(last>50){ever.setAttribute('fill','#C93B3B');
+    // Bands are the c6 ladder exactly (>3 exploded, <0.05 vanished, <0.5 fading), so the same
+    // product cannot read "exploded" in one widget and "healthy" in the other.
+    // Clipping is NOT its own band. The ceiling (5) sits above the exploded line (3), so a
+    // "clipped, all sane now" verdict would contradict the red bars it is sitting under.
+    // Clipping bounds the STEP; it does not make the gradient healthy. So report the raw
+    // product that WOULD have arrived, and say what clipping did to it.
+    if(didClip){ever.setAttribute('fill','#C93B3B');
+      ever.textContent='would have hit '+(raw>=100?raw.toExponential(1):raw.toFixed(1))
+        +' → clipped to '+CLIP+' before the step';}
+    else if(last>3){ever.setAttribute('fill','#C93B3B');
       ever.textContent='exploded → '+(last>=100?last.toExponential(1):last.toFixed(1))+' · one step overshoots the valley';}
-    else if(last<0.05){ever.setAttribute('fill','#C99A12');
-      ever.textContent='faded → '+last.toExponential(1)+' · the early layers get almost nothing';}
+    else if(last<0.05){ever.setAttribute('fill','#C93B3B');
+      ever.textContent='vanished → '+last.toExponential(1)+' · the early layers get nothing';}
+    else if(last<0.5){ever.setAttribute('fill','#C99A12');
+      ever.textContent='fading → '+last.toFixed(2)+' · the early layers learn slowly';}
     else {ever.setAttribute('fill','#2D8B55');ever.textContent='healthy — the signal survives';}
   }
   function paint(){paintUnit();paintChain();}
@@ -644,7 +706,7 @@ why: same chain of multiplies as the fade, just pointed the other way
 step: the blow-up — a few layers of that and you get **huge values**: this is the **exploding gradient**
 why: the gradient is still "correct" — it is just enormous, and one giant step **overshoots** the whole valley, so the loss often comes back as `inf` or `NaN`
 step: the fix — **gradient clipping**: set a ceiling and **clip** anything above it before you step
-why: tick the clip box and watch every bar stop at the line — one monster number can never launch you off the hill again
+why: tick the clip box and every bar that reaches the ceiling stops right there — one monster number can never launch you off the hill again
 %%%
 
 %%% demo id=explode label="run it — the squeal in six numbers"
