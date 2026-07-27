@@ -29,7 +29,7 @@ The "mental picture visual" means a picture of the OBJECT itself (the curve, dis
 
 Every concept unit carries its OWN inline visual: a static labeled figure at minimum, an interactive viz where the behavior is explorable. Analogy is NOT depiction — a "valve"/"dimmer" card does not satisfy "show the ReLU curve." A lesson must not defer a concept's picture to a later unit or to a single shared late "build" section. The moment a concept names a visual object (a curve, distribution, boundary, geometric/matrix shape), that same unit must show it.
 
-Mechanical backstop: the reader_flow_gate concept branch (every @@@ concept must contain a visual marker) + concept_shell_gate (every concept section has a visual).
+Mechanical backstop: the reader_flow_gate concept branch (every @@@ concept must contain a visual marker) + concept_shell_gate (every concept section has a visual). These gates only confirm a visual marker is PRESENT, not that it renders and correctly depicts the object. Opus 5 vision is strong: render the produced %%% svg / %%% viz output and visually inspect it (crop and re-check iteratively) rather than reasoning about the markup alone — verifying the rendered figure beats trusting the marker.
 
 ## Behavioral visual rule
 
@@ -74,3 +74,7 @@ height sender. A concept unit with no visual is a **compile error** (Reader Flow
 Shell gates), not a late QA finding.
 
 Keep claim and moving evidence adjacent in `source.md`. Do not let prose and its plotted evidence drift into separate files — that decoupling is why prose-only behavioral gaps recur in hand-authored HTML.
+
+## Deliverable length
+
+Match the length of written deliverables (especially Markdown files) to what the task needs: cover the substance, but do not pad documents with filler sections, redundant summaries, or boilerplate.

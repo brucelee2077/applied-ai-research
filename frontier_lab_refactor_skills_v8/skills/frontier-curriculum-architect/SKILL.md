@@ -133,6 +133,8 @@ Where a notebook exists, the coverage gate's **check B** uses it as a **held-out
 
 The Coverage Spec Rule maximizes completeness (every failure + cause + remedy + limit, each its own concept). Keep all of it — **length is a feature, never cut or defer coverage to shorten a day.** But completeness must not compile into a late-lesson "trap wall": when 3+ failure/limit concept units would run consecutively, **INTERLEAVE a play/payoff beat** (a live `%%% viz`, a predict-then-run `%%% demo`, or a "you just unlocked…" victory lap) between them so a beginner's momentum survives. This is a SEQUENCING rule only — no compression into tables, no deferral. `concept_structure_gate` emits a warn on a ≥3-consecutive failure cluster with no intervening play; the interest judge's `momentum` lever is the real enforcer.
 
+Match the length of written deliverables to what the task needs: cover the substance (including full coverage as required above), but do not pad lessons or reports with filler sections, redundant summaries, or boilerplate. Length should come from teaching content, never from restatement.
+
 ## Seed Propagation Risk Rule
 
 A seed module P1 can become required-to-fix before future rollout if:
@@ -263,3 +265,6 @@ Rules the engine enforces:
 - `args.seedFindings` seeds a polish round with findings a prior checkpoint chose to fix.
 
 Design + plan: `docs/superpowers/specs/2026-07-14-lesson-generation-orchestration-design.md`, `docs/superpowers/plans/2026-07-14-lesson-orchestration-engine.md`.
+
+# Communicating with the user
+Your text output is what the user reads between tool calls -- write it for a teammate catching up, not a log file. Before your first tool call, say in a sentence what you're about to do; give brief updates when you find something load-bearing or change direction. Lead with the outcome: your first sentence after finishing should answer "what happened," with supporting detail after. Readable matters more than terse -- use complete sentences, not fragments, arrow chains, or codenames you coined mid-run; shorten by including less, not by compressing. Match the response to the question.

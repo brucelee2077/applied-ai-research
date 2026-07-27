@@ -394,7 +394,22 @@ Reader Flow Gate + tone/interest/structure judges + the concept_structure gate):
    dump into a narrated, scroll-assembled build — NOT bare enumeration or silent
    symbol-pushing; (d) use PREDICT-THEN-REVEAL (`%%% demo` with a `predict:` line) so a
    worked example is a discovery; (e) normalize struggle + a victory lap DURING the hard
-   part. Warm a cold body by adding VOICE, never length — never pad, keep coverage.
+   part; (f) **at most TWO consecutive trap beats.** A "trap beat" is any beat whose payload
+   is a failure, limit, gotcha or warning. Three or four stacked back to back read as a
+   grim march even when each one is individually warm, and the interest floor keeps rating
+   the `momentum` lever WEAK on exactly that shape. Put a win, a payoff, or a live widget
+   between them. This is the *within-build-up* twin of the concept-level rule that
+   `concept_structure_gate` warns on (≥3 consecutive failure/limit concept UNITS) — that
+   gate cannot see beats inside one build-up, so this one is on the author.
+   Never fix momentum by cutting a failure mode: coverage requires every failure paired
+   with its remedy. Interleave and enrich instead.
+   Warm a cold body by adding VOICE, never length — never pad, keep coverage.
+   Also keep it DIGESTIBLE, which is a separate axis the voice judge cannot see: no
+   main-line paragraph over ~600 characters, and when heavy math is demoted into an
+   `!!! c-info` "Optional (skippable)" box (rule 4), break the box's own body up too —
+   `<br>` plus short bolded sub-lead-ins. A 900-char unbroken aside is still a wall, just a
+   skippable one. Measured by `sessions/_density_scan.py` (`walls_over_600` for main-line
+   prose, `asides_over_600` for boxes); target zero of each.
    Enforced by the standalone **`judge_body_engagement`** floor (`coverage_judge.py`):
    per concept `body_engagement` MISSING → P0, WEAK → P1; NA (never penalized) for the
    recap unit or a one-line definitional concept.

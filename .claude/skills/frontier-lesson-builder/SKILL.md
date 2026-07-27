@@ -12,6 +12,9 @@ Your job is to make the learner want to continue while still building staff-leve
 > Author every `source.md` from that file, not from memory or the obsolete
 > `v8_source_first_authoring_plan.md`.
 
+# Communicating with the user
+Your text output is what the user reads between tool calls -- write it for a teammate catching up, not a log file. Before your first tool call, say in a sentence what you're about to do; give brief updates when you find something load-bearing or change direction. Lead with the outcome: your first sentence after finishing should answer "what happened," with supporting detail after. Readable matters more than terse -- use complete sentences, not fragments, arrow chains, or codenames you coined mid-run; shorten by including less, not by compressing. Match the response to the question.
+
 ## Non-negotiables
 
 No formula before felt intuition.
@@ -29,6 +32,8 @@ Jargon is glossed **define-before-use, inline** — never a front-loaded wall. T
 No checklist before invitation in foundation lessons.
 
 No decorative analogy. Use a narrative spine.
+
+Match the length of written deliverables (especially Markdown files) to what the task needs: cover the substance, but do not pad documents with filler sections, redundant summaries, or boilerplate.
 
 ## Beginner Intuition Register (per concept — the notebook's tone)
 
@@ -93,7 +98,29 @@ Hit these body beats in every concept's build-up:
                              tricky bit — totally normal"; "you just did the hard part").
 7. Spine alive to the end    keep the analogy running through the mechanism, and mark
                              where it breaks down — don't abandon it once math starts.
+8. Max TWO trap beats        a "trap beat" is any beat whose payload is a failure, limit,
+   in a row                  gotcha or warning. Three or four stacked back to back read as a
+                             grim march even when each is warm on its own, and the interest
+                             floor keeps rating the `momentum` lever WEAK on exactly that
+                             shape. Put a win, a payoff or a live widget between them. This
+                             is the within-build-up twin of the concept-level rule
+                             `concept_structure_gate` warns on (>=3 consecutive failure/limit
+                             concept UNITS); that gate cannot see beats inside a single
+                             build-up, so this one is on the author. NEVER fix momentum by
+                             cutting a failure mode — coverage requires every failure paired
+                             with its remedy. Interleave and enrich.
 ```
+
+**Digestibility is a separate axis from voice, and the judge is blind to it.**
+`judge_body_engagement` grades how a body SOUNDS. It cannot see how dense it is, and "hard
+to digest" (the user's actual words) is a density complaint. So measure it:
+`sessions/_density_scan.py` reports `walls_over_600` (unbroken MAIN-LINE prose paragraphs)
+and `asides_over_600` (unbroken runs inside `!!!` callout boxes). Target **zero of each**.
+Note the two have different cures: a main-line wall gets split into paragraphs, a `%%% steps`
+ladder or a `%%% insight`; a long "Optional (skippable)" box is already correctly placed by
+math-restraint rule 4 and only needs breaking up INSIDE the box, with `<br>` and short bolded
+sub-lead-ins. Do not promote a box into main-line prose to fix it — that turns a skippable
+aside into a paragraph every reader must cross.
 
 **Tools (see AUTHORING.md):** `%%% insight` (the re-hook / "why this matters" callout),
 `%%% demo` with a `predict:` line (predict-then-reveal discovery), `%%% steps` (a narrated
