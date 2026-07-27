@@ -69,12 +69,35 @@ def test_a_callout_does_not_merge_with_the_prose_around_it():
     assert density.longest_wall(text) < 200
 
 
-def test_scan_reports_aside_walls_per_day():
-    """A day carrying a long optional aside reports it separately."""
-    snap = density.scan_day(os.path.join(
-        ROOT, 'sessions', 'm03-attention', 'day-03-attention-scores'))
-    assert snap is not None
-    # this day's three long runs are all inside "Optional (skippable)" boxes
-    assert snap['walls_over_600'] == 0
-    assert snap['asides_over_600'] >= 3
-    assert snap['max_aside_wall'] > 900
+def test_scan_reports_main_and_aside_walls_separately():
+    """scan_day reports the two wall classes as separate numbers.
+
+    Built on a synthetic day, deliberately NOT on a real lesson: an earlier
+    version of this test asserted that day-03-attention-scores carried three
+    long asides, which pinned the very defect the next pass was about to fix.
+    A test that fails when the content improves is testing the content, not the
+    metric.
+    """
+    import tempfile
+    day = ('---\nquest_id: t\n---\n\n'
+           '@@@ concept id=c1 title="main-line wall"\n'
+           'Opening intuition line.\n'
+           '%%% svg\n<svg><text x="1" y="1">anchor</text></svg>\n%%%\n'
+           + LONG_A + '\n\n'
+           '@@@ concept id=c2 title="boxed aside"\n'
+           'Opening intuition line.\n'
+           '%%% svg\n<svg><text x="1" y="1">anchor</text></svg>\n%%%\n'
+           'A short main-line beat.\n\n'
+           '!!! c-info 🔬\n<b>Optional (skippable) — the algebra.</b> ' + LONG_A + '\n!!!\n')
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, 'source.md'), 'w', encoding='utf-8') as fh:
+            fh.write(day)
+        snap = density.scan_day(d)
+
+    assert snap['concepts'] == 2
+    # c1's long paragraph is main-line; c2's identical text is inside a box
+    assert snap['walls_over_600'] == 1
+    assert snap['asides_over_600'] == 1
+    assert snap['max_wall'] > 600
+    assert snap['max_aside_wall'] > 600
+    assert snap['per_concept']['boxed aside']['wall'] < 200

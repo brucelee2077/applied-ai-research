@@ -421,7 +421,11 @@ Here's the live pizza, starting from our row `[1, 3, 2]`. Drag a slider and watc
 %%%
 
 !!! c-info 💡
-<b>Optional (skippable) — the exact recipe, and one real-world rescue.</b> The "stretch" is <code>exp(score)</code>: raise a special growth number to the power of the score. The pot is the sum of those, and each share is <code>exp(score) / pot</code>. That growth is fierce: <code>exp</code> of a big score can overflow past the largest number a computer can hold, and then dividing one infinity by another gives you NaN — a broken model. The rescue uses the fourth promise: subtract the row's biggest score from every score first. Nothing changes mathematically, and nothing overflows. Libraries call this the <b>stable softmax</b> (or the log-sum-exp trick), and it's on by default. There's one more dial here too — divide every score by a <b>temperature</b> before softmax: small temperature = decisive, big temperature = wishy-washy.
+<b>Optional (skippable) — the exact recipe, and one real-world rescue.</b>
+<br><b>The recipe:</b> The "stretch" is <code>exp(score)</code>: raise a special growth number to the power of the score. The pot is the sum of those, and each share is <code>exp(score) / pot</code>.
+<br><b>The catch:</b> That growth is fierce: <code>exp</code> of a big score can overflow past the largest number a computer can hold, and then dividing one infinity by another gives you NaN — a broken model.
+<br><b>The rescue:</b> It uses the fourth promise: subtract the row's biggest score from every score first. Nothing changes mathematically, and nothing overflows. Libraries call this the <b>stable softmax</b> (or the log-sum-exp trick), and it's on by default.
+<br><b>One more dial:</b> Divide every score by a <b>temperature</b> before softmax: small temperature = decisive, big temperature = wishy-washy.
 !!!
 
 The victory lap: you now hold the middle of the whole spine — **score every pair, then split one attention budget by those scores.** One step left to make it useful: spending that budget.
@@ -561,7 +565,10 @@ Cosine :: none :: list length can't bully the score — but you lose the confide
 %%%
 
 !!! c-info 🔬
-<b>Optional (skippable) — the honest trade-off.</b> Additive attention has its own weight matrices, so in principle it can learn match patterns a bare dot product cannot express — it is the <i>more</i> flexible scorer, not the weaker one. What settled it is that Query and Key each already get their own learned projection (Day 2), so the flexibility mostly moves there instead, and the plain dot product reaches comparable quality at a fraction of the cost. Cheaper with no real loss is a rare win — enjoy it. Cosine scoring is the other one worth knowing: shrink both lists to length 1 before the dot product, so a single very long Key can't bully its whole column just by being big. You pay for it by throwing away the confidence that a long list carried.
+<b>Optional (skippable) — the honest trade-off.</b>
+<br><b>Additive is the more flexible one:</b> Additive attention has its own weight matrices, so in principle it can learn match patterns a bare dot product cannot express — it is the <i>more</i> flexible scorer, not the weaker one.
+<br><b>So why did it still lose?</b> What settled it is that Query and Key each already get their own learned projection (Day 2), so the flexibility mostly moves there instead, and the plain dot product reaches comparable quality at a fraction of the cost. Cheaper with no real loss is a rare win — enjoy it.
+<br><b>Cosine, the other one worth knowing:</b> shrink both lists to length 1 before the dot product, so a single very long Key can't bully its whole column just by being big. You pay for it by throwing away the confidence that a long list carried.
 !!!
 
 @@@ concept id=c8 tag="Puzzle 1 · too loud" title="The spotlight puzzle — when one word takes the whole budget" gotit="Solved puzzle 1"
@@ -744,7 +751,11 @@ Here are the two grids side by side, so you can watch the same nine scores just 
 Two limits, honestly stated — and neither one is a flaw you have to fix today. Limit 1 you already cured this morning: softmax turns the whole row into a budget, so "a score is not a weight" is a reading habit to keep, not a repair to make. Limit 2 — order-blindness — is a real gap, and it gets its own fix on **Day 5** (positional encoding). Day 4 is about something different and lovely: running several of these meetings at once.
 
 !!! c-info 🗺️
-<b>Two curiosities, and where the rest of the story lives.</b> First: a bright cell on an attention map shows where the weight <i>went</i>, not proof that the answer depended on that word — attention weights are not explanations, and researchers argue about this a lot. Second: because the shares must add to 1, a word with nothing useful to look at still has to park its <b>budget</b> somewhere, and heads often dump it on the very first word — an oddity called an <i>attention sink</i>, tamed either by giving heads a spare "register" word to dump into or by letting softmax add a 1 to its pot so "attend to nothing" becomes sayable. <b>Coming up:</b> several score-and-blend meetings at once (multi-head), the cure for one grid holding only ONE notion of relatedness → <b>Day 4</b>. Stamping word order onto the words (positional encoding) → <b>Day 5</b>. Never building the n×n grid at all, so long context gets affordable (FlashAttention) → the inference-systems module.
+<b>Two curiosities, and where the rest of the story lives.</b>
+<br><b>Curiosity 1 — a bright cell is not a reason.</b> A bright cell on an attention map shows where the weight <i>went</i>, not proof that the answer depended on that word — attention weights are not explanations, and researchers argue about this a lot.
+<br><b>Curiosity 2 — the attention sink.</b> Because the shares must add to 1, a word with nothing useful to look at still has to park its <b>budget</b> somewhere, and heads often dump it on the very first word — an oddity called an <i>attention sink</i>.
+<br><b>How the sink gets tamed:</b> either give heads a spare "register" word to dump into, or let softmax add a 1 to its pot so "attend to nothing" becomes sayable.
+<br><b>Coming up:</b> several score-and-blend meetings at once (multi-head), the cure for one grid holding only ONE notion of relatedness → <b>Day 4</b>. Stamping word order onto the words (positional encoding) → <b>Day 5</b>. Never building the n×n grid at all, so long context gets affordable (FlashAttention) → the inference-systems module.
 !!!
 
 @@@ concept id=c11 tag="Recap" title="Today in one page" gotit="Got the recap"

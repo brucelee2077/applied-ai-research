@@ -467,7 +467,10 @@ take: <b>MSE's push nearly vanishes; cross-entropy's stays loud.</b> Confidently
 **The neat fix:** swap in binary cross-entropy. Where MSE-plus-sigmoid whispers "meh, barely move", **cross-entropy is the fix** that shouts "you're loudly wrong — fix this *now*". That's the whole reason classifiers train on cross-entropy.
 
 !!! c-info 🔎
-<b>Optional (skippable) — one line of "why".</b> With a sigmoid output, the MSE learning signal carries a factor of the sigmoid's slope, which is ≈ 0 in the flat tails (Day 2) — so a confident-wrong unit gets almost no signal. Cross-entropy is built so that factor cancels: its signal is simply proportional to the plain error <code>(prediction − target)</code>, which is <em>largest</em> when the model is most wrong. (The pushes above use the tidy <code>½·(pred − target)²</code> form of MSE, which is why no stray factor of 2 shows up; the shrinking-versus-growing story is identical either way.) You'll see the actual slopes multiplied out on Day 5.
+<b>Optional (skippable) — one line of "why".</b> With a sigmoid output, the MSE learning signal carries a factor of the sigmoid's slope, which is ≈ 0 in the flat tails (Day 2) — so a confident-wrong unit gets almost no signal.<br>
+<b>Why cross-entropy escapes it:</b> it is built so that factor cancels: its signal is simply proportional to the plain error <code>(prediction − target)</code>, which is <em>largest</em> when the model is most wrong.<br>
+<b>One bookkeeping note:</b> the pushes above use the tidy <code>½·(pred − target)²</code> form of MSE, which is why no stray factor of 2 shows up; the shrinking-versus-growing story is identical either way.<br>
+<b>Where this goes next:</b> you'll see the actual slopes multiplied out on Day 5.
 !!!
 
 **Victory lap:** two puzzles down, and both cures fit on a sticky note — *outliers? use MAE.* *Yes/no? never MSE, use cross-entropy.* Now let's take a breath and do something easier and rather satisfying: learn to *read* the score you've been building.

@@ -143,7 +143,10 @@ One rule to carry forward: **the Query and the Key must come out the same length
 !!!
 
 !!! c-info 🪜
-<b>Optional (skippable) — the arithmetic, for the curious.</b> Skipping this costs you nothing today. We picked "bank"'s card as `x = [0, 1, 1, 0]` on purpose: when a card is made of 0s and 1s, multiplying by a grid is just "**add up the grid rows where the card has a 1**". `W_Q`'s rows are `[0.1,0.1,0,0]`, `[0.5,0.5,0,0]`, `[0.5,0,0,0]`, `[0,0,0.5,0.5]` — so `Q = row 2 + row 3 = [1.0, 0.5, 0, 0]`. Do the same with `W_K`'s rows and you get `K = [0, 2.0, 4.0, 0]`; with `W_V`'s two-column rows you get `V = [0.1, 1.0]`. Those are exactly the numbers in both pictures above, and exactly what `experiment.py` prints.
+<b>Optional (skippable) — the arithmetic, for the curious.</b> Skipping this costs you nothing today.<br>
+<b>The shortcut:</b> We picked "bank"'s card as `x = [0, 1, 1, 0]` on purpose: when a card is made of 0s and 1s, multiplying by a grid is just "**add up the grid rows where the card has a 1**".<br>
+<b>Row by row:</b> `W_Q`'s rows are `[0.1,0.1,0,0]`, `[0.5,0.5,0,0]`, `[0.5,0,0,0]`, `[0,0,0.5,0.5]` — so `Q = row 2 + row 3 = [1.0, 0.5, 0, 0]`. Do the same with `W_K`'s rows and you get `K = [0, 2.0, 4.0, 0]`; with `W_V`'s two-column rows you get `V = [0.1, 1.0]`.<br>
+<b>Sanity check:</b> Those are exactly the numbers in both pictures above, and exactly what `experiment.py` prints.
 !!!
 
 If matrix multiplication feels slippery right now, that's completely normal — everyone re-learns it about four times. You can run every idea in today's lesson while holding only "a filter reshapes the card."

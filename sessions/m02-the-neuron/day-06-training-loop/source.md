@@ -257,7 +257,12 @@ t3: Crossing the bottom is fine; landing farther out than you started is not. Th
 %%%
 
 !!! c-info 🔬
-<b>Optional (skippable) — the same thing in symbols.</b> For weight `w` with gradient `g` and learning rate `η` (the Greek letter "eta", the usual symbol): the update is `w ← w − η·g`. The step *length* is `η × |g|`, and on a bowl-shaped loss `|g|` grows with your distance from the bottom — which is why the step shrinks all by itself as you approach, with `η` untouched. The run only runs away when `η` is bigger than roughly `2 / (curvature of the loss)`; that inequality is exactly the "more than twice the distance left" rule, written in symbols. A schedule replaces the single `η` with a shrinking sequence `η₁ > η₂ > η₃ > ��`. You never need any of this to run a loop — the curve tells you everything by eye.
+<b>Optional (skippable) — the same thing in symbols.</b><br>
+<b>The rule:</b> For weight `w` with gradient `g` and learning rate `η` (the Greek letter "eta", the usual symbol): the update is `w ← w − η·g`.<br>
+<b>Why the step shrinks on its own:</b> The step *length* is `η × |g|`, and on a bowl-shaped loss `|g|` grows with your distance from the bottom — which is why the step shrinks all by itself as you approach, with `η` untouched.<br>
+<b>Where it runs away:</b> The run only runs away when `η` is bigger than roughly `2 / (curvature of the loss)`; that inequality is exactly the "more than twice the distance left" rule, written in symbols.<br>
+<b>What a schedule changes:</b> A schedule replaces the single `η` with a shrinking sequence `η₁ > η₂ > η₃ > …`.<br>
+<b>And you can skip all of it:</b> You never need any of this to run a loop — the curve tells you everything by eye.
 !!!
 
 Dial sorted — and that's **two of the six traps** already in your kit. Next: how do we *count* all this practice, and how do we know when to stop?

@@ -834,7 +834,11 @@ XOR | "on when exactly one input is on" — the classic pattern one straight lin
 %%%
 
 !!! c-ok 🎤
-<b>If someone asks you what an activation is, here's the whole day in four sentences:</b> "It's the per-layer bend. Without it the stack collapses — <code>(x W₁) W₂ = x (W₁ W₂)</code>, and the two biases fold into one new bias as well, so depth adds nothing at all. ReLU = max(0, z) is the cheap default and keeps the backward signal alive, because its positive-side slope of 1 doesn't shrink it the way sigmoid's ≈0.25 does. The failures are silent — saturated units and dead ReLUs — so I watch activation statistics, not just the loss, and I reach for Leaky ReLU or GELU with He initialization." Every piece of that is something you can already explain in your own words.
+<b>If someone asks you what an activation is, here's the whole day in four sentences:</b>
+<br><b>· Why it exists:</b> "It's the per-layer bend. Without it the stack collapses — <code>(x W₁) W₂ = x (W₁ W₂)</code>, and the two biases fold into one new bias as well, so depth adds nothing at all."
+<br><b>· Why ReLU is the default:</b> "ReLU = max(0, z) is the cheap default and keeps the backward signal alive, because its positive-side slope of 1 doesn't shrink it the way sigmoid's ≈0.25 does."
+<br><b>· What goes wrong, and what you reach for:</b> "The failures are silent — saturated units and dead ReLUs — so I watch activation statistics, not just the loss, and I reach for Leaky ReLU or GELU with He initialization."
+<br>Every piece of that is something you can already explain in your own words.
 !!!
 
 That's the whole day. Next you'll stack these neurons into layers and push data through them — the **forward pass**.

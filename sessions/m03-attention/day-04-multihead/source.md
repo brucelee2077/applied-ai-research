@@ -49,6 +49,23 @@ Think of **one meeting in a room**. Everyone talks, you decide how much to weigh
 #### The one head, in one breath
 Inside that head, three roles do the work — you named them on Day 2. A word's [[Query||The "what am I looking for?" side of a word.]] asks "what am I looking for?", each word's [[Key||The "what do I offer?" side of a word.]] answers "here's what I've got," and each word's [[Value||The actual content a word carries — the stuff that gets blended into the answer.]] is the actual content that gets blended in. The head scores each Query against each Key, softmaxes those scores into shares that add up to one, and uses those shares to blend the Values into a single answer. That's the whole meeting — and today we make copies of it.
 
+Here is that same meeting slowed down to four rungs, so we know exactly what we are about to copy.
+
+%%% steps
+step: every word forms its own Query and its own Key
+why: the Query is "what am I looking for?", the Key is "here's what I've got" — one side asks, the other side answers
+step: score each Query against each Key
+why: which gives one match number per pair of words: how much this word wants to listen to that one
+step: softmax turns a word's row of scores into shares that add up to 1
+why: therefore the word is splitting one whole attention budget, never spending more and never less
+step: blend the Values with those shares → ONE answer for that word
+why: that single blended answer is everything the head hands back — and "one answer" is exactly the wall we walk into next
+%%%
+
+%%% insight
+Hold onto that last rung: one head, one answer per word. Nothing is broken about that answer — it is just **one**. Every idea in the rest of today grows out of a single question: what could a word tell us if it were allowed to answer in several ways at once?
+%%%
+
 !!! c-info 🗺️
 <b>The one line to hold all day:</b> one head gives one blended answer per word; a <b>panel</b> of heads gives many answers at once, then stitches them into one. Hold that; the rest is slow motion.
 !!!
@@ -64,10 +81,29 @@ Think of **one photo of a whole birthday party**. If you can only take a single 
 
 **What the birthday-photo picture gets right:** one wide shot has to average the whole scene, so every part comes out soft — exactly how one head blurs the different relationships into one answer. **Where it breaks down:** a photo blurs because of a lens and light, while a head "blurs" by doing math — it literally averages several patterns into one set of numbers, no camera involved.
 
+#### Count what "cat" needs, then count what it gets
+The squeeze is easier to feel one rung at a time.
+
+%%% steps
+step: the sentence hands "cat" three live relationships at once
+why: "tired" describes it, "sat" is what it did, "mat" is where it happened — three different questions about the same word
+step: one head is allowed to hand back exactly ONE blended answer
+why: that is simply the shape of a head — score everyone, mix them, return a single vector per word
+step: so three answers have to be squeezed into that one
+why: which means the head averages them together, because averaging is the only move it has
+step: the average is a compromise nobody asked for
+why: therefore every relationship comes out at partial strength and not one of them stays sharp
+%%%
+
+%%% insight
+Why this bites: the head is not making a mistake, and no amount of extra training repairs it. A single head that averages two clean patterns is doing its job perfectly — the **shape** of one head is what loses the detail. That is why the fix has to change the shape, not the training.
+%%%
+
 #### Watch one head average two relationships into mush
 Let's make the blur concrete. Say the word "cat" cares about two things: the word that *describes* it ("tired") and the word for *where* it sat ("mat"). Two clean relationships. **Predict first:** if a single head must fold both into one blend, what happens to each one? Guess, then reveal.
 
 %%% demo id=average label="one head folds two relationships into one blend"
+predict: on its own, each relationship was a crisp 1.00 / 0.00. Squeezed into ONE head, do you get 1.00 / 0.00 again — or something near 0.50 / 0.50?
 code: head_1 must answer "cat" using BOTH: describe->tired  AND  place->mat
 out: describe-only would give:  [tired 1.00, mat 0.00]   (crisp: it's the adjective)
      place-only would give:     [tired 0.00, mat 1.00]   (crisp: it's the location)
@@ -88,10 +124,29 @@ Think of a **panel of judges at a talent show**. All three watch the same act, b
 
 **What the judges picture gets right:** everyone watches the same act, yet each returns their own score for their own thing — exactly like heads each returning their own answer for their own relationship. **Where it breaks down:** the judges *know* their assigned category ahead of time, but nobody tells a head what to specialize in — it discovers its own job on its own while the model trains.
 
+#### One sentence, three heads, in order
+Nothing about the panel is mysterious once you walk it rung by rung.
+
+%%% steps
+step: hand the same sentence to every head — nothing is divided up yet
+why: all the heads read the same words, exactly like all three judges watch the same act
+step: each head runs those words through ITS OWN `W_Q`, `W_K`, `W_V`
+why: same input, different recipes, which means each head ends up asking a different question
+step: inside each head, run yesterday's attention — score, softmax, blend the Values
+why: therefore nothing new has to be learned here; a head *is* the meeting you already built
+step: every head hands back its own answer, all at the same moment
+why: three heads, three answers — and because they never shared a recipe, they never got averaged into one
+%%%
+
+%%% insight
+Notice what we did **not** add: no new kind of math, no new layer type. A panel is yesterday's meeting, copied. That is the quiet reason this idea won — it buys you several views for the price of copying something you already had.
+%%%
+
 #### The key phrase: each head has its OWN Q, K, V
 This is the one detail that makes heads different from each other. On Day 2 you learned a word becomes a Query, a Key, and a Value by passing through three little learned recipes (the projections `W_Q`, `W_K`, `W_V`). In multi-head attention, **every head gets its OWN set** of these three recipes. Same input word, different recipes, so head 1 might turn "cat" into a Query that looks for describing words, while head 2 turns the same "cat" into a Query that looks for the place word. Different eyes, same sentence. **Predict first:** send the same word "cat" through two heads' recipes — will they land on the same word or different ones? Guess, then reveal.
 
 %%% demo id=ownqkv label="the SAME word through two different heads"
+predict: one of these two heads ends up hunting for "tired". Where does the OTHER one land — on "tired" as well, or on "the", "sat" or "mat"?
 code: word "cat" -> head_1's own W_Q  vs  head_2's own W_Q
 out: head_1 Query -> "I'm hunting for a word that DESCRIBES me"  -> lands on "tired"
      head_2 Query -> "I'm hunting for WHERE I happened"          -> lands on "mat"
@@ -115,10 +170,29 @@ t3: Because d_k = d_model ÷ h, the product h × d_k always lands back on d_mode
 
 **What the pizza picture gets right:** slicing changes how many pieces you have, never how much pizza there is — just like slicing the vector gives more heads without adding width. **Where it breaks down:** pizza slices are separate once cut, but the head slices are still part of one vector — they get stitched back into a full-width vector at the end, something you can't do with actual pizza.
 
+#### Slice one vector, slowly
+Take the width-12 vector from the picture and cut it for 3 heads, one rung at a time.
+
+%%% steps
+step: start with the whole vector: `d_model = 12` slots
+why: this is the one pizza — the total number of slots the model gives each word
+step: choose how many views you want: `h = 3` heads
+why: the number of heads is the only knob you turned here; nothing else about the model changed
+step: cut the width evenly: `d_k = 12 ÷ 3 = 4` slots per head
+why: which means each head thinks inside a third of the slots instead of all of them — a thinner room, not a bigger bill
+step: check the total: `h × d_k = 3 × 4 = 12`
+why: therefore the slices add straight back up to the vector you started with — you re-sliced the budget, you never grew it
+%%%
+
+%%% insight
+This is the sentence that surprises people: more heads is not "more model." It is the **same** numbers, grouped differently. So when you read that a model has 32 heads, don't picture 32 times the work — picture one vector cut into 32 thin strips, each strip free to watch for its own thing.
+%%%
+
 #### Watch the cost stay flat as heads go up
 The one-line rule: `d_k = d_model / h`. In words — the per-head width is the full width divided by the number of heads. **Predict first:** if a model has width `d_model = 64` and we go from 1 head to 8 heads, does the total amount of work roughly grow, shrink, or stay the same? Guess, then reveal.
 
 %%% demo id=cost label="does adding heads cost more?"
+predict: for 8 heads at `d_model = 64`, what does `heads × d_k` come out as — 8, 64, or 512?
 code: d_model = 64;  compare 1 head vs 8 heads
 out: 1 head :  d_k = 64/1 = 64   ->  work ∝ heads × d_k = 1 × 64 = 64
      8 heads:  d_k = 64/8 = 8    ->  work ∝ heads × d_k = 8 × 8  = 64
@@ -167,6 +241,23 @@ Think of a **set of colored highlighters on one page**. You read the same paragr
 #### Play with it — drag the head count and watch the views multiply
 Try the widget above. Set it to **1 head** first: the whole vector is one color and you get a single view — one relationship, just like our blurry photo. Now step up to **2, then 4, then 8** heads and watch two things happen at once: the one long vector splits into that many colored slices (each one thinner — that's d_k shrinking), and that many heads switch on, each free to specialize in a different relationship. That is "many views at once," and you're driving it by hand.
 
+Here is what each stop of that slider is telling you, rung by rung (the vector in the widget is `d_model = 8` slots wide).
+
+%%% steps
+step: `h = 1` → one colour across all 8 slots, `d_k = 8`
+why: this is yesterday's single head, and the blur we opened the day with
+step: `h = 2` → two colours, `d_k = 8 ÷ 2 = 4` slots each
+why: two heads can now chase two different relationships, and 2 × 4 = 8 keeps the total width exactly where it was
+step: `h = 4` → four colours, `d_k = 8 ÷ 4 = 2` slots each
+why: which means four views for the same 8 slots — extra views cost width *per head*, never width overall
+step: `h = 8` → eight colours, `d_k = 8 ÷ 8 = 1` slot each
+why: therefore you can keep buying views, but each head ends up with a narrower room to think in — which is why real models settle somewhere in the middle instead of slicing forever
+%%%
+
+%%% insight
+Here is the part nobody tells the model: which head does which job. There is no line of code that says "head 3, you handle grammar." The jobs fall out of training — so train the same model twice and the specialities land on different heads. You always get a panel of specialists; you never get to choose who specializes in what.
+%%%
+
 !!! c-ok ✅
 <b>The payoff:</b> because heads specialize, a model with 8 heads can track 8 different relationships in a sentence at the same time — grammar, nearby words, long-range links, and more — instead of blurring them all into one average. That richness is a real reason transformers understand language so well.
 !!!
@@ -182,10 +273,29 @@ Think of a **group project**. Three teammates each write their own section — o
 
 **What the group-project picture gets right:** stapling keeps the sections in one place but still separate, and the editor is what turns them into one coherent voice — exactly the join-then-`W_O` pair. **Where it breaks down:** an editor rewrites with judgment and taste, while `W_O` just multiplies numbers by learned weights — no opinions, only a learned mix that training tuned.
 
+#### Two moves: staple, then edit
+Walk the two moves in order, with `d_model = 6` and `h = 3` heads.
+
+%%% steps
+step: three head answers arrive, each of width `d_k = 6 ÷ 3 = 2`
+why: every head worked inside its own thin slice, so each answer it hands back is short
+step: concatenate — lay them side by side into one vector of width 2 + 2 + 2 = 6
+why: this is the staple: the pieces are all in one place now, but still sitting apart, untouched by each other
+step: multiply that width-6 vector by `W_O`
+why: which lets every slot of the final answer be built from all three heads at once — the editor, blending the voices
+step: out comes one vector of width 6 — exactly the width that went in
+why: therefore the next layer never has to know how many heads there were; the whole panel hides behind one familiar shape
+%%%
+
+%%% insight
+Without `W_O` the heads would stay strangers stapled together, and the next layer would be handed three separate reports with no idea how they relate. `W_O` is the step that lets head 1's "tired" and head 2's "mat" end up in the same thought about "cat". Small matrix, big job.
+%%%
+
 #### Follow the widths, end to end
 Here's the whole pipeline in one predict-then-run. **Predict first:** start with `d_model = 6` and `h = 3` heads. What width does each head answer with, what width after joining them, and what width after `W_O`? Guess three numbers, then reveal.
 
 %%% demo id=concat label="the width from split to join to W_O"
+predict: three widths are about to print — one head's answer, the joined vector, the final vector. Two of them are 6. Which one is not?
 code: d_model = 6, h = 3;  split -> attend -> join -> W_O
 out: split :  each head works in d_k = 6/3 = 2      -> 3 answers of width 2
      join  :  stitch them side by side              -> one vector of width 2+2+2 = 6

@@ -49,6 +49,23 @@ Think of the **seats around your dinner table**. Imagine the food is fixed — t
 
 **What the dinner-table picture gets right:** same people, different seats, whole different evening — exactly how the same words in a different order can mean the opposite thing. **Where it breaks down:** at a dinner table a person keeps being the same person no matter where they sit, but for a model a word only becomes "the subject" or "the object" *because* of where it sits — the seat is part of the meaning, not just a place to put it.
 
+Let's do the swap slowly, one seat at a time, and watch exactly where the meaning goes.
+
+%%% steps
+step: seat 1 = *dog* · seat 2 = *bites* · seat 3 = *man*
+why: whoever sits in seat 1 is the one doing the biting — that is the job seat 1 holds in an English sentence
+step: now swap ONLY the words in seat 1 and seat 3
+why: nothing was added and nothing was removed — the same three cards are still on the table
+step: seat 1 = *man* · seat 2 = *bites* · seat 3 = *dog*
+why: therefore the biter and the bitten traded places, which means the sentence now claims the opposite thing
+step: the words are identical; only the seating changed
+why: so every bit of that flipped meaning was living in the ORDER, and nowhere else
+%%%
+
+%%% insight
+This is not a word game. A model that cannot see the seats would read the note "patient stopped taking aspirin" exactly the same as "aspirin stopped taking patient" — same words, opposite fact, and only one of them is safe to act on. So the order is not a nice extra we could skip. Whatever we build has to carry it, or it can hand back a confident answer that is precisely backwards.
+%%%
+
 #### Hold this one thought
 A sentence is not a bag of words tossed together. It's an *ordered line* of words, and the order carries real meaning. Keep that in your hand — because in the very next concept we'll discover that the attention you built has no idea about any of it.
 
@@ -66,10 +83,28 @@ Think of **dumping a bag of alphabet fridge magnets onto the table**. The magnet
 #### Why does this happen? One plain reason
 Under the hood, attention builds each word's answer by taking a *weighted sum* of the other words. And a sum doesn't care what order you add things in: `3 + 5 + 2` is the same as `2 + 3 + 5`. That's the whole reason. Because the core step is "add up the words, weighted," swapping the order of the words being added lands on the identical total. Order isn't built in — it has to be *handed in* as an extra signal.
 
+Follow that reason one rung at a time — it is four short steps from "adding numbers" to "the bug."
+
+%%% steps
+step: `3 + 5 + 2 = 10`
+why: three numbers, added in the order they happened to arrive
+step: `2 + 3 + 5 = 10` — the very same total
+why: addition only knows *what* went in, never *when* it went in. Shuffle the pile and the total does not budge
+step: attention's core move is exactly that: add up the words, each one weighted by its share
+why: which means shuffling the sentence just shuffles the order of the adding — and the total lands in the same place
+step: so the seat a word sat in never reaches the answer
+why: therefore attention did not *forget* the order; the order was never handed in. That is the part we get to fix
+%%%
+
+%%% insight
+Here is why a bug like this survives so long before anyone catches it: nothing crashes. The model trains, the loss drops, the answers come out fluent — it is simply reading every sentence as an unordered shopping list. A crash you fix in an afternoon. A silent wrong answer you only find by going looking for it, which is exactly what you are about to do in the next run.
+%%%
+
 #### Watch the shuffle change nothing
 Let's catch the bug red-handed. We'll run tiny attention on "the cat sat," then shuffle the word rows to "sat the cat" and run it again. **Predict first:** will each word's output vector change, or will attention hand back the same set of numbers? Guess, then reveal.
 
 %%% demo id=shuffle label="run attention, then shuffle the words and run again"
+predict: after the shuffle, does "cat" come back as `[0.55, 0.40]` again, or with brand-new numbers?
 code: attention(["the", "cat", "sat"])   vs   attention(["sat", "the", "cat"])   # same words, new seats
 out: ordered  ["the","cat","sat"]  ->  the:[0.31,0.62]  cat:[0.55,0.40]  sat:[0.48,0.51]
      shuffled ["sat","the","cat"]  ->  the:[0.31,0.62]  cat:[0.55,0.40]  sat:[0.48,0.51]
@@ -93,10 +128,28 @@ Think of **numbered stickers on moving boxes**. On moving day every box looks th
 #### One quiet but important detail: we ADD it, not glue it on
 There are two ways you might imagine attaching a seat number to a word. You could **glue it beside** the word, making the word longer (that's called concatenating). Or you could **add it on top** of the word's existing numbers, keeping the same width. The Transformer does the second: the seat signal is a vector the *same size* as the word, and we simply add the two together. Same width goes in, same width comes out — nothing gets bigger, the word just quietly carries its seat now.
 
+Here is that "add it on top" in slow motion, with real numbers, so you can see nothing gets wider.
+
+%%% steps
+step: the word *cat* arrives as 2 numbers: `[0.20, 0.90]`
+why: whatever width the embedding has, that is the width every later step already expects to receive
+step: build a seat stamp with the SAME width — 2 numbers, say `[0.84, 0.54]` for seat 1
+why: matching widths is what makes the next rung legal, because you can only add two lists slot by slot when they are the same length
+step: add them slot by slot: `[0.20+0.84, 0.90+0.54]` = `[1.04, 1.44]`
+why: which means the seat gets folded INTO the word's own numbers instead of sitting beside them as a separate label
+step: 2 numbers in, 2 numbers out
+why: therefore you can drop this trick into the attention you already built without changing one other line of it
+%%%
+
+%%% insight
+Now the question a careful reader always asks here: doesn't adding a stamp *damage* the word? A little — those numbers really do move, and the word is no longer purely "cat." That is a genuine trade, and the model takes it happily, because a word in the wrong place already means the wrong thing. Training then does something quietly clever: it learns to read *both* signals — which word, and which seat — back out of the same slots.
+%%%
+
 #### Watch the same word take on two different seats
 Let's make it real. Take the identical word "cat" and drop it into seat 1, then into seat 3. **Predict first:** after we add the seat stamp, will the two "cat"s carry the same numbers or different ones? Guess, then reveal.
 
 %%% demo id=addseat label="the same word cat in two different seats"
+predict: *cat* is `[0.20, 0.90]` both times. Which seat pushes its second number BELOW zero — seat 1, or seat 3?
 code: cat = [0.20, 0.90]           # the plain word, identical both times
       seat_1 = [0.84, 0.54]        # stamp for seat 1
       seat_3 = [0.14, -0.99]       # stamp for seat 3
@@ -131,6 +184,23 @@ Here's a puzzle worth solving. What if we tried just *one* slow wave for the sea
 <svg viewBox="0 0 520 210" role="img" aria-label="Three panels. Left: one slow wave alone, with two adjacent seats reading nearly the same height and marked collide. Middle: one fast wave alone, with two far-apart seats reading the same height and marked collide. Right: fast plus slow combined, where every seat has a distinct pair of readings, marked all unique."><g font-family="monospace" font-size="9"><text x="260" y="14" text-anchor="middle" fill="#2C2A28" font-size="12">One wave collides · many waves give every seat a unique fingerprint</text><text x="86" y="34" text-anchor="middle" fill="#C0392B" font-size="9">only a SLOW wave</text><path d="M20 70 Q60 46 100 70 T180 70" fill="none" stroke="#5E5191" stroke-width="1.6"/><circle cx="70" cy="61" r="3" fill="#C0392B"/><circle cx="84" cy="64" r="3" fill="#C0392B"/><text x="86" y="92" text-anchor="middle" fill="#C0392B" font-size="8">neighbors ≈ same → collide</text><text x="260" y="34" text-anchor="middle" fill="#C0392B" font-size="9">only a FAST wave</text><path d="M195 70 Q205 50 215 70 T235 70 T255 70 T275 70 T295 70 T315 70 T335 70" fill="none" stroke="#C99A12" stroke-width="1.6"/><circle cx="215" cy="70" r="3" fill="#C0392B"/><circle cx="315" cy="70" r="3" fill="#C0392B"/><text x="265" y="92" text-anchor="middle" fill="#C0392B" font-size="8">far seats repeat → collide</text><text x="440" y="34" text-anchor="middle" fill="#2D8B55" font-size="9">FAST + SLOW together</text><path d="M360 70 Q368 54 376 70 T392 70 T408 70 T424 70 T440 70 T456 70 T472 70 T488 70 T504 70" fill="none" stroke="#C99A12" stroke-width="1.3"/><path d="M360 74 Q400 52 440 74 T520 74" fill="none" stroke="#5E5191" stroke-width="1.5"/><text x="440" y="92" text-anchor="middle" fill="#2D8B55" font-size="8">every seat unique ✓</text><text x="30" y="126" fill="#6B645E" font-size="9">each seat's stamp = its reading from EVERY wave, bundled together:</text><rect x="30" y="136" width="70" height="22" rx="3" fill="#FCF3DC" stroke="#C99A12"/><text x="65" y="151" text-anchor="middle" fill="#8A6D3B" font-size="8">seat 0: [.., ..]</text><rect x="110" y="136" width="70" height="22" rx="3" fill="#FDECEA" stroke="#C0392B"/><text x="145" y="151" text-anchor="middle" fill="#C0392B" font-size="8">seat 1: [.., ..]</text><rect x="190" y="136" width="70" height="22" rx="3" fill="#EAF5EE" stroke="#2D8B55"/><text x="225" y="151" text-anchor="middle" fill="#276b45" font-size="8">seat 2: [.., ..]</text><rect x="270" y="136" width="70" height="22" rx="3" fill="#EAF0FA" stroke="#5E5191"/><text x="305" y="151" text-anchor="middle" fill="#5E5191" font-size="8">seat 3: [.., ..]</text><text x="260" y="182" text-anchor="middle" fill="#9A938A" font-size="9">fast wave keeps neighbors apart · slow wave keeps far seats apart · together = no collisions</text><text x="260" y="200" text-anchor="middle" fill="#276b45" font-size="9">that bundle of readings IS the seat stamp we add to the word</text></g></svg>
 %%%
 
+Now let's assemble one seat's stamp, rung by rung, so you can see where those numbers actually come from.
+
+%%% steps
+step: fix the wave speeds once — the first slot-pair gets the fastest wave, each later pair a slower one
+why: the speeds come from the formula, not from training, which means every seat is read off the very same set of waves
+step: stand at seat `pos` and read the height of each wave right there
+why: one wave gives you one number, and a fast wave at that spot gives a very different reading from a slow one
+step: bundle those readings into one list — that list IS seat `pos`'s stamp
+why: so a stamp is not the seat number written down; it is the seat's *pattern* across many speeds at once
+step: add that list on top of the word sitting in seat `pos`
+why: therefore the word now quietly carries where it sits, and it never got any wider — the same trick from the last concept, with better numbers in it
+%%%
+
+%%% insight
+Step back and see the real problem the waves are solving. You need a different label for seat 0, seat 1, … seat 5000, and every label has to stay *small*, because it gets added straight onto the word. Plain counting fails at that: a stamp of 5000 would tower over a word whose numbers sit near 1, and the seat would drown out the meaning. A wave never leaves the range −1 to 1, no matter how far out you walk. Small numbers, endless seats — that is the whole reason waves and not counting.
+%%%
+
 !!! c-info 🧮
 <b>Optional (skippable) — the exact wave formula.</b> If you love the math: for seat `pos`, the stamp fills even slots with a sine and odd slots with a cosine — `PE(pos, 2i) = sin(pos / 10000^(2i/d_model))` and `PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))`. Here `pos` is which seat, `i` is which slot-pair, `d_model` is the word width, and `10000` is the knob that spreads the wave speeds from fast (front slots) to slow (back slots). You never need this to *use* attention — it's here for the curious, and it gets the full worked-numbers treatment in the interview deep-dive.
 !!!
@@ -139,6 +209,7 @@ Here's a puzzle worth solving. What if we tried just *one* slow wave for the sea
 Let's see the stamps for the first few seats and check they're all different. **Predict first:** we build stamps from a fast wave and a slow wave. Will seat 0, 1, and 2 come out identical, or each unique? Guess, then reveal.
 
 %%% demo id=fingerprint label="build seat stamps from a fast + slow wave"
+predict: from seat 1 to seat 2, which reading moves MORE — the fast wave's, or the slow wave's?
 code: two waves — one fast, one slow.  stamp[seat] = [fast(seat), slow(seat)]
 out: seat 0 -> [0.00, 0.00]     (both waves start at 0)
      seat 1 -> [0.84, 0.01]     (fast wave jumped a lot, slow wave barely moved)
@@ -170,6 +241,10 @@ Extra parameters :: none :: one vector per seat to store and train
 Seats past training length :: still defined by the formula :: undefined — no label exists
 %%%
 
+%%% insight
+So which one do real models actually use? Both — and the choice comes down to how far they need to stretch. Learned stamps are easy to write and did about as well as the waves on the lengths they were trained for, so several famous models shipped with them. Fixed waves cost nothing, need no storage, and keep producing a stamp past the longest sentence anyone trained on. Notice the shape of that trade, because you will meet it over and over: a thing that fits your data exactly, against a thing that keeps working where your data ran out.
+%%%
+
 You now know both families exist and how they differ. That "learned stamps have no label past the longest trained seat" line is a genuine weakness — hold onto it, because it's exactly the crack the next concept opens up.
 
 @@@ concept id=c6 tag="What it does & doesn't do" title="Two honest limits of the seat trick" gotit="Got the limits"
@@ -186,6 +261,23 @@ Think of a **race with numbered lanes painted on the track**. Painting lane numb
 %%%
 
 **What the painted-lanes picture gets right:** paint tells runners which lane is theirs but not how to run, and it runs out where nobody marked it — the two limits, exactly. **Where it breaks down:** a painter *could* just keep painting more lanes, but a model can't simply "paint more" trained seats without more training data at those lengths, which is what makes the long-sentence problem genuinely hard.
+
+Let's trace limit two carefully, because what breaks is not the part most people guess.
+
+%%% steps
+step: training only ever showed the model seats 0–100
+why: every practice sentence was short, so those are the only seat stamps it ever had to make sense of
+step: a long sentence arrives, and the word in seat 800 asks for its stamp
+why: the formula hands one over without complaint — the waves run on forever, so nothing is missing here
+step: but the attention layers have never met that pattern of readings before
+why: which means they have no practice turning it into "this word is far out, near the end" — the stamp is a stranger
+step: the answers get vaguer the further past 100 you go
+why: therefore the crack is not a missing seat number; it is a reader who was never taught this handwriting
+%%%
+
+%%% insight
+Read those two limits as a map, not as bad news. The second one is exactly the problem every long-context model had to solve, and the shape of the fix is already something you can picture: instead of *adding* a seat stamp, gently *rotate* each word a bit further for every seat it moves along — so "ten seats apart" looks the same whether you are at seat 5 or seat 5000. You are one honest limit away from seeing why that idea won.
+%%%
 
 !!! c-info 🔭
 <b>The exciting part:</b> that "gets lost on longer sentences" crack is not a dead end — it's the doorway to the methods behind today's long-context models that read whole books. Later days introduce smarter schemes (rotate each word by its seat instead of adding a stamp; or gently nudge attention toward nearby words) that stretch to lengths the model never trained on. You've earned the map; those days fill it in.
@@ -204,6 +296,22 @@ Let's gather the whole day onto one page you can come back to any time. Here's a
 3. **Give each word a seat stamp.** Add a position signal to each word *before* attention (added, not glued on) so the same word differs by where it sits.
 4. **Build the stamps from waves.** Sinusoidal encoding uses many waves at different speeds — fast for neighbors, slow for far seats — so every seat gets a unique fingerprint and none collide. Fixed (from a formula) is one family; learned (invented in training) is the other.
 5. **Know the limits.** The stamp only says *where*, not *how* to use it, and fixed stamps don't stretch to seats longer than training — which is exactly what smarter, later methods repair.
+
+#### The whole input side, in the order it flows
+Everything this module built, one rung per step, ending on today's piece.
+
+%%% steps
+step: words → embeddings — each word becomes a list of numbers (Day 1)
+why: numbers are the only thing the machine can compute with, and similar words land on similar lists
+step: **+ the seat stamp** — add each word's position on top, same width in, same width out (today)
+why: this is the one rung you added today, and it has to happen HERE, before attention, or order never gets in at all
+step: each word → a Query, a Key and a Value (Day 2)
+why: three views of the same word: what I'm looking for, what I offer, and what I'd hand over
+step: score every pair, soften the scores into shares, blend the Values (Day 3)
+why: which means each word walks out carrying a little of whoever it listened to — meaning in context
+step: run several heads at once, then mix their answers back together (Day 4)
+why: therefore one word can follow several relationships at the same time instead of averaging them into mush
+%%%
 
 #### Cheat-sheet — every word from today
 %%% jargon

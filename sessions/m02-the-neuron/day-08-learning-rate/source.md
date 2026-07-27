@@ -54,6 +54,19 @@ Let us start with the one thing the learning rate actually does. Back on the str
 #### The one-line update rule
 Here is the whole move in one plain sentence: **new weight = old weight − learning rate × gradient.** The gradient hands you the direction and steepness; the learning rate scales it; the minus sign turns you to face *downhill*. That is the same update you built in the training loop on earlier days — the learning rate is just the one number multiplying the gradient in it.
 
+Let us build that line one rung at a time, so you can see which part is *yours* to turn:
+
+%%% steps
+step: the gradient hands you a direction — and how steep it is
+why: it points the way the loss goes UP, so the way *down* is the exact opposite way
+step: the minus sign turns you around, to face downhill
+why: you want *less* loss, therefore the rule subtracts instead of adds
+step: the learning rate turns that direction into an actual distance
+why: this is the only place a hop *size* lives — nothing else in the line decides how far you travel
+step: new weight = old weight − learning rate × gradient
+why: three tiny decisions, one line — and the only one you tune today is the third
+%%%
+
 %%% formula
 expr: new_weight = old_weight − learning_rate × gradient
 note: gradient = the direction (which way is downhill, and how steep). learning_rate = how far you hop. The MINUS sign walks downhill. This is the exact same step that trains your single neuron's weights and bias.
@@ -62,9 +75,14 @@ note: gradient = the direction (which way is downhill, and how steep). learning_
 Let us watch it with tiny real numbers so the sentence turns concrete. Say a weight is `old_weight = 2.0` and the gradient (the slope) is `4.0`. Change *only* the learning rate and watch how far the weight moves in one hop:
 
 %%% demo id=onestep label="run it — one hop with lr = 0.1"
+predict: old weight 2.0, gradient 4.0, learning rate 0.1 — how far does the weight move in this one hop: 0.04, 0.4, or 4.0? Guess before you reveal.
 code: 2.0 - 0.1 * 4.0        # new_weight = old_weight - learning_rate * gradient
 out: 1.6
 take: <b>Only the learning rate scales the hop.</b> With `old_weight = 2.0` and `gradient = 4.0`: at lr = 0.1 the hop is 0.1×4.0 = 0.4, so the weight moves to 1.6. Try it in your head at other rates: lr = 0.01 gives a tiny 0.04 hop (→ 1.96, barely nudged), and lr = 0.5 gives a giant 2.0 hop (→ 0.0). Same weight, same gradient — the learning rate alone decides how far each hop reaches. This is the whole knob; the rest of today is what happens when it is too small, too big, or just right.
+%%%
+
+%%% insight
+Why does one small number get this much attention? Because it is the *same* hop size for every weight in the network, on every single step, for the whole run. Two people can share the same model, the same data and the same code, change only this one number, and end up with "it learned beautifully" versus "it never learned at all". That is why this is the first thing an experienced engineer checks when training misbehaves — and why it is worth the day.
 %%%
 
 Here is the same one-hop story as a picture — one weight, one gradient, three learning rates, three hop lengths:
@@ -88,9 +106,27 @@ Now the first thing that goes wrong. Imagine crossing that stream by only ever s
 Let us make "crawls" something you can *see*. Here is a tiny valley — loss `= weight²`, so the bottom is at `weight = 0` — started at `weight = 2.0`. With a too-small learning rate of `0.01`, one step moves the weight only a hair. **Predict:** will one step get anywhere near the bottom? Then run it:
 
 %%% demo id=crawl label="run it — one step at a too-small lr = 0.01"
+predict: write your guess for the new weight down first — does it still start with 1.9…, or does it get down near 1.0?
 code: 2.0 - 0.01 * (2 * 2.0)      # one step downhill on loss = weight**2
 out: 1.96
 take: <b>One step crept from 2.00 to 1.96</b> — the loss barely dipped from 4.0 to 3.84. Five steps only reach ~1.81; it would take well over a hundred steps to reach the bottom at 0. Nothing is broken — it is just crawling. The fix is simple: raise the learning rate.
+%%%
+
+And it does not get better on its own — watch the crawl rung by rung:
+
+%%% steps
+step: step 1 — 2.00 − 0.01 × (2 × 2.00) = 1.96
+why: the hop is 0.04 wide and the gap to the bottom is 2.0, so this hop covers one fiftieth of the trip
+step: step 2 — 1.96 − 0.01 × (2 × 1.96) = 1.92
+why: the slope shrinks as the weight shrinks, which means each hop is even *smaller* than the one before it
+step: step 5 — still about 1.81, loss only down from 4.00 to 3.27
+why: five hops moved you less than a tenth of the way — and that is with everything working correctly
+step: about 260 steps — finally within 0.01 of the bottom
+why: therefore the whole cost of this failure is time; a healthier rate makes the same trip in a handful of steps
+%%%
+
+%%% insight
+Here is the part that bites: a crawl does not *look* like a mistake. No crash, no error message, no `NaN` — the loss really is going down, and the graph really does slope the right way. So you wait. You leave it running overnight, come back, and it has learned almost nothing. This failure costs you time and money rather than correctness, which is exactly why it is the easy one to miss.
 %%%
 
 Now compare the crawl step-by-step against a healthy drop, so you can *see* how little ground a too-small rate covers. Each bar is the weight after one more step, starting at 2.0 and heading for the bottom at 0:
@@ -126,9 +162,27 @@ t3: A rate that is too big makes each hop longer than the distance to the bottom
 Same tiny valley as before — loss `= weight²`, bottom at `weight = 0`, start at `weight = 2.0`. Now crank the learning rate up to `1.1` (too big). **Predict:** does the weight get closer to 0, or fling itself *past* the bottom? Then run one step:
 
 %%% demo id=diverge label="run it — one step at a too-big lr = 1.1"
+predict: the hop measures 1.1 × 4.0 = 4.4, and the bottom is only 2.0 away — so guess the SIGN of the new weight before you reveal it.
 code: 2.0 - 1.1 * (2 * 2.0)      # one step downhill, lr way too big
 out: -2.4
 take: <b>The weight flew clean past the bottom.</b> It started at +2.0, aimed downhill toward 0, and overshot all the way to −2.4 — now *farther* from the bottom than it started (loss went 4.0 → 5.76, up not down). The next step flings it to +2.9, then −3.5, then +4.1… bouncing bigger and bigger until it overflows to <b>NaN</b>. This is <b>divergence</b> — and the fix is simply to lower the learning rate.
+%%%
+
+Why must it *grow*? Walk the runaway one rung at a time — the trap is in rung three:
+
+%%% steps
+step: compare the hop to the trip — hop = 1.1 × 4.0 = 4.4, distance to the bottom = 2.0
+why: the hop is more than twice as long as the trip, therefore landing *on* the bottom is not even possible
+step: so you overshoot: 2.0 − 4.4 = −2.4, past the bottom and up the far wall
+why: you are now 2.4 from the bottom where you began 2.0 away, which means the loss went UP: 4.00 → 5.76
+step: farther out means a steeper slope, and a steeper slope means a longer hop
+why: this is the trap — the overshoot itself makes the *next* overshoot bigger, with no outside help
+step: every bounce multiplies your distance by 1.2 — 2.4 → 2.88 → 3.46 → 4.15 → 4.98 …
+why: nothing in the rule ever stops it, so the numbers keep doubling up until they overflow into `NaN`
+%%%
+
+%%% insight
+This is the failure you will actually meet in person, and being able to name it in one second is a real skill. A loss that prints `nan` almost always means one thing: the steps were too big. People lose whole afternoons hunting for a bug in their data or their model when the fix was to divide the learning rate by ten. You now know the first thing to try — that alone is worth today.
 %%%
 
 Here is the whole runaway as a picture — each bar is the weight after one more step, flipping sign and growing every time instead of shrinking toward the bottom:
@@ -188,9 +242,25 @@ So there is a crawling wall on one side and an exploding wall on the other, with
 **What the radio-dial picture gets right:** you *sweep* across widely-spaced settings and *listen* (watch the loss) rather than calculating the perfect number — that is exactly the real workflow. **Where it breaks down:** a radio has one true station; a network can have a whole *range* of decent learning rates, and the best one can even drift as training goes on (that is the schedule trick coming next).
 
 #### The order-of-magnitude sweep
-Because good rates can be anywhere from tiny to almost one, you do not try `0.011, 0.012, 0.013…` — that would take forever and cover almost no ground. Instead you jump by *powers of ten*: **1.0, 0.1, 0.01, 0.001, 0.0001.** Each is ten times smaller than the last, so five tries cover an enormous range. This is the practical search almost everyone starts with. Here is the winner from that sweep — the final loss after 40 steps at `lr = 0.1`. **Predict:** near the bottom (≈0), or still stuck up high? Then run it:
+Because good rates can be anywhere from tiny to almost one, you do not try `0.011, 0.012, 0.013…` — that would take forever and cover almost no ground. Instead you jump by *powers of ten*: **1.0, 0.1, 0.01, 0.001, 0.0001.** Each is ten times smaller than the last, so five tries cover an enormous range. This is the practical search almost everyone starts with.
+
+Here is the whole sweep as four rungs you could run this afternoon:
+
+%%% steps
+step: pick rates a power of ten apart — 1.0, 0.1, 0.01, 0.001, 0.0001
+why: a workable rate can live anywhere from tiny to nearly one, so jumping by tens covers that whole range in five tries
+step: run a SHORT training with each — you do not need to finish any of them
+why: a bad rate shows its shape in the first handful of steps, which means the sweep costs you almost nothing
+step: plot loss-versus-step for each run and look at the SHAPE, not just the final number
+why: the shape names the regime — flat means too small, spiky or rising means too big
+step: keep the rate whose curve drops smoothly, then narrow around it if you want more
+why: therefore you never solved an equation; you looked at pictures and picked the best one
+%%%
+
+Here is the winner from that sweep — the final loss after 40 steps at `lr = 0.1`. **Predict:** near the bottom (≈0), or still stuck up high? Then run it:
 
 %%% demo id=sweep label="run it — final loss after 40 steps at lr = 0.1"
+predict: at lr = 0.1 each step shrinks the weight to 0.8 of what it was — after 40 of those, is the final loss nearer 1, nearer 0.1, or almost nothing at all?
 code: train(lr=0.1)      # loss = weight**2 after 40 downhill steps from weight = 2.0
 out: 7.1e-08
 take: <b>lr = 0.1 lands essentially at the bottom</b> — final loss ≈ 0.00000007, basically 0. Run the whole sweep and the winner jumps right out: lr = 1.0 never settles (stuck bouncing at loss 4), lr = 0.1 nails it (≈0), lr = 0.01 crawls only partway (≈0.79), and lr = 0.001 (≈3.4) and 0.0001 (≈3.9) barely budge off the starting loss of 4. No equation needed — the sweep points straight at 0.1.
@@ -200,6 +270,10 @@ Here is the whole sweep as a picture — final loss after 40 steps for each rate
 
 %%% svg
 <svg viewBox="0 0 520 196" role="img" aria-label="A bar chart of final loss after 40 steps for five learning rates. Learning rate 1.0 is a tall bar at loss 4 (bouncing, never settles). 0.1 is essentially zero (reaches the bottom). 0.01 is a short bar at loss 0.79 (partway). 0.001 at loss 3.4 and 0.0001 at loss 3.9 are tall (barely moved). Only the middle rate reaches the floor."><g font-family="monospace" font-size="9"><text x="260" y="14" text-anchor="middle" fill="#2C2A28" font-size="12">Final loss after 40 steps (lower = better; floor = 0)</text><line x1="70" y1="150" x2="470" y2="150" stroke="#B8AEA2"/><text x="40" y="94" fill="#6B645E" font-size="9" transform="rotate(-90 40 94)">final loss</text><g><rect x="88" y="30" width="46" height="120" fill="#C93B3B"/><text x="111" y="166" text-anchor="middle" fill="#C93B3B" font-size="8">1.0</text><text x="111" y="24" text-anchor="middle" fill="#C93B3B" font-size="7.5">4.0 bounces 💥</text></g><g><rect x="164" y="147" width="46" height="3" fill="#2D8B55"/><text x="187" y="166" text-anchor="middle" fill="#1a5c38" font-size="8">0.1</text><text x="187" y="140" text-anchor="middle" fill="#1a5c38" font-size="7.5">≈0 ✓</text></g><g><rect x="240" y="126" width="46" height="24" fill="#C99A12"/><text x="263" y="166" text-anchor="middle" fill="#9A7208" font-size="8">0.01</text><text x="263" y="120" text-anchor="middle" fill="#9A7208" font-size="7.5">0.79 partway</text></g><g><rect x="316" y="48" width="46" height="102" fill="#C99A12"/><text x="339" y="166" text-anchor="middle" fill="#9A7208" font-size="8">0.001</text><text x="339" y="42" text-anchor="middle" fill="#9A7208" font-size="7.5">3.4 🐢</text></g><g><rect x="392" y="32" width="46" height="118" fill="#C99A12"/><text x="415" y="166" text-anchor="middle" fill="#9A7208" font-size="8">0.0001</text><text x="415" y="26" text-anchor="middle" fill="#9A7208" font-size="7.5">3.9 🐢</text></g></g></svg>
+%%%
+
+%%% insight
+Notice what you did *not* need there: no derivation, no closed form, no theory of the loss surface. You tried five numbers and looked at five pictures. That really is how the rate gets picked in working labs — sweep, look, keep the best — and it is one of the friendliest facts in all of machine learning: the single most important knob is tuned by *looking*, and you can already look.
 %%%
 
 #### Read the curve shape to diagnose
@@ -224,9 +298,27 @@ Here is a tension you may have already felt. A *big* hop is great early on — y
 Deliberately shrinking the learning rate as training goes on is called a [[learning-rate schedule||a plan that changes the learning rate over training — usually big early for speed, small late to settle. Shrinking it is also called decay]] (and the shrinking part is called **decay**). Big hops early cover ground fast; small hops late let you settle precisely into the bottom instead of bouncing over it. A common, simple plan: start at `0.8`, **halve the rate** each time — `0.8 → 0.4 → 0.2 → 0.1` — but hold a small floor of `0.1` so it eases into a gentle, steady size instead of vanishing to nothing. **Predict:** after several halvings from 0.8 with a 0.1 floor, what rate are we left with? Then run it:
 
 %%% demo id=decay label="run it — a halving schedule that floors at 0.1"
+predict: 0.8 halved five times is 0.025 — but the plan also has a 0.1 floor. Which of those two numbers does the schedule hand back?
 code: max(0.1, 0.8 * 0.5**5)      # start 0.8, halve each step, never below the 0.1 floor
 out: 0.1
 take: <b>The rate starts big at 0.8, halves toward zero, and settles at the 0.1 floor.</b> The sequence is `0.8 → 0.4 → 0.2 → 0.1 → 0.1 → 0.1 …` — big fast hops early, then it eases down and holds a small, gentle 0.1 for a precise landing. That plan is a learning-rate schedule (decay) — one of the most common tricks in real training.
+%%%
+
+Each halving is a decision, so here is the plan rung by rung — with the reason each rung exists:
+
+%%% steps
+step: start at 0.8 — long, confident strides
+why: you are far from the bottom, so a big hop is pure profit; there is nothing nearby to overshoot yet
+step: halve to 0.4, then halve again to 0.2
+why: the loss has dropped, which means you are closer in now, and the hop that helped at the start would begin to fly past the bottom
+step: halve once more to 0.1 — and stop halving there
+why: 0.1 is the floor; keep halving forever and the hops shrink to nothing, so learning would quietly stall out
+step: hold 0.1 for the rest of training
+why: therefore you finish with small steady shuffles that settle *into* the bottom instead of hopping back and forth over it
+%%%
+
+%%% insight
+There is a quiet lesson hiding in this trick: the best hop size is not a number, it is a *plan*. Nearly every model you have used today — the one that finishes your sentence, the one that picks your next song — was trained on a schedule rather than one fixed rate. Once you see training as "big steps first, small steps last", you are thinking about it the way the people who train these models do.
 %%%
 
 Here is the schedule as a picture — each bar is the learning rate after another halving, big early and easing down to the steady `0.1` floor:
