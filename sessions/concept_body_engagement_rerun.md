@@ -1,7 +1,7 @@
 # Concept-body engagement — rerun report (Task 10/11)
 
-**Branch** `build/capability-spiral` · **run** 2026-07-24 → 2026-07-26 ·
-**status: PARTIAL — 6 of 14 days rebuilt, then stopped by a hard quota blocker.**
+**Branch** `build/capability-spiral` · **run** 2026-07-24 → 2026-07-27 ·
+**status: PARTIAL — 11 of 14 days rebuilt and committed. 3 left, blocked on the daily quota.**
 
 Sequel to the engine/skill/judge work of Tasks 1–9. Those tasks built the body
 toolkit (`%%% insight`, `%%% steps`, `demo predict:`), the `judge_body_engagement`
@@ -44,37 +44,58 @@ even though the voice judge was already green.
 
 ## 2. What shipped
 
-Six days rebuilt, each through the full `lesson_build.js` loop (blind coverage
-draft → author under the Build-Up Register → compile → 6-lens judge panel → fix
-rounds) and then through a **keep-or-revert accept gate**
-(`sessions/_rebuild_accept.py`).
+Eleven days rebuilt and committed, each through the full `lesson_build.js` loop
+(blind coverage draft → author under the Build-Up Register → compile → 6-lens
+judge panel → fix rounds) and then through a **keep-or-revert accept gate**
+(`sessions/_rebuild_accept.py`). One day was rebuilt and REVERTed by that gate.
 
 | Day | verdict | steps/insight/predict | prose/concept | walls>600 | max wall | body floor |
 |---|---|---|---|---|---|---|
 | m02 day-01-single-neuron | KEEP (clean) | 10 / 12 / 6 | 1645 → **1254** | 3 → **0** | 1040 → **472** | 12 GOOD (held) |
+| m02 day-02-activations | KEEP | 13 / 12 / 6 | 1575 → 1901 | 5 → **2** | 1335 → **717** | 11 GOOD (held) |
 | m02 day-03-layers-forward-pass | KEEP (clean) | 9 / 10 / 3 | 1520 → 1668 | 1 → **0** | 681 → **513** | 9 → **10 GOOD** |
+| m02 day-04-loss | KEEP (clean) | 11 / 10 / 7 | 1514 → **1406** | 1 → 1 | 602 → 670 | 9 → **10 GOOD** |
 | m02 day-05-gradients-backprop | KEEP | 11 / 9 / 6 | 1934 → **1898** | 1 → 2 | 684 → 817 | 7G/**1W** → **9G/0W** |
 | m02 day-06-training-loop | KEEP | 8 / 9 / 6 | 1758 → **1546** | 0 → 1 | 544 → 732 | 6G/**2W** → **9G/0W** |
 | m02 day-07-optimizers | KEEP (clean) | 9 / 5 / 4 | 2179 → **2056** | 1 → **0** | 689 → **555** | 5 GOOD (held) |
 | m02 day-09-train-val-test | KEEP | 6 / 9 / 5 | 1740 → 2203 | 1 → 2 | 757 → 842 | 8 → **9 GOOD** |
+| m03 day-01-embeddings | KEEP | 9 / 10 / 9 | 1660 → 1830 | 3 → **1** | 1258 → **960** | 8 → **9 GOOD** |
+| m03 day-02-qkv | KEEP | 8 / 9 / 5 | 1759 → 2088 | 3 → **1** | 952 → **634** | 7 GOOD (held) |
+| m03 day-03-attention-scores | KEEP | 16 / 11 / 8 | 1424 → 1599 | 0 → **3** | 451 → 993 | 8 → **10 GOOD** |
+| m02 day-08-learning-rate | **REVERT** | — | — | — | — | lost 1 visual, no density gain |
 
-**Across the 6 rebuilt days:** 53 steps ladders, 54 insight re-hooks and 30
-predict prompts where there were **zero**; walls>600 **7 → 5**; mean prose per
-build-up 1,796 → 1,770 (−1%). Every day kept all its concepts and coverage
-topics, and every day ended with **more** visuals than it started with
-(e.g. day-05 svg 16→21, day-06 demo 2→6 plus 3 new interactive viz).
+**Across the 11 rebuilt days:** **110 steps ladders, 106 insight re-hooks and 65
+predict prompts** where there were **zero**; walls over 600 chars **19 → 13**;
+mean prose per build-up 1,700 → 1,768 (**+4%**). Every day kept all its concepts
+and coverage topics, and every day ended with **more** visuals than it started
+with (day-05 svg 16→21, day-06 demo 2→6 plus 3 new interactive viz, day-02-qkv
+svg 12→17).
 
 **All 3 WEAK build-ups in the entire 14-day set are now GOOD** — including the
 flat "Step 1/2/3" forward pass that the before-scan singled out.
 
 ### Honest read of the density result
 
-Chunking landed everywhere, but density only *fell* on 4 of 6 days. Three days
-(03, 09, and to a lesser extent 05/06) grew a longer single wall or more prose,
-because the author added concepts and material while chunking. That is a real
-partial miss against the "hard to digest" goal, recorded as accept-gate warnings
-rather than hidden: **day-09 (+27% prose, walls 1→2)** and **day-05 (walls 1→2)**
-are the two weakest outcomes and are queued for a targeted trim pass.
+The **walls** result is solid and is the metric closest to "hard to digest": the
+worst unbroken paragraphs shrank sharply (1335→717, 1258→960, 1040→472, 952→634)
+and walls over 600 chars fell **19 → 13** across the rebuilt days.
+
+**Total prose did not fall — it rose 4%.** Chunking broke the walls into rungs
+rather than cutting them, and the authors added concepts and material at the same
+time. So these days genuinely read in smaller pieces, but they are *longer*, and
+on that axis this is a partial miss. Recorded per-day as accept-gate warnings
+rather than smoothed over. The weakest outcomes, queued for a targeted trim pass:
+
+- **m03 day-03-attention-scores** — walls>600 0→3, max wall 451→993. Worst
+  regression of the run.
+- **m02 day-09-train-val-test** — prose +27%, walls 1→2.
+- **m02 day-05-gradients-backprop** — walls 1→2, and 2 residual correctness P0s.
+
+A pattern worth acting on: the two days that *regressed* on walls
+(day-03-attention-scores, and day-08 which was reverted) both started with the
+**cleanest** baselines (0 walls over 600). Days that were already digestible have
+no headroom, and a full re-author risks more than it gains. **A future rerun
+should skip any day whose baseline already shows 0 walls over 600.**
 
 ---
 
@@ -142,31 +163,26 @@ where it recompiles clean. Nothing partial was committed.
 
 ## 5. What is left
 
-**8 days not yet rebuilt:** m02 `day-02-activations` (reverted, needs a fresh
-run), m02 `day-04-loss`, m02 `day-08-learning-rate`, and all 5 m03 days
-(`day-01-embeddings`, `day-02-qkv`, `day-03-attention-scores`,
-`day-04-multihead`, `day-05-positional`).
+**3 days not yet rebuilt:** m03 `day-04-multihead`, m03 `day-05-positional`
+(neither started — their arg-loader agents 429'd), and m02 `day-08-learning-rate`
+(rebuilt, REVERTed for losing a visual with no density gain; per the pattern above
+it is a candidate to **leave at baseline** rather than retry).
 
 **Resume command** (once the daily quota resets):
 
 ```
 Workflow({scriptPath: 'sessions/_compiler/workflows/body_rebuild_batch.js',
-          args: {batches: [[['m02-the-neuron','day-02-activations'],
-                            ['m02-the-neuron','day-04-loss'],
-                            ['m02-the-neuron','day-08-learning-rate']],
-                           [['m03-attention','day-01-embeddings'],
-                            ['m03-attention','day-02-qkv'],
-                            ['m03-attention','day-03-attention-scores']],
-                           [['m03-attention','day-04-multihead'],
+          args: {batches: [[['m03-attention','day-04-multihead'],
                             ['m03-attention','day-05-positional']]]}})
 ```
 
-Budget note: 6 days cost roughly $300 of subagent spend (~2.5h/day wall-clock,
-driven by the correctness lens re-deriving every number). Expect ~2 quota-days
-for the remaining 8.
+Budget note: each quota-day of $300 buys about 5–6 days of rebuild (~2.5 h/day
+wall-clock, driven by the correctness lens re-deriving every number by running
+code). The remaining 2 days fit inside one quota-day.
 
 **Also open:**
-1. **Trim pass** on day-09 and day-05, whose prose/walls grew.
+1. **Trim pass** on day-03-attention-scores, day-09 and day-05, whose walls or
+   prose grew (see the density read above).
 2. **day-05's 2 residual correctness P0s** (symmetry demo, clip-ceiling geometry)
    — it exhausted its 4 fix rounds. It was kept because the alternative (revert)
    would also discard the gradient-direction fix and the WEAK→GOOD clearance; the
