@@ -28,8 +28,16 @@ WIDGET_BLOCK_RE = re.compile(r'(?m)^%%%\s+[a-z]+\b.*?(?:\n%%%\s*$|\Z)', re.DOTAL
 # a raw-HTML escape block (AUTHORING.md §"Raw HTML escape"): ~~~html … ~~~.
 # Markup, not prose — strip it for the same reason widget bodies are stripped.
 RAW_HTML_RE = re.compile(r'(?m)^~~~\w*\b.*?(?:\n~~~\s*$|\Z)', re.DOTALL)
+# a CALLOUT block (AUTHORING.md §5): "!!! <class> <emoji>" … "!!!". The compiler
+# treats "!!! " as a block opener (v8lib.is_special) and renders a set-off
+# <div class="callout">, and concept rule 4 REQUIRES heavy math to be demoted
+# into one marked "Optional (skippable)". So its body is not main-line prose —
+# it is an ASIDE, measured separately by aside_wall() rather than erased.
+# NOTE "[ \t]+" not "\s+": \s would match the newline after a CLOSING "!!!" and
+# swallow the following line as if it opened a box.
+CALLOUT_BLOCK_RE = re.compile(r'(?m)^!!![ \t]+\S+.*?(?:\n!!!\s*$|\Z)', re.DOTALL)
 # anything that gives the eye a place to rest / breaks a wall into one-idea chunks
-BREAK_RE = re.compile(r'(?m)^(?:####+\s|%%%\s+\w|step:|why:|[-*]\s|\d+\.\s|>\s)')
+BREAK_RE = re.compile(r'(?m)^(?:####+\s|%%%\s+\w|!!!\s|step:|why:|[-*]\s|\d+\.\s|>\s)')
 
 
 def concept_blocks(src):
@@ -57,13 +65,17 @@ def buildup_of(body):
     return body[first.end():] if first else body
 
 
-def longest_wall(text):
-    """Longest run of PROSE (chars) with no chunk boundary and no blank line.
+def _strip_markup(text):
+    """Drop everything that is not main-line prose: widget bodies, raw-HTML
+    escapes, and callout boxes. Each is replaced by a blank line so the prose
+    on either side does not fuse into one apparent wall."""
+    out = WIDGET_BLOCK_RE.sub('\n\n', text)
+    out = RAW_HTML_RE.sub('\n\n', out)
+    return CALLOUT_BLOCK_RE.sub('\n\n', out)
 
-    Widget bodies (raw SVG, demo key:value lines, steps rungs) are stripped first —
-    a 4k-char inline <svg> is not a wall of text for the reader, it is a picture.
-    """
-    prose = RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', text))
+
+def _worst_run(prose):
+    """Longest paragraph with no chunk boundary and no blank line."""
     worst = 0
     for para in re.split(r'\n\s*\n', prose):
         stripped = para.strip()
@@ -74,6 +86,33 @@ def longest_wall(text):
     return worst
 
 
+def longest_wall(text):
+    """Longest run of MAIN-LINE prose (chars) with no chunk boundary.
+
+    Widget bodies (raw SVG, demo key:value lines, steps rungs) are stripped
+    first — a 4k-char inline <svg> is not a wall of text for the reader, it is
+    a picture. Callout boxes are stripped too and measured by aside_wall().
+    """
+    return _worst_run(_strip_markup(text))
+
+
+def aside_wall(text):
+    """Longest unbroken run INSIDE callout boxes ("Optional (skippable)" asides).
+
+    A boxed aside off the critical path is a milder problem than a main-line
+    wall, and it has a cheaper fix (break it internally with <br> and bold
+    sub-lead-ins) than re-authoring a concept. Kept as its own number so long
+    asides stay visible instead of being hidden by the strip above.
+    """
+    worst = 0
+    for block in CALLOUT_BLOCK_RE.findall(text):
+        body = re.sub(r'(?m)^!!!.*$', '', block)              # drop both fences
+        body = RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', body))
+        for run in re.split(r'<br\s*/?>|\n\s*\n', body):      # <br> is a real line break
+            worst = max(worst, len(run.strip()))
+    return worst
+
+
 def scan_day(day_dir):
     source_md = os.path.join(day_dir, 'source.md')
     if not os.path.exists(source_md):
@@ -81,14 +120,17 @@ def scan_day(day_dir):
     src = open(source_md, encoding='utf-8').read()
     concepts = concept_blocks(src)
 
-    walls, per_concept = [], {}
+    walls, asides, per_concept = [], [], {}
     for title, body in concepts:
         buildup = buildup_of(body)
         wall = longest_wall(buildup)
+        aside = aside_wall(buildup)
         breaks = len(BREAK_RE.findall(buildup))
         prose_chars = len(RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', buildup)).strip())
         walls.append(wall)
-        per_concept[title] = {'wall': wall, 'breaks': breaks, 'prose_chars': prose_chars}
+        asides.append(aside)
+        per_concept[title] = {'wall': wall, 'aside_wall': aside,
+                              'breaks': breaks, 'prose_chars': prose_chars}
 
     return {
         'module': os.path.basename(os.path.dirname(day_dir.rstrip('/'))),
@@ -96,6 +138,8 @@ def scan_day(day_dir):
         'max_wall': max(walls) if walls else 0,
         'mean_wall': round(sum(walls) / len(walls)) if walls else 0,
         'walls_over_600': sum(1 for w in walls if w > 600),
+        'max_aside_wall': max(asides) if asides else 0,
+        'asides_over_600': sum(1 for a in asides if a > 600),
         'widgets': {
             'steps': len(re.findall(r'(?m)^%%%\s+steps\b', src)),
             'insight': len(re.findall(r'(?m)^%%%\s+insight\b', src)),
@@ -116,17 +160,20 @@ def main():
         name = os.path.basename(day_dir)
         result[name] = snap
         w = snap['widgets']
-        print('%-34s concepts=%-3d max_wall=%-5d mean_wall=%-4d walls>600=%-2d  steps=%d insight=%d predict=%d' % (
+        print('%-34s concepts=%-3d max_wall=%-5d mean_wall=%-4d walls>600=%-2d aside>600=%-2d max_aside=%-5d steps=%d insight=%d predict=%d' % (
             name, snap['concepts'], snap['max_wall'], snap['mean_wall'],
-            snap['walls_over_600'], w['steps'], w['insight'], w['predict']))
+            snap['walls_over_600'], snap['asides_over_600'], snap['max_aside_wall'],
+            w['steps'], w['insight'], w['predict']))
 
     with open(out_path, 'w', encoding='utf-8') as fh:
         json.dump(result, fh, indent=1, sort_keys=True)
 
     tot_over = sum(s['walls_over_600'] for s in result.values())
+    tot_aside = sum(s['asides_over_600'] for s in result.values())
     worst = max((s['max_wall'] for s in result.values()), default=0)
-    print('\n%d days | walls>600 total=%d | worst wall=%d -> %s' % (
-        len(result), tot_over, worst, out_path))
+    worst_aside = max((s['max_aside_wall'] for s in result.values()), default=0)
+    print('\n%d days | MAIN walls>600=%d (worst %d) | ASIDE walls>600=%d (worst %d) -> %s' % (
+        len(result), tot_over, worst, tot_aside, worst_aside, out_path))
 
 
 if __name__ == '__main__':
