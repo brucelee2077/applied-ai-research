@@ -1,7 +1,14 @@
 # Concept-body engagement — rerun report (Task 10/11)
 
 **Branch** `build/capability-spiral` · **run** 2026-07-24 → 2026-07-27 ·
-**status: PARTIAL — 11 of 14 days rebuilt and committed. 3 left, blocked on the daily quota.**
+**status: COMPLETE — all 14 days done. See §7 for the close-out, which corrects
+several numbers in §1–§5 below.**
+
+> §1–§6 are the record of the first pass, kept as written. §7 is the close-out,
+> and it revises two things you should not read §1–§5 without: the density metric
+> had a **third** counting bug (it scored a correctly-demoted `!!! c-info` aside as
+> a main-line wall), and the "worst regression of the run" recorded in §2 was
+> mostly that bug rather than a real regression.
 
 Sequel to the engine/skill/judge work of Tasks 1–9. Those tasks built the body
 toolkit (`%%% insight`, `%%% steps`, `demo predict:`), the `judge_body_engagement`
@@ -221,3 +228,157 @@ the *wiring* keys (quest_id, mode, donor, nav_*, module_label, page_title,
 brand_sub, spine, notebook_yardstick); `fin_title`/`fin_body`/`title`/`subtitle`
 are authored voice. The gate now compares wiring keys key-by-key and reports
 prose-key rewrites as review warnings.
+
+---
+
+## 7. Close-out (2026-07-27) — all 14 days done
+
+### 7.1 The metric had a third bug, and it changed what was left to do
+
+Before spending any quota, re-reading the 13 flagged "walls" showed that **9 of
+them were `!!! c-info` / `!!! c-ok` callout boxes**, seven of those opening with
+the words "Optional (skippable)". That placement is not a defect — AUTHORING.md
+concept rule 4 (*Math restraint*) **requires** heavy math to be demoted into
+exactly such a box, and `v8lib.is_special` treats `!!! ` as a block opener. The
+metric had no `!!!` case, so it was penalising authors for obeying the rule.
+
+This is the same family as the two bugs §1 already records (inline `<svg>`,
+`~~~html`). Because that made it three, the fix was written under TDD with the
+first tests this metric has ever had — 8 of them, one per markup class plus the
+new split. Callout bodies are **not** erased: a 975-char unbroken aside is still
+a real digestibility problem, just a skippable one off the critical path with a
+cheaper cure, so it is reported as `asides_over_600` alongside
+`walls_over_600`. `<br>` now counts as the line break it renders as.
+
+Re-scoring the same 14 days:
+
+| | recorded in §2 | corrected metric |
+|---|---|---|
+| pre-rebuild main-line walls > 600 | 19 | **12** |
+| after the 11-day rebuild | 13 | **4** (day-05 ×2, day-09 ×2) |
+| pre-rebuild long asides | not measured | **5** |
+| after the 11-day rebuild | not measured | **7** |
+
+Two consequences worth stating plainly:
+
+- **§2's "worst regression of the run" is retired.** m03 day-03-attention-scores
+  went 0 → 3 only because the rebuild added three Optional-skippable deep-dive
+  boxes. Its main-line prose never exceeded **433** characters. It did add three
+  long asides, which is a real but much milder finding with a much cheaper fix.
+- **§2's "skip any day whose baseline shows 0 walls over 600" rests on one data
+  point, not two.** The other (day-08) was reverted for losing a visual, which is
+  a real reason. So the guidance survives in weaker form: re-authoring an
+  already-clean day tends to add long *optional* boxes rather than main-line
+  walls — a cost worth paying if the day gains chunking, and not worth a full
+  re-author if it does not.
+
+### 7.2 What shipped, and why it was not a rebuild
+
+The three days §5 left open were **the only 3 of 14 carrying zero chunking
+widgets** while every other day carried 6–16. A reader crossed from days full of
+predict-then-reveal prompts and scroll-assembling ladders into days with none.
+Their prose was already well broken up (max 520 chars, 0 walls), so a full
+re-author was the wrong tool — by this run's own evidence it risks more than it
+gains. They got an **additive** pass instead.
+
+Ten days were touched, each surgically and each through `_rebuild_accept.py`
+(**KEEP on all ten**):
+
+| job | days | result |
+|---|---|---|
+| break long "Optional (skippable)" boxes internally (`<br>` + bolded sub-lead-ins) | day-02-activations, day-04-loss, day-06-training-loop, m03 day-02-qkv, m03 day-03-attention-scores | worst aside 975 → 515 |
+| split main-line walls | day-09-train-val-test | 842 → 537 |
+| main walls + 2 correctness P0s | day-05-gradients-backprop | 817 → 452 |
+| add chunking where there was none | day-08-learning-rate, m03 day-04-multihead, m03 day-05-positional | +17 steps, +17 insight, +12 predict |
+
+**Final state of all 14 m02+m03 days:**
+
+| | pre-rebuild | after §2 | now |
+|---|---|---|---|
+| main-line walls > 600 | 12 | 4 | **0** (worst 555) |
+| callout asides > 600 | 5 | 7 | **0** (worst 579) |
+| steps / insight / predict | 0 / 0 / 0 | 281 | **328** (128 / 123 / 77) |
+| days with zero chunking widgets | 14 | 3 | **0** |
+| days whose ladders pass the reveal audit | 0 | 11 | **14** |
+
+The aside diffs are almost pure insertions — every clause and number kept, broken
+into labelled beats. Example, day-04-loss: one 653-char paragraph became four
+beats led by `<b>Why cross-entropy escapes it:</b>`, `<b>One bookkeeping
+note:</b>`, `<b>Where this goes next:</b>`.
+
+### 7.3 day-05's two P0s took three rounds, and the first two fixes were wrong
+
+Worth recording, because the failure mode is instructive: **an adversarial verify
+round caught a wrong fix twice, and both times the wrong fix came from a
+confidently-written mandate.**
+
+- **Round 1** rebuilt the twins demo as a two-layer *linear* toy and concluded
+  "the tie breaks on the wire out, not on the weight in". Refuted by training that
+  same toy: a nudged incoming weight *does* break the tie. The claim was an
+  artifact of dropping the activation — and the mandate that produced it was mine.
+- **Round 2** (hand-written, by me) narrowed it to "own weight in → own output →
+  own blame". Refuted because tanh's slope `1−h²` is an **even** function of `z`,
+  so `w=+0.3` and `w=−0.3` give different outputs and *bit-identical* blame. The
+  driver is the local steepness, not the output.
+- **Round 3** stopped making laws. Every claim now either describes the demo's own
+  printed rows, or is the single rule that survived refutation across
+  identity / ReLU / leaky-ReLU / sigmoid / tanh at nine learning rates: **a layer
+  that starts symmetric all through — same weights in AND same wires out — stays
+  symmetric forever.** How fast the cure bites is activation-dependent, and an
+  Optional box now says so.
+
+The verification rounds also turned up **five more defects in the c9 widget**,
+including one this close-out introduced: aligning the verdict bands to the c6
+ladder (`>3` = exploded) put "clipped at 5 — the step stays sane" (green) one
+slider notch from "exploded → 4.8" (red). Fixed by making clipping *not* a band —
+it bounds the step, it does not make a gradient healthy — so the verdict now
+reports the raw size that would have arrived and what clipping passed on instead.
+Bars and verdict now share one band table; **312 bar checks across 52 reachable
+settings, 0 mismatches**, driven in a real DOM.
+
+### 7.4 Deliberately not fixed
+
+The verification rounds were far more thorough than the task required and
+surfaced a list of **pre-existing** issues in day-05 that belong to a separate
+widget-correctness pass, not to body engagement. Recording them rather than
+half-fixing them:
+
+- **c8 mirror symmetry.** Weights `+0.3` and `−0.3` give a tanh unit identical
+  steepness, so the SVG's right-panel caption is a true description of the weights
+  it draws but not a law. Exact mirror symmetry is a measure-zero case in a real
+  layer; judged out of depth for Reader A.
+- **A different start does not *always* separate.** Three different weights that
+  all put a ReLU unit at negative `z` never separate and never learn — which is
+  the dead-ReLU trap taught in the next concept. The lesson now avoids "always"
+  but does not teach the interaction.
+- **Zero-init in one layer only.** Identical weights in with *different* wires out
+  separate immediately for every activation. The lesson's claim is scoped to a
+  fully symmetric start; the mixed case (common in practice) is not covered.
+- **Targets with mean 0** make an all-zero net an exact stationary point, so
+  "the loss usually still creeps down" is hedged rather than resolved.
+- **c9 leftovers:** the left-panel bar is labelled "gradient reaching its weight"
+  but plots `δ` (by this day's Rule 2 the weight's gradient is `δ·x`); the
+  checked-in static markup does not depict the state the script paints on load, so
+  a JS-off render shows six flat bars under a "healthy" verdict; the twins demo's
+  one-line `def` bodies do not survive a line-by-line REPL paste.
+- **Coverage layer:** the twin trap has no jargon-table row, no glossary tooltip
+  and no quiz question, though `zero-init symmetry` and `small random init remedy`
+  are both front-matter coverage topics. This is the one item here that is a
+  genuine coverage gap rather than a widget nit.
+
+### 7.5 Verification
+
+- Every touched day: `compile_lesson.py` + `concept_structure_gate.py` exit 0,
+  idempotent recompile, frozen wiring front-matter byte-identical, no drop in
+  concepts / coverage topics / visuals, `body_engagement` no MISSING with GOOD ≥
+  committed, interest `FLOOR_MET`, `_rebuild_accept.py` **KEEP**.
+- `_reveal_audit.js` across **all 14** lessons: 0 failed, in all three modes
+  (scroll, reduced-motion, no-IntersectionObserver).
+- Compiler suite **198/198** (190 + 8 new density tests).
+- One brittle test of my own was removed: it asserted day-03-attention-scores
+  carried three long asides, which pinned the very defect this close-out fixes. A
+  test that fails when the content improves is testing the content, not the
+  metric; it now runs against a synthetic day.
+
+**Commits:** `c7222b2` (metric + tests), `c9e2d5f` (9 days), `b9acb87` (day-05),
+`95ee4e1` (Build-Up Register beat 8 + digestibility targets).
