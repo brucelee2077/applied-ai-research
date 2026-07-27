@@ -123,3 +123,28 @@ def _shipped_concept_lessons():
 def test_shipped_concept_lesson_visual_integrity(src):
     ok, msgs = vg.run(src)
     assert ok, os.path.relpath(src, _REPO) + '\n' + '\n'.join(msgs)
+
+
+def test_every_referenced_viz_page_is_tracked_in_git():
+    """A `%%% viz src=` target must be COMMITTED, not merely present on disk.
+
+    The visual-integrity gate checks the file exists in the working tree, which
+    it does for the author who just wrote it. But a viz page that was never
+    `git add`ed still renders as an EMPTY IFRAME for everyone else — a fresh
+    clone, CI, and the GitHub Pages deploy. That is exactly how
+    sessions/viz/embedding-similarity.html shipped: m03 day-01-embeddings had
+    the reference committed and the page untracked.
+    """
+    import re, subprocess
+    tracked = set(subprocess.run(
+        ['git', 'ls-files', 'sessions/viz'], cwd=_REPO,
+        capture_output=True, text=True).stdout.split())
+    missing = {}
+    for src in glob.glob(os.path.join(_REPO, 'sessions', '**', 'source.md'), recursive=True):
+        body = open(src, encoding='utf-8', errors='replace').read()
+        for m in re.finditer(r'src=(\S*?viz/[\w.-]+\.html)', body):
+            target = os.path.normpath(os.path.join(os.path.dirname(src), m.group(1)))
+            rel = os.path.relpath(target, _REPO)
+            if rel not in tracked:
+                missing.setdefault(rel, []).append(os.path.relpath(src, _REPO))
+    assert not missing, 'viz pages referenced by a lesson but not tracked in git: %s' % missing
