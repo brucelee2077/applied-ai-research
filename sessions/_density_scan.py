@@ -151,6 +151,9 @@ def scan_day(day_dir):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__)
+        return
     out_path = sys.argv[1] if len(sys.argv) > 1 else '/tmp/density.json'
     result = {}
     for day_dir in DAYS:

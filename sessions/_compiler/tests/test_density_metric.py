@@ -69,6 +69,28 @@ def test_a_callout_does_not_merge_with_the_prose_around_it():
     assert density.longest_wall(text) < 200
 
 
+def test_help_flag_does_not_create_a_file_called_help():
+    """`_density_scan.py --help` must print usage, not write to ./--help.
+
+    argv[1] is the output path, so asking for help silently wrote a JSON file
+    named `--help` into the repo root. One had been sitting there untracked.
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        cwd = os.getcwd()
+        os.chdir(d)
+        try:
+            argv = sys.argv
+            sys.argv = ['_density_scan.py', '--help']
+            try:
+                density.main()
+            finally:
+                sys.argv = argv
+        finally:
+            os.chdir(cwd)
+        assert os.listdir(d) == [], 'help run wrote %r' % os.listdir(d)
+
+
 def test_scan_reports_main_and_aside_walls_separately():
     """scan_day reports the two wall classes as separate numbers.
 
