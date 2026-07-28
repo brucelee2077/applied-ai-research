@@ -9,14 +9,12 @@
 
 import numpy as np  # numpy keeps the row math (dot product, arrow length) tidy
 
-# ---- The vocabulary: one ticket number per known word -----------------------
-# Each word gets a ticket number (its token id) = the ROW it sits on in the table
-# below. Seven known words here, so a one-hot row further down is 7 slots wide.
+# ---- The vocabulary: a ticket number (token id) per word = the ROW it sits on ----
 vocab = {"cat": 0, "dog": 1, "car": 2, "the": 3, "bank": 4, "bites": 5, "man": 6}
 
-# ---- The embedding table: one row per word ----------------------------------
-# Row i holds the numbers for the word with token id i. Every row is the same length
-# (4). Made-up columns: is-animal, is-furry, is-vehicle, is-fast. The lesson's rows.
+# ---- The embedding table: one row per word, 4 numbers long ------------------
+# Row i = the word with token id i. Made-up columns: is-animal, is-furry, is-vehicle,
+# is-fast. These are the exact rows the lesson draws.
 E = np.array([
     [0.9, 0.8, 0.0, 0.3],   # row 0 = cat    animal, furry, quite fast
     [0.8, 0.9, 0.0, 0.4],   # row 1 = dog    animal, furry, quite fast
@@ -41,8 +39,7 @@ def cosine(a, b):
     return float(np.dot(a, b)) / (float(np.linalg.norm(a)) * float(np.linalg.norm(b)))
 
 def onehot(word):
-    # The old way: all zeros with a single 1 in this word's slot, one slot per known
-    # word (7 here, around 50,000 in a real model).
+    # The old way: all zeros with a single 1 in this word's slot, one slot per known word.
     vec = np.zeros(len(vocab))
     vec[vocab[word]] = 1.0
     return vec
@@ -50,10 +47,10 @@ def onehot(word):
 
 if __name__ == "__main__":
     # --- Part 1: a word becomes a ticket number, then a row ---------------
-    sentence = "the cat"
-    token_ids = row_ids(sentence)
-    print("table shape:", E.shape, " '" + sentence + "' -> token ids:", token_ids)
+    token_ids = row_ids("the cat")   # split the sentence, then look up each ticket
+    print("table shape:", E.shape, " 'the cat' ->", token_ids, "(the->3, cat->0)")
     print("row for 'cat' (id 0):", embed("cat"), "<- that is the whole lookup")
+    # A glue word like "the" sits near the middle of the map, so its arrow is short.
     the_length = round(float(np.linalg.norm(embed("the"))), 2)
     print("arrow length of 'the':", the_length, "(short arrows swing direction easily)")
 
@@ -63,8 +60,7 @@ if __name__ == "__main__":
     shared_dog = int(np.sum((embed("cat") > 0) & (embed("dog") > 0)))
     shared_car = int(np.sum((embed("cat") > 0) & (embed("car") > 0)))
     predicted = "cat-dog" if shared_dog > shared_car else "cat-car"
-    print("\nshared columns: cat-dog", shared_dog, " cat-car", shared_car,
-          "-> prediction:", predicted, "wins")
+    print("\nshared columns: cat-dog", shared_dog, " cat-car", shared_car, "->", predicted)
     dot_cat_dog = round(float(np.dot(embed("cat"), embed("dog"))), 2)
     len_cat = round(float(np.linalg.norm(embed("cat"))), 2)
     len_dog = round(float(np.linalg.norm(embed("dog"))), 2)
@@ -82,16 +78,15 @@ if __name__ == "__main__":
     print("doubling cat: dot", dot_plain, "->", dot_doubled, " cosine stays", cos_doubled)
 
     # --- Part 3: limit one — one frozen row per word ----------------------
-    # Our seven-word wall cannot spell the lesson's sentences, so "the bank" and "man
-    # bank" stand in for the river one and the money one ("bank" is last in both).
+    # Our wall of seven words cannot spell the lesson's two sentences, so "the bank"
+    # and "man bank" stand in for them ("bank" is the last word in both).
     river_ids, money_ids = row_ids("the bank"), row_ids("man bank")
-    bank_from_river = E[river_ids][-1]     # the row fetched for "bank" here
-    bank_from_money = E[money_ids][-1]     # and the row fetched in the other sentence
+    # the row fetched for "bank" in each sentence (it is the last word of each)
+    bank_from_river, bank_from_money = E[river_ids][-1], E[money_ids][-1]
     bank_score = round(cosine(bank_from_river, bank_from_money), 2)
     print("\ncontexts", river_ids, "vs", money_ids, "-> bank", bank_from_river, "and",
           bank_from_money, " cosine =", bank_score, "<- context-free limit")
-    # Careful: cosine(row, row) is 1.00 for EVERY row, so that score alone proves
-    # nothing — the self-check pins the fetched row itself as well.
+    # Careful: cosine(row, row) is 1.00 for EVERY row, so the self-check pins the row.
 
     # --- Part 4: the one-hot contrast ------------------------------------
     onehot_cos = {a + "-" + b: round(cosine(onehot(a), onehot(b)), 2)
@@ -133,9 +128,9 @@ if __name__ == "__main__":
         print("   and both word orders add up to the same [1.3 1.1 0. 1.2].")
     else:
         print("\n❌ not yet — expected ids [3, 0] / length('the') 0.17 / dot 1.56 / cosines")
-        print("   0.99 and 0.08 / 1.54 -> 3.08 with cosine 1.0 / bank [0.4 0.4 0.4 0.4] from")
-        print("   ids [3, 4] and [6, 4] / one-hot 0.0 / ids [1,5,6] vs [6,5,1] / total")
-        print("   [1.3 1.1 0. 1.2]. Failed:", [k for k, v in claims.items() if not v])
+        print("   0.99 and 0.08 / 1.54 -> 3.08, cosine 1.0 / bank [0.4 0.4 0.4 0.4] from ids")
+        print("   [3, 4] and [6, 4] / one-hot 0.0 / [1,5,6] vs [6,5,1] / total [1.3 1.1 0. 1.2]")
+        print("   Failed:", [k for k, v in claims.items() if not v])
 
     # A failed assert stops the script with a message; a passed one stays quiet.
     assert lookup_ok, "'the cat' -> ids [3, 0], row 0 = [0.9 0.8 0. 0.3], 'the' length 0.17"
