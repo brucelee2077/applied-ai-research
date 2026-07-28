@@ -155,6 +155,11 @@ if __name__ == "__main__":
     final_no_mixing = joined @ W_O_no_mixing
     moved_mixing = np.abs(joined_without_B @ W_O - final)
     moved_no_mixing = np.abs(joined_without_B @ W_O_no_mixing - final_no_mixing)
+    # BOTH corners must be zeroed for "each head writes only its own slots" to be true, so
+    # check both — zeroing only one of them used to pass unnoticed.
+    corners_both_zeroed = (not W_O_no_mixing[:a_cols, a_cols:].any()
+                           and not W_O_no_mixing[a_cols:, :a_cols].any()
+                           and W_O[:a_cols, a_cols:].any() and W_O[a_cols:, :a_cols].any())
     print("\nPart 4 — drop head B, then compare the mixing W_O with a no-mixing one")
     print("  mixing W_O    : the first", a_cols, "final slots move by at least",
           round(float(moved_mixing[:, :a_cols].min()), 4), "-> head B had a say in them")
@@ -202,18 +207,33 @@ if __name__ == "__main__":
     MOVE_WITH_MIXING = 0.10008479 # smallest move in the first two final slots when head B is dropped
     MOVE_OF_OWN_SLOTS = 0.40016958  # smallest move in head B's own slots under the no-mixing W_O
     RANDOM_TOP_SHARE = 0.73198896  # the biggest 'cat' share either RANDOM head manages
+    TWO_BIG_SHARES = 0.99664234    # tired + mat in the muddy row — short of 1, the rest is on "cat"
+    SUM_TOL = 1e-12                # how close a row of shares has to sit to exactly 1
     EXPECTED_FINAL = np.array([[0.7333, 0.6333, 0.7667, 0.6667],
                                [1.5978, 0.6001, 0.7002, 1.1986],
                                [0.7333, 0.6333, 0.7667, 0.6667]])
 
-    rows_sum_to_one = all(close(r.sum(), 1.0, 1e-12)
-                          for w in (w_describe, w_both, head_weights[0], head_weights[1]) for r in w)
+    rows_sum_to_one = (all(close(r.sum(), 1.0, SUM_TOL)
+                           for w in (w_describe, w_both, head_weights[0], head_weights[1]) for r in w)
+                       # A row adds up to 1 only when EVERY word is counted. Tired and mat alone
+                       # come to 0.9966 — the leftover 0.0034 sits on "cat" — so SUM_TOL has to
+                       # be tight enough to tell that sum apart from 1.
+                       and close(w_both[CAT, 0] + w_both[CAT, 2], TWO_BIG_SHARES)
+                       and not close(w_both[CAT, 0] + w_both[CAT, 2], 1.0, SUM_TOL))
     # The two shares come out of identical arithmetic, so ask for exact equality here.
     one_head_blurs = (float(w_both[CAT, 0]) == float(w_both[CAT, 2]) and close(w_both[CAT, 0], MUDDY_SHARE)
                       and close(out_both[CAT, 0], MUDDY_SHARE) and close(out_both[CAT, 1], MUDDY_SHARE))
     one_head_can_be_sharp = (close(w_describe[CAT, 0], ONE_JOB_SHARE)      # the head is not broken —
                              and close(out_describe[CAT, 0], ONE_JOB_SHARE))  # one blend is all it has
     recipes_are_half_width = all(w.shape == (d_model, d_k) for head in heads for w in head)
+    # NOTE on what actually separates these two heads. "cat" is the row [0, 0, 1, 1]: it asks
+    # BOTH questions equally, so slot 2 and slot 3 hold the same 1.0, and W_Q_A (which reads
+    # slot 2) and W_Q_B (which reads slot 3) therefore hand both heads the SAME Query here.
+    # That is not a bug — it is the whole reason one head muddles: cat's question is genuinely
+    # two questions at once. What makes the heads specialise on this input is their KEY recipe:
+    # head A's W_K_A only lets a describing word answer, head B's W_K_B only a place word. So
+    # the check below is written against the keys, and tying them is what must break it.
+    heads_own_their_own_keys = not np.array_equal(W_K_A, W_K_B)
     panel_heads_stay_sharp = (close(head_weights[0][CAT, 0], PANEL_SHARP)   # head A -> tired
                               and close(head_weights[1][CAT, 2], PANEL_SHARP)  # head B -> mat
                               and close(head_weights[0][CAT, 2], PANEL_TINY)   # head A barely looks at mat
@@ -249,12 +269,15 @@ if __name__ == "__main__":
                                   and biggest_random_share < PANEL_SHARP)
 
     if all([rows_sum_to_one, one_head_blurs, one_head_can_be_sharp, recipes_are_half_width,
-            panel_heads_stay_sharp, widths_as_predicted, join_layout_exact, heads_differ,
+            panel_heads_stay_sharp, heads_own_their_own_keys, corners_both_zeroed,
+            widths_as_predicted, join_layout_exact, heads_differ,
             w_o_reaches_across_heads, final_values_match, budget_is_the_same,
             tolerance_is_tight_enough, random_panel_widths_match, random_heads_are_not_sharp]):
         print("\n✅ you got it — one full-width head asked both questions blurs to 0.4983 / 0.4983;"
-              " two heads with their OWN width-2 recipes each hold 0.9983 on their own word,"
-              " join to width 4, and W_O hands back width 4")
+              " two heads with their OWN width-2 recipes each hold 0.9983 on their own word"
+              " (here it is their KEY recipe that separates them — cat asks both questions"
+              " equally, so both heads get the same Query), they join to width 4, and W_O"
+              " hands back width 4")
     else:
         print("\n❌ not yet — expected the muddy share", MUDDY_SHARE, "the panel's sharp share", PANEL_SHARP,
               "widths (3,2) / (3,4) / (3,4), head A in joined[:, :2] and head B in joined[:, 2:], the first two"
@@ -263,11 +286,16 @@ if __name__ == "__main__":
               " tell those shares apart, and the random panel to reach the same widths with a top share of only",
               RANDOM_TOP_SHARE)
 
-    assert rows_sum_to_one, "softmax must give shares that add up to 1"
+    assert rows_sum_to_one, ("softmax must give shares that add up to 1, with a tolerance tight enough to see"
+                             " that tired + mat alone come to 0.9966 and not 1")
     assert one_head_blurs, "one full-width head doing two jobs should give both words the same 0.4983 share"
     assert one_head_can_be_sharp, "that same head asked ONE question should give 0.9867 to its word"
     assert recipes_are_half_width, "each head's W_Q, W_K, W_V must be (4, 2) — half the model width"
-    assert panel_heads_stay_sharp, "each width-2 head with its own Query should give 0.9983 to its own word"
+    assert panel_heads_stay_sharp, "each width-2 head should give 0.9983 to its own word"
+    assert heads_own_their_own_keys, ("the two heads must look for DIFFERENT things — on this input it is"
+                                      " W_K, not W_Q, that separates them, so tying the keys must break it")
+    assert corners_both_zeroed, ("the no-mixing W_O must have BOTH cross-head corners zeroed, and the real"
+                                 " W_O must have both non-zero")
     assert widths_as_predicted, "expected (3,2) per head, (3,4) joined, (3,4) final"
     assert join_layout_exact, "joined[:, :2] must be head A and joined[:, 2:] must be head B"
     assert heads_differ, "two heads with their own recipes must not return the same answer"
@@ -276,3 +304,5 @@ if __name__ == "__main__":
     assert final_values_match, "the final vectors, rounded to 4 places, must match the written-down ones"
     assert budget_is_the_same, "two heads of width 2 must hold as many numbers as one head of width 4"
     assert tolerance_is_tight_enough, "close() must still tell 0.9983, 0.9867, 0.4983 and 0.0008 apart"
+    assert random_panel_widths_match, "the random panel must reach (3,2) per head, (3,4) joined, (3,4) final too"
+    assert random_heads_are_not_sharp, "with random recipes no head should get near the hand-typed 0.9983"

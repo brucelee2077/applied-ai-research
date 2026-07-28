@@ -12,7 +12,8 @@
 # Run it:  python3 sessions/m04-first-model-mlp/day-06-why-pytorch/experiment.py
 
 import numpy as np           # numpy writes the by-hand backward pass we compare against
-import torch                 # a torch tensor is a numpy array that remembers its own steps
+import torch                 # a torch tensor holds the same grid of numbers a numpy array does,
+                             # and also records how it was computed so gradients can flow back
 import torch.nn as nn        # nn holds the ready-made pieces: nn.Linear, nn.MSELoss
 import torch.optim as optim  # optim holds SGD, the update rule w := w - lr * grad
 
