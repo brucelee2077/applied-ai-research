@@ -4,19 +4,21 @@
 #   The same 784→128→10 MLP you hand-wrote in numpy fits in a handful of PyTorch lines.
 #   Its loss falls the same way, because autograd redoes your hand-derived backward pass.
 #
-# Parts: (1) stand-in data, (2) the model, (3) the five-line loop, (4) a taste test against a
-# hand-written numpy twin, (5) the same loop with zero_grad() deleted.
+# Parts: (1) stand-in data, (2) the model and how few lines it takes, (3) the five-line loop,
+# (4) a taste test against a hand-written numpy twin, (5) the same loop with zero_grad() deleted.
 # Run it:  python3 sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py
 
+import ast                   # ast reads this file's own code, to count how short it is
 import math                  # math.log(10) is the loss we expect BEFORE any learning
 import numpy as np           # numpy makes the stand-in data and the hand-written twin
-import torch                 # torch gives us tensors: arrays that remember how they were made
+import torch                 # torch gives us tensors: grids of numbers that can record their history
 import torch.nn as nn        # nn holds the ready-made pieces: Linear, ReLU, CrossEntropyLoss
 import torch.optim as optim  # optim holds SGD, the helper that applies each nudge
 
 torch.set_num_threads(1)                 # one thread keeps every run byte-identical
 PIXELS, HIDDEN, CLASSES = 784, 128, 10   # the three sizes the lesson uses
 EPOCHS, LR = 25, 0.3                     # rounds of practice, and how big each nudge is
+HAND_WRITTEN_LINES = 500                 # the lesson's count for the numpy build of days 2-4
 
 
 def make_digit_data(distinct=128, copies=8, agree=5):
@@ -50,6 +52,25 @@ class MLP(nn.Module):
 def fresh_model():
     torch.manual_seed(0)   # same seed each time, so every run below starts from equal weights
     return MLP()
+
+def code_lines(*names):
+    """How many real lines of code do these definitions take? Read out of this file itself, so
+    the number cannot drift from the code it describes. Blank lines, comment-only lines and
+    docstrings do not count — they are not work the reader has to think through."""
+    lines = open(__file__, encoding="utf-8").read().splitlines()
+    counted = 0
+    for node in ast.parse("\n".join(lines)).body:
+        if getattr(node, "name", None) not in names:
+            continue
+        # a bare string on its own line is a docstring, not code, so skip those line numbers
+        prose = {i for inner in ast.walk(node)
+                 if isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Constant)
+                 and isinstance(inner.value.value, str)
+                 for i in range(inner.lineno, inner.end_lineno + 1)}
+        counted += sum(1 for i in range(node.lineno, node.end_lineno + 1)
+                       if lines[i - 1].strip() and not lines[i - 1].strip().startswith("#")
+                       and i not in prose)
+    return counted
 
 def gradient_size(model):
     # One number for the whole model: how big is the gradient the optimizer will apply?
@@ -101,23 +122,44 @@ def numpy_twin_losses(model, X, y, epochs):
 if __name__ == "__main__":
     # --- Part 1: the data (a seeded stand-in, not real MNIST) --------------
     X, y = make_digit_data()
-    print("X shape:", tuple(X.shape), " y shape:", tuple(y.shape), " first labels:", y[:8].tolist(),
-          "\nX type:", type(X).__name__, "- a numpy array that also remembers how it was made")
+    print("X shape:", tuple(X.shape), " y shape:", tuple(y.shape), " first labels:", y[:8].tolist())
+    print("X type:", type(X).__name__, "- the same grid of numbers a numpy array holds, plus the"
+          " power to record how it was computed, so gradients can flow back")
+    print("this X is plain data, so there is nothing to record:", f"X.requires_grad = {X.requires_grad}",
+          "- the weights below say True, which is why gradients reach them")
 
-    # --- Part 2: the model, and the handle that finds every weight ---------
+    # --- Part 2: the model, how short it is, and the handle that finds every weight ---
     model = fresh_model()
     layout = [(name, tuple(p.shape)) for name, p in model.named_parameters()]
     total_numbers = sum(p.numel() for p in model.parameters())
-    print("parameters:", layout, "\nnumbers to learn:", total_numbers,
-          "= 784*128 + 128 + 128*10 + 10")
+    weights_track_history = all(p.requires_grad for p in model.parameters())
+    print("\nparameters:", layout, "\nnumbers to learn:", total_numbers,
+          "= 784*128 + 128 + 128*10 + 10", "\nevery weight records its history:", weights_track_history)
+    # Predict before you look: how many lines is this PyTorch version, next to the ~500 you
+    # hand-wrote across days 2-4? The count comes from this file, not from a number typed in.
+    # (The Part 4 twin is a squeezed-down copy of that build, so it is not the ~500-line rival.)
+    print(f"\npredict: fewer lines than the ~{HAND_WRITTEN_LINES} hand-written ones, or more?")
+    torch_lines = code_lines("MLP", "run_loop")
+    print("counted from this file: the model + its whole training loop =", torch_lines,
+          "lines of code", f"-> about {HAND_WRITTEN_LINES // torch_lines}x less typing"
+          " for the same network")
 
     # --- Part 3: the five-line loop, with zero_grad in place ---------------
-    # Predict before running: an untrained model spreads its guess evenly over the classes,
-    # so the first loss should sit near ln(CLASSES). Computed here, not typed in.
+    # Predict before running: an untrained model has learned nothing, so it should be no better
+    # than guessing 1 class out of CLASSES. Guesses that flat put the first loss near ln(CLASSES).
+    # The guessing is measured here; ln(CLASSES) is computed here. Neither is typed in.
     predicted_start = math.log(CLASSES)
-    print(f"\npredict: epoch 0 loss near ln({CLASSES}) = {predicted_start:.4f}, then falling"
-          "\nwith zero_grad():")
+    with torch.no_grad():                      # a look at the untrained model, recording nothing
+        start_probs = torch.softmax(model(X), dim=1)
+    untrained_accuracy = float((start_probs.argmax(dim=1) == y).float().mean())
+    top_probability = float(start_probs.max())
+    print(f"\nuntrained model: {untrained_accuracy:.1%} of labels right, and its most confident"
+          f" single guess is only {top_probability:.3f} - flat guessing, chance is {1 / CLASSES:.1%}"
+          f"\npredict: so epoch 0 loss should sit near ln({CLASSES}) = {predicted_start:.4f},"
+          " then fall\nwith zero_grad():")
     good_losses, good_grads = run_loop(model, X, y, clear_gradients=True)
+    print(f"prediction check: epoch 0 loss was {good_losses[0]:.4f}, ln({CLASSES}) ="
+          f" {predicted_start:.4f}, gap {abs(good_losses[0] - predicted_start):.4f}")
 
     # --- Part 4: the taste test against the hand-written twin --------------
     twin_epochs = 8
@@ -154,10 +196,18 @@ if __name__ == "__main__":
     claims = {
         "the 784->128->10 layout and 101770 numbers in total":
             layout == want_layout and total_numbers == 101770,
-        "a first loss within 0.1 of ln(10), the untrained prediction":
-            abs(good_losses[0] - predicted_start) < 0.1,
-        "loss 2.32391 at epoch 0, 1.15495 at epoch 24, first gradient size 1.4597":
-            abs(good_losses[0] - 2.32391) < 0.002 and abs(good_losses[-1] - 1.15495) < 0.002
+        "plain data with requires_grad False, and every weight with requires_grad True":
+            X.requires_grad is False and weights_track_history,
+        "the model plus its whole loop in 24 lines of code, 20x shorter than the ~500 by hand":
+            torch_lines == 24 and torch_lines * 20 < HAND_WRITTEN_LINES,
+        "an untrained model no better than guessing: 7.5% right, no single guess above 0.25":
+            abs(untrained_accuracy - 0.07520) < 0.002
+            and abs(untrained_accuracy - 1 / CLASSES) < 0.05 and top_probability < 0.25,
+        "loss 2.32391 at epoch 0 — that is within 0.1 of the untrained ln(10) = 2.30259 —"
+        " 1.15495 at epoch 24, first gradient size 1.4597":
+            abs(good_losses[0] - 2.32391) < 0.002
+            and abs(good_losses[0] - predicted_start) < 0.1
+            and abs(good_losses[-1] - 1.15495) < 0.002
             and abs(good_grads[0] - 1.4597) < 0.005,
         "the loss to fall in every one of the 24 steps":
             all(good_losses[i] < good_losses[i - 1] for i in range(1, EPOCHS)),

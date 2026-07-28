@@ -24,6 +24,13 @@ def hand_score_matrix(queries, keys):
     return np.array([[hand_dot(query, key) for key in keys] for query in queries])
 
 
+def ranking_with_values(names, row):
+    # Who beats whom in ONE row, weakest first: each word's name paired with the number it
+    # actually holds in THAT row. Carrying the number matters. Two different rows can share
+    # the same order, so a list of names alone cannot tell you which row it came from.
+    return [(names[i], float(row[i])) for i in np.argsort(row, kind="stable")]
+
+
 def softmax_row(scores):
     # Turn one row of scores into positive shares that add up to 1.
     # Taking the row's biggest score away first does not change the answer (softmax
@@ -57,10 +64,18 @@ if __name__ == "__main__":
     scaled = scores / np.sqrt(d_k)
     print("\n--- Part 3: scaled scores (every cell divided by sqrt(d_k)) ---")
     print(scaled)
-    # Who beats whom: sort bank's row and read the word names, weakest first.
-    rank_before = [words[i] for i in np.argsort(scores[2], kind="stable")]
-    rank_after = [words[i] for i in np.argsort(scaled[2], kind="stable")]
-    print("bank's ranking before:", rank_before, " after:", rank_after)
+    # Who beats whom, weakest first — twice, from two different rows of numbers.
+    raw_row = scores[2]                      # bank's row BEFORE the division: [2, 6, 4]
+    scaled_row = scaled[2]                   # bank's row AFTER  the division: [1, 3, 2]
+    rank_before = ranking_with_values(words, raw_row)
+    rank_after = ranking_with_values(words, scaled_row)
+    names_before = [pair[0] for pair in rank_before]
+    names_after = [pair[0] for pair in rank_after]
+    print("ranking before:", rank_before)
+    print("ranking after :", rank_after)
+    print("same order:", names_before == names_after,
+          " same numbers:", rank_before == rank_after,
+          "(division moved every number and left the order alone)")
 
     # --- Part 4: softmax splits one budget into shares -----------------------
     weights = np.array([softmax_row(row) for row in scaled])
@@ -80,11 +95,18 @@ if __name__ == "__main__":
     open_shares = softmax_row(mask_scores)                   # what happens with no mask
     masked_scores = np.where(forbidden, -1e9, mask_scores)   # huge negative score BEFORE softmax
     masked_shares = softmax_row(masked_scores)
+    biggest_masked_share = float(np.abs(masked_shares[forbidden]).max())
+    # Why "huge" and not merely "low": run the same mask again at only -12 and measure the leak.
+    mild_shares = softmax_row(np.where(forbidden, -12.0, mask_scores))
+    mild_leak = float(np.abs(mild_shares[forbidden]).max())
     print("\n--- Part 5: masking (a forbidden word gets a huge negative score) ---")
     print("labels  :", mask_labels)
     print("no mask :", np.round(open_shares, 4), " sum", round(float(open_shares.sum()), 6))
     print("masked  :", np.round(masked_shares, 4), " sum", round(float(masked_shares.sum()), 6))
     print("change  :", np.round(masked_shares - open_shares, 4), "(freed budget moves to allowed words)")
+    print("biggest share left on a forbidden word, mask -1e9 :", biggest_masked_share)
+    print("biggest share left on a forbidden word, mask -12   : {:.2e}".format(mild_leak),
+          "(a mask that is only a bit negative still leaks budget)")
 
     # --- Part 6: spend the budget on the Values -----------------------------
     bank_shares = weights[2]
@@ -107,34 +129,49 @@ if __name__ == "__main__":
     lesson_grid = np.array([[2.0, 2.0, 2.0], [2.0, 4.0, 2.0], [2.0, 6.0, 4.0]])
     grid_ok = np.array_equal(scores, lesson_grid) and np.array_equal(by_hand, lesson_grid)
     scale_ok = np.sqrt(d_k) == 2.0 and np.array_equal(scaled[2], np.array([1.0, 3.0, 2.0]))
-    order_ok = rank_before == ["the", "bank", "river"] and rank_after == ["the", "bank", "river"]
+    # The order must survive the division, and the two rankings must really be the before
+    # and the after: the names match each other, while the numbers pin each list to its own
+    # row ([2,4,6] only exists before the division, [1,2,3] only after).
+    order_ok = (names_before == ["the", "bank", "river"]
+                and names_after == names_before
+                and rank_before == [("the", 2.0), ("bank", 4.0), ("river", 6.0)]
+                and rank_after == [("the", 1.0), ("bank", 2.0), ("river", 3.0)])
     shares_ok = np.allclose(weights[2], [0.09003057, 0.66524096, 0.24472847])
     budget_ok = np.allclose(weights.sum(axis=1), 1.0)
     winner_ok = predicted_winner == "river" and actual_winner == "river"
     open_ok = np.allclose(open_shares, [0.08714432, 0.64391426, 0.23688282, 0.03205860])
+    # A forbidden word must keep NOTHING, not merely something that rounds to nothing.
     mask_ok = (np.allclose(masked_shares[:2], [0.11920292, 0.88079708])
-               and round(float(np.abs(masked_shares[forbidden]).max()), 6) == 0.0
+               and biggest_masked_share == 0.0
                and np.allclose(masked_shares.sum(), 1.0))
+    # And the size of the negative number is the reason it is nothing: -12 leaks 2.69e-07.
+    magnitude_ok = mild_leak > 1e-9 and biggest_masked_share == 0.0
     freed_ok = masked_shares[0] > open_shares[0] and masked_shares[1] > open_shares[1]
     blend_ok = np.allclose(blended, [7.63132344, 2.84957923])
     nearest_ok = predicted_nearest == "river" and actual_nearest == "river"
 
     if (grid_ok and scale_ok and order_ok and shares_ok and budget_ok and winner_ok
-            and open_ok and mask_ok and freed_ok and blend_ok and nearest_ok):
+            and open_ok and mask_ok and magnitude_ok and freed_ok and blend_ok and nearest_ok):
         print("\n✅ you got it")
     else:
-        print("\n❌ not yet — expected the grid [[2,2,2],[2,4,2],[2,6,4]], bank's scaled row [1,3,2], "
-              "shares [0.0900,0.6652,0.2447] summing to 1, masked shares [0.1192,0.8808,0,0], "
+        print("\n❌ not yet — expected the grid [[2,2,2],[2,4,2],[2,6,4]], bank's scaled row [1,3,2] "
+              "ranked the(1) -> bank(2) -> river(3), the same order as the raw the(2) -> bank(4) -> river(6), "
+              "shares [0.0900,0.6652,0.2447] summing to 1, masked shares [0.1192,0.8808] with an "
+              "exact 0.0 on both forbidden words (a mild -12 mask leaks 2.69e-07 instead), "
               "and the blend [7.6313,2.8496] nearest river's Value")
 
     assert grid_ok, "Q @ K.T must give [[2,2,2],[2,4,2],[2,6,4]], and so must the by-hand loop"
     assert scale_ok, "dividing by sqrt(4)=2 must turn bank's row [2,6,4] into [1,3,2]"
-    assert order_ok, "scaling must keep the ranking the -> bank -> river"
+    assert order_ok, ("dividing by sqrt(d_k) must keep the ranking the -> bank -> river, holding "
+                      "[2, 4, 6] before the division and [1, 2, 3] after it")
     assert shares_ok, "softmax([1,3,2]) must give [0.0900, 0.6652, 0.2447]"
     assert budget_ok, "every row of shares must add up to 1 — one whole budget"
     assert winner_ok, "the biggest score must also win the biggest share"
     assert open_ok, "unmasked softmax([1,3,2,0]) must give [0.0871, 0.6439, 0.2369, 0.0321]"
-    assert mask_ok, "masking before softmax must give [0.1192, 0.8808, 0, 0] and still sum to 1"
+    assert mask_ok, ("masking before softmax must give [0.1192, 0.8808] to the allowed words, "
+                     "exactly 0.0 to every forbidden word, and still sum to 1")
+    assert magnitude_ok, ("the size of the negative matters: a -12 mask must still leak budget "
+                          "while -1e9 leaves a clean 0.0")
     assert freed_ok, "the budget freed by masking must flow to the allowed words"
     assert blend_ok, "bank's shares times the Values must give [7.6313, 2.8496]"
     assert nearest_ok, "the blend must land nearest river's Value, the word holding most budget"

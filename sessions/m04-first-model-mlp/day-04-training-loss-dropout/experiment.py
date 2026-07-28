@@ -80,9 +80,13 @@ def train_run(train_x, train_y, val_x, val_y, drop_p, epochs=EPOCHS, lr=0.05, ba
         history.append((float(np.mean(batch_losses)), cross_entropy(val_probs, val_y)))
     return history, (W1, b1, W2, b2)
 
+def validation_bottom(val_losses):
+    # The early-stopping point: the 1-based epoch whose held-out loss is the lowest.
+    return int(np.argmin(val_losses)) + 1
+
 def show_curve(history, every=4):
     # Print epoch / train loss / validation loss, and mark the validation bottom.
-    bottom = int(np.argmin([v for _, v in history]))
+    bottom = validation_bottom([v for _, v in history]) - 1
     for i, (t, v) in enumerate(history):
         if i % every == 0 or i == bottom or i == len(history) - 1:
             print("  epoch %2d   train %.4f   validation %.4f%s" % (i + 1, t, v,
@@ -95,11 +99,16 @@ if __name__ == "__main__":
     gaps = [0.5, 1.0, 2.0, 4.0]
     print("MSE  gaps", gaps, "-> squared", [g * g for g in gaps], "-> MSE", round(mse(gaps), 4))
     demo_probs = (0.90, 0.50, 0.01)          # confident-and-right, hedging, confident-and-wrong
-    demo_losses = [round(-float(np.log(p)), 2) for p in demo_probs]
+    # Score each row through the SAME cross_entropy the training loop uses: two columns, the
+    # true class is column 0, so the loss is -log(the probability given to the true class).
+    demo_losses = [round(cross_entropy(np.array([[p, 1 - p]]), np.array([0])), 2)
+                   for p in demo_probs]
     for p_true, loss in zip(demo_probs, demo_losses):
         print(f"cross-entropy, {p_true:.2f} on the true class -> loss {loss:.2f}")
-    hurt = round(np.log(demo_probs[2]) / np.log(demo_probs[0]))
-    print(f"-> confident-and-wrong (0.01) hurts about {hurt}x confident-and-right (0.90)")
+    pain_ratio = demo_losses[2] / demo_losses[0]        # 4.61 / 0.11 — how much worse it hurts
+    pain_shown = round(pain_ratio / 10) * 10            # to the nearest ten, as the lesson quotes
+    print(f"-> confident-and-wrong (0.01) hurts about {pain_shown}x confident-and-right (0.90)"
+          f"  ({demo_losses[2]:.2f} / {demo_losses[0]:.2f} = {pain_ratio:.1f})")
 
     # --- Part 2: split the data into train and held-out validation ---------
     rng = np.random.default_rng(0)
@@ -116,6 +125,11 @@ if __name__ == "__main__":
           " VALIDATION; (3) dropout makes the gap SMALLER")
 
     # --- Part 3: Run A — no dropout, watch the two curves split ------------
+    # Warm-up: hand the lesson's own six-epoch table to the same bottom-finder that is about to
+    # mark the real run, and see that it lands where the lesson read the bottom by eye.
+    lesson_val = [0.62, 0.44, 0.35, 0.36, 0.42, 0.51]             # the lesson's 6-epoch table
+    print(f"\nlesson's table {lesson_val} -> the bottom-finder says epoch"
+          f" {validation_bottom(lesson_val)} (the lesson read epoch 3, loss {min(lesson_val)})")
     print("\n--- Run A: NO dropout ---")
     hist_a, _ = train_run(train_x, train_y, val_x, val_y, drop_p=0.0)
     best_a, train_a, val_a, best_val_a = show_curve(hist_a)
@@ -163,15 +177,18 @@ if __name__ == "__main__":
     # --- Self-check: one boolean per claim ---------------------------------
     # Every expected value below is written down here — the lesson's demo numbers, and the
     # numbers this script printed when it was written — never re-derived from the code above.
-    lesson_val = [0.62, 0.44, 0.35, 0.36, 0.42, 0.51]             # the lesson's 6-epoch table
+    # The shape claims read the recorded history of the two runs, so a model that learned
+    # nothing (a flat curve) fails them instead of agreeing with itself.
     lesson_numbers_ok = (
         abs(mse(gaps) - 5.3125) < 1e-9                            # lesson demo: MSE 5.31
         and demo_losses == [0.11, 0.69, 4.61]                     # lesson: 0.11 / 0.69 / 4.61
-        and hurt >= 40                                            # lesson: "about 40x the pain"
-        and int(np.argmin(lesson_val)) + 1 == 3                   # lesson: bottom at epoch 3
-        and abs(min(lesson_val) - 0.35) < 1e-9                    # lesson: the bottom is 0.35
-        and abs(lesson_val[-1] - min(lesson_val) - 0.16) < 1e-9   # lesson: 0.35 climbs to 0.51
-        and all(lesson_val[i] > lesson_val[i - 1] for i in (3, 4, 5)))   # rises after the bottom
+        and pain_shown == 40                                      # the "about 40x" Part 1 printed
+        # The bottom-finder that marked BOTH runs above, on three curves whose answer is known
+        # by hand: the lesson's table (bottom at epoch 3), a curve still falling at the end
+        # (bottom = the last epoch), and one rising from the start (bottom = the first epoch).
+        and validation_bottom(lesson_val) == 3
+        and validation_bottom([0.9, 0.8, 0.7]) == 3
+        and validation_bottom([0.7, 0.8, 0.9]) == 1)
     # A wrong scale factor shows up here: scaled must match eval, unscaled must be half of it.
     # A mask that KEPT with probability p would look fine at p = 0.5, so probe an uneven rate
     # too: at p = 0.75 only about a quarter of the units may survive, each boosted by 4.
@@ -181,17 +198,26 @@ if __name__ == "__main__":
                 and abs(unscaled_mean / eval_signal - 0.5) < 0.02
                 and abs(float((probe > 0).mean()) - 0.25) < 0.02
                 and abs(float(probe.max()) - 4.0) < 1e-12)
-    # Predictions 1 and 2, read off Run A's own recorded history: TRAIN is the curve that keeps
-    # falling (every one of the last ten epochs), VALIDATION is the one that ends above its
-    # bottom — and the reported bottom epoch must really be where that lowest value sits.
+    # Predictions 1 and 2, read off Run A's own recorded history. TRAIN is the curve that keeps
+    # falling — every one of the last ten epochs, and it ends far below where it started. The
+    # VALIDATION curve must make a real U: it drops a long way into the epoch the printout
+    # marked, that epoch sits well before the end, and all ten final epochs are back above the
+    # bottom. A model that learned nothing would print a flat curve and fail every one of these.
     train_keeps_falling = all(hist_a[i][0] < hist_a[i - 1][0] for i in range(EPOCHS - 10, EPOCHS))
-    bottom_is_the_bottom = hist_a[best_a - 1][1] == best_val_a and 2 <= best_a <= 30
-    split_ok = (train_keeps_falling and bottom_is_the_bottom
-                and train_a < 0.10 and abs(train_a - 0.047) < 0.05 and rise_a > 0.10
+    train_dived = hist_a[0][0] - train_a > 1.0                 # 2.822 -> 0.047, a fall of 2.77
+    val_fell_into_bottom = hist_a[0][1] - best_val_a > 0.50    # 2.067 -> 1.231, a fall of 0.84
+    val_climbed_back = all(v > best_val_a + 0.05 for _, v in hist_a[-10:])   # margins 0.158 up
+    split_ok = (train_keeps_falling and train_dived and val_fell_into_bottom and val_climbed_back
+                and 2 <= best_a <= 30 and rise_a > 0.10
+                and abs(train_a - 0.047) < 0.05
                 and abs(best_val_a - 1.231) < 0.05 and abs(val_a - 1.422) < 0.05)
     # Prediction 3: dropout halves the gap (1.375 -> 0.742), reaches a better best, rises less,
-    # and costs something — its train loss is still high after the same EPOCHS epochs.
-    dropout_ok = (abs(gap_a - 1.375) < 0.05 and abs(gap_b - 0.742) < 0.05 and gap_b < gap_a
+    # and costs something — its train loss is still high after the same EPOCHS epochs. The gap is
+    # narrower at every one of the last ten epochs, not only on the epoch that gets printed.
+    gap_smaller_all_along = all(hist_b[i][1] - hist_b[i][0] < hist_a[i][1] - hist_a[i][0]
+                                for i in range(EPOCHS - 10, EPOCHS))
+    dropout_ok = (abs(gap_a - 1.375) < 0.05 and abs(gap_b - 0.742) < 0.05
+                  and gap_smaller_all_along
                   and best_val_b < best_val_a and rise_b < rise_a / 2 and train_b > 0.20)
     # The eval-mode bug: three dropout-ON passes all disagree, three eval passes are identical,
     # and leaving dropout on flipped the predicted digit on at least one pass.
@@ -204,13 +230,14 @@ if __name__ == "__main__":
     if lesson_numbers_ok and scale_ok and split_ok and dropout_ok and eval_bug_ok:
         print("\n✅ you got it")
     else:
-        print("\n❌ not yet — expected MSE 5.3125, cross-entropy 0.11/0.69/4.61, the lesson's "
-              "table to bottom at epoch 3, 1/(1-0.5) == 2, Run A to end near train 0.047 and "
-              "validation 1.422 (gap 1.375) with its bottom before the last epoch, Run B's gap "
-              "near 0.742, and dropout-ON predictions to differ while eval-mode ones repeat")
+        print("\n❌ not yet — expected MSE 5.3125, cross-entropy 0.11/0.69/4.61 (about 40x the "
+              "pain), the bottom-finder to say epoch 3 on the lesson's table, 1/(1-0.5) == 2, "
+              "Run A to dive to train 0.047 while validation dips to 1.231 and climbs back to "
+              "1.422 (gap 1.375), Run B's gap near 0.742 and narrower at every late epoch, and "
+              "dropout-ON predictions to differ while eval-mode ones repeat")
 
-    assert lesson_numbers_ok, "MSE 5.3125, cross-entropy 0.11/0.69/4.61, lesson bottom epoch 3"
+    assert lesson_numbers_ok, "MSE 5.3125, cross-entropy 0.11/0.69/4.61, bottom-finder epoch 3"
     assert scale_ok, "p = 0.5 must scale survivors by 2 so the average signal matches eval mode"
-    assert split_ok, "Run A must dive on train while the held-out loss bottoms early, then rises"
-    assert dropout_ok, "dropout must shrink the gap and the late rise, and cost some train loss"
+    assert split_ok, "Run A must dive on train while the held-out loss dips early, then climbs"
+    assert dropout_ok, "dropout must shrink the gap all along and the late rise, and cost train"
     assert eval_bug_ok, "dropout left ON must give different answers; eval mode must repeat"

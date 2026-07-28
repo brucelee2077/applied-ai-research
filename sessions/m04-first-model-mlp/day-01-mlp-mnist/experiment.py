@@ -5,7 +5,8 @@
 #   The wiring is already right, but every knob is random — so it guesses ~10%.
 #
 # This script (1) makes a stand-in digit set, (2) builds an UNTRAINED 784->128->10 MLP
-# with He init, (3) runs one forward pass and reads its guess, (4) shows why layers bend.
+# with He init, (3) runs one forward pass and reads its guess, (4) shows why layers bend,
+# (5) hands the same forward pass two NON-ZERO bias vectors so you see what a bias adds.
 # Run it:  python3 sessions/m04-first-model-mlp/day-01-mlp-mnist/experiment.py
 
 import numpy as np  # numpy gives us arrays, matrix multiply (@) and argmax
@@ -122,7 +123,10 @@ if __name__ == "__main__":
     Wa = np.array([[1.0, 0.0], [0.0, 1.0], [2.0, 1.0]])
     Wb = np.array([[1.0, -1.0], [2.0, 1.0]])
     x_demo = np.array([[1.0, 2.0, 3.0]])
-    print("\nlesson demo z = x@Wa + b :", x_demo @ Wa + np.array([0.5, 0.5]))
+    # The lesson's z = x@W + b, run through the SAME forward() the big model uses, so its
+    # printed [[7.5, 5.5]] depends on the "+ b1" inside that function.
+    lesson_pre, _, _ = forward(x_demo, Wa, np.array([0.5, 0.5]), Wb, np.zeros(2))
+    print("\nlesson demo z = x@Wa + b :", lesson_pre)
     print("two layers (x@Wa)@Wb =", (x_demo @ Wa) @ Wb,
           " one layer x@(Wa@Wb) =", x_demo @ (Wa @ Wb), "-> the same numbers")
     x_mix = np.array([[1.0, -3.0, 0.5]])     # this input makes x@Wa mixed-sign
@@ -131,6 +135,22 @@ if __name__ == "__main__":
     print("x_mix@Wa =", x_mix @ Wa, "-> relu ->", relu(x_mix @ Wa))
     print("with the bend:", bent, " folded flat:", folded,
           "-> NOT the same, so with a bend the stack is no longer one linear layer")
+
+    # --- Part 7: what the two bias vectors do, once they are not zero ------
+    # Above, b1 and b2 are all zeros, so "+ b1" and "+ b2" add nothing yet. Give the SAME
+    # forward() two non-zero biases on the small demo weights, and the numbers stay small
+    # enough to check by hand. Judge 2's raw note is -2.5, so the bend would delete it; a
+    # +3.0 bias lifts it to +0.5 and it survives.
+    b1_demo = np.array([0.5, 3.0])       # a head start for each of the 2 hidden judges
+    b2_demo = np.array([-1.0, 0.5])      # a head start for each of the 2 output scores
+    zero_pre, zero_hidden, zero_logits = forward(x_mix, Wa, np.zeros(2), Wb, np.zeros(2))
+    biased_pre, biased_hidden, biased_logits = forward(x_mix, Wa, b1_demo, Wb, b2_demo)
+    print("\nzero biases : pre", zero_pre, "-> relu", zero_hidden,
+          "-> logits", zero_logits)
+    print("with biases : pre", biased_pre, "-> relu", biased_hidden,
+          "-> logits", biased_logits)
+    print("adding b1 =", b1_demo, "and b2 =", b2_demo,
+          "moved every number -> the two '+ b' terms are doing work")
 
     # --- Self-check: one boolean per claim, expected values written down here
     shapes_ok = (x.shape == (500, 784) and hidden.shape == (500, 128)
@@ -145,10 +165,18 @@ if __name__ == "__main__":
     chance_ok = abs(accuracy - predicted_accuracy) < 0.05
     data_ok = data_accuracy > 0.95                       # so ~10% is not the data's fault
     # Both paths must land on the SAME written-down numbers — not merely on each other.
-    numbers_ok = (np.allclose(x_demo @ Wa + np.array([0.5, 0.5]), [[7.5, 5.5]])
+    numbers_ok = (np.allclose(lesson_pre, [[7.5, 5.5]])
                   and np.allclose((x_demo @ Wa) @ Wb, [[17.0, -2.0]])
                   and np.allclose(x_demo @ (Wa @ Wb), [[17.0, -2.0]])
                   and np.allclose(bent, [[2.0, -2.0]]) and np.allclose(folded, [[-3.0, -4.5]]))
+    # The biases must change the answer. x_mix@Wa = [2.0,-2.5], so with b1 = [0.5,3.0] the
+    # pre-bend row is [2.5,0.5] (both survive relu), and [2.5,0.5]@Wb = [3.5,-2.0], which
+    # b2 = [-1.0,0.5] moves to [2.5,-1.5]. Drop either "+ b" and these numbers change.
+    bias_ok = (np.allclose(zero_pre, [[2.0, -2.5]]) and np.allclose(zero_hidden, [[2.0, 0.0]])
+               and np.allclose(zero_logits, [[2.0, -2.0]]) and np.allclose(zero_logits, bent)
+               and np.allclose(biased_pre, [[2.5, 0.5]])
+               and np.allclose(biased_hidden, [[2.5, 0.5]])
+               and np.allclose(biased_logits, [[2.5, -1.5]]))
 
     claims = [
         (shapes_ok, "shapes flowing (500,784) -> (500,128) -> (500,10)"),
@@ -162,6 +190,9 @@ if __name__ == "__main__":
         (data_ok, "readable stand-in digits, else ~10% would prove nothing"),
         (numbers_ok, "z=[[7.5,5.5]], both two-layer paths [[17,-2]], and the bend giving "
                      "[[2,-2]] where the folded single matrix gives [[-3,-4.5]]"),
+        (bias_ok, "the '+ b' terms carrying their weight: b1=[0.5,3.0] turning pre-bend "
+                  "[[2,-2.5]] into [[2.5,0.5]], then b2=[-1,0.5] turning logits [[3.5,-2]] "
+                  "into [[2.5,-1.5]] (and zero biases reproducing [[2,-2]])"),
     ]
     if all(ok for ok, _ in claims):
         print("\n✅ you got it")

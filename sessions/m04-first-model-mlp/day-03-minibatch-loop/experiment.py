@@ -1,7 +1,8 @@
 # day-03-minibatch-loop — experiment
 #
 # Today's big idea in two lines of output:
-#   One epoch is not one update. With N = 60,000 and batch_size = 32 it is 1,875 of them.
+#   One epoch is not one update. On full MNIST (N = 60,000, batch_size = 32) it is 1,875 of
+#   them; on this run's 1,000-example stand-in it is 32. Both counts are printed, kept apart.
 #   Shuffle every epoch, average (never sum) each batch, and the training loss falls.
 #
 # It counts epochs / iterations / batches, slices one epoch (keeping the short last batch),
@@ -66,20 +67,22 @@ def run_epochs(x, one_hot, params, n_epochs, shuffle, seed):
     # One iteration = one update on one batch. One epoch = many iterations, one full pass.
     rng = np.random.default_rng(seed)
     params = [p.copy() for p in params]                # never train the caller's weights
-    epoch_means, epoch1_losses, orders = [], [], []
+    epoch_means, epoch1_losses, orders, batch_log = [], [], [], []
     for _ in range(n_epochs):
         order = rng.permutation(len(x)) if shuffle else np.arange(len(x))   # fresh each epoch
         orders.append(order)
-        batch_losses = []
+        batch_losses, sizes_used = [], []
         for index in batch_slices(order, BATCH_SIZE):
             loss, grads = loss_and_grads(x[index], one_hot[index], params)
             batch_losses.append(loss)
+            sizes_used.append(len(index))    # record the real size of every update we make
             for p, g in zip(params, grads):
                 p -= LEARNING_RATE * g                  # forward, loss, backward, update
         epoch_means.append(float(np.mean(batch_losses)))
+        batch_log.append(sizes_used)         # one row per epoch, one number per update
         if not epoch1_losses:
             epoch1_losses = batch_losses
-    return params, epoch_means, epoch1_losses, orders
+    return params, epoch_means, epoch1_losses, orders, batch_log
 
 def full_loss(x, one_hot, params):   # loss over the WHOLE set: one fair number per run
     return float(((forward(x, params)[2] - one_hot) ** 2).sum(axis=1).mean())
@@ -90,10 +93,22 @@ def jerkiness(batch_losses):         # how far the loss jumps from one batch to 
 
 if __name__ == "__main__":
     # --- Part 1: the vocabulary, counted ----------------------------------
-    iters = 60_000 // BATCH_SIZE
-    total_steps = 10 * iters
-    print(f"N = 60000  batch_size = {BATCH_SIZE}  iterations per epoch = {iters}")
-    print(f"10 epochs = {total_steps} updates — an epoch is many iterations, not one")
+    # Two sets of numbers, kept apart. First the full-MNIST ones the lesson quotes. This
+    # machine has no MNIST, so those are a quote, not a measurement of anything here. Then
+    # the numbers for THIS run, which trains on the small stand-in set built in Part 2.
+    # Both are COUNTED with batch_slices, the same helper the training loop slices with.
+    MNIST_N, MNIST_EPOCHS = 60_000, 10        # the lesson's example, not the data below
+    mnist_iters = len(batch_slices(np.arange(MNIST_N), BATCH_SIZE))
+    mnist_steps = MNIST_EPOCHS * mnist_iters
+    print(f"the lesson's figures, quoted from full MNIST (not this run): N = {MNIST_N}"
+          f"  batch_size = {BATCH_SIZE}")
+    print(f"   -> {mnist_iters} iterations per epoch, so {MNIST_EPOCHS} epochs"
+          f" = {mnist_steps} updates")
+    planned_batches = len(batch_slices(np.arange(N_TRAIN), BATCH_SIZE))
+    print(f"THIS run's own figures, counted the same way: N = {N_TRAIN}"
+          f"  batch_size = {BATCH_SIZE}")
+    print(f"   -> {planned_batches} iterations per epoch, so {N_EPOCHS} epochs"
+          f" = {planned_batches * N_EPOCHS} updates — an epoch is many iterations, not one")
     ragged = [len(s) for s in batch_slices(np.arange(100), BATCH_SIZE)]
     print(f"N = 100 sliced into batches of 32 -> {ragged}  sum = {sum(ragged)}"
           "  (the last batch is ragged: 4, not 32)")
@@ -125,8 +140,11 @@ if __name__ == "__main__":
           "  -> 32x bigger, so the step would secretly grow with batch_size")
 
     # --- Part 4: train, and watch the loss fall ---------------------------
-    trained, epoch_means, epoch1_losses, orders = run_epochs(
+    trained, epoch_means, epoch1_losses, orders, batch_log = run_epochs(
         x_train, y_train, params0, N_EPOCHS, True, 1)
+    updates_done = sum(len(sizes) for sizes in batch_log)   # counted inside the real loop
+    print(f"\nthe loop itself counted {len(batch_log)} epochs x {len(batch_log[0])} batches"
+          f" = {updates_done} weight updates (epoch 1's last batch held {batch_log[0][-1]})")
     for epoch, mean_loss in enumerate(epoch_means, start=1):
         print(f"epoch {epoch}  average training loss {mean_loss:.4f}")
     went_up = int(np.sum(np.diff(epoch1_losses) > 0))
@@ -137,9 +155,9 @@ if __name__ == "__main__":
 
     # --- Part 5: one epoch on label-sorted data, with NO shuffle ----------
     sorted_index = np.argsort(labels, kind="stable")    # all the 0s, then all the 1s, ...
-    p_sorted, _, sorted_losses, _ = run_epochs(
+    p_sorted, _, sorted_losses, _, _ = run_epochs(
         x_train[sorted_index], y_train[sorted_index], params0, 1, False, 1)
-    p_shuffled, _, shuffled_losses, _ = run_epochs(x_train, y_train, params0, 1, True, 1)
+    p_shuffled, _, shuffled_losses, _, _ = run_epochs(x_train, y_train, params0, 1, True, 1)
     jerk_sorted, jerk_shuffled = jerkiness(sorted_losses), jerkiness(shuffled_losses)
     loss_sorted, loss_shuffled = (full_loss(x_train, y_train, p_sorted),
                                   full_loss(x_train, y_train, p_shuffled))
@@ -156,12 +174,18 @@ if __name__ == "__main__":
 
     # --- Self-check: every claim pinned to a number written down here -----
     # Everything here is seeded, so the numbers below are the ones this file really printed:
-    # each one is compared exactly, after rounding, instead of "close enough". The batch
-    # layout is checked as an exact list of sizes and positions, not only as "the same
-    # examples somewhere", and the batch gradient against Part 3's 32 separate gradients.
+    # each one is compared exactly, after rounding, instead of "close enough". The update
+    # counts come from the loop's own record of every batch it stepped on, not from arithmetic
+    # on 60,000. The batch layout is checked as an exact list of sizes and positions, not only
+    # as "the same examples somewhere", and the batch gradient against Part 3's 32 separate
+    # gradients.
     checks = [
-        ("1875 iterations per epoch and 18750 updates over 10 epochs",
-         iters == 1875 and total_steps == 18750),
+        ("this run really made 6 epochs x 32 batches = 192 updates, as Part 1 said",
+         [len(sizes) for sizes in batch_log] == [32] * 6 and updates_done == 192
+         and updates_done == planned_batches * N_EPOCHS and len(x_train) == N_TRAIN
+         and batch_log[0] == [32] * 31 + [8]),
+        ("slicing full MNIST the same way gives 1875 iterations per epoch, 18750 over 10",
+         mnist_iters == 1875 and mnist_steps == 18750),
         ("N=100 slices into [32, 32, 32, 4]", ragged == [32, 32, 32, 4] and sum(ragged) == 100),
         ("one epoch = 31 full batches then a ragged 8, each index exactly once",
          sizes == [32] * 31 + [8] and sorted(order_demo.tolist()) == list(range(N_TRAIN))
