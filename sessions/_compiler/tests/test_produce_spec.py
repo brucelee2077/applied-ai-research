@@ -96,12 +96,19 @@ def test_claude_prompt_and_acceptance_are_split_apart():
 
 
 def test_every_stub_day_in_the_repo_yields_a_usable_spec():
-    """The backfill depends on this: no day may be left without a contract."""
+    """The backfill depends on this: no stub day may be left without a contract.
+
+    Deliberately NOT asserting how MANY stubs remain. An earlier version required
+    >= 100 and broke the moment the first module was backfilled — a test that
+    fails when the work succeeds is measuring progress, not correctness. The
+    invariant is per-day and holds at every point in the rollout, including the
+    end when there are zero stubs left.
+    """
     specs = ps.all_specs()
-    assert len(specs) >= 100, 'expected ~101 stub days, got %d' % len(specs)
     empty = [s['dir'] for s in specs if not s['produce'] or len(s['produce']) < 400]
     assert not empty, 'produce spec too short to be real: %s' % empty
-    # every day states its requirements one way or the other
+    # every day states its requirements one way or the other: a numbered
+    # Option-B list (V7 shape) or a substantial prose produce block (V9 shape)
     without = [s['dir'] for s in specs if not s['claude_prompt'] and len(s['produce']) < 900]
     assert not without, 'no usable requirement list: %s' % without
 
