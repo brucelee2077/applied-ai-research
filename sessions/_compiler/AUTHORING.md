@@ -539,7 +539,78 @@ shipped concept lesson.
 
 ---
 
-## 10. Minimal compiling example
+## 10. The produce artifact (`experiment.py`)
+
+The produce section only has to MENTION `experiment.py` (§8). The file itself is the day's
+DOING leg, and it has its own contract. Until 2026-07-27 all but 14 days shipped a 5-line
+"Placeholder. Fill this…" stub, so this is the standard they are being backfilled to.
+
+**Where the spec comes from.** Never invent requirements: the produce section already states
+them. `python3 sessions/_produce_spec.py sessions/<module>/<day>` prints it (the `@@@ produce`
+block for a V9 day, the produce `.module-section` for an older compiled lesson), including the
+numbered Option-B list and the acceptance criteria where those exist.
+
+**Shape.** Follow `sessions/m02-the-neuron/day-02-activations/experiment.py`: a header naming
+the day, "Today's big idea in two lines of output", the exact run command; imports with a
+reason each; small named helpers; `if __name__ == "__main__":` split into `# --- Part N ---`
+sections; printed shapes and intermediate values at every step; then a self-check that
+computes one boolean per claim, prints `✅ you got it` or `❌ not yet — expected …`, and
+`assert`s each with a message. 85-140 lines.
+
+**Environment.** Read `sessions/_experiment_env.md` first — it is binding. No network, no file
+writes, no `savefig`, deterministic (seed everything), fast, no CUDA. No dataset is cached, so
+synthesize a seeded stand-in and say so at the point of use; several HF models ARE cached.
+
+**Gates.**
+```bash
+python3 sessions/_experiment_check.py sessions/<module>/<day>/experiment.py   # contract + a REAL run
+python3 sessions/_experiment_mutate.py sessions/<module>/<day>/experiment.py  # is the self-check real?
+```
+`_experiment_check.py` runs `gates/experiment_contract.py` and then EXECUTES the file (exit 0,
+a `✅`, no `❌`, no network, no timeout). `_experiment_mutate.py` perturbs one numeric literal
+at a time and re-runs: a surviving mutant is a claim nothing checks.
+
+### ⚠️ A passing ✅ is not evidence the check means anything
+
+Every pattern below was PROVEN on a real day by planting the bug and watching the script still
+print `✅ you got it`. Read this list before writing a self-check.
+
+1. **Circular** — the expected value is re-derived from the code path under test.
+   `loss = power_law(compute, 2.0, b)` then `assert abs(slope_of(loss) - b) < 1e-12` is an
+   algebraic identity; it passed with `b` planted at `-0.7`. Pin claims against values WRITTEN
+   DOWN in the self-check.
+2. **Too weak to see the bug** — asserting a sorted multiset after a `reshape`, which cannot
+   change the multiset, so `reshape(3,2).T` passed while printing the wrong layout.
+3. **Fake prediction** — a "predict first" line that is a hardcoded string can never disagree
+   with reality. Compute the prediction from the inputs.
+4. **Coupled to a library's wording** — asserting on the TEXT of a numpy/torch error message.
+   It gets reworded between majors and then a correct script shows the learner a red `❌`.
+   Assert the exception TYPE.
+5. **Entailed clause** — `train < 0.10 and abs(train - 0.047) < 0.05`: the tight pin implies
+   the loose one, so the first clause can never be the failing one. Padding, not rigor.
+6. **Constant fold** — `iters = 60_000 // 32` then `assert iters == 1875`: both sides are
+   literals, so it holds whatever the training code does.
+7. **Dead branch as a prediction** — `"down" if LR * grad_sq > 0 else "up"` is always "down".
+8. **Self-derived tautology** — `hist[best - 1][1] == best_val` where `best` came from
+   `argmin(hist)` and `best_val` from `min(hist)` on the same list: true for every history.
+9. **Identity / scale-invariant claim** — `cosine(v, v) == 1.0` holds for every nonzero `v`.
+
+**Make the code path observable.** A parameter initialised to zero cannot be tested: deleting
+both biases from a `forward()` whose `b1 = b2 = np.zeros(...)` changed nothing and still passed.
+Likewise `2.0 * err / err.size` versus `/ err.shape[0]` — the classic MSE-reduction bug — is
+invisible when `Y` is `(8, 1)`, and a transpose bug is invisible when the test data is
+symmetric (`Q = K = V = x` makes `x @ x.T` symmetric). Choose shapes and values where a wrong
+spelling gives a different answer.
+
+**Prove a fix with a negative control.** Plant the bug on a copy, run it, and confirm it now
+fails. The numeric mutation meter is blind to all of the structural cases above, so a review
+must plant SEMANTIC defects: drop a bias / a normalisation / a `/N`; transpose an operand; swap
+mean for sum; set `lr = 0`; remove `zero_grad`; wrap the forward in `no_grad`; flip an update
+sign; drop the ragged final batch.
+
+---
+
+## 11. Minimal compiling example
 
 This compiles clean (exit 0, all gates pass). It has 3 concept units (each with a
 visual), a 4-question quiz, and a discovery produce that references `experiment.py`.
