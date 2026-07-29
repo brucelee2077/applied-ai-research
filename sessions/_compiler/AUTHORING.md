@@ -555,7 +555,16 @@ the day, "Today's big idea in two lines of output", the exact run command; impor
 reason each; small named helpers; `if __name__ == "__main__":` split into `# --- Part N ---`
 sections; printed shapes and intermediate values at every step; then a self-check that
 computes one boolean per claim, prints `✅ you got it` or `❌ not yet — expected …`, and
-`assert`s each with a message. 85-140 lines.
+`assert`s each with a message. 85-140 lines for a single-concept day.
+
+**On length.** 85-140 is the target, not a cap. Wave 2 (m05a/m05b/m06) landed 15 of 20 days
+between 147 and 256 lines, and trimming them would have meant deleting the printed steps and
+pinned claims that close the vacuity gaps below — which is the wrong trade. A day may run
+longer when the extra lines carry a printed step, a contrast control, or a pinned claim.
+It may NOT run longer to carry commentary. A synthesis day that assembles several earlier
+days (m05a day-08 builds a whole encoder-decoder and generates from it) will be the longest
+in its module; that is expected. If a file is long and its claim count is not, that is the
+signal to cut.
 
 **Environment.** Read `sessions/_experiment_env.md` first — it is binding. No network, no file
 writes, no `savefig`, deterministic (seed everything), fast, no CUDA. No dataset is cached, so
@@ -602,11 +611,40 @@ invisible when `Y` is `(8, 1)`, and a transpose bug is invisible when the test d
 symmetric (`Q = K = V = x` makes `x @ x.T` symmetric). Choose shapes and values where a wrong
 spelling gives a different answer.
 
+**A uniform OUTPUT hides an axis bug just as well as a symmetric input.** m06 day-01's
+average-pooled map was a uniform 13.5, so regrouping the window axes gave byte-identical
+numbers. Run the reduction on a lopsided map too. Related: floor division absorbs a changed
+kernel size — `(32-4+2)//2+1` and `(32-3+2)//2+1` are both 16 — so one dial setting cannot see
+`K`; evaluate several settings computed from ONE shared literal.
+
+**A strictness is untestable unless a value sits exactly ON the boundary.** `> 0.85` and
+`>= 0.85` were byte-identical on m06 day-07's box list because nothing scored 0.85. Add one
+boundary case. Same for a `>` IoU cut-off: include a deliberate tie.
+
+**A symmetric aggregation hides an internal transpose.** m06 day-08 averaged the two
+contrastive directions, so transposing inside the loss changed nothing; and because the
+diagonal was always each row's max, reading the max instead of the LABELLED diagonal was also
+byte-identical. Pin the directions separately.
+
 **Prove a fix with a negative control.** Plant the bug on a copy, run it, and confirm it now
 fails. The numeric mutation meter is blind to all of the structural cases above, so a review
 must plant SEMANTIC defects: drop a bias / a normalisation / a `/N`; transpose an operand; swap
 mean for sum; set `lr = 0`; remove `zero_grad`; wrap the forward in `no_grad`; flip an update
 sign; drop the ragged final batch.
+
+**Before you call a plant "not caught", diff the full stdout.** A plant that reproduces the
+same VALUE is a no-op and proves nothing about the check: hardcoding `exact_steps = 13.5` where
+the code computes `(28-3+2)/2` is byte-identical by construction. Some no-ops are correct and
+should be recorded rather than chased — subtracting the max inside a softmax is a
+numerical-stability step that cannot change the result, and deleting `eps` changes nothing
+below print precision except on a flat channel, where it IS caught.
+
+**In a cumulative module, check the days against each other.** Wave 2 found the output-size
+formula under three names across the three m06 days that define it, `causal_mask` naming two
+incompatible objects (an additive `-inf` grid on m05a days 05/06, a boolean keep-list on day
+08), `channel` meaning axis 0 on one day and axis 1 on the next, and a helper losing the two
+knobs an earlier day taught as the mechanism. None of these fail a gate; all of them cost the
+learner.
 
 ---
 
