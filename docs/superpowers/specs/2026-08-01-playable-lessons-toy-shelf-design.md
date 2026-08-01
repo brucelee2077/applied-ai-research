@@ -102,26 +102,33 @@ Not code. A rule governing when play gets built.
   shelf (§4.3), after the dedup check. Both are scoped to the one module.
 - **Horizon:** nothing is built for a module the learner has not reached. `m17b` stays
   inert until they are working through `m17a`.
-- **The horizon is forward-only, and that has a cost worth stating.** Lessons already
-  passed stay as they are. Concretely `m01-shape-of-data` is 3/6 — `day-01-arrays`,
-  `day-02-indexing-slicing`, and `day-06-random-seeds` have no iframe and no range input,
-  and the learner has already completed all of m01 — so those three remain inert
-  permanently unless separately revisited. This does not violate G1, which is scoped to the
-  module the learner is currently on, but it is a real gap and is accepted knowingly rather
-  than overlooked.
+- **The horizon is forward-only, and that has two costs worth stating.** Lessons already
+  passed stay as they are.
+  - `m01-shape-of-data` is 3/6 — `day-01-arrays`, `day-02-indexing-slicing`, and
+    `day-06-random-seeds` have no iframe and no range input, and the learner has already
+    completed all of m01 — so those three remain inert permanently unless separately
+    revisited.
+  - The larger cost, created by removing the m02 backfill (§4.3): m02's **13** inline widgets
+    never reach the shelf unless m02 is revisited. Only the two that already exist as
+    standalone pages (`neuron-boundary`, `xor-limit`) are represented, via curated ownership.
+  Neither violates G1, which is scoped to the module the learner is currently on. Both are
+  accepted knowingly rather than overlooked. The cheap remedy, if wanted, is a one-time pass
+  over m01's three inert days folded into the m03 increment — deliberately left out of scope
+  here pending a decision.
 - **Reuse is discovered, not designed.** Build what each lesson needs. Only on the *third*
   time the same widget shape is needed does it become a settings-driven reusable one. This
   follows directly from the user's stated reason for choosing just-in-time.
 
 **First increment, from the verified census:**
 
-| Module | Playable now | Lessons needing play |
-|---|---|---|
-| m02 ← current position | 9/9 | 0 — already the best module in the repo |
-| m03 · attention | 4/5 | **1** — `day-05-positional` |
-| m04 · first-model-mlp | 2/6 | **4** — `day-02-backward-pass`, `day-04-training-loss-dropout`, `day-05-pytorch-version`, `day-06-why-pytorch` |
+| Module | Playable now | Lessons needing play | Widgets extractable to the shelf |
+|---|---|---|---|
+| m02 ← current position | 9/9 | 0 — already the best module in the repo | 13, **not planned** (§4.3) |
+| m03 · attention | 4/5 | **1** — `day-05-positional` | **6** — `day-02` 3, `day-03` 2, `day-04` 1 |
+| m04 · first-model-mlp | 2/6 | **4** — `day-02-backward-pass`, `day-04-training-loss-dropout`, `day-05-pytorch-version`, `day-06-why-pytorch` | **2** — `day-01` 1, `day-03` 1 |
 
-Five lessons covers the learner through the end of m04. The next wall (m05a 0/8, m05b 0/4,
+Five new widgets carries the learner through the end of m04; the 8 extractions are the second
+half of those two passes and are what makes the shelf grow. The next wall (m05a 0/8, m05b 0/4,
 m06 0/8, m07 0/6 = 26 lessons) is three modules away and is not planned now, by design.
 
 ### 4.2 Component B — the bar for newly built widgets
@@ -168,37 +175,58 @@ var TOYS = [
   ['Broadcasting',      'm01 · Day 3', 'wf1-d03-broadcasting','stretch two shapes to fit', 'viz/broadcasting.html'],
   ['Matmul shapes',     'm01 · Day 4', 'wf1-d04-matmul',      'multiply matrices',         'viz/matmul.html'],
   ['Activation curves', 'm02 · Day 2', 'wf2-d02-activations', 'compare ReLU vs sigmoid',   'viz/activation-derivatives.html'],
-  ['XOR limit',         'm02 · Day 2', 'wf2-d02-activations', 'break a single neuron',     'viz/xor-limit.html'],
-  // ...
+  ['XOR limit',         'm02 · Day 1', 'wf2-d01-neuron',      'break a single neuron',     'viz/xor-limit.html'],
+  ['Neuron weights',    'm02 · Day 1', 'wf2-d01-neuron',      'tilt a decision boundary',  'viz/neuron-boundary.html'],
+  // …17 rows total at launch; 5 of them unlocked today
 ];
 ```
 
 `wire_index.py` cannot clobber this: its id regex is `\['(w\d{2}-d\d{2})'`, matching only
 entries whose *first* field is `wNN-dMM`. `TOYS` rows begin with a display name.
 
-**Shelf inventory: 21 pages, not 22.** `sessions/viz/leaky-slope.html` is untracked and
-referenced by zero lessons, so it has no unlocking quest-id and would 404 on GitHub Pages.
-It is excluded until committed and embedded.
+**Shelf inventory: 17 pages, not 22.** Five of the 22 files in `sessions/viz/` cannot carry a
+`TOYS` row, because §6.5 requires every row's quest-id to exist as a `data-quest-id` on some
+lesson page and these are embedded nowhere:
 
-**Five committed viz pages have no range slider** — `attention-heatmap`,
-`attention-multihead`, `attention-pipeline`, `broadcasting`, `softmax-scaling` — and are
-button-driven click-throughs (`sessions/batch_1_rollout_plan.md:32` describes
-`broadcasting` exactly that way). They **do** go on the shelf: they are still something the
-learner manipulates, and excluding them would empty the shelf of m01 entirely. §4.2's rule 1
-constrains what we *build next*, not what already exists. `broadcasting.html` is
-deliberately kept as the first `TOYS` entry despite failing rule 1.
+- `leaky-slope.html` — untracked *and* embedded by zero lessons.
+- `attention-heatmap.html`, `attention-multihead.html`, `attention-pipeline.html`,
+  `softmax-scaling.html` — tracked, but embedded by **zero** compiled lesson pages
+  (verified: `grep -rl` across all 262 lesson pages → 0 each). Their only remaining
+  references are `roadmap.html`, `batch_2_rollout_plan.md`, the pre-V9 m03 donors, and
+  `m03-attention/_refactor/manifest.yaml` — that manifest still claims at `:178`/`:251-254`
+  that m03 days 1/3/4 embed them, which the V9 rebuild made false. They are **excluded**
+  until some lesson actually embeds them; the manifest discrepancy is noted in §8 and is not
+  fixed here.
+
+So **17 shelf-eligible pages**, while all 22 files carry the height sender.
+
+**Four committed pages have no range slider** and still go on the shelf: of the five
+slider-less pages, four are the excluded attention pages above, leaving **`broadcasting.html`**
+as the only reachable one. It is button-driven click-through
+(`sessions/batch_1_rollout_plan.md:32`), so it fails §4.2's rule 1 — and it is kept anyway,
+because it is still something the learner manipulates and it is m01 Day 3's only toy. *This
+correction matters:* an earlier draft justified keeping the slider-less pages by claiming
+exclusion "would empty the shelf of m01 entirely," which is false — m01's other toy
+`matmul.html` has 6 range sliders and would survive. The keep-decision rests on
+`broadcasting` alone.
 
 **Toy ownership is curated, not derived.** A `TOYS` row holds one quest-id, so each toy
 needs one owning lesson. The rule is: **the earliest lesson where the learner encounters
 that widget *or an inline equivalent of it*.** This must be hand-set per row, because
-deriving it from `grep` gives the wrong answer in a real case:
-`sessions/viz/neuron-boundary.html` (sliders `w1`/`w2`/`b`) is embedded by exactly one
-lesson, `m02/day-06-training-loop` — but `m02/day-01-single-neuron` already contains the
-same three-control widget inline as `db-w1`/`db-w2`/`db-b`. Deriving ownership would label
-it `m02 · Day 6` and render it **locked**, even though the learner has played with its
-equivalent in Day 1. It is therefore owned by `wf2-d01-neuron`. For the simpler case of one
-standalone page embedded by several lessons, earliest embedder wins: `viz/xor-limit.html`
-(three m02 lessons) and `viz/matmul.html` (two) are owned by their first.
+deriving it from `grep` gives the wrong answer for **two** of the five launch toys, both in
+m02 Day 1:
+
+- `viz/neuron-boundary.html` (sliders `w1`/`w2`/`b`) is embedded only by
+  `m02/day-06-training-loop` — but `m02/day-01-single-neuron` holds the same three-control
+  widget inline as `db-w1`/`db-w2`/`db-b`. Owner: **`wf2-d01-neuron`**, not `wf3-d03`.
+- `viz/xor-limit.html` is embedded by three m02 lessons, the earliest being
+  `day-02-activations` — but `day-01-single-neuron/source.md:519` holds the `xor-c` rope
+  widget, an inline equivalent. Owner: **`wf2-d01-neuron`**, not `wf2-d02-activations`.
+
+Deriving ownership would render both **locked**, even though the learner has played with
+their equivalents in Day 1 — the exact failure the generous unlock rule exists to prevent.
+Only `viz/matmul.html` is the genuinely simple case (m01 Day 1 and Day 2 hold no widgets), so
+earliest-embedder gives the right answer there: `wf1-d04-matmul`.
 
 #### Unlock rule
 
@@ -274,7 +302,8 @@ fallback" would be meaningless here because the entire hub is rendered from JS a
 
 #### Two kinds of toy, and how inline widgets reach the shelf
 
-- **Standalone** (`sessions/viz/*.html`) — shelf-able immediately. 21 committed.
+- **Standalone** (`sessions/viz/*.html`) — shelf-able immediately. **17** of the 22 files
+  qualify; see the inventory above.
 - **Inline** — 24 lesson pages build their widget directly in the page. In m02's six slider
   lessons alone there are **13** widget-bearing `%%% svg` blocks, not six: `day-01` 2,
   `day-04` 3, `day-05` 3, `day-07` 1, `day-08` 1, `day-09` 3. Counting lessons badly
@@ -309,13 +338,19 @@ standalone page does not have. Each extraction is therefore: locate the true fen
 move the block → add the `viz-height` sender → **re-establish page chrome and theme
 variables** → replace the source block with `%%% viz` → recompile.
 
-**Two extraction hazards to check per module, not just per widget:** element-id collisions
-and filename collisions. `day-07-optimizers` and `day-08-learning-rate` both use
-`gd-svg`/`gd-bowl`/`gd-traj`/`gd-ball`/`gd-lr`, yet they are *different* widgets — day-07
+**Two extraction hazards — element-id collisions and filename collisions — and the check must
+run across modules, not just within one.** `day-07-optimizers` and `day-08-learning-rate` both
+use `gd-svg`/`gd-bowl`/`gd-traj`/`gd-ball`/`gd-lr`, yet they are *different* widgets — day-07
 branches on `Math.abs(1-2*a)` with three outcomes including "hops over the bottom", day-08 on
 `fin > Math.abs(W0)*1.2` with two — so collapsing them under one file would silently drop
 day-08's stricter demo. The obvious filename is also already taken:
 `sessions/viz/gradient-descent.html` exists and is embedded by day-06.
+
+A cross-module instance is already in the first increment:
+`m04-first-model-mlp/day-01-mlp-mnist/source.md:79` uses ids `xor-svg`/`xor-c` — the same ids
+as `m02-the-neuron/day-01-single-neuron/source.md:519`, and a *different* widget (52 lines vs
+82, different aria-label). So m04's pass must dedup against `viz/xor-limit.html` **and** m02's
+inline `xor-c`, and must rename ids, even though neither lives in m04.
 
 #### The gate-line subtitle requires a small hoist
 
@@ -393,11 +428,11 @@ and AppleScript are all blocked, and both `start-server.sh` and `lavish-axi` fai
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **The shelf is only as good as the toys on it.** It launches thin — **21 rows, 5 unlocked** (§4.3). Charming at 5; unproven at 40. | High — it is the core bet | The user was shown this risk and accepted it. Derivation of the checkpoint: m03's pass adds 1 new page plus up to 3 extractions, m04's adds 4 plus up to 2, so after m04 the shelf is ~26–31 rows with **~11** unlocked. **Re-evaluate then.** Fallback is mockup option C (ring + can-do strip), nearly free. |
+| **The shelf is only as good as the toys on it.** It launches thin — **17 rows, 5 unlocked** (§4.3). Charming at 5; unproven at 40. | High — it is the core bet | The user was shown this risk and accepted it. **Checkpoint arithmetic, sized per widget not per lesson:** m03's pass = 1 new page + **6** extractable widgets (`day-02` 3, `day-03` 2, `day-04` 1); m04's = 4 new + **2** (`day-01` 1, `day-03` 1). So after m04 the shelf is 17+1+6+4+2 = **30 rows** before dedup, or as few as **22** if every extraction dedups onto an existing page. Unlocked then ≈ **19–20**: today's 5, plus `gradient-descent` (owned by m02 `day-06`, unlocks when m02 finishes) and `embedding-similarity` (m03 `day-01`), plus all 5 new widgets and all 8 extractions, since every owner is a lesson completed by that point. **Re-evaluate at that checkpoint.** Fallback is mockup option C (ring + can-do strip), nearly free. |
 | Extraction changes lesson rendering. It is a **replacement**, not additive. | Medium | Verified by `concept_shell_gate.py` (every concept section still has a real visual) plus `visual_integrity_gate.py` (the embed resolves and its sender protocol holds). Compare compiled output before/after; only the widget region may differ. |
 | Extracted widgets lose the lesson's palette, or collide on element ids / filenames. | Medium | Treat page chrome + theme variables as required extraction steps (§4.3), and run the per-module id/filename collision check — `day-07`/`day-08` share five element ids while being different widgets, and `gradient-descent.html` is already taken. |
 | A height message races a collapsed panel and throws. | Medium | Receiver resolves against `e.source` and null-guards `openFrame` (§4.3); asserted in §6.2. |
-| Just-in-time means meeting inert lessons if the learner outruns the build. | Medium | The rule triggers on module completion, giving one module of lead time; m02→m04 is only 5 lessons. |
+| Just-in-time means meeting inert lessons if the learner outruns the build. | Medium | The rule triggers on module completion, giving one module of lead time. m02→m04 is 5 new widgets plus 8 extractions, spread over 10 lessons — small, but not the "5 lessons" an earlier draft claimed. |
 | A widget satisfies rule 1 but not rule 3 and becomes decoration. | Medium | Rule 3 is an explicit per-widget checklist item. |
 | Unlock-on-any-section feels loose. | Low | Deliberate; trivially revertible to `pillStatus()`. |
 | The hoisted `gate` silently changes the existing goal card. | Low | §6.6 asserts byte-identical rendered text. |
@@ -449,6 +484,8 @@ Recorded so they are not lost, and explicitly not built now:
 
 **Not touched:** `coach/**`, any notebook, any `experiment.py`, any `data-quest-id`, any
 lesson prose, and **no m02 lesson** — the m02 extraction backfill was removed in review
-(§4.3). m02 already reads 9/9 playable; its inline widgets reach the shelf only if m02 is
-ever revisited, except `neuron-boundary.html` which the curated-ownership rule surfaces today
-for free.
+(§4.3). m02 already reads 9/9 playable, and its 13 inline widgets reach the shelf only if m02
+is ever revisited. Two of them are nonetheless represented at launch without touching m02 at
+all, because `neuron-boundary.html` and `xor-limit.html` already exist as standalone pages and
+the curated-ownership rule assigns both to `wf2-d01-neuron` — a hand-set field in `TOYS`
+inside `index.html`, not an edit to any lesson.
