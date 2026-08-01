@@ -14,13 +14,26 @@ import numpy as np  # numpy gives us arrays and matrix multiply (@)
 
 
 def softmax(scores):
-    """Turn scores into positive shares that add up to 1 — the "one pizza" step.
+    """Turn EVERY ROW of scores into positive shares that add up to 1 — "one pizza".
 
-    We slide every score down by the largest one first, so exp() cannot overflow.
-    The shift does not change the answer: softmax reads only the gaps.
+    The axis is the last one, so a grid keeps one whole budget per asking ROW. A
+    plain 1-D row is just a grid with one row, which is all today's demo needs;
+    Days 3, 4 and 5 hand it a whole grid, and the same axis keeps them right.
+    We slide every row down by its own largest score first, so exp() cannot
+    overflow. The shift does not change the answer: softmax reads only the gaps.
     """
-    slices = np.exp(scores - np.max(scores))   # bigger score -> much bigger slice
-    return slices / slices.sum()               # divide by the total -> shares add to 1
+    slices = np.exp(scores - np.max(scores, axis=-1, keepdims=True))
+    return slices / slices.sum(axis=-1, keepdims=True)   # each row adds to 1
+
+
+def scale_by_sqrt_width(scores, width):
+    """The "scaled" in scaled dot-product: divide by sqrt(width).
+
+    Every caller below goes through this one function, so the law itself is under
+    test — and it is tested at three widths, because at our d_k = 4 the right
+    divisor sqrt(4) = 2.0 is byte-identical to half the width and to d_v.
+    """
+    return scores / np.sqrt(width)
 
 
 def matches(computed, expected):
@@ -34,8 +47,12 @@ if __name__ == "__main__":
     bank, river = 5, 4          # the two words we follow all day
 
     # --- Part 1: the sentence as six embedding cards ------------------------
-    # Each ROW is one word's Day-1 embedding — its profile card. A card is four
-    # numbers wide, and that width has a name: d_model. The four slots are
+    # Each ROW is one word's embedding — its profile card, exactly the kind of row
+    # Day 1 looked up. The NUMBERS are hand-written fresh for today: Day 1's table
+    # had a different vocabulary and different made-up axes (is-animal, is-furry,
+    # is-vehicle, is-fast), so nothing here is Day 1's row for the same word. What
+    # carries over is the idea — one row per word. A card is four numbers wide, and
+    # that width has a name: d_model. The four slots (slot = COLUMN of a row) are
     # made-up meaning axes:  water  place  money  action
     x = np.array([[0.0, 0.2, 0.0, 0.0],    # 0 "the"     — filler, points almost nowhere
                   [0.0, 0.2, 0.0, 1.0],    # 1 "animal"  — a doer
@@ -43,57 +60,105 @@ if __name__ == "__main__":
                   [0.0, 0.2, 0.0, 0.0],    # 3 "the"     — filler again
                   [1.0, 1.0, 0.0, 0.0],    # 4 "river"   — watery AND a place
                   [0.0, 1.0, 1.0, 0.0]])   # 5 "bank"    — a place, unsure about money
-    print("Part 1 — embeddings x, shape", x.shape, " d_model =", x.shape[1])
+    print("Part 1 — embeddings x, shape", x.shape, " d_model =", x.shape[-1])
 
-    # --- Part 2: one card, three DIFFERENT filters -> Q, K, V ---------------
-    # A filter is a grid you multiply the card by: row = input slot, column =
-    # output slot. A real model learns these three grids; ours are hand-picked.
+    # --- Part 2: one card, three DIFFERENT recipes -> Q, K, V ---------------
+    # A recipe is a grid you multiply the card by: row = input slot, column =
+    # output slot. Days 4 and 5 call these three grids recipes too. A real model
+    # learns them; ours are hand-picked.
     # W_Q makes the QUERY (the question a word asks), W_K the KEY (the label it
     # advertises), W_V the VALUE (the content it shares if someone listens).
-    Wq = np.array([[0.1, 0.1, 0.0, 0.0],   # W_Q water slot -> mild interest in water+place
-                   [0.5, 0.5, 0.0, 0.0],   #     place slot  -> asks about water and place
-                   [0.5, 0.0, 0.0, 0.0],   #     money slot  -> asks harder about water
-                   [0.0, 0.0, 0.5, 0.5]])  #     action slot -> asks about money and action
-    Wk = np.array([[4.4, 0.0, 0.0, 0.0],   # W_K water slot -> "I am watery"
-                   [0.0, 2.0, 0.0, 0.0],   #     place slot  -> "I am a place"
-                   [0.0, 0.0, 4.0, 0.0],   #     money slot  -> "I am about money"
-                   [0.0, 0.0, 0.0, 4.0]])  #     action slot -> "I am an action"
+    W_Q = np.array([[0.1, 0.1, 0.0, 0.0],  # W_Q water slot -> mild interest in water+place
+                    [0.5, 0.5, 0.0, 0.0],  #     place slot  -> asks about water and place
+                    [0.5, 0.0, 0.0, 0.0],  #     money slot  -> asks harder about water
+                    [0.0, 0.0, 0.5, 0.5]]) #     action slot -> asks about money and action
+    W_K = np.array([[4.4, 0.0, 0.0, 0.0],  # W_K water slot -> "I am watery"
+                    [0.0, 2.0, 0.0, 0.0],  #     place slot  -> "I am a place"
+                    [0.0, 0.0, 4.0, 0.0],  #     money slot  -> "I am about money"
+                    [0.0, 0.0, 0.0, 4.0]]) #     action slot -> "I am an action"
     # W_V has only two columns: a Value is never compared to anything, so its
-    # length d_v is a free choice and does not have to equal d_k.
-    Wv = np.array([[0.9, 0.0],             # W_V water slot -> watery content
-                   [0.1, 0.1],             #     place slot  -> a little of both
-                   [0.0, 0.9],             #     money slot  -> money content
-                   [0.2, 0.0]])            #     action slot -> a little watery content
-    Q, K, V = x @ Wq, x @ Wk, x @ Wv
-    d_k, d_v = Q.shape[1], V.shape[1]
+    # width d_v is a free choice and does not have to equal d_k.
+    W_V = np.array([[0.9, 0.0],            # W_V water slot -> watery content
+                    [0.1, 0.1],            #     place slot  -> a little of both
+                    [0.0, 0.9],            #     money slot  -> money content
+                    [0.2, 0.0]])           #     action slot -> a little watery content
+    Q, K, V = x @ W_Q, x @ W_K, x @ W_V
+    d_k, d_v = Q.shape[-1], V.shape[-1]
     print("Part 2 — Q", Q.shape, " K", K.shape, " V", V.shape,
           " (d_k =", d_k, ", d_v =", d_v, ")")
     for i, word in enumerate(WORDS):
         print("         %-8s Q=%s K=%s V=%s" % (word, Q[i], K[i], V[i]))
     # Two different grids, so a word's question and its label are different lists.
     print("         is Q the same numbers as K?", np.array_equal(Q, K), "-> must be False")
+    # W_K above is a pure diagonal, so x @ W_K and x @ W_K.T print the same numbers —
+    # today's Key grid cannot show that "row = input slot, column = output slot" is
+    # the rule. Pin the rule on a lopsided stand-in (day-05's W_K looks like this):
+    # let the money row also feed the water column, and the two orders disagree.
+    W_K_lopsided = W_K.copy()
+    W_K_lopsided[2, 0] = 1.0               # money row -> water column
+    bank_key_lopsided = x[bank] @ W_K_lopsided
+    print("         lopsided W_K: bank's Key =", bank_key_lopsided,
+          " but read column-first it would be", x[bank] @ W_K_lopsided.T)
 
     # --- Part 3: "bank" scores its Query against every Key ------------------
     # A dot product multiplies two lists slot by slot and adds the products up.
     # A big total means "your label answers my question".
-    raw_scores = K @ Q[bank]               # one score per word
+    # THE CONVENTION, spelled once for the whole module and used again on Days 3, 4
+    # and 5: the score grid is QUERY-FIRST, scores = Q @ K.T, so ROW = the word
+    # ASKING and COLUMN = the word being offered. Today only "bank" asks, so what we
+    # want is bank's ROW of that grid: Q[bank] @ K.T.
+    raw_scores = Q[bank] @ K.T             # bank's row of the grid: one score per word
     print("\nPart 3 — bank's raw match scores:", raw_scores)
     for i, word in enumerate(WORDS):
         print("         bank -> %-8s = %.1f" % (word, raw_scores[i]))
     # Looking is one-way traffic: W_Q and W_K are different grids, so
     # "bank -> river" and "river -> bank" come out as two different numbers.
-    river_to_bank = K[bank] @ Q[river]
+    river_to_bank = Q[river] @ K[bank]     # river asks, bank answers -> Query first again
     print("         bank->river = %.1f  but river->bank = %.1f"
           % (raw_scores[river], river_to_bank))
+    # The whole grid, so the convention has a LAYOUT to point at, not just a habit.
+    raw_grid = Q @ K.T
+    print("         full grid Q @ K.T:", raw_grid.shape,
+          "row = the asker, column = the word offered")
+    print("         so bank->river 5.4 sits at [%d, %d] and river->bank 1.2 at [%d, %d];"
+          % (bank, river, river, bank), "row", bank, "IS bank's row:",
+          np.array_equal(raw_grid[bank], raw_scores))
+    # Spelling it KEY-first instead gives K @ Q.T — the TRANSPOSE, a different table.
+    # It looks just as plausible and it moves bank's biggest match off "river".
+    key_first_grid = K @ Q.T
+    print("         key-first K @ Q.T row", bank, "=", key_first_grid[bank],
+          "-> biggest match '%s', not 'river'" % WORDS[int(np.argmax(key_first_grid[bank]))])
+    # Reconciling the two spellings, because the lesson's own Produce step writes the
+    # ONE-ASKER form K @ Q[5]: for a single asker the two agree exactly, since a dot
+    # product does not care which list comes first. It is only when a whole GRID is built
+    # that the choice matters — and then the module's choice is Q @ K.T, every time.
+    one_asker_key_first = K @ Q[bank]
+    print("         the Produce step's K @ Q[%d] gives the same row:" % bank,
+          np.array_equal(one_asker_key_first, raw_scores),
+          "-> one asker, no difference; a whole grid, the transpose")
 
-    # --- Part 4: scale the scores by sqrt(d_k) ------------------------------
-    # d_k is the length of a Key. A dot product adds one product per slot, so long
-    # cards give big scores, and big scores make softmax hand everything to one
-    # word. Dividing by sqrt(d_k) cancels that growth — the "scaled" in the name.
-    scaled_scores = raw_scores / np.sqrt(d_k)
+    # --- Part 4: scale the raw scores by sqrt(d_k) --------------------------
+    # d_k is the WIDTH of a Key — how many slots it has. (Careful: Day 1 used the
+    # word "length" for how long an arrow is. That is a different quantity, and it
+    # had a different cure, cosine. Attention keeps the RAW dot product and cures
+    # the width instead; cosine attention is a real alternative, not an oversight.)
+    # A dot product adds one product per slot, so WIDE cards give big scores, and
+    # big scores make softmax hand everything to one word. Dividing by sqrt(d_k)
+    # cancels that growth — the "scaled" in the name.
+    scaled_scores = scale_by_sqrt_width(raw_scores, d_k)
     print("\nPart 4 — divide every score by sqrt(d_k) = sqrt(%d) = %.1f"
           % (d_k, np.sqrt(d_k)))
     print("         scaled scores:", scaled_scores, " (same ranking, calmer numbers)")
+    # Careful: at d_k = 4 the right divisor sqrt(4) = 2.0 is the same number as half
+    # the width (4/2) and as d_v (2), so this width alone proves nothing about the
+    # law. Push river's same 5.4 through the SAME function at two wider Keys, where
+    # the three candidate laws split apart.
+    WIDTHS = (4, 9, 64)
+    river_scaled = [float(scale_by_sqrt_width(raw_scores[river], w)) for w in WIDTHS]
+    for w, got in zip(WIDTHS, river_scaled):
+        print("         d_k = %2d -> sqrt(d_k) = %.1f, river's 5.4 becomes %.4f"
+              "  (half-width law: %.4f, d_v law: %.4f)"
+              % (w, np.sqrt(w), got, raw_scores[river] / (w / 2), raw_scores[river] / d_v))
 
     # --- Part 5: softmax the scaled scores into shares ----------------------
     weights = softmax(scaled_scores)
@@ -101,6 +166,16 @@ if __name__ == "__main__":
     print("\nPart 5 — attention weights (shares):", np.round(weights, 3))
     print("         they add up to:", round(float(weights.sum()), 6))
     print("         biggest slice: word %d = '%s'" % (winner, WORDS[winner]))
+    # Today only one word asks, so a softmax with no axis at all would look right
+    # here — and would be wrong the moment a whole grid arrives on Day 3. Hand it
+    # a TWO-row block and check each row separately: with the last axis, both rows
+    # spend a whole budget; sharing one budget across the block gives 0.5 each.
+    two_rows = np.array([scaled_scores, scaled_scores[::-1]])
+    two_row_sums = softmax(two_rows).sum(axis=-1)
+    whole_block = np.exp(two_rows - two_rows.max())
+    whole_block_sums = (whole_block / whole_block.sum()).sum(axis=-1)
+    print("         two rows in -> row sums", two_row_sums,
+          " (one shared budget would give", whole_block_sums, "instead)")
 
     # --- Part 6: blend the Values by those shares ---------------------------
     # Weighted sum: pour in each word's Value scaled by its share, then add up.
@@ -118,7 +193,7 @@ if __name__ == "__main__":
     # The lesson's slider, in code. Keep every Key exactly as it is, and let
     # "bank" ask about money instead of water (slots: water, place, money, action).
     money_query = np.array([0.0, 0.5, 1.0, 0.0])
-    money_scores = K @ money_query
+    money_scores = money_query @ K.T       # Query first again: one row of the grid
     money_winner = int(np.argmax(money_scores))
     print("\nPart 7 — same Keys, a money-flavoured question:", money_scores)
     print("         winner is now word %d = '%s' — a money-bank, not a river-bank"
@@ -142,13 +217,40 @@ if __name__ == "__main__":
         (matches(Q, exp_Q) and matches(K, exp_K) and matches(V, exp_V),
          "one card through three different grids should give the lesson's Q, K and V rows"),
         (not np.array_equal(Q, K), "Q and K must differ, or the score grid turns symmetric"),
+        (matches(bank_key_lopsided, [1.0, 2.0, 4.0, 0.0])
+         and not np.array_equal(bank_key_lopsided, x[bank] @ W_K_lopsided.T),
+         "row = input slot: through a lopsided W_K bank's Key is [1. 2. 4. 0.], "
+         "and reading the grid column-first gives a different list"),
         (matches(raw_scores, [0.2, 0.2, 0.4, 0.2, 5.4, 1.0]),
          "raw scores should be [0.2 0.2 0.4 0.2 5.4 1.0], with river the 5.4"),
         (matches(river_to_bank, 1.2), "river->bank should score 1.2, not bank->river's 5.4"),
+        # The ORIENTATION, pinned on the day's own two promised numbers: 5.4 must sit at
+        # [bank, river] and 1.2 at [river, bank]. The key-first spelling is the transpose,
+        # so it fails both and moves bank's biggest match to 'crossed'.
+        (raw_grid.shape == (6, 6) and np.array_equal(raw_grid[bank], raw_scores)
+         and matches(raw_grid[bank, river], 5.4) and matches(raw_grid[river, bank], 1.2)
+         and np.allclose(key_first_grid, raw_grid.T)
+         and matches(key_first_grid[bank], [0.2, 2.2, 2.4, 0.2, 1.2, 1.0])
+         and int(np.argmax(key_first_grid[bank])) == 2 and WORDS[2] == "crossed"
+         # one asker: both spellings agree; a whole grid: they are transposes
+         and np.array_equal(one_asker_key_first, raw_scores)
+         and not np.array_equal(key_first_grid, raw_grid),
+         "the grid is Q @ K.T with row = the asker, so bank->river 5.4 sits at [5, 4] "
+         "and river->bank 1.2 at [4, 5]; the Produce step's one-asker K @ Q[5] gives the "
+         "same row, but the key-first GRID K @ Q.T is its transpose and makes bank's "
+         "biggest match 'crossed'"),
         (matches(scaled_scores, [0.1, 0.1, 0.2, 0.1, 2.7, 0.5]),
          "scaled scores should be [0.1 0.1 0.2 0.1 2.7 0.5] — raw divided by 2"),
+        (matches(np.round(river_scaled, 4), [2.7, 1.8, 0.675]),
+         "the divisor is sqrt(d_k), so river's 5.4 becomes 2.7 / 1.8 / 0.675 at "
+         "d_k = 4 / 9 / 64 — half the width would say 2.7 / 1.2 / 0.169, d_v 2.7 every time"),
         (bool(np.all(weights >= 0)) and matches(weights.sum(), 1.0),
          "every share must be positive and the six must add up to 1"),
+        # The AXIS, pinned: two rows in must come back as two whole budgets of 1, not
+        # one budget of 1 split across the block (which would print 0.5 and 0.5).
+        (matches(two_row_sums, [1.0, 1.0]) and matches(whole_block_sums, [0.5, 0.5]),
+         "softmax must normalise the LAST AXIS: a two-row block gives row sums "
+         "[1. 1.], where one shared budget would give [0.5 0.5]"),
         (matches(np.round(weights, 3), [0.052, 0.052, 0.058, 0.052, 0.706, 0.078]),
          "shares should be [0.052 0.052 0.058 0.052 0.706 0.078]"),
         (winner == 4 and WORDS[4] == "river", "the biggest share should land on 'river'"),

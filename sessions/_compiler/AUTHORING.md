@@ -603,6 +603,34 @@ print `✅ you got it`. Read this list before writing a self-check.
 8. **Self-derived tautology** — `hist[best - 1][1] == best_val` where `best` came from
    `argmin(hist)` and `best_val` from `min(hist)` on the same list: true for every history.
 9. **Identity / scale-invariant claim** — `cosine(v, v) == 1.0` holds for every nonzero `v`.
+10. **Print/assert divergence** — the value IS asserted, but through a SECOND, separately written
+    expression, so the printed line and the checked line are two independent computations of one
+    quantity. Corrupt only the printed one and nothing notices: the learner reads a wrong number
+    off the screen while the script prints `✅`. This is NOT plain "printed but never asserted",
+    and it is the class the original nine missed — a single m02 sweep found five instances. On
+    day-07 a `show()` helper rendered the day's three headline step counts while the self-check
+    asserted the raw tuple instead, so transforming the value inside `show()` was invisible; on
+    day-09 the printed gap column computed `vl - tl` while the assert recomputed the gap
+    separately, so negating the print alone was invisible. **Fix: compute the quantity ONCE, bind
+    it to a name, PRINT that name, and ASSERT that same name.** One value, one expression, two
+    uses. Adding a second assert that duplicates the print's expression only moves the divergence.
+    An unprinted shadow value is the same defect wearing the other face: if a check compares
+    against a "second opinion" the learner never sees, hardcoding that opinion cannot be caught.
+
+    ⚠️ **This one is SYSTEMIC, not a per-day defect — treat it differently from patterns 1-9.**
+    It is a property of the `print(...)`-then-separately-`assert` idiom, so it is present wherever
+    that idiom is, which is nearly everywhere. Measured 2026-08-01: 24 of 28 print-site plants
+    survived across all nine m02 days, and spot-probes confirmed it on m05a day-08, m05b day-04 and
+    m06 day-07 — the wave-2 days built under the full discipline, including a claim hardened by hand.
+    Corrupting a print site let artifacts display, under a passing `✅`: an XOR ceiling of "4 of 4"
+    (the exact opposite of that day's point), a transposed `W1@W2` against the acceptance-quoted
+    value, MSE and MAE growth factors swapped so the outlier-hijack claim inverted, a training loss
+    that appeared to RISE, and "lowest validation loss at degree 6" where the day's answer is
+    another degree. Because it is systemic, naming individual values does not close it: a round-2
+    pass fixed the ~8 values it was handed and the class stayed open on all nine days. The only
+    fix that scales is the discipline itself — **render each reported quantity ONCE into a named
+    value and let the print and the assert both read that name** — applied as you write, not
+    retrofitted claim by claim.
 
 **Make the code path observable.** A parameter initialised to zero cannot be tested: deleting
 both biases from a `forward()` whose `b1 = b2 = np.zeros(...)` changed nothing and still passed.

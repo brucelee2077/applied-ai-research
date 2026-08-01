@@ -39,9 +39,21 @@ def tanh(z):
     return np.tanh(z)
 
 
+# ---- How we MEASURE a slope, instead of trusting a formula ------------------
+EPS = 1e-5   # a tiny step to the left and right of the point we care about
+
+def central_slope(bend, z):
+    # Rise over run, measured on the real function: (f(z+eps) - f(z-eps)) / (2*eps).
+    # We use this instead of the textbook derivative formula so the slope numbers we
+    # print come from the code above, not from an identity that would hold anyway.
+    return float((bend(z + EPS) - bend(z - EPS)) / (2.0 * EPS))
+
+
 if __name__ == "__main__":
     # --- Part 1: print all five bends over a small grid -------------------
     # A row of 13 evenly spaced inputs from -6 to +6 — enough to see each shape.
+    # ("grid" here means this row of INPUT values, the lesson's own word for it. Day 3
+    # uses "grid" for a weight matrix instead — two ideas, one word, so read the type.)
     grid = np.linspace(-6, 6, 13)
 
     print("input z :", np.round(grid, 2))
@@ -52,18 +64,44 @@ if __name__ == "__main__":
     print("tanh    :", np.round(tanh(grid), 3))          # inside (-1, 1), and 0 at 0
 
     # --- Part 2: the slope facts that seed today's failures ---------------
-    # sigmoid'(z) = sigmoid(z) * (1 - sigmoid(z)); at z=0 that is 0.5*0.5 = 0.25.
-    s0 = sigmoid(0.0)
-    sigmoid_slope_at_0 = s0 * (1 - s0)
-    print("\nsigmoid'(0) =", round(float(sigmoid_slope_at_0), 4),
+    # The textbook says sigmoid'(z) = sigmoid(z) * (1 - sigmoid(z)); at z=0 that is
+    # 0.5*0.5 = 0.25. The number we headline is MEASURED on the sigmoid we wrote above,
+    # not read off that formula. The formula is kept as a second opinion — and a second
+    # opinion only counts as evidence if you can SEE it, so we print it too, and we
+    # compare it against the measurement at every point on the grid instead of only at
+    # z = 0. An unprinted, single-point "agreement" could be a hardcoded 0.25 and nobody
+    # reading the output would ever know.
+    sigmoid_slope_at_0 = central_slope(sigmoid, 0.0)      # measured on our sigmoid
+    printed_sigmoid_slope = round(sigmoid_slope_at_0, 4)  # the number the next line prints
+    formula_slopes = sigmoid(grid) * (1 - sigmoid(grid))  # the textbook formula, whole grid
+    measured_slopes = np.array([central_slope(sigmoid, z) for z in grid])
+    max_slope_gap = float(np.max(np.abs(measured_slopes - formula_slopes)))
+    zero_idx = int(np.argmin(np.abs(grid)))               # where z == 0 sits on the grid
+    # One expression, one value, two uses: the number printed below IS the number checked.
+    formula_slope_at_0 = round(float(formula_slopes[zero_idx]), 4)
+    print("\nsigmoid'(0) =", printed_sigmoid_slope,
           "(peak slope ~0.25 -> shrinks the backward signal in deep sigmoid nets)")
+    print("  second opinion: sigmoid(0)*(1-sigmoid(0)) =", formula_slope_at_0,
+          f"| worst measured-vs-formula gap across all 13 grid points = {max_slope_gap:.2e}")
     # ReLU's slope on the negative side is exactly 0 -> the seed of a "dead" ReLU.
     # Leaky ReLU keeps a small slope alpha there -> the seed of the cure.
-    print("ReLU slope for negatives = 0   (can go 'dead')")
-    print("leaky slope for negatives = 0.01 (small alpha keeps it alive)")
+    # Both numbers below are measured at z = -1, not typed in by hand.
+    relu_neg_slope = central_slope(relu, -1.0)
+    leaky_neg_slope = round(central_slope(leaky_relu, -1.0), 4)
+    print(f"ReLU slope for negatives = {relu_neg_slope:g}   (can go 'dead')")
+    print(f"leaky slope for negatives = {leaky_neg_slope:g} (small alpha keeps it alive)")
 
     # --- Part 3: watch two linear layers collapse into one ----------------
-    # These fixed weights are the lesson's "anchor pair".
+    # These fixed weights are the lesson's "anchor pair". Day 3 re-uses this exact
+    # numeric pair under the names A = W1 and B = W2, so the two days are running one
+    # demo — see the layout note in Part 3b for why their printed grids differ.
+    #
+    # LAYOUT CONVENTION (today: ROW-on-the-left). The input rides in as a ROW and the
+    # weights sit to its RIGHT: x @ W1 @ W2. In this layout a matrix's ROWS are its
+    # INPUTS and its COLUMNS are its neurons, and the stations multiply LEFT-to-RIGHT,
+    # so the combined grid is W1 @ W2. Day 3 uses the other layout (a COLUMN input on
+    # the right: W @ x + b, "rows = neurons, columns = inputs"). Do not carry one day's
+    # matrices into the other day's layout untransposed — Part 3b prints what happens.
     W1 = np.array([[1.0, 2.0], [0.0, 1.0]])
     W2 = np.array([[1.0, 0.0], [3.0, 1.0]])
 
@@ -75,13 +113,34 @@ if __name__ == "__main__":
     x_b = np.array([[-1.0, 3.0]])    # x_b@W1 = [-1,  1]  -> relu -> [0, 1]
 
     # Path A: push x through layer 1, THEN through layer 2 (no bend between).
-    two_layers = (x_a @ W1) @ W2
+    two_layers = (x_a @ W1) @ W2       # Day 3 calls this same two-station path no_bend
     # Path B: multiply the two weight matrices FIRST, then push x through once.
-    one_layer = x_a @ (W1 @ W2)
+    one_layer = x_a @ (W1 @ W2)        # Day 3 calls this same one-station answer one_step
+    # ONE name for the object both paths share: the single matrix the two layers fold
+    # into. Day 3 calls it combined_grid, so use its name here too.
+    combined_grid = W1 @ W2
 
-    print("\nW1 @ W2 =\n", (W1 @ W2).astype(int))     # the single combined matrix
+    print("\nW1 @ W2 =\n", combined_grid.astype(int))   # the single combined matrix
     print("(x_a@W1)@W2 =", np.round(two_layers, 4))    # two layers...
     print("x_a@(W1@W2) =", np.round(one_layer, 4))     # ...land on the SAME numbers
+
+    # --- Part 3b: say the layout out loud, and pin BOTH orders --------------
+    # Matrix multiply is not commutable, so the layout decides the ORDER the stations
+    # combine in. Today's row layout gives W1 @ W2. Day 3's column layout, fed the same
+    # NUMBERS, gives the other order W2 @ W1 — a different network, not a typo. And to
+    # rewrite TODAY's network as a column layer you TRANSPOSE the combined grid:
+    # x @ (W1@W2) == ((W1@W2).T @ x.T).T. Pinning all three keeps the two days from ever
+    # drifting into a real disagreement, and shows why an untransposed carry-over breaks.
+    day03_column_grid = W2 @ W1                # the order Day 3's layout multiplies in
+    today_as_column = combined_grid.T          # today's OWN network, written as columns
+    today_column_out = (today_as_column @ x_a.T).T
+    print("layout: x is a ROW on the left today, so the combined grid is W1 @ W2 =",
+          combined_grid.astype(int).tolist())
+    print("        Day 3 puts x in a COLUMN on the right, so its order is W2 @ W1 =",
+          day03_column_grid.astype(int).tolist(), "(same numbers, other order)")
+    print("        today's network AS a column layer = (W1@W2).T =",
+          today_as_column.astype(int).tolist(), "-> (W1@W2).T @ x_a.T =",
+          np.round(today_column_out, 4), "(same answer, transposed layout)")
 
     # --- Part 4: slip a ReLU in the middle and break the collapse ---------
     # How do we PROVE that no single matrix can reproduce the bent path? Not by showing
@@ -108,26 +167,125 @@ if __name__ == "__main__":
     print("-> the bent path does NOT add up, and every single matrix does,",
           "so no single matrix can reproduce it: the bend cannot be folded flat")
 
+    # --- Part 4b: run the SAME test on a lopsided pair, so it can actually fail ----
+    # Read the pair above again: x_b is exactly -x_a, so x_a + x_b is the all-zero row.
+    # That makes the lesson's numbers easy to read, but it makes the STRAIGHT claim say
+    # almost nothing: for any linear g, g(x_a) + g(-x_a) is zero and g(0) is zero, so
+    # "adds up: True" and the printed [[0,0]] would show up with the WRONG matrices
+    # inside g just as happily (swap the order to x@W2@W1, or use x@W1@W1 — the zeros
+    # hide it). A test whose answer does not depend on the code is not a test.
+    # So run it again on a lopsided pair whose sum is a real, nonzero third point, and
+    # pin the numbers it lands on. Now the code has to be right for the output to match.
+    # (Day 3 runs this same test in its own column layout with its own different
+    # numbers — same convention, different data, deliberately not a copy of these.)
+    x_c = np.array([[2.0, 1.0]])           # NOT the negation of x_a
+    x_lop = x_a + x_c                      # = [[3., -2.]] — nonzero, and mixed-sign after W1
+    # Compute each quantity ONCE, print that name, assert that same name.
+    straight_lop_sum = g(x_a) + g(x_c)     # g of each, then added
+    straight_lop_of_sum = g(x_lop)         # g of the sum
+    bent_lop_sum = f(x_a) + f(x_c)
+    bent_lop_of_sum = f(x_lop)
+    lin_lop_adds_up = np.allclose(straight_lop_of_sum, straight_lop_sum)
+    bent_lop_adds_up = np.allclose(bent_lop_of_sum, bent_lop_sum)
+    print("\nlopsided pair x_a =", x_a.tolist(), "x_c =", x_c.tolist(),
+          "-> x_a + x_c =", x_lop.tolist(), "(a distinct, NONZERO point)")
+    print("straight path  g(x_a)+g(x_c) =", np.round(straight_lop_sum, 4),
+          " g(x_a+x_c) =", np.round(straight_lop_of_sum, 4),
+          " -> adds up:", lin_lop_adds_up)
+    print("bent path      f(x_a)+f(x_c) =", np.round(bent_lop_sum, 4),
+          " f(x_a+x_c) =", np.round(bent_lop_of_sum, 4),
+          " -> adds up:", bent_lop_adds_up)
+
     # --- Self-check: assert the lesson's stated expected values -----------
+    # (a) Every curve printed in Part 1 gets pinned to a written-down row. Without
+    # these, any bend could be quietly changed (alpha 0.01 -> 0.1, a sign flip inside
+    # sigmoid, tanh(z) -> tanh(z/2), step's >= -> >) and the table above would print
+    # different numbers with nothing to object. z = 0 IS on the grid, so the row for
+    # `step` also decides the boundary rule: >= fires at exactly 0, > does not.
+    expected_curves = {
+        "step":    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+        "relu":    [0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6],
+        "leaky":   [-0.06, -0.05, -0.04, -0.03, -0.02, -0.01, 0, 1, 2, 3, 4, 5, 6],
+        "sigmoid": [0.002, 0.007, 0.018, 0.047, 0.119, 0.269,
+                    0.5, 0.731, 0.881, 0.953, 0.982, 0.993, 0.998],
+        "tanh":    [-1, -1, -0.999, -0.995, -0.964, -0.762,
+                    0, 0.762, 0.964, 0.995, 0.999, 1, 1],
+    }
+    printed_curves = {"step": step(grid), "relu": relu(grid), "leaky": leaky_relu(grid),
+                      "sigmoid": sigmoid(grid), "tanh": tanh(grid)}
+    curves_match = all(np.array_equal(np.round(printed_curves[name], 3),
+                                      np.array(row, dtype=float))
+                       for name, row in expected_curves.items())
+
+    # (b) The three slope numbers, each measured on the real bend in Part 2. These pin
+    # the exact values Part 2 printed — no tolerance to loosen, so a wrong slope cannot
+    # slip through by being "close enough".
+    sigmoid_ok = printed_sigmoid_slope == 0.25              # measured sigmoid'(0) == 0.25
+    # The second opinion is now a printed number, and it is checked at all 13 grid points
+    # instead of only at z = 0 — so a hardcoded formula shows up as a widening gap.
+    formula_agrees = (formula_slope_at_0 == printed_sigmoid_slope
+                      and max_slope_gap < 1e-6)
+    slopes_match = relu_neg_slope == 0.0 and leaky_neg_slope == 0.01
+
+    # (c) The collapse. `collapse_holds` alone is matrix associativity — true for ANY
+    # W1, W2, x — so it would still hold with the wrong operands. The literal pin is
+    # what makes it a claim about THESE numbers.
     expected_W = np.array([[7, 2], [3, 1]])              # the lesson says expect [[7,2],[3,1]]
+    expected_collapse = np.array([[-2.0, -1.0]])         # ...and both paths land here
     collapse_holds = np.allclose(two_layers, one_layer)   # two linear layers == one
-    W_matches = np.array_equal((W1 @ W2).astype(int), expected_W)
-    sigmoid_ok = abs(sigmoid_slope_at_0 - 0.25) < 1e-9    # sigmoid'(0) == 0.25
+    collapse_values_match = (np.allclose(two_layers, expected_collapse)
+                             and np.allclose(one_layer, expected_collapse))
+    W_matches = np.array_equal(combined_grid.astype(int), expected_W)
+    # (c2) The layout, pinned in both orders. Day 3 prints W2 @ W1 = [[1,2],[3,7]] for
+    # the same numbers; today's own network in that column layout is the TRANSPOSE of
+    # today's grid, [[7,3],[2,1]] — which is NOT W2 @ W1, and that is the whole warning.
+    layout_ok = (np.array_equal(day03_column_grid.astype(int), [[1, 2], [3, 7]])
+                 and np.array_equal(today_as_column.astype(int), [[7, 3], [2, 1]])
+                 and not np.array_equal(day03_column_grid, today_as_column)
+                 and np.allclose(today_column_out, expected_collapse))
     bend_breaks = lin_adds_up and not bent_adds_up        # only the bent path fails additivity
     values_match = (np.allclose(f(x_a) + f(x_b), [[4.0, 1.0]])
                     and np.allclose(f(x_sum), [[0.0, 0.0]]))  # the lesson's printed numbers
+    # (d) The lopsided pair from Part 4b. These four literals are what give the additivity
+    # test teeth: with x_b = -x_a every term is zero, so the printed [[0,0]] survives a
+    # wrong g; on the lopsided pair a wrong g prints different numbers and these fail.
+    lop_bend_breaks = lin_lop_adds_up and not bent_lop_adds_up
+    lop_values_match = (np.allclose(straight_lop_sum, [[15.0, 4.0]])
+                        and np.allclose(straight_lop_of_sum, [[15.0, 4.0]])
+                        and np.allclose(bent_lop_sum, [[18.0, 5.0]])
+                        and np.allclose(bent_lop_of_sum, [[15.0, 4.0]]))
 
-    if collapse_holds and W_matches and sigmoid_ok and bend_breaks and values_match:
+    if (curves_match and slopes_match and collapse_holds and collapse_values_match
+            and W_matches and layout_ok and sigmoid_ok and formula_agrees and bend_breaks
+            and values_match and lop_bend_breaks and lop_values_match):
         print("\n✅ you got it")
     else:
-        print("\n❌ not yet — expected W1@W2 == [[7,2],[3,1]], "
-              "(x_a@W1)@W2 == x_a@(W1@W2), sigmoid'(0) == 0.25, the straight path to "
-              "add up, and the bent path to give [[4,1]] vs [[0,0]]")
+        print("\n❌ not yet — expected the five printed curves to match their pinned rows, "
+              "slopes of 0 (ReLU) and 0.01 (leaky) on the negative side, "
+              "W1@W2 == [[7,2],[3,1]], both collapse paths == [[-2,-1]], "
+              "the column layout to read W2@W1 == [[1,2],[3,7]] and (W1@W2).T == [[7,3],[2,1]], "
+              "measured sigmoid'(0) == 0.25 with the formula agreeing across the grid, "
+              "the straight path to add up, the bent path to give [[4,1]] vs [[0,0]], "
+              "and the lopsided pair to give straight [[15,4]] both ways with bent "
+              "[[18,5]] vs [[15,4]]")
 
     # These asserts make the check hard (they stop the program if a fact is wrong).
+    assert curves_match, "each printed bend must match its pinned row over the grid"
+    assert slopes_match, "negative-side slopes should measure 0 (ReLU) and 0.01 (leaky)"
     assert W_matches, "W1@W2 should be [[7,2],[3,1]]"
+    assert layout_ok, ("the row layout's grid is W1@W2; the column order W2@W1 is "
+                       "[[1,2],[3,7]] (Day 3's number) and today's network as a column "
+                       "layer is the transpose (W1@W2).T = [[7,3],[2,1]]")
     assert collapse_holds, "(x_a@W1)@W2 must equal x_a@(W1@W2) — two linear layers are one"
-    assert sigmoid_ok, "sigmoid'(0) should be 0.25"
+    assert collapse_values_match, "both collapse paths should land on [[-2,-1]]"
+    assert sigmoid_ok, "measured sigmoid'(0) should be 0.25"
+    assert formula_agrees, ("the printed formula sigmoid(z)*(1-sigmoid(z)) must equal the "
+                           "measured slope at z=0 and match it at every grid point")
     assert lin_adds_up, "a straight (linear) path must always add up"
     assert not bent_adds_up, "a ReLU between the layers must break additivity"
     assert values_match, "expected f(x_a)+f(x_b) == [[4,1]] and f(x_a+x_b) == [[0,0]]"
+    assert lop_bend_breaks, ("on the lopsided pair too, only the bent path may fail "
+                             "additivity")
+    assert lop_values_match, ("expected the lopsided pair to give straight [[15,4]] both "
+                              "ways, and bent [[18,5]] vs [[15,4]]")
+

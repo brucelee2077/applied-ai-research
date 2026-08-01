@@ -251,7 +251,7 @@ cross-day pass. Hand-author only when the target is a single day.
   sessions/<module>/<day>/experiment.py` (structural contract + a REAL run).
   `frontier-refactor-qa` owns what that gate does and does not prove.
 
-**Writing a self-check that cannot fail is the default failure mode, not an edge case.** Nine
+**Writing a self-check that cannot fail is the default failure mode, not an edge case.** Ten
 vacuity patterns and five harder no-op traps were each proven on a real day by planting the bug
 and watching the script still print `✅ you got it`. Read
 **`sessions/_compiler/AUTHORING.md` section 10** for the catalogue with worked examples before you
@@ -260,6 +260,9 @@ consequences: assert exception TYPES, never a library's message text; compute an
 from the inputs instead of hardcoding a string; and choose shapes and values where a wrong
 spelling gives a DIFFERENT answer — a parameter initialised to zero, symmetric test data
 (`Q = K = V = x`), a uniform output, or floor division each make their own code path untestable.
+And **print the same object you assert**: compute a quantity once, bind it to a name, then print
+that name and assert that name. Two parallel expressions for one claim means corrupting the printed
+one is invisible, and the learner reads a wrong number under a `✅`.
 Then PROVE the check bites: plant **at least 4 semantic defects, one at a time, on a copy in
 `/tmp`**, and confirm each is caught while diffing the FULL stdout — a plant that reproduces the
 same value is a no-op and proves nothing about your check. A writer cannot clear its own

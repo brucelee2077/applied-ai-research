@@ -9,16 +9,24 @@
 
 import numpy as np  # arrays, matrix multiply (@), and seeded random numbers
 
-PIXELS, CLASSES, HIDDEN = 64, 10, 128   # 8x8 "pixels" -> 128 hidden units -> 10 digits
+# DEVIATION, on purpose and only for today: days 1, 2, 3 and 5 all run PIXELS = 784 (a 28x28
+# image). Today needs a model that is clearly over-powered for its 300 training examples, so the
+# input shrinks to an 8x8 = 64-pixel stamp while the hidden layer stays at 128. The tuple is
+# written in the module's order — PIXELS, HIDDEN, CLASSES — so the line can be read at a glance.
+PIXELS, HIDDEN, CLASSES = 64, 128, 10   # 8x8 "pixels" -> 128 hidden units -> 10 digits
 DROP_P = 0.5                            # the lesson's dropout rate: bench half the units
 EPOCHS = 40                             # full passes through the training data, both runs
 
 def mse(gaps):
-    # Mean squared error: square every gap, then average. Big misses count for much more.
+    # Mean squared error: square every gap, then average over every ELEMENT (day 2's
+    # denominator). Big misses count for much more. Day 3 uses a different, named reduction.
     return float(np.mean(np.square(gaps)))
 
 def cross_entropy(probs, labels):
-    # Cross-entropy: -log(the probability the model gave the TRUE class), averaged.
+    # Cross-entropy: -log(the probability the model gave the TRUE class), averaged. NOTE what
+    # this eats: PROBABILITIES, already through softmax_rows. Day 5's nn.CrossEntropyLoss eats
+    # raw scores instead, because it runs the softmax itself — day 5 prints what happens if you
+    # carry today's habit over and hand it probabilities.
     return float(np.mean(-np.log(probs[np.arange(len(labels)), labels])))
 
 def softmax_rows(scores):
@@ -36,11 +44,25 @@ def dropout_mask(dice, shape, p):
     # survivor the 1/(1-p) boost. A benched unit gets 0, a survivor gets 1/(1-p).
     return (dice.random(shape) > p) * keep_scale(p)
 
+def forward_eval(x, W1, b1, W2, b2, dice=None, drop_p=0.0):
+    # THE eval path, used in three places: the per-epoch validation score inside the loop, the
+    # signal ladder in Part 5, and Part 6's "steady" predictions. Dropout stays off unless a
+    # caller hands over dice, so if dropout ever leaked into this path Part 6's three repeats
+    # would stop matching — the one code change that makes eval mode stop repeating.
+    hidden = np.maximum(0, x @ W1 + b1)
+    if drop_p:
+        hidden = hidden * dropout_mask(dice, hidden.shape, drop_p)
+    return hidden, softmax_rows(hidden @ W2 + b2)   # raw scores (day 1's logits) -> probabilities
+
 # No dataset is cached on this machine, so we synthesize 8x8 = 64-pixel "digit stamps": each
 # class gets one fixed prototype, and every example is that prototype plus noise. A fraction
 # of the TRAINING labels is then made wrong on purpose — that wrong-label noise is what the
 # lesson says an over-powered model memorizes. The validation labels are all left correct.
-def make_stamps(rng, prototypes, per_class, wrong_fraction):
+# SECOND DEVIATION: day 1 pinned its pixels to bytes scaled into exactly [0.0, 1.0]. These
+# stamp values are prototype + N(0, 1), so they are centred near 0 and run negative — the other
+# standard input scaling, not day 1's. Part 2 prints the real range and pins it, so the change
+# is on the page rather than hidden behind the word "pixels".
+def make_stamps(prototypes, per_class, wrong_fraction, rng):   # rng last, as on days 1 and 3
     labels = np.repeat(np.arange(CLASSES), per_class)
     images = prototypes[labels] + rng.normal(0, 1.0, (len(labels), PIXELS))
     spoiled = rng.permutation(len(labels))[:int(round(wrong_fraction * len(labels)))]
@@ -51,6 +73,7 @@ def make_stamps(rng, prototypes, per_class, wrong_fraction):
 def train_run(train_x, train_y, val_x, val_y, drop_p, epochs=EPOCHS, lr=0.05, batch=16):
     """Day 3's mini-batch loop, now recording BOTH average losses every epoch."""
     start = np.random.default_rng(1)                 # both runs get the same starting weights
+    # Day 1's He spread and Day 1's (in, out) layout: W1 is (64, 128), W2 is (128, 10).
     W1 = start.normal(0, np.sqrt(2 / PIXELS), (PIXELS, HIDDEN)); b1 = np.zeros(HIDDEN)
     W2 = start.normal(0, np.sqrt(2 / HIDDEN), (HIDDEN, CLASSES)); b2 = np.zeros(CLASSES)
     dice = np.random.default_rng(2)                  # the dice that bench neurons
@@ -62,21 +85,21 @@ def train_run(train_x, train_y, val_x, val_y, drop_p, epochs=EPOCHS, lr=0.05, ba
         for first in range(0, len(shuffled), batch):          # --- train mode: dropout ON ---
             rows = shuffled[first:first + batch]
             x, y = train_x[rows], train_y[rows]
-            pre = x @ W1 + b1
-            hidden = np.maximum(0, pre)                       # ReLU
+            z1 = x @ W1 + b1                                  # days 1-3's pre-activation
+            hidden = np.maximum(0, z1)                        # ReLU
             # mask 1.0 means "keep everything, scale nothing" — that is the no-dropout run.
             mask = dropout_mask(dice, hidden.shape, drop_p) if drop_p else 1.0
             hidden = hidden * mask
             probs = softmax_rows(hidden @ W2 + b2)
             batch_losses.append(cross_entropy(probs, y))
-            d_scores = probs.copy()                           # gradient of softmax + x-entropy
-            d_scores[np.arange(len(y)), y] -= 1
-            d_scores /= len(y)
-            d_pre = (d_scores @ W2.T) * mask * (pre > 0)       # benched units get no gradient
-            W2 -= lr * (hidden.T @ d_scores); b2 -= lr * d_scores.sum(axis=0)
-            W1 -= lr * (x.T @ d_pre);         b1 -= lr * d_pre.sum(axis=0)
+            d_out = probs.copy()                       # day 2's seed delta, for softmax+x-entropy
+            d_out[np.arange(len(y)), y] -= 1
+            d_out /= len(y)
+            d_hidden = (d_out @ W2.T) * mask * (z1 > 0)        # benched units get no gradient
+            W2 -= lr * (hidden.T @ d_out); b2 -= lr * d_out.sum(axis=0)
+            W1 -= lr * (x.T @ d_hidden);   b1 -= lr * d_hidden.sum(axis=0)
         # --- eval mode: dropout OFF, every unit kept, no scaling ---
-        val_probs = softmax_rows(np.maximum(0, val_x @ W1 + b1) @ W2 + b2)
+        _, val_probs = forward_eval(val_x, W1, b1, W2, b2)
         history.append((float(np.mean(batch_losses)), cross_entropy(val_probs, val_y)))
     return history, (W1, b1, W2, b2)
 
@@ -113,13 +136,21 @@ if __name__ == "__main__":
     # --- Part 2: split the data into train and held-out validation ---------
     rng = np.random.default_rng(0)
     prototypes = 0.5 * rng.normal(0, 1, (CLASSES, PIXELS))     # one stamp per digit
-    train_x, train_y = make_stamps(rng, prototypes, 30, 0.4)   # small slice, 40% wrong labels
-    val_x, val_y = make_stamps(rng, prototypes, 50, 0.0)       # never trained on, clean labels
+    train_x, train_y = make_stamps(prototypes, 30, 0.4, rng)   # small slice, 40% wrong labels
+    val_x, val_y = make_stamps(prototypes, 50, 0.0, rng)       # never trained on, clean labels
+    # Day 1 counted 101770 "knobs" = weights PLUS both bias vectors. This count is WEIGHTS only
+    # (the biases would add HIDDEN + CLASSES = 138); it is the number the over-powered argument
+    # rests on, so the two days are quoting two different quantities under similar words.
     weights = PIXELS * HIDDEN + HIDDEN * CLASSES
     print(f"\ntrain images {train_x.shape} labels {train_y.shape}"
           f" | held-out val {val_x.shape} labels {val_y.shape}")
     print(f"model {PIXELS} -> {HIDDEN} -> {CLASSES} = {weights} weights for {len(train_y)}"
           " training examples (over-powered on purpose)")
+    # The pixel-range deviation, measured. Day 1's rule was bytes scaled into exactly [0.0, 1.0];
+    # these stamp values are prototype + N(0, 1), so they run negative and are not bounded by 1.
+    stamp_lo, stamp_hi = float(train_x.min()), float(train_x.max())
+    print(f"stamp values run ({stamp_lo:.2f}, {stamp_hi:.2f}) — NOT day 1's [0.0, 1.0] byte"
+          " pixels: these are centred near 0 with spread ~1, the other standard input scaling")
     # Three predictions, written down BEFORE the runs and tested in the self-check below.
     print("predict: (1) train loss -> near 0 while validation turns UP; (2) the rising curve is"
           " VALIDATION; (3) dropout makes the gap SMALLER")
@@ -131,11 +162,15 @@ if __name__ == "__main__":
     print(f"\nlesson's table {lesson_val} -> the bottom-finder says epoch"
           f" {validation_bottom(lesson_val)} (the lesson read epoch 3, loss {min(lesson_val)})")
     print("\n--- Run A: NO dropout ---")
-    hist_a, _ = train_run(train_x, train_y, val_x, val_y, drop_p=0.0)
+    hist_a, params_a = train_run(train_x, train_y, val_x, val_y, drop_p=0.0)
     best_a, train_a, val_a, best_val_a = show_curve(hist_a)
     rise_a, gap_a = val_a - best_val_a, val_a - train_a
     print(f"  validation was lowest at epoch {best_a}, then rose by {rise_a:.3f} while train dived")
     print(f"  final gap (validation - train) = {gap_a:.3f} <- this growing gap IS overfitting")
+    # The two bias rows started as exact zeros, so whatever they hold now was learned by the two
+    # bias update lines in the loop. Both numbers are pinned tightly in the self-check.
+    b1_a, b2_a = params_a[1], params_a[3]
+    print(f"  biases started at 0 and learned: b1 spread {b1_a.std():.4f}, b2 top {b2_a.max():.4f}")
 
     # --- Part 4: Run B — the same run, now with dropout p = 0.5 ------------
     print(f"\n--- Run B: dropout p = {DROP_P} (train mode only, survivors x{keep_scale(DROP_P)}) ---")
@@ -152,7 +187,7 @@ if __name__ == "__main__":
     print(f"\n4 units kept as-is -> total {4 * 1.0} | 2 benched, survivors"
           f" x{keep_scale(DROP_P)} -> total {kept_total}")
     W1, b1, W2, b2 = params_b
-    hidden_eval = np.maximum(0, val_x[:1] @ W1 + b1)           # eval mode: all units kept
+    hidden_eval, _ = forward_eval(val_x[:1], W1, b1, W2, b2)   # eval mode: all units kept
     dice = np.random.default_rng(11)
     masks = dropout_mask(dice, (500,) + hidden_eval.shape, DROP_P)   # 500 random benchings
     eval_signal = float(hidden_eval.sum())
@@ -162,10 +197,13 @@ if __name__ == "__main__":
           f" vs {unscaled_mean:.3f} (if you forget to scale)")
 
     # --- Part 6: the silent bug — dropout left ON at prediction time -------
-    steady_rows = [softmax_rows(hidden_eval @ W2 + b2)[0] for _ in range(3)]   # eval mode
+    # Both sets of rows go through the SAME forward_eval the loop scored validation with; the
+    # ONLY difference is whether dice and a drop rate are handed in. So "eval mode repeats" is a
+    # claim about that code path, not about re-reading one expression three times.
+    steady_rows = [forward_eval(val_x[:1], W1, b1, W2, b2)[1][0] for _ in range(3)]   # eval mode
     dice = np.random.default_rng(7)
-    flicker_rows = [softmax_rows((hidden_eval * m) @ W2 + b2)[0]               # train mode, oops
-                    for m in dropout_mask(dice, (3,) + hidden_eval.shape, DROP_P)]
+    flicker_rows = [forward_eval(val_x[:1], W1, b1, W2, b2, dice, DROP_P)[1][0]       # oops: ON
+                    for _ in range(3)]
     print("\nsame picture, dropout still ON -> digit", [int(r.argmax()) for r in flicker_rows],
           "confidence", [round(float(r.max()), 3) for r in flicker_rows])
     print("same picture, eval mode        -> digit", [int(r.argmax()) for r in steady_rows],
@@ -189,6 +227,12 @@ if __name__ == "__main__":
         and validation_bottom(lesson_val) == 3
         and validation_bottom([0.9, 0.8, 0.7]) == 3
         and validation_bottom([0.7, 0.8, 0.9]) == 1)
+    # The two places this day leaves the module's spine, pinned so neither can pass as an
+    # accident: a 64-pixel input (days 1/2/3/5 use 784) with the tuple still in PIXELS, HIDDEN,
+    # CLASSES order, and stamp values that really do leave day 1's [0.0, 1.0] band on BOTH sides.
+    inputs_ok = ((PIXELS, HIDDEN, CLASSES) == (64, 128, 10)
+                 and abs(stamp_lo + 4.76) < 0.02 and abs(stamp_hi - 4.36) < 0.02
+                 and stamp_lo < 0.0 < 1.0 < stamp_hi)
     # A wrong scale factor shows up here: scaled must match eval, unscaled must be half of it.
     # A mask that KEPT with probability p would look fine at p = 0.5, so probe an uneven rate
     # too: at p = 0.75 only about a quarter of the units may survive, each boosted by 4.
@@ -219,25 +263,38 @@ if __name__ == "__main__":
     dropout_ok = (abs(gap_a - 1.375) < 0.05 and abs(gap_b - 0.742) < 0.05
                   and gap_smaller_all_along
                   and best_val_b < best_val_a and rise_b < rise_a / 2 and train_b > 0.20)
+    # The two bias update lines: b1 and b2 start as exact zeros, so these two pins fail flat (at
+    # 0.0000) if either line stops running, and shift far past 1e-4 if either one uses the wrong
+    # gradient or step. The run is fully seeded, so both numbers are pinned to what it printed.
+    biases_learned_ok = (abs(float(b1_a.std()) - 0.026786) < 1e-4
+                         and abs(float(b2_a.max()) - 0.068894) < 1e-4)
     # The eval-mode bug: three dropout-ON passes all disagree, three eval passes are identical,
-    # and leaving dropout on flipped the predicted digit on at least one pass.
+    # and leaving dropout on flipped the predicted digit on at least one pass. Both sets came out
+    # of forward_eval, so dropout leaking into that path breaks the "identical" clause.
     steady, top = steady_rows[0], int(steady_rows[0].argmax())
     eval_bug_ok = (len({r.tobytes() for r in flicker_rows}) == 3
                    and len({r.tobytes() for r in steady_rows}) == 1
                    and any(int(r.argmax()) != top for r in flicker_rows)
                    and max(float(steady.max() - r[top]) for r in flicker_rows) > 0.30)
 
-    if lesson_numbers_ok and scale_ok and split_ok and dropout_ok and eval_bug_ok:
+    if (lesson_numbers_ok and scale_ok and split_ok and dropout_ok and eval_bug_ok
+            and biases_learned_ok and inputs_ok):
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected MSE 5.3125, cross-entropy 0.11/0.69/4.61 (about 40x the "
               "pain), the bottom-finder to say epoch 3 on the lesson's table, 1/(1-0.5) == 2, "
+              "a 64 -> 128 -> 10 model on stamp values spanning (-4.76, 4.36) rather than day "
+              "1's [0, 1], "
               "Run A to dive to train 0.047 while validation dips to 1.231 and climbs back to "
-              "1.422 (gap 1.375), Run B's gap near 0.742 and narrower at every late epoch, and "
+              "1.422 (gap 1.375), Run B's gap near 0.742 and narrower at every late epoch, "
+              "Run A's learned biases at b1 spread 0.0268 / b2 top 0.0689, and "
               "dropout-ON predictions to differ while eval-mode ones repeat")
 
     assert lesson_numbers_ok, "MSE 5.3125, cross-entropy 0.11/0.69/4.61, bottom-finder epoch 3"
+    assert inputs_ok, ("today's deliberate deviations: a 64-pixel input in PIXELS, HIDDEN, "
+                       "CLASSES order, and stamp values outside day 1's [0.0, 1.0]")
     assert scale_ok, "p = 0.5 must scale survivors by 2 so the average signal matches eval mode"
     assert split_ok, "Run A must dive on train while the held-out loss dips early, then climbs"
     assert dropout_ok, "dropout must shrink the gap all along and the late rise, and cost train"
+    assert biases_learned_ok, "both bias update lines must run: b1 spread 0.0268, b2 top 0.0689"
     assert eval_bug_ok, "dropout left ON must give different answers; eval mode must repeat"

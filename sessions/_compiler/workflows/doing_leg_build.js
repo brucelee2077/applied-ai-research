@@ -28,6 +28,22 @@ export const meta = {
 //   force      rewrite every listed day even if its artifact already passes.
 //   plants     minimum semantic defects each day's self-check must catch (default 4).
 //   repair     false to skip the bounded repair round (findings then just stand).
+//
+// ⚠️ OBSERVED FAILURE MODE — THE MODULE-WIDE REVIEWER STALLS ON A BIG MODULE.
+// This engine funnels the whole module through ONE adversarial reviewer, which is
+// deliberate (a per-day reviewer cannot see cross-day collisions). But on a 9-day
+// module that is 70+ plants in a single agent, and on 2026-08-01 an equivalent
+// hand-run reviewer for a 5-day module STALLED SIX TIMES (no progress for 180s
+// each) and its workflow failed with the repairs already applied — leaving the
+// module repaired but UNVERIFIED, which is the worst state to leave silently.
+// Mitigations, in order of preference:
+//   1. Run the engine on a SUBSET of days per invocation (the day list is already
+//      explicit) and let the cross-day pass run once over the full module after.
+//   2. Lower `plants` for the first pass, then re-run for depth.
+//   3. If a run dies after the writers, DO NOT report the module as verified.
+//      Re-plant by hand: copy each day to /tmp, apply one recorded plant at a
+//      time, and diff FULL stdout. A stalled prover is missing evidence, not
+//      evidence of success.
 // ---------------------------------------------------------------------------
 const A = args || {}
 const module_ = A.module || ''
@@ -77,7 +93,7 @@ function shortDay(day) {
 const SAFETY = `HARD CONSTRAINTS. Never run a git write command (no add / commit / checkout / stash / restore / rm / mv); read-only git (status, log, diff, show) is fine. Do not touch source.md, lesson.html, any other day's files, anything under portfolio/, any gate, or any skill. Work from the repo root /Users/ruifengli/Desktop/applied-ai-research and use system python3.`
 
 const VACUITY = `A PASSING ✅ IS NOT EVIDENCE THE CHECK MEANS ANYTHING. Every one of these was proven on a real day by planting the bug and watching the script still print "✅ you got it" — read sessions/_compiler/AUTHORING.md section 10 for the catalogue with worked examples, and do not reproduce any of them:
-  (1) circular — the expected value is re-derived from the code path under test; (2) too weak to see the bug (a sorted multiset after a reshape); (3) fake prediction — a hardcoded "predict" string, so compute the prediction from the inputs; (4) coupled to a library's error WORDING — assert the exception TYPE instead; (5) entailed clause — a tight pin that implies the loose one next to it; (6) constant fold — both sides are literals; (7) dead branch as a prediction; (8) self-derived tautology (argmin vs min of the same list); (9) identity / scale-invariant claim (cosine(v, v) == 1.0).
+  (1) circular — the expected value is re-derived from the code path under test; (2) too weak to see the bug (a sorted multiset after a reshape); (3) fake prediction — a hardcoded "predict" string, so compute the prediction from the inputs; (4) coupled to a library's error WORDING — assert the exception TYPE instead; (5) entailed clause — a tight pin that implies the loose one next to it; (6) constant fold — both sides are literals; (7) dead branch as a prediction; (8) self-derived tautology (argmin vs min of the same list); (9) identity / scale-invariant claim (cosine(v, v) == 1.0); (10) print/assert divergence — the printed line and the asserted line are two SEPARATE expressions for one quantity, so corrupting only the print is invisible: compute once, bind a name, print that name and assert that same name.
 Pin every claim against a value WRITTEN DOWN in the self-check — prefer an exact round(x, 4) == <literal>, because a tolerance can only ever be widened.
 MAKE THE CODE PATH OBSERVABLE. A parameter initialised to zero cannot be tested (deleting a bias that is np.zeros changes nothing). A transpose is invisible on symmetric data (Q = K = V = x). /err.size vs /err.shape[0] is invisible when Y is (8, 1). A UNIFORM OUTPUT hides an axis bug exactly as well as a symmetric input — run the reduction on a lopsided map too. Floor division absorbs a changed kernel size ((32-4+2)//2+1 and (32-3+2)//2+1 are both 16), so evaluate several settings computed from ONE shared literal. A strictness (> 0.85 vs >= 0.85) is untestable unless a value sits exactly ON the boundary — add the tie. A symmetric aggregation hides an internal transpose, and "the diagonal is always the row max" hides reading the max instead of the LABELLED diagonal — pin the directions separately.`
 

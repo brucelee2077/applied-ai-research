@@ -11,32 +11,46 @@
 import numpy as np  # numpy gives us arrays, matrix multiply (@), and a seeded random generator
 
 def relu(z):   # the bend: keep positive numbers, turn negative ones into 0
-    return np.maximum(0.0, z)
+    return np.maximum(0, z)
 
-def forward(x, target, W1, b1, W2, b2):   # one forward trip; also returns the breadcrumbs
+def relu_gate(z):   # the saved mask: a unit is ON only if its forward input was STRICTLY above 0
+    return z > 0
+
+def forward(x, W1, b1, W2, b2):
+    """One forward trip. Returns day 1's 3-tuple UNCHANGED — (z1, hidden, out) — so the line
+    `z1, h, out = forward(...)` means the same slots it meant yesterday. The loss is scored
+    separately, by squared_loss below, instead of being wedged into the front of this tuple."""
     z1 = x @ W1 + b1                             # layer 1 raw score, before the bend
     h = relu(z1)                                 # the bend
-    out = h @ W2 + b2                            # layer 2 raw score = the 10 guesses
-    loss = float(((out - target) ** 2).mean())   # one honest number; lower is better
-    return loss, z1, h, out
+    out = h @ W2 + b2                            # layer 2 raw score = the 10 guesses (day 1's logits)
+    return z1, h, out
+
+def squared_loss(out, target):
+    # MSE, and its denominator, named: the mean runs over every ELEMENT of the error, so it
+    # divides by out.size (batch x 10) — NOT by the row count. Day 3 keeps this chain rule but
+    # switches to a different, named reduction, and prints the factor between the two.
+    return float(((out - target) ** 2).mean())   # one honest number; lower is better
 
 def backward(x, target, z1, h, out, W2):   # the backward pass by hand; no autograd anywhere
-    delta2 = 2.0 * (out - target) / out.size   # seed delta: slope of mean((out-target)^2) at out
-    dW2 = h.T @ delta2      # weight slope = delta times the layer's SAVED input
-    db2 = delta2.sum(0)     # bias slope = delta itself, added up over the batch rows
+    n_elements = out.size   # the SAME denominator squared_loss used: elements, not rows
+    delta2 = 2.0 * (out - target) / n_elements   # seed delta (later days call this d_out)
+    dW2 = h.T @ delta2         # weight slope = delta times the layer's SAVED input
+    db2 = delta2.sum(axis=0)   # bias slope = delta itself, added up over the batch rows
     # Pass blame back a layer, then through the ReLU gate: on-units keep their slope, off-units 0.
-    delta1 = (delta2 @ W2.T) * (z1 > 0)
+    delta1 = (delta2 @ W2.T) * relu_gate(z1)
     dW1 = x.T @ delta1
-    db1 = delta1.sum(0)
+    db1 = delta1.sum(axis=0)
     return dW1, db1, dW2, db2
 
-def numerical_slope(knob, index, x, target, knobs, h=1e-5):
-    # The slow honest second opinion: nudge ONE number by +h and -h, re-run the forward pass.
+def numerical_slope(knob, index, x, target, knobs, eps=1e-5):
+    # The slow honest second opinion: nudge ONE number by +eps and -eps, re-run the forward pass.
+    # (The lesson writes this step size as h; it is eps here because h is the hidden layer.)
     up = {name: value.copy() for name, value in knobs.items()}
     dn = {name: value.copy() for name, value in knobs.items()}
-    up[knob][index] += h
-    dn[knob][index] -= h
-    return (forward(x, target, **up)[0] - forward(x, target, **dn)[0]) / (2.0 * h)
+    up[knob][index] += eps
+    dn[knob][index] -= eps
+    return (squared_loss(forward(x, **up)[2], target)
+            - squared_loss(forward(x, **dn)[2], target)) / (2.0 * eps)
 
 def relative_gap(a, b):   # how far apart two numbers are, measured against their own size
     return abs(a - b) / max(abs(a), abs(b), 1e-8)
@@ -48,18 +62,28 @@ if __name__ == "__main__":
     downstream = upstream * local             # multiply-and-pass-back, in one line
     print("slopes 2, 3, 3 -> chain =", chain_product, "|  one box: upstream", upstream,
           "x local", local, "-> downstream", downstream)
-    print("squared miss: guess 2 vs target 5 ->", (2.0 - 5.0) ** 2, "| guess 4 ->", (4.0 - 5.0) ** 2)
+    hole_target = 5.0                                        # the lesson's target, written once
+    miss_2 = (2.0 - hole_target) ** 2                        # squared miss for the far guess
+    miss_4 = (4.0 - hole_target) ** 2                        # and for the closer guess
+    print("squared miss: guess 2 vs target 5 ->", miss_2, "| guess 4 ->", miss_4)
 
     # --- Part 2: push a gradient back through a ReLU gate ------------------
-    z_fwd = np.array([2.0, -1.0, 3.0, -0.5])            # what the forward pass produced here
-    upstream_delta = np.array([0.4, -0.7, 0.9, -0.2])   # blame arriving from the right
-    gate = z_fwd > 0                                    # the saved mask: was this unit on?
+    # The lesson's four entries, plus a fifth sitting exactly ON the hinge (z = 0), so that ONE
+    # gate call decides both the printed exhibit and the boundary case.
+    z_all = np.array([2.0, -1.0, 3.0, -0.5, 0.0])
+    delta_all = np.array([0.4, -0.7, 0.9, -0.2, 0.6])
+    gate_all = relu_gate(z_all)                         # the saved mask: was this unit on?
+    gated_all = delta_all * gate_all + 0.0   # the "+ 0.0" only turns -0.0 into 0.0 for printing
+    z_fwd, upstream_delta = z_all[:4], delta_all[:4]    # what the forward pass produced here
+    gate, gated_delta = gate_all[:4], gated_all[:4]     # blame arriving from the right, then gated
     predicted_survivors = int(gate.sum())    # the prediction is read off the inputs, not guessed
-    gated_delta = upstream_delta * gate + 0.0   # the "+ 0.0" only turns -0.0 into 0.0 for printing
     actual_survivors = int(np.count_nonzero(gated_delta))
     print("\nforward inputs :", z_fwd, "\nincoming delta :", upstream_delta)
     print("gate (on = 1)  :", gate.astype(int), "-> we predict", predicted_survivors, "of 4 live")
     print("outgoing delta :", gated_delta, "-> survived:", actual_survivors)
+    # The fifth entry: z = 0 counts as OFF, so its 0.6 of blame must vanish too.
+    print("on the hinge   : z =", z_all[4], "with delta", delta_all[4], "-> outgoing",
+          gated_all[4], "(z = 0 is OFF, not on)")
 
     # --- Part 3: forward pass, saving the breadcrumbs ----------------------
     rng = np.random.default_rng(0)
@@ -69,20 +93,42 @@ if __name__ == "__main__":
     x = rng.random((batch, n_in))
     target = np.eye(n_out)[[7, 2, 1, 0]]      # one row per image, 1.0 at the true digit
     # He initialization: a spread of sqrt(2 / inputs), so ReLU units are not born dead.
+    # Layout is day 1's convention, (in, out): W1 is (784, 128) and W2 is (128, 10).
     W1 = rng.standard_normal((n_in, n_hidden)) * np.sqrt(2.0 / n_in)
     W2 = rng.standard_normal((n_hidden, n_out)) * np.sqrt(2.0 / n_hidden)
     b1, b2 = np.zeros(n_hidden), np.zeros(n_out)   # the two biases start at zero
-    loss, z1, h, out = forward(x, target, W1, b1, W2, b2)
-    on_count = int((z1 > 0).sum())            # a breadcrumb: how many units were on
+    z1, h, out = forward(x, W1, b1, W2, b2)   # day 1's tuple, same order
+    loss = squared_loss(out, target)
+    on_count = int(relu_gate(z1).sum())       # a breadcrumb: how many units were on
     print("\nx", x.shape, "-> z1", z1.shape, "-> h", h.shape, "-> out", out.shape)
     print("out[0][:4] =", np.round(out[0][:4], 4), " target[0][:4] =", target[0][:4])
     print("hidden units on (z1 > 0):", on_count, "of", z1.size, " loss =", round(loss, 8))
+    # The denominator, made visible before it is used. This loss is a mean over ELEMENTS, so a
+    # 4-row batch of 10 scores divides by 40, not by 4. Seeding the backward pass with the row
+    # count instead — the mistake that reads as "average over the batch" — would multiply every
+    # delta by n_out. Here that factor is 10, and it is asserted below.
+    rows_seed = 2.0 * (out - target) / out.shape[0]        # the wrong denominator, written out
+    element_seed = 2.0 * (out - target) / out.size         # the one backward() really uses
+    seed_ratio = float(np.abs(rows_seed / element_seed).max())
+    print("MSE denominator :", out.size, "elements =", out.shape[0], "rows x", n_out,
+          "classes -> dividing by rows instead would make every delta", round(seed_ratio, 1),
+          "x too big")
 
     # --- Part 4: backward pass by hand, and the free shape check -----------
     dW1, db1, dW2, db2 = backward(x, target, z1, h, out, W2)
     for name, grad, knob in [("dW1", dW1, W1), ("db1", db1, b1), ("dW2", dW2, W2), ("db2", db2, b2)]:
         print(name, grad.shape, "vs knob", knob.shape, "-> same shape:", grad.shape == knob.shape)
     print("dW1[0][:3] =", np.round(dW1[0][:3], 8), "\n")
+    # The hinge case again, but through the REAL backward pass: a hand-built net whose z1 is
+    # exactly [2, 0], so the second unit sits on the bend and must receive no blame at all.
+    x_edge, target_edge = np.array([[1.0, 1.0]]), np.zeros((1, 1))
+    W1_edge, b1_edge = np.array([[1.0, 2.0], [1.0, -2.0]]), np.zeros(2)   # column 2 cancels to 0
+    W2_edge, b2_edge = np.array([[1.0], [1.0]]), np.zeros(1)
+    z1_edge, h_edge, out_edge = forward(x_edge, W1_edge, b1_edge, W2_edge, b2_edge)
+    loss_edge = squared_loss(out_edge, target_edge)
+    dW1_edge = backward(x_edge, target_edge, z1_edge, h_edge, out_edge, W2_edge)[0]
+    print("hinge net: z1 =", z1_edge[0], "loss =", loss_edge, "-> dW1 for the live unit",
+          dW1_edge[:, 0], "and for the z=0 unit", dW1_edge[:, 1], "\n")
 
     # --- Part 5: gradient check — analytic vs numerical --------------------
     knobs = {"W1": W1, "b1": b1, "W2": W2, "b2": b2}
@@ -100,7 +146,7 @@ if __name__ == "__main__":
     print("worst relative gap over", len(to_check), "entries =", f"{worst_gap:.2e}", "\n")
 
     # --- Part 6: break the backward pass on purpose -----------------------
-    delta2 = 2.0 * (out - target) / out.size     # forget the ReLU gate on purpose:
+    delta2 = element_seed                        # forget the ReLU gate on purpose:
     dW1_no_gate = x.T @ (delta2 @ W2.T)          # this line is missing the  * (z1 > 0)
     spoiled, disagreements = float((np.abs(dW1_no_gate - dW1) > 1e-9).mean()), 0
     # A unit that was on for every image hides this bug, so we look at three entries.
@@ -108,39 +154,55 @@ if __name__ == "__main__":
         gap = relative_gap(float(dW1_no_gate[index]), numerical_slope("W1", index, x, target, knobs))
         disagreements += int(gap > 1e-3)
         print(f"no-gate dW1{index}: {float(dW1_no_gate[index]): .8f}  gap {gap:.2e}"
-              f"  (this unit was on for {int((z1[:, index[1]] > 0).sum())} of 4 images)")
+              f"  (this unit was on for {int(relu_gate(z1[:, index[1]]).sum())} of 4 images)")
     print("the bug spoils", spoiled, "of dW1, caught on", disagreements, "of the 3 entries")
 
     # --- Self-check: one boolean per claim; pinned numbers come from a real run of this file ---
     chain_ok = abs(chain_product - 18.0) < 1e-12 and abs(downstream - 2.0) < 1e-12
-    golf_ok = (2.0 - 5.0) ** 2 == 9.0 and (4.0 - 5.0) ** 2 == 1.0   # lesson: L = 9, then 1
+    golf_ok = miss_2 == 9.0 and miss_4 == 1.0   # the two numbers we PRINTED; lesson: L = 9, then 1
     gate_ok = (np.array_equal(z_fwd, [2.0, -1.0, 3.0, -0.5])            # the lesson's inputs
                and np.array_equal(upstream_delta, [0.4, -0.7, 0.9, -0.2])
                and np.array_equal(gated_delta, [0.4, 0.0, 0.9, 0.0]))   # and its outgoing delta
+    # The strictness itself: with a ">=" gate the on-the-hinge entry would keep its 0.6, and the
+    # hinge net's dead column would collect blame instead of the exact zeros it must get.
+    edge_ok = bool(gate_all[4]) is False and float(gated_all[4]) == 0.0
+    edge_back_ok = (loss_edge == 4.0 and np.array_equal(z1_edge, [[2.0, 0.0]])
+                    and np.array_equal(dW1_edge, [[4.0, 0.0], [4.0, 0.0]]))
     survivors_ok = predicted_survivors == 2 and actual_survivors == 2
     shapes_ok = (dW1.shape == (784, 128) == W1.shape and db1.shape == (128,) == b1.shape
                  and dW2.shape == (128, 10) == W2.shape and db2.shape == (10,) == b2.shape)
+    # The reduction, pinned: this loss divides by ELEMENTS. 40 of them, from 4 rows of 10, so
+    # the row-count spelling is exactly n_out = 10 times bigger. Day 3 keeps the same chain rule
+    # and deliberately switches to that other reduction — which is why the factor is named here.
+    reduction_ok = (out.size == 40 and out.shape[0] == 4 and seed_ratio == 10.0
+                    and np.allclose(rows_seed, n_out * element_seed, rtol=1e-12, atol=0.0))
     pinned_ok = (abs(loss - 0.92741551) < 1e-7 and on_count == 263 and steepest == (515, 82)
                  and relative_gap(float(dW1[steepest]), 0.15716058) < 1e-6
                  and relative_gap(float(dW1[0, 0]), -0.0006150285) < 1e-6)
     check_ok = worst_gap < 1e-5       # two independent code paths agree on all 8 entries
     bug_caught = disagreements == 1 and abs(spoiled - 0.6953125) < 1e-9
 
-    if (chain_ok and golf_ok and gate_ok and survivors_ok and shapes_ok
-            and pinned_ok and check_ok and bug_caught):
+    if (chain_ok and golf_ok and gate_ok and edge_ok and edge_back_ok and survivors_ok
+            and shapes_ok and reduction_ok and pinned_ok and check_ok and bug_caught):
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected chain 18.0 and box 2.0, losses 9 and 1, outgoing delta "
-              "[0.4, 0, 0.9, 0] with 2 survivors, dW1 shaped (784, 128), loss 0.92741551 with 263 units "
-              "on, steepest dW1 0.15716058 at (515, 82), gap < 1e-5, and the no-gate bug to spoil "
-              "0.6953125 of dW1, caught on 1 of 3 entries")
+              "[0.4, 0, 0.9, 0] with 2 survivors, a forward input of exactly 0 to send back 0.0 "
+              "(hinge net: loss 4.0, dW1 [[4, 0], [4, 0]]), dW1 shaped (784, 128), the loss to "
+              "divide by 40 ELEMENTS (4 rows x 10) so the row-count seed is 10x too big, loss "
+              "0.92741551 with 263 units on, steepest dW1 0.15716058 at (515, 82), gap < 1e-5, "
+              "and the no-gate bug to spoil 0.6953125 of dW1, caught on 1 of 3 entries")
 
     # These asserts make the check hard (they stop the program if a fact is wrong).
     assert chain_ok, "slopes 2, 3, 3 must multiply to 18.0, and upstream 4 x local 0.5 to 2.0"
     assert golf_ok, "the squared miss must be 9 for guess 2 and 1 for guess 4"
     assert gate_ok, "pushing [0.4, -0.7, 0.9, -0.2] back must give exactly [0.4, 0, 0.9, 0]"
+    assert edge_ok, "a forward input of exactly 0 is OFF, so its outgoing delta must be 0.0"
+    assert edge_back_ok, "the hinge net must give loss 4.0 and dW1 [[4, 0], [4, 0]] — no blame at z=0"
     assert survivors_ok, "2 of the 4 entries had a positive forward input, so 2 survive"
     assert shapes_ok, "every gradient must have the same shape as the knob it corrects"
+    assert reduction_ok, ("this loss must divide by 40 ELEMENTS (4 rows x 10 classes), so the "
+                          "row-count seed is exactly 10x too big")
     assert pinned_ok, "loss 0.92741551, 263 units on, steepest dW1 0.15716058 at (515, 82)"
     assert check_ok, "the hand-wired gradient must match the numerical one to better than 1e-5"
     assert bug_caught, "dropping the ReLU gate must spoil 0.6953125 of dW1 and be caught once"

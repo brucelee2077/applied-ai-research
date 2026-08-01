@@ -178,7 +178,7 @@ python3 sessions/_experiment_check.py --all
 
 Every pattern below was proven by planting a real bug and watching the script still print `✅ you got it`. Names only here; the catalogue with worked examples is `sessions/_compiler/AUTHORING.md` section 10.
 
-Nine vacuity patterns — a check that cannot fail:
+Ten vacuity patterns — a check that cannot fail:
 
 1. **Circular** — the expected value is re-derived from the code path under test.
 2. **Too weak to see the bug** — e.g. a sorted multiset asserted after a `reshape`.
@@ -189,6 +189,7 @@ Nine vacuity patterns — a check that cannot fail:
 7. **Dead branch** — a conditional prediction whose other branch is unreachable.
 8. **Self-derived tautology** — an `argmin` index checked against the `min` of the same list.
 9. **Identity / scale-invariant claim** — e.g. `cosine(v, v) == 1.0`.
+10. **Print/assert divergence** — the printed line and the asserted line are two separate expressions for one quantity, so corrupting only the print is invisible and the learner reads a wrong number under a `✅`. Distinct from "printed but never asserted", and the class the original nine missed (five instances in one m02 sweep). Reviewing for it: for every printed number that matters, ask whether the printed expression and the asserted expression are the SAME object or two parallel computations.
 
 Five harder no-op traps — a PLANT that cannot fail, so the day reads as "verified":
 

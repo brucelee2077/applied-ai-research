@@ -46,30 +46,43 @@ XOR = [
 ]
 
 
-def best_single_line_accuracy():
+def search_single_lines():
     # Try LOTS of different straight lines (each is one choice of w1, w2, bias).
-    # For each line, a step-neuron fires 1 when z >= 0, else 0. Count how many of
-    # the 4 XOR points it gets right, and remember the very best score we ever see.
+    # For each line, the step-neuron above does the "decide". Count how many of the
+    # 4 XOR points it gets right; remember the best score, AND how many settings
+    # reach that best score.
     best = 0.0
-    grid = np.linspace(-4, 4, 17)  # candidate values for each dial
-    for w1 in grid:
-        for w2 in grid:
-            for b in grid:
+    ties = 0            # how many (w1, w2, b) settings score exactly 3 of 4
+    # 17 candidate values per dial. This is a SEARCH SPACE over settings — Day 3 uses
+    # the word "grid" for a weight matrix, so keep the two ideas under two names.
+    dial_values = np.linspace(-4, 4, 17)
+    for w1 in dial_values:
+        for w2 in dial_values:
+            for b in dial_values:
                 w = np.array([w1, w2])
                 # How many of the 4 XOR points does THIS one line get right?
                 correct = 0
                 for x, target in XOR:
-                    z = (w * x).sum() + b       # the neuron's raw score
-                    guess = 1 if z >= 0 else 0  # the hard step "decide"
+                    z = (w * x).sum() + b   # the neuron's raw score
+                    guess = step(z)         # the SAME hard step "decide" as above
                     if guess == target:
                         correct += 1
                 accuracy = correct / len(XOR)
                 if accuracy > best:
                     best = accuracy
-    return best
+                if accuracy == 0.75:
+                    ties += 1
+    return best, ties
 
 
 if __name__ == "__main__":
+    # ---- Part 0: pin the "decide" rule right ON the bar ----
+    # step() says the neuron fires when z REACHES zero, so z = 0 must give 1, not 0.
+    # A score exactly on the bar is the only place ">= 0" and "> 0" differ.
+    on_the_bar = step(np.array([-0.1, 0.0, 0.1]))
+    print("step(-0.1, 0.0, +0.1) =", on_the_bar, "(a score of exactly 0 fires)")
+    boundary_ok = on_the_bar.tolist() == [0.0, 1.0, 1.0]
+
     # ---- Part 1: run one full forward pass and check the numbers ----
     x = np.array([2, 3])          # two raw inputs
     w = np.array([0.5, -1.0])     # one trust dial per input
@@ -83,22 +96,55 @@ if __name__ == "__main__":
     print("sigmoid(z)       =", round(out, 3))  # should be ~0.269 (a soft "probably no")
 
     # The lesson's stated expected values: z = -1.0 and sigmoid(z) rounds to 0.269.
-    assert z == -1.0, "expected z = -1.0"
-    assert round(out, 3) == 0.269, "expected sigmoid(z) = 0.269"
+    z_ok = (z == -1.0)
+    out_ok = (round(out, 3) == 0.269)
 
-    # A quick sanity check on the bias being the "starting lean":
-    # a bigger (more positive) bias should push the answer higher.
-    _, out_bigger_bias = neuron(x, w, b + 4.0)
-    assert out_bigger_bias > out, "a more positive bias should raise the output"
+    # ---- Part 2: the bias is the starting lean — turn only that dial ----
+    # Three settings, all measured off the SAME b, so one shared number moves the
+    # score: b+4 lands above the bar, b+1 lands exactly ON it, b-4 lands below.
+    z_high, out_high = neuron(x, w, b + 4.0)   # z = +3.0
+    z_bar, out_bar = neuron(x, w, b + 1.0)     # z =  0.0 exactly — on the bar
+    z_low, out_low = neuron(x, w, b - 4.0)     # z = -5.0
+    print("bias b+4 -> z =", z_high, " sigmoid =", round(out_high, 3), "(above 0.5)")
+    print("bias b+1 -> z =", z_bar, " sigmoid =", round(out_bar, 3),
+          " step =", float(step(z_bar)), "(exactly on the bar)")
+    print("bias b-4 -> z =", z_low, " sigmoid =", round(out_low, 3), "(below 0.5)")
+    print("-> the answer rises as the bias rises:", round(out_low, 3), "<",
+          round(out, 3), "<", round(out_bar, 3), "<", round(out_high, 3))
 
-    # ---- Part 2: watch the single-neuron limit on XOR ----
-    best = best_single_line_accuracy()
+    # Pin each of the three to its own literal. That is stronger than only checking
+    # the direction: it also fixes HOW FAR the bias moved the score.
+    lean_ok = (round(out_high, 3) == 0.953
+               and out_bar == 0.5
+               and round(out_low, 3) == 0.007)
+    bar_ok = (z_bar == 0.0 and float(step(z_bar)) == 1.0)
+
+    # ---- Part 3: watch the single-neuron limit on XOR ----
+    best, ties = search_single_lines()
     print("best XOR accuracy any single straight line can reach =",
           round(best, 2), "->", int(best * 4), "of 4")
+    print("settings on the 17-point grid that reach 3 of 4 =", ties, "of 4913")
 
     # The whole point: one neuron = one straight line, and XOR is NOT linearly
     # separable, so no single line ever gets all 4 right. The ceiling is 3 of 4.
-    assert best == 0.75, "expected best single-line XOR accuracy = 0.75 (3 of 4)"
+    ceiling_ok = (best == 0.75)
+    # A ceiling alone is a weak claim — a search that barely ran also reports 0.75.
+    # The tie count is the floor: coarsen the grid, or stop turning w1, and it moves.
+    search_ok = (ties == 732)
 
-    # If every check passed, tell the learner they got it.
-    print("✅ you got it")
+    # ---- Self-check: one boolean per claim, then a verdict ----
+    if boundary_ok and z_ok and out_ok and lean_ok and bar_ok and ceiling_ok and search_ok:
+        print("✅ you got it")
+    else:
+        print("❌ not yet — expected step(0) = 1, z = -1.0, sigmoid(z) = 0.269, "
+              "sigmoid at b-4/b+1/b+4 = 0.007/0.5/0.953, and best XOR accuracy "
+              "0.75 (3 of 4) reached by 732 of the 4913 grid settings")
+
+    # These asserts make the check hard (they stop the program if a fact is wrong).
+    assert boundary_ok, "step() must fire at exactly z = 0: expected [0, 1, 1]"
+    assert z_ok, "expected z = -1.0"
+    assert out_ok, "expected sigmoid(z) = 0.269"
+    assert lean_ok, "expected sigmoid = 0.007 / 0.5 / 0.953 at bias b-4 / b+1 / b+4"
+    assert bar_ok, "at bias b+1 the score is exactly 0, so the step-neuron fires"
+    assert ceiling_ok, "expected best single-line XOR accuracy = 0.75 (3 of 4)"
+    assert search_ok, "expected 732 of the 4913 grid settings to reach 3 of 4"
