@@ -58,6 +58,10 @@ If a failure mode is taught, show the broken behavior visually or through a runn
 
 If a playground demonstrates a behavior, the Produce artifact should reproduce it or clearly explain why it is illustrative.
 
+**This skill does not own the doing leg.** Despite this skill's "runnable evidence" framing, the learner-facing runnable artifact `sessions/<module>/<day>/experiment.py` belongs to `frontier-lesson-builder` → "The doing leg", is gated by `frontier-refactor-qa` → "Doing-Leg Gates", and is contracted in `sessions/_compiler/AUTHORING.md` section 10. Build it with `sessions/_compiler/workflows/doing_leg_build.js`, not from here.
+
+**A `%%% demo`'s `out:` block is a hand-written CLAIM about what that artifact prints, and no gate compares the two.** The coupling is one character wide: an `out:` line reading `loss: 0.0470` and an artifact printing `loss: 0.047` disagree on screen while both pass every gate. When a demo shows an output the doing leg also produces, copy it from a REAL run of the artifact, and re-copy it whenever either side changes. If the demo is deliberately illustrative rather than a transcript, say so in the demo body so a later reviewer does not "fix" the artifact to match a number that was never real.
+
 ## Seed propagation visual risk
 
 If a seed lesson uses static or late visuals in a way that future modules may copy, record this as seed-stabilization P1 when appropriate.

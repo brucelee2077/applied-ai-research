@@ -639,12 +639,12 @@ should be recorded rather than chased — subtracting the max inside a softmax i
 numerical-stability step that cannot change the result, and deleting `eps` changes nothing
 below print precision except on a flat channel, where it IS caught.
 
-**In a cumulative module, check the days against each other.** Wave 2 found the output-size
-formula under three names across the three m06 days that define it, `causal_mask` naming two
-incompatible objects (an additive `-inf` grid on m05a days 05/06, a boolean keep-list on day
-08), `channel` meaning axis 0 on one day and axis 1 on the next, and a helper losing the two
-knobs an earlier day taught as the mechanism. None of these fail a gate; all of them cost the
-learner.
+**In a cumulative module, check the days against each other.** No gate is cross-file, so a
+module can be 8/8 green and still teach a contradiction: wave 2 found six real collisions, from
+the output-size formula appearing under three names to `causal_mask` naming two incompatible
+objects. The canonical six-item checklist lives in the `frontier-refactor-qa` skill under
+"Cross-day consistency pass" — use it there rather than a copy here, and run it via
+`sessions/_compiler/workflows/doing_leg_build.js` with `cumulative: true` (its default).
 
 ---
 

@@ -80,6 +80,10 @@ sessions/_refactor/rollout_tracker.yaml
 
 The tracker records current target, module order, statuses, manifest paths, constraints, success gates, report paths, open P0/P1/P2 counts, skill version, rollout history, and skill history.
 
+It also records the repo-level **doing-leg count** in `summary.doing_leg`: real days / total days and the modules still holding stubs. Read it there rather than restating it here — a count copied into a skill goes stale the moment a wave lands. Regenerate it with `python3 sessions/_experiment_check.py --all`. A module recorded `pass` may still ship stub doing legs: m07-thinking-in-jax is `pass` with `open_p0: 0` and 6 of 6 days stubbed. When asking whether a module is practisable, read the count, not the status.
+
+**`sanctioned_designs.guided_stub_experiment_py` was DELETED from the tracker on 2026-08-01 — do not reinstate it.** It had said the per-day `experiment.py` is "a deliberate ~5-line guided stub … Not a defect". Step 1 of the rollout loop is *read the tracker*, so that entry was the first authoritative thing a fresh session saw on this axis, and it pointed the wrong way: no amount of skill guidance survives a state file that says the deliverable is not a deliverable. A stub `experiment.py` is a P0 (`sessions/_compiler/AUTHORING.md` §10). The matching `experiment.py guided stubs (untouched)` lines were also dropped from the m02/m06/m07 manifests, where they froze the stub as a passing invariant. If you find another copy in a module manifest, delete it.
+
 ## Module Refactor Manifest Rule
 
 Every module maintains:
@@ -89,6 +93,16 @@ sessions/<module>/_refactor/manifest.yaml
 ```
 
 The manifest records constraints, quality gates, coverage items, visual/evidence items, artifact items, backlog, held-out eval findings, skill-gap candidates, and loop history.
+
+`artifact_items` must record the **doing-leg state per day** — real vs stub, gate result, date — not only `design` and `run_paths`. That the artifact exists is a different claim from that it runs. Mirror the module's real/total count into the tracker `summary` so the backfill is resumable from state files rather than from a session's memory.
+
+Count stubs; never estimate them:
+
+```bash
+python3 -c "import glob;print(sum('Placeholder' in open(f,errors='replace').read() for f in glob.glob('sessions/**/experiment.py',recursive=True)))"
+```
+
+VERIFY which days are actually stubs before choosing a backfill wave — one module was re-written by five agents because its days were already real. And never write a test that asserts a stub COUNT: such a test fails the moment the work succeeds.
 
 ## Coverage Spec Rule (the skill drafts coverage; the notebook is a test)
 
@@ -134,6 +148,22 @@ Where a notebook exists, the coverage gate's **check B** uses it as a **held-out
 The Coverage Spec Rule maximizes completeness (every failure + cause + remedy + limit, each its own concept). Keep all of it — **length is a feature, never cut or defer coverage to shorten a day.** But completeness must not compile into a late-lesson "trap wall": when 3+ failure/limit concept units would run consecutively, **INTERLEAVE a play/payoff beat** (a live `%%% viz`, a predict-then-run `%%% demo`, or a "you just unlocked…" victory lap) between them so a beginner's momentum survives. This is a SEQUENCING rule only — no compression into tables, no deferral. `concept_structure_gate` emits a warn on a ≥3-consecutive failure cluster with no intervening play; the interest judge's `momentum` lever is the real enforcer.
 
 Match the length of written deliverables to what the task needs: cover the substance (including full coverage as required above), but do not pad lessons or reports with filler sections, redundant summaries, or boilerplate. Length should come from teaching content, never from restatement.
+
+## Produce Spec Rule (the produce block is the doing leg's specification)
+
+The produce block is not only discovery framing. It is the **specification the day's `experiment.py` is built from** — `python3 sessions/_produce_spec.py <day-dir>` reads it back out deterministically — so it must state a CHECKABLE claim:
+
+```text
+1. Named observable      what the learner prints or plots, named
+2. Concrete expectation  the value / shape / direction / ordering they should see
+3. Acceptance criteria   a "What you should see" list that converts to one boolean per claim
+```
+
+The extraction is the test. `_produce_spec.py <day-dir>` must return a non-null `claude_prompt` (the numbered Option-B requirement list) AND a non-empty `acceptance`. A produce section that only says "predict what happens, then run it and observe" passes `reader_flow_gate` (which wants a discovery cue) and `concept_shell_gate` (which wants the string `experiment.py`) while specifying nothing — and the doing-leg author must then INVENT requirements, which `sessions/_compiler/AUTHORING.md` §10 forbids and which is how a lesson and its artifact come to disagree. Fixing this at spec time removes the invention step for every future day.
+
+A bare `python3 sessions/_produce_spec.py` reports, across all stub days, how many lack an Option-B prompt or acceptance criteria. A missing prompt is a real SPEC gap to fix in `source.md`, not an authoring gap. **But confirm a reported gap by reading the day before you act on it.** A 2026-08-01 sweep reported 11 stub days with no acceptance criteria, including all 6 m07 days; every one of them in fact stated its criteria, and the extractor simply could not see the heading spelling they used. That false diagnosis was one edit away from being written into this skill as fact. Read the day's produce block yourself before you call a spec incomplete.
+
+The discovery-framing requirement still holds (predict / observe register; `## Artifact as discovery` in `frontier-lesson-builder`). This is an ADDITIONAL requirement, not a replacement. HOW the artifact is written is `frontier-lesson-builder`'s doing-leg section; this rule only guarantees there is something to write it from.
 
 ## Seed Propagation Risk Rule
 
@@ -196,7 +226,10 @@ A rollout passes only when:
 - Learning Experience Gate passes,
 - audit/test evidence is reported,
 - tracker and manifest are updated,
-- report paths are recorded.
+- report paths are recorded,
+- **every day has a real, gated doing leg** — `python3 sessions/_experiment_check.py --module <module>` exits 0 (no placeholder stub; contract + real run green for every day).
+
+A module whose lessons pass while its days ship the placeholder stub is NOT done: the learner cannot practise a single day. Verified 2026-08-01 — m07-thinking-in-jax is recorded `pass` with `open_p0: 0` and all 6 of its days stubbed, so the Done gate without this bullet certifies an unpractisable module. Repo-wide sweep: `python3 sessions/_experiment_check.py --all` — it globs every day including the stubs, so today it exits 1 and its FAIL list *is* the remaining stub list; that is expected state, not a regression.
 
 ## v8 Source-First Authoring Rule
 
@@ -251,6 +284,7 @@ determine authoring mode (notebook? refs? neither)
 author source.md per day in reader-flow order (six rules, anchors single-sourced, spine chosen up front)
 compile source.md → lesson.html
 fix P0 in source.md and recompile (never hand-edit lesson.html)
+write the day's experiment.py from its produce spec, then gate it
 ```
 
 ## Lesson Build Engine (v9)
@@ -263,6 +297,8 @@ Rules the engine enforces:
 - Deterministic gates (Reader Flow · Concept Shell · Notebook Smoothness) stay the hard compile block; the LLM judges gate the loop only.
 - **skill_gaps are surfaced as a proposed diff for user approval — never auto-applied** (a Coverage Spec Rule edit changes every future lesson).
 - `args.seedFindings` seeds a polish round with findings a prior checkpoint chose to fix.
+
+The doing leg has its OWN engine: `sessions/_compiler/workflows/doing_leg_build.js` builds and gates each day's `experiment.py` from its produce spec. `lesson_build.js` never writes that file — the string `experiment` does not occur anywhere in it, and no judge lens reads an artifact — so a green compile plus a clean judge panel is not evidence the day is practisable. Run the doing-leg engine per module after the lesson engine converges, and gate with `_experiment_check.py` (definition in `frontier-refactor-qa` → Doing-Leg Gate).
 
 Design + plan: `docs/superpowers/specs/2026-07-14-lesson-generation-orchestration-design.md`, `docs/superpowers/plans/2026-07-14-lesson-orchestration-engine.md`.
 

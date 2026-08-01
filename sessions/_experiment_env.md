@@ -14,6 +14,10 @@ timeout. Design to that, not to the contract alone.
   a download does not fail gracefully — it fails loudly. This is deliberate: an
   artifact that downloads something is not reproducible for the reader.
 - **No file writes, no `savefig`, no plot window.** `MPLBACKEND=Agg` is forced.
+  ⚠️ Unlike the rules above and below, this one is **convention only — no gate checks it.**
+  Neither `experiment_contract.py` nor `_experiment_check.py` inspects for writes or `savefig`,
+  so nothing will catch you breaking it. (The portfolio/evidence artifact is deliberately
+  exempt: it MAY `savefig` into its own `assets/`.)
 - **Deterministic.** Seed everything (`np.random.default_rng(0)`,
   `torch.manual_seed(0)`). Running twice must print byte-identical output — the
   reviewer diffs two runs.
@@ -27,6 +31,14 @@ timeout. Design to that, not to the contract alone.
 `scikit-learn 1.6.1` · `matplotlib 3.10.1` · `transformers 4.52.4` · `tqdm 4.67.1`
 
 Prefer **numpy** unless the day is specifically about another one.
+
+**NOT installed, despite a day teaching them:** `flax` and `optax` both raise
+`ModuleNotFoundError` (verified 2026-08-01) while `jax` itself is present — and
+`m07-thinking-in-jax/day-05-flax-optax` specifies `nn.Dense` / `optax.sgd` /
+`optax.apply_updates` throughout. **Check that a day's imports actually import before you write
+its artifact.** Where a library is absent, implement the same mechanism in numpy/jax and declare
+the substitution in a comment at the point of use; do not stub a fake API that appears to be the
+real one.
 
 ## Hardware
 

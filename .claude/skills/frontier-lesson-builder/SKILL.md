@@ -206,6 +206,66 @@ Submit this homework.
 
 Acceptance criteria should include observation and explain-back.
 
+## The doing leg (`experiment.py`)
+
+The produce section is the day's PROSE; `sessions/<module>/<day>/experiment.py` is the day's
+DOING leg — a **separate deliverable the lesson author owns**. `lesson_build.js` does not write
+it, no judge lens reads it, and `concept_shell_gate` only checks that the produce section
+MENTIONS the filename. So a green compile plus a clean judge panel says nothing about whether the
+learner can practise the day: until 2026-07-27 all but 14 of 115 days shipped a 5-line
+"Placeholder. Fill this…" stub behind a fully passing lesson. A day is not done until its
+artifact is real and gate-passing.
+
+**Build a module's doing leg with the engine, not by hand:**
+`sessions/_compiler/workflows/doing_leg_build.js` via the Workflow tool, `args {module,
+days:[...], maxRounds, cumulative, force}`. It triages first — skipping any day whose artifact
+already passes the gate, because assuming a whole module is stubs once cost five working
+artifacts — then runs one writer per day, then ONE module-wide adversarial reviewer, then a
+cross-day pass. Hand-author only when the target is a single day.
+
+- **The spec already exists — never invent requirements.** `python3 sessions/_produce_spec.py
+  sessions/<module>/<day>` prints the day's produce block. Its `claude_prompt` — the numbered
+  Option-B list you already wrote for the learner — IS the specification, together with the "What
+  you should see" acceptance lines. Build exactly that, in the lesson's own spelling, variable
+  names and numbers. Those lines address the LEARNER, so "paste the output as a comment" and
+  "write three lines into `log.md`" are not requirements on the artifact — where the produce prose
+  and the self-check contract conflict, the contract wins. If the extract is not checkable, fix
+  the produce section first (`frontier-curriculum-architect`, Produce Spec Rule) rather than
+  inventing a requirement the lesson never promised.
+- **Shape, length and environment are already specified — do not re-derive them.** The contract
+  (header, "Today's big idea in two lines of output", the run command, `# --- Part N ---`
+  sections, printed shapes at every step, one boolean per claim, `✅`/`❌`, one assert per claim)
+  and the 85-140-line target live in **`sessions/_compiler/AUTHORING.md` section 10**; the binding
+  environment and the current library/model inventory live in **`sessions/_experiment_env.md`**.
+  Read both, and copy the gold standard
+  `sessions/m02-the-neuron/day-02-activations/experiment.py`. Two things those files leave to you:
+  confirm the day's imports actually import before you write (a lesson may teach a library this
+  machine does not have — declare the substitution in a comment rather than faking the API), and
+  know that "no file writes, no `savefig`" is an unenforced convention, so no gate will catch you
+  breaking it.
+- **Pin every claim; seed everything.** Each expected value must be WRITTEN DOWN in the
+  self-check (prefer an exact literal), never re-derived from the code path under test — that is
+  an algebraic identity, and it holds while the code is broken. Two runs must print
+  byte-identical output.
+- **Run the gate before you call the day done:** `python3 sessions/_experiment_check.py
+  sessions/<module>/<day>/experiment.py` (structural contract + a REAL run).
+  `frontier-refactor-qa` owns what that gate does and does not prove.
+
+**Writing a self-check that cannot fail is the default failure mode, not an edge case.** Nine
+vacuity patterns and five harder no-op traps were each proven on a real day by planting the bug
+and watching the script still print `✅ you got it`. Read
+**`sessions/_compiler/AUTHORING.md` section 10** for the catalogue with worked examples before you
+write your first self-check; the review-side list lives in `frontier-refactor-qa`. The authoring
+consequences: assert exception TYPES, never a library's message text; compute any "predict" value
+from the inputs instead of hardcoding a string; and choose shapes and values where a wrong
+spelling gives a DIFFERENT answer — a parameter initialised to zero, symmetric test data
+(`Q = K = V = x`), a uniform output, or floor division each make their own code path untestable.
+Then PROVE the check bites: plant **at least 4 semantic defects, one at a time, on a copy in
+`/tmp`**, and confirm each is caught while diffing the FULL stdout — a plant that reproduces the
+same value is a no-op and proves nothing about your check. A writer cannot clear its own
+self-check; a separate module-wide adversarial reviewer is required, which is what the engine's
+stage 2 exists for.
+
 ## Staff courage rule
 
 Staff depth should feel empowering:

@@ -72,15 +72,80 @@ def from_lesson(lesson_html):
     return None
 
 
+# Two spellings of the same heading, each optionally wrapped in markdown bold.
+# V7 compiled lessons say "Acceptance criteria"; every V9 source.md says "What
+# you should see" instead (46 files use it, 0 use the literal one). Match both or
+# the V9 field is null by construction.
+_ACCEPT_LABEL = r'\*{0,2}(?:Acceptance criteria|What you should see)(?![A-Za-z])\*{0,2}'
+
+# Where a block ends: the next structural marker of either shape. V9 markup
+# (`####` heading, `@@@` block, `%%%` widget fence, `!!!` callout) or the
+# compiled page's next part (the Option cards, the research-log box, the Done
+# button, the finale, any leading emoji marker). Without this the criteria run to
+# end-of-text and swallow the whole rest of the page.
+_MARKERS = (r'####|@@@|%%%|!!!|\*{0,2}Option\s+[AB]\b'
+            r'|Mark\b|Next\b|Finish\b|Wrap\b|Done[ \t]*(?=\n|\Z)'
+            r'|[\U0001F300-\U0001FAFF☀-➿]')
+_ACCEPT_END = r'(?i)(?=\n[ \t]*(?:' + _MARKERS + r')|\Z)'
+# the prompt additionally ends at the criteria heading that follows it
+_PROMPT_END = r'(?=\n[ \t]*(?:' + _ACCEPT_LABEL + r'|' + _MARKERS + r')|\Z)'
+
+
 def _claude_prompt(text):
     """The Option-B copy-prompt: the numbered requirement list, verbatim."""
-    m = re.search(r'(?is)(Help me build.*?)(?=\nAcceptance criteria|\Z)', text)
+    m = re.search(r'(?is)(Help me build.*?)' + _PROMPT_END, text)
     return m.group(1).strip() if m else None
 
 
 def _acceptance(text):
-    m = re.search(r'(?is)Acceptance criteria\s*\n(.*?)(?=\n(?:Mark|Next|Finish|Wrap)\b|\Z)', text)
-    return m.group(1).strip() if m else None
+    """The acceptance list, under either heading spelling.
+
+    Three m03 days state the criteria as prose on the heading line itself ("What
+    you should see by the end: <criteria>"), so that line is kept when it carries
+    real content after a colon. A bare lead-in ("… when you run it:") or a
+    parenthetical aside ("(check your prediction)") is dropped as decoration.
+    """
+    head = re.search(r'(?im)^[ \t]*(?:#{1,6}[ \t]*)?' + _ACCEPT_LABEL + r'([^\n]*)$', text)
+    if not head:
+        return None
+    tail = head.group(1).strip()
+    after_colon = tail.split(':', 1)[1].strip() if ':' in tail else ''
+    if len(after_colon) > 15:
+        # prose shape: the criteria ARE the heading line, so keep it (minus `####`)
+        rest = re.sub(r'\A[ \t]*#{1,6}[ \t]*', '', text[head.start():])
+    else:
+        rest = text[head.end():]
+    stop = re.search(_ACCEPT_END, rest)
+    return _list_only((rest[:stop.start()] if stop else rest)).strip() or None
+
+
+_BULLET = re.compile(r'[-*+•]\s|\d+[.)]\s')
+
+
+def _list_only(block):
+    """If the criteria are written as a list, the list is where they end.
+
+    V9 days often follow the bullet list with a paragraph of optional play
+    ("Then poke it — set `keep` to 0.0 …"). That is the next part of the lesson,
+    not a criterion, and no markup marker separates the two. Blocks that are not
+    lists (the compiled-HTML shape, where `<li>` text is already flattened to
+    bare lines) are returned untouched.
+    """
+    lines = block.split('\n')
+    first = next((i for i, ln in enumerate(lines) if ln.strip()), None)
+    if first is None or not _BULLET.match(lines[first].lstrip()):
+        return block
+    kept = lines[:first]
+    for ln in lines[first:]:
+        if not ln.strip():
+            kept.append(ln)          # blank lines may sit inside a list
+            continue
+        # a bullet, or an indented continuation of the bullet above it
+        if _BULLET.match(ln.lstrip()) or ln[:1] in (' ', '\t'):
+            kept.append(ln)
+            continue
+        break
+    return '\n'.join(kept)
 
 
 def spec_for(day_dir):
