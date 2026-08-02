@@ -1,0 +1,38 @@
+the lesson's figures, quoted from full MNIST (not this run): N = 60000  batch_size = 32
+   -> 1875 iterations per epoch, so 10 epochs = 18750 updates
+THIS run's own figures, counted the same way: N = 1000  batch_size = 32
+   -> 32 iterations per epoch, so 6 epochs = 192 updates — an epoch is many iterations, not one
+N = 100 sliced into batches of 32 -> [32, 32, 32, 4]  sum = 100  (the last batch is ragged: 4, not 32)
+
+x_train (1000, 784)  y_train (one-hot) (1000, 10)  pixel range (0.0, 1.0)
+He spread: W1 std 0.0506 = sqrt(2/784) as Day 1 taught  ·  W2 std 0.0637 = 0.5 x sqrt(2/128), NOT He
+untrained whole-set loss with that half-scale 2.2460  ·  at full He spread 5.6774  -> the factor is tuning, not the rule
+one epoch over 1000 examples -> 32 batches: 31 of size 32 plus a ragged last one of 8
+
+batch of 32 -> loss 2.3590  dW1 (784, 128) (same shape as W1)
+largest |dW1|  batch step 0.148989  ·  32 single steps averaged 0.148989  -> the same number
+largest |dW1| if we SUMMED the 32 instead: 4.767646  -> 32x bigger, so the step would secretly grow with batch_size
+reduction: sum over 10 classes then mean over 32 rows -> 2.3590; day 2's mean over all 320 elements -> 0.2359  (10x apart, largest |dW1| 0.014899 vs 0.148989)
+
+hinge net: z1 [3. 0.] (unit 2 sits exactly ON the bend)  out 3.0  loss 9.0
+  batch dW1: live column [12.  6.]  ·  z=0 column [0. 0.]  ·  db1 [6. 0.]
+  the one-example gradient agrees on the z=0 column: [0. 0.]  -> both gates are strict, z = 0 is OFF
+
+the loop itself counted 6 epochs x 32 batches = 192 weight updates (epoch 1's last batch held 8)
+epoch 1  average training loss 0.7296
+epoch 2  average training loss 0.2773
+epoch 3  average training loss 0.1897
+epoch 4  average training loss 0.1562
+epoch 5  average training loss 0.1353
+epoch 6  average training loss 0.1187
+inside epoch 1 the per-batch loss went UP 10 of 31 times (bumpy), first batch 2.3596 -> last 0.3884
+epoch 1 and 2 use different orders: True — a fresh shuffle every epoch
+
+average jump between batches  shuffled 0.0907   label-sorted, no shuffle 0.7219
+whole-set loss after 1 epoch  before training 2.2460  shuffled 0.3609  sorted 1.0552
+-> same weights, same 32 updates: only the ORDER changed, and sorted learns worse
+
+reminder: this is TRAINING loss, so a falling curve only proves the LOOP works.
+whether the model is any good needs held-out data it never trained on (Day 4).
+
+✅ you got it

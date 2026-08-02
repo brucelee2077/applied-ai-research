@@ -1,0 +1,55 @@
+w: [2.0]  shape: (1,)  dtype: torch.float32  device: cpu  grad slot before backward: None
+the loss tensor carries a graph: True | hand-derived slope at w=2.0: 42.0  autograd w.grad: 42.0
+same formula at w=-1.0: hand-derived -12.0  autograd w.grad: -12.0  (the slope flipped sign — 42 was no constant)
+
+X shape: (8, 4)  Y shape: (8, 1)  parameters: [('weight', (1, 4)), ('bias', (1,))]
+loss  by hand 11.341604  PyTorch 11.341604
+dW    by hand [-3.147   0.1902 -4.9423 -3.5771]  db by hand [0.3394]
+dW    W.grad  [-3.147   0.1902 -4.9423 -3.5771]  db b.grad   [0.3394] 
+-> biggest gap between hand-derived and autograd: 0.00e+00 (the same numbers)
+
+wide target shape: (8, 2)  -> 16 elements over 8 rows, so the denominator now shows
+loss  by hand 7.724387  PyTorch 7.724387
+dW row 0  by hand [-1.6414  0.0971 -2.507  -1.777 ]  W.grad [-1.6414  0.0971 -2.507  -1.777 ] | gap 8.94e-08
+dW row 0  dividing by rows instead [-3.2828  0.1943 -5.0139 -3.554 ] | 16/8 = 2x too big, 2.507 away from autograd
+
+predict: step 1 at lr=0.1 moves the loss down by 4.1403; at lr=1.0 it moves up by 11.4624  (the sign flips at lr=0.8049)
+epoch  0  loss 11.34160  gradient size  6.876
+epoch  1  loss  7.20129  gradient size  5.195
+epoch  2  loss  4.81580  gradient size  4.010
+epoch  3  loss  3.38125  gradient size  3.161
+epoch  4  loss  2.48218  gradient size  2.540
+epoch  5  loss  1.89655  gradient size  2.079
+epoch  6  loss  1.50127  gradient size  1.730
+epoch  7  loss  1.22556  gradient size  1.462
+epoch  8  loss  1.02727  gradient size  1.254
+epoch  9  loss  0.88048  gradient size  1.090
+epoch 10  loss  0.76881  gradient size  0.961
+epoch 11  loss  0.68164  gradient size  0.857
+step 1 at lr=0.1 really moved it down by 4.1403 (predicted +4.1403)
+step 1 at lr=1.0 really moved it up: 11.3416 -> 22.8040 (predicted -11.4624)
+same formula, 2-column model (N = 16 elements, not 8 rows): predicted +1.52394, step 1 really moved +1.52394 | with rows as N it would predict +1.42358, 0.10036 off
+PyTorch: [11.3416, 7.20129, 4.8158, 3.38125] ... | all numpy: [11.3416, 7.20129, 4.8158, 3.38125] ... | biggest gap 3.58e-07
+
+grad after 1 backward: [-3.147  0.19  -4.942 -3.577] | after a 2nd backward, divided by the 1st: [2. 2. 2. 2.]
+no zero_grad  epoch  0  loss  11.3416  gradient size   6.876
+no zero_grad  epoch  1  loss   7.2013  gradient size  12.055
+no zero_grad  epoch  2  loss   2.7044  gradient size  14.385
+no zero_grad  epoch  3  loss   1.6418  gradient size  13.664
+no zero_grad  epoch  4  loss   4.2606  gradient size  10.891   <- went UP
+no zero_grad  epoch  5  loss   7.5202  gradient size   8.479   <- went UP
+no zero_grad  epoch  6  loss   8.4995  gradient size   8.930   <- went UP
+no zero_grad  epoch  7  loss   7.0834  gradient size  10.833
+no zero_grad  epoch  8  loss   5.3112  gradient size  11.935
+no zero_grad  epoch  9  loss   4.7266  gradient size  11.947
+no zero_grad  epoch 10  loss   5.0225  gradient size  11.669   <- went UP
+no zero_grad  epoch 11  loss   5.2168  gradient size  11.607   <- went UP
+with zero_grad: 0 rises, ends 0.6816, gradient 6.88 -> 0.86 (shrinks, as it should)
+without it:     5 rises, ends 5.2168, gradient 6.88 -> 11.61 (a pile-up that never settles)
+
+graph on: requires_grad True  grad_fn is None: False | in no_grad: requires_grad False  grad_fn is None: True
+recording on outside the block: True  inside: False | a weight combined inside still tracks history: False - detaching one tensor would not have done that
+same numbers either way: True - no_grad drops the record, not the answer
+a 2nd backward() on one loss raised: RuntimeError
+
+✅ you got it

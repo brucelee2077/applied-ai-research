@@ -1,0 +1,52 @@
+img shape: (3, 3)  txt shape: (3, 3) (3 pairs, 3 numbers each)
+  pair 0  photo [1. 0. 0.]  caption [0.9 0.1 0. ]  "a photo of a dog"
+  pair 1  photo [0. 1. 0.]  caption [0.05 0.95 0.1 ]  "a sunset over the ocean"
+  pair 2  photo [0. 0. 1.]  caption [0.  0.1 0.9]  "a red sports car"
+
+txt row lengths BEFORE: [0.9055 0.9566 0.9055] (not length 1)
+all 6 row lengths AFTER: [1. 1. 1. 1. 1. 1.] (every row is on the unit sphere)
+  caption 0  [0.9939 0.1104 0.    ]
+  caption 1  [0.0523 0.9931 0.1045]
+  caption 2  [0.     0.1104 0.9939]
+column lengths of txt_n: [0.9953 1.0054 0.9994] -> not 1: we normalized rows (each embedding), not columns
+
+similarity matrix S = img_n @ txt_n.T -> shape (3, 3) (row = photo, column = caption)
+  dog        [0.9939 0.0523 0.    ]
+  beach      [0.1104 0.9931 0.1104]
+  car        [0.     0.1045 0.9939]
+  cos(dog photo, its OWN caption) = 0.9939 -> closer to 1
+  cos(dog photo, the car caption) = 0.0000 -> closer to 0
+  cos(anything, anything) = 0.5000 -> closer to 0: a tie is not a match
+each photo's pick: [0 1 2]  true pairing: [0 1 2] -> winner: diagonal
+diagonal: [0.9939 0.9931 0.9939]  best mismatch per row: [0.0523 0.1104 0.1045]  margin: [0.9416 0.8827 0.8893]
+
+same code, messy photos — photo row lengths BEFORE: [1.6613 2.0833 1.3038]  AFTER: [1. 1. 1.]
+  dog        [0.9838 0.302  0.1462]
+  beach      [0.2491 0.9861 0.3446]
+  car        [0.1186 0.4811 0.9571]
+  picks: [0 1 2]  margin: [0.6817 0.6415 0.476 ] -> winner: diagonal (here normalizing the PHOTOS changes every score)
+
+row probabilities with NO temperature:
+  dog        [0.5681 0.2216 0.2103]
+  beach      [0.2264 0.5473 0.2264]
+  car        [0.2078 0.2307 0.5615]
+weakest true-pair probability: 0.5473 (no temperature) -> 0.99999996 (x20)
+biggest wrong-pair probability after x20: 2.1520e-08
+row sums: [1. 1. 1.]  column sums: [1.002331 0.999543 0.998126] -> rows add to 1, columns do not
+
+photos->captions 0.5818 and captions->photos 0.5819 — two different numbers
+symmetric contrastive loss: 0.5819 (no temperature) -> 2.4349e-08 (x20)
+rows shuffled so every diagonal cell is a WRONG pair -> loss 18.4396, not ~0
+collapsed space (every input on one point): S row 0 = [1. 1. 1.]  probabilities = [0.3333 0.3333 0.3333]
+-> a 1-in-3 guess, loss 1.0986, and no temperature can rescue it
+
+zero-shot for photo 0 (the dog photo):
+  "a photo of a dog"         -> 0.9939  <- picked
+  "a sunset over the ocean"  -> 0.0523
+  "a red sports car"         -> 0.0000
+argmax = 0 -> predicted caption: "a photo of a dog"
+captions re-ordered to [2, 0, 1] -> argmax moves to 1 = caption 0's new slot 1, so the label set is free to change at test time
+
+Takeaway: one shared space + cosine similarity scores the match; the diagonal holds the true pairs, temperature sharpens them, the push prevents collapse.
+
+✅ you got it

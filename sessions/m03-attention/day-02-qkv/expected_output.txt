@@ -1,0 +1,48 @@
+Part 1 — embeddings x, shape (6, 4)  d_model = 4
+Part 2 — Q (6, 4)  K (6, 4)  V (6, 2)  (d_k = 4 , d_v = 2 )
+         the      Q=[0.1 0.1 0.  0. ] K=[0.  0.4 0.  0. ] V=[0.02 0.02]
+         animal   Q=[0.1 0.1 0.5 0.5] K=[0.  0.4 0.  4. ] V=[0.22 0.02]
+         crossed  Q=[0.2 0.2 0.5 0.5] K=[0.  0.8 0.  4. ] V=[0.24 0.04]
+         the      Q=[0.1 0.1 0.  0. ] K=[0.  0.4 0.  0. ] V=[0.02 0.02]
+         river    Q=[0.6 0.6 0.  0. ] K=[4.4 2.  0.  0. ] V=[1.  0.1]
+         bank     Q=[1.  0.5 0.  0. ] K=[0. 2. 4. 0.] V=[0.1 1. ]
+         is Q the same numbers as K? False -> must be False
+         lopsided W_K: bank's Key = [1. 2. 4. 0.]  but read column-first it would be [0. 2. 4. 0.]
+
+Part 3 — bank's raw match scores: [0.2 0.2 0.4 0.2 5.4 1. ]
+         bank -> the      = 0.2
+         bank -> animal   = 0.2
+         bank -> crossed  = 0.4
+         bank -> the      = 0.2
+         bank -> river    = 5.4
+         bank -> bank     = 1.0
+         bank->river = 5.4  but river->bank = 1.2
+         full grid Q @ K.T: (6, 6) row = the asker, column = the word offered
+         so bank->river 5.4 sits at [5, 4] and river->bank 1.2 at [4, 5]; row 5 IS bank's row: True
+         key-first K @ Q.T row 5 = [0.2 2.2 2.4 0.2 1.2 1. ] -> biggest match 'crossed', not 'river'
+         the Produce step's K @ Q[5] gives the same row: True -> one asker, no difference; a whole grid, the transpose
+
+Part 4 — divide every score by sqrt(d_k) = sqrt(4) = 2.0
+         scaled scores: [0.1 0.1 0.2 0.1 2.7 0.5]  (same ranking, calmer numbers)
+         d_k =  4 -> sqrt(d_k) = 2.0, river's 5.4 becomes 2.7000  (half-width law: 2.7000, d_v law: 2.7000)
+         d_k =  9 -> sqrt(d_k) = 3.0, river's 5.4 becomes 1.8000  (half-width law: 1.2000, d_v law: 2.7000)
+         d_k = 64 -> sqrt(d_k) = 8.0, river's 5.4 becomes 0.6750  (half-width law: 0.1688, d_v law: 2.7000)
+
+Part 5 — attention weights (shares): [0.052 0.052 0.058 0.052 0.706 0.078]
+         they add up to: 1.0
+         biggest slice: word 4 = 'river'
+         two rows in -> row sums [1. 1.]  (one shared budget would give [0.5 0.5] instead)
+
+Part 6 — the new context-aware 'bank': [0.742 0.154]
+         0.052 x V(the    ) = [0.001 0.001]
+         0.052 x V(animal ) = [0.012 0.001]
+         0.058 x V(crossed) = [0.014 0.002]
+         0.052 x V(the    ) = [0.001 0.001]
+         0.706 x V(river  ) = [0.706 0.071]
+         0.078 x V(bank   ) = [0.008 0.078]
+         distance to river's Value 0.26   to bank's old Value 1.06
+
+Part 7 — same Keys, a money-flavoured question: [0.2 0.2 0.4 0.2 1.  5. ]
+         winner is now word 5 = 'bank' — a money-bank, not a river-bank
+
+✅ you got it — 'bank' put 70.6% of its attention on 'river', and its new vector [0.742 0.154] leans watery, not money. That is self-attention.

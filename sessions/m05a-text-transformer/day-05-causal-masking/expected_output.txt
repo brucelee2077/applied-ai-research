@@ -1,0 +1,42 @@
+sentence: the cat sat mat
+scores shape: (4, 4) (row = word looking, column = word looked at)
+   the    2.1000  0.3000  1.0000  0.4000
+   cat    0.5000  3.2000  0.9000  0.2000
+   sat    1.1000  2.4000  2.0000  0.6000
+   mat    0.7000  1.3000  2.8000  1.9000
+scores[cat][mat] = 0.2 vs scores[mat][cat] = 1.3 -> not a mirror.  The danger: row 'cat' scores 'mat', and 'mat' comes LATER
+
+causal_mask shape: (4, 4) (0 = allowed, -inf = blocked future)
+   the    0.0000    -inf    -inf    -inf
+   cat    0.0000  0.0000    -inf    -inf
+   sat    0.0000  0.0000  0.0000    -inf
+   mat    0.0000  0.0000  0.0000  0.0000
+blocked (future) cells per row: [3 2 1 0]  allowed per row: [1 2 3 4] -> row 0 may see 1 word, row 3 may see all 4
+
+masked_scores shape: (4, 4) (future scores pushed to -inf)
+   the    2.1000    -inf    -inf    -inf
+   cat    0.5000  3.2000    -inf    -inf
+   sat    1.1000  2.4000  2.0000    -inf
+   mat    0.7000  1.3000  2.8000  1.9000
+attention weights AFTER the mask:
+   the    1.0000  0.0000  0.0000  0.0000
+   cat    0.0630  0.9370  0.0000  0.0000
+   sat    0.1403  0.5147  0.3450  0.0000
+   mat    0.0699  0.1273  0.5707  0.2320
+each row's weights add up to: [1. 1. 1. 1.]
+row 'sat': future words ['mat'] -> predicted zero columns [3] | observed [3]
+
+attention weights with NO mask (the cheating version):
+   the    0.5949  0.0983  0.1980  0.1087
+   cat    0.0552  0.8215  0.0824  0.0409
+   sat    0.1293  0.4743  0.3180  0.0784
+   mat    0.0699  0.1273  0.5707  0.2320
+weight each row spends on its own FUTURE, no mask: [0.4051 0.1233 0.0784 0.    ]
+total future weight: masked 0.0 vs unmasked 0.6067 -> the leakage the mask removes
+row 'mat' identical with and without the mask? True
+
+demo row scores: [2. 1. 5.] (column 2 is the future word)
+no mask:   [0.0466 0.0171 0.9362] -> winner is column 2 (the future word takes almost everything)
+with mask: [0.7311 0.2689 0.    ] -> winner is column 0 (a past word; the future got 0)
+
+✅ you got it

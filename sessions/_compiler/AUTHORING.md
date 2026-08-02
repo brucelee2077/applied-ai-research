@@ -575,6 +575,41 @@ synthesize a seeded stand-in and say so at the point of use; several HF models A
 python3 sessions/_experiment_check.py sessions/<module>/<day>/experiment.py   # contract + a REAL run
 python3 sessions/_experiment_mutate.py sessions/<module>/<day>/experiment.py  # is the self-check real?
 ```
+```bash
+python3 sessions/_experiment_check.py sessions/<module>/<day>/experiment.py --write-expected
+```
+
+**⭐ THE GOLDEN REFERENCE — pin it when you author the day, not later.**
+`--write-expected` runs the artifact and stores its stdout as `<day>/expected_output.txt`. From then
+on the gate compares every run against it, so **any** change to what reaches the screen fails: an
+operand swap inside a `%`-tuple, an index shifted at the print site, arithmetic wrapped around an
+already-asserted name, an inverted verdict string. This is the ONLY mechanism that closes those —
+they are invisible to in-file assertions by construction, because the corruption happens at the
+print CALL, after the assertion's view of the world ends. Measured on this corpus: 498 such plants,
+4 caught (0.8%) by assertions; all of them caught by a reference.
+
+- **Opt-in by existence.** No `expected_output.txt`, no comparison. That is why the 69 stub days are
+  unaffected.
+- **It detects DRIFT, not correctness.** ⚠️ The reference is only as good as the moment it was
+  pinned. Pin a broken artifact and you freeze the breakage as truth, and the gate will defend it
+  forever. **The first pin of a day is the single point of failure in this whole scheme** — read the
+  output before you write it, and never pin a day you have not verified.
+- **Fail, never heal.** A mismatch prints a unified diff and the regenerate command; it never
+  rewrites the reference. Regenerating needs `--write-expected --force`. If you find yourself
+  reaching for `--force` to make a failure go away, stop: either the output changed on purpose (say
+  so in the commit) or you are erasing a real catch.
+- **Determinism is a prerequisite**, and the comparison is byte-exact on content lines (trailing
+  blank lines and CRLF are normalised). An unseeded draw, a timestamp, a dict ordering or an
+  absolute path in the output becomes a permanent false failure.
+- **One sanctioned exception exists.** `sessions/m01-shape-of-data/day-06-random-seeds` prints two
+  deliberately UNSEEDED draws — the varying numbers ARE that day's lesson — so it has no reference
+  and must not be given one. It is also the one legitimate exception to `_experiment_env.md`'s
+  "two runs must print byte-identical output".
+- **With a reference in place, do NOT also pin rendered text in the file.** A pass that added 218
+  in-file text pins moved the headline class by 0.3pp and made the artifacts brittle: ~33% of those
+  pins sat on claim-free rows, so a changed `EPOCHS` or `%8.4f` width broke 25-50 at once. Keep
+  in-file pins for VALUES and CLAIMS; let the reference cover the rendering. A learner has to be
+  able to edit these files.
 `_experiment_check.py` runs `gates/experiment_contract.py` and then EXECUTES the file (exit 0,
 a `✅`, no `❌`, no network, no timeout). `_experiment_mutate.py` perturbs one numeric literal
 at a time and re-runs: a surviving mutant is a claim nothing checks.

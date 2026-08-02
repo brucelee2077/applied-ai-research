@@ -1,0 +1,51 @@
+Part 1 · the image — shape: (6, 6)  bright pixels: 18
+[[0 0 0 9 9 9]
+ [0 0 0 9 9 9]
+ [0 0 0 9 9 9]
+ [0 0 0 9 9 9]
+ [0 0 0 9 9 9]
+ [0 0 0 9 9 9]]
+  columns 0-2 dark (0), columns 3-5 bright (9) -> one vertical edge between
+
+Part 2 · the kernel (the stencil) and the output-size formula
+  k shape: (3, 3)  weights: 9
+[[-1  0  1]
+ [-1  0  1]
+ [-1  0  1]]
+  output side = (N - K + 2P)/S + 1;  ours N=6 K=3 P=0 S=1 -> 4
+  32x32 dials [valid S1, same S1, same S2]: [30, 32, 16]
+
+Part 3 · slide it: one dot product per stop
+  stop (row 0, col 1) patch: [[0, 0, 9], [0, 0, 9], [0, 0, 9]] -> right col 27 - left col 0 = 27
+  fmap shape: (4, 4)  (predicted (4, 4) )
+[[ 0 27 27  0]
+ [ 0 27 27  0]
+ [ 0 27 27  0]
+ [ 0 27 27  0]]
+  every row: [0, 27, 27, 0] -> 0 over flat halves, 27 at the edge
+
+Part 4 · pool it: one number per 2x2 window (size=2 is the default)
+  pooled shape: (2, 2)  values: 4 — a quarter of 16
+[[27 27]
+ [27 27]]
+  average pooling, same windows: [13.5, 13.5] -> the mean, not the max
+
+Part 5 · weight sharing in numbers
+  conv: 9 weights · fully-connected: 36 pixels x 10 neurons = 360
+  and the kernel stays 9 weights on ANY image size — weight sharing
+
+Part 6 · shift the edge one column left — fmap_shift shape: (4, 4)
+  rows now [27, 27, 0, 0] was [0, 27, 27, 0]
+  pooled_shift: [[27, 0], [27, 0]] -> edge in the left window
+  averaged_shift: [[27.0, 0.0], [27.0, 0.0]] -> same windows, the mean of each
+
+Part 7 · a 4x6 counting map — shape: (4, 6) (rows != cols on purpose)
+[[ 1  2  3  4  5  6]
+ [ 7  8  9 10 11 12]
+ [13 14 15 16 17 18]
+ [19 20 21 22 23 24]]
+  pooled shape: (2, 3) -> 4/2 rows x 6/2 cols, not a square
+  max of each window:  [[8, 10, 12], [20, 22, 24]] -> the bottom-right of each 2x2
+  mean of each window: [[4.5, 6.5, 8.5], [16.5, 18.5, 20.5]] -> e.g. (1+2+7+8)/4 = 4.5
+
+✅ you got it

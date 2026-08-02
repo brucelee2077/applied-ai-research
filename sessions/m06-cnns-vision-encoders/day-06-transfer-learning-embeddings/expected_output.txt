@@ -1,0 +1,51 @@
+cat    -> [0.8 0.1 0.7 0.2]  shape (4,)
+kitten -> [0.7  0.15 0.79 0.11]  shape (4,)
+car    -> [0.1 0.9 0.  0.8]  shape (4,)
+(a real backbone gives shape (512,); kitten is slot-by-slot close to cat, car is not)
+mean |difference| per slot: {'cat-kitten': 0.0825, 'cat-car': 0.7, 'kitten-car': 0.7075}
+-> prediction from that crude ruler: the closest pair is cat-kitten
+
+dot(cat, kitten) = 1.15  length of cat = 1.0863  of kitten = 1.0718
+cosine(cat, kitten) = 0.9878 -> near 1: same direction, similar
+cosine(cat, car)    = 0.2514 -> far nearer 0 than 1: unrelated
+cosine(kitten, car) = 0.2262 -> also unrelated
+
+cat-kitten  difference = [ 0.1  -0.05 -0.09  0.09] -> l2 = 0.1694
+cat-car     difference = [ 0.7 -0.8  0.7 -0.6] -> l2 = 1.4071
+kitten-car  difference = [ 0.6  -0.75  0.79 -0.69] -> l2 = 1.4222
+pairs ordered most-similar-first — cosine: ('cat-kitten', 'cat-car', 'kitten-car') 
+  L2: ('cat-kitten', 'cat-car', 'kitten-car') 
+  mean-|diff|: ('cat-kitten', 'cat-car', 'kitten-car') -> all three rulers agree ON THESE THREE PAIRS
+
+counterexample 1 · cat vs 0.1*cat (same direction, shorter): cosine = 1.0 but l2 = 0.9777 > 0.1694 = l2(cat, kitten),
+  whose cosine is only 0.9878 -> HIGHER cosine here comes with a BIGGER l2: the two rulers disagree
+counterexample 2 · [0.01 0 0 0] vs [0 0.01 0 0] (right angles, both tiny): l2 = 0.0141 (tiny) but cosine = 0.0 (no similarity at all)
+after UNIT-normalizing both (length 1 each): l2^2 = 0.02447 and 2 - 2*cosine = 0.02447  equal? True
+-> the rule to carry away: small L2 = high cosine ONLY for equal-length (e.g. unit-normalized) vectors; on raw embeddings of different lengths it can fail.
+
+query embedding: [0.78 0.12 0.74 0.15] shape (4,) (never stored in the db)
+  #1 cat    cosine = 0.9979
+  #2 kitten cosine = 0.9953
+  #3 car    cosine = 0.2319
+ranking: ('cat', 'kitten', 'car') -> both cats first, the car last: image search with no training.
+best score minus worst: 0.7661 (a wide, meaningful gap)
+
+query with the WRONG normalization: [-42.2 -48.8 -42.6 -48.5] shape (4,)
+  every number is now large and negative — that scale never reached the eye
+  #1 kitten cosine = -0.7754
+  #2 car    cosine = -0.7884
+  #3 cat    cosine = -0.7884
+ranking: ('kitten', 'car', 'cat') -> 'cat', the true match, fell from #1 to #3. 
+best score minus worst: 0.013 (was 0.7661) -> squashed together, and all negative
+the gap deciding cat vs car: -0.0000006 -> noise, not meaning: the ranking has stopped carrying information
+
+E shape (3, 4)  Q shape (2, 4)  cosine grid shape (2, 3)
+  row 0, good query, db order (cat, kitten, car): [0.9979 0.9953 0.2319]
+  row 1, bad query,  db order (cat, kitten, car): [-0.7884 -0.7754 -0.7884]
+  same numbers as the one-pair-at-a-time loop? True
+
+takeaway: transfer learning borrows a trained backbone; its penultimate features
+are an embedding; similar images have close embeddings (high cosine / small L2), so
+nearest-neighbor search needs no training — but only with the model's exact preprocessing.
+
+✅ you got it

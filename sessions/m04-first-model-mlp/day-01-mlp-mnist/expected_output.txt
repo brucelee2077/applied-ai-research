@@ -1,0 +1,32 @@
+raw images       : (500, 28, 28) uint8 min 0 max 255
+flattened+scaled : (500, 784) min 0.0 max 1.0 (one image is now a row of 784 numbers)
+pre-cast floats  : min 0.0 max 255.0 -> rounding moved a pixel by at most 0.5 | still exactly black: 42.5 %
+two samples of class 0 differ by up to 0.518 -> the pen wobble is alive; 50 samples of a class are not one repeated image
+flat slots 0,1,28 of image 7 hold grid cells [(0, 0), (0, 1), (1, 0)] -> row-major: True
+
+prediction: logits (500, 10) and accuracy about 0.1
+W1 (784, 128) b1 (128,) W2 (128, 10) b2 (10,)
+parameters       : 100352 + 128 + 1280 + 10 = 101770 knobs
+He spread        : W1 std 0.0505  W2 std 0.13
+
+step 1 input     : (500, 784)
+step 2 x@W1+b1   : (500, 128) min -2.262
+step 3 relu      : (500, 128) min 0.0 -> zeroed 45.8 % of the notes
+step 4 logits    : (500, 10) = one row of 10 scores per image
+logits for image 0: [ 0.084  1.124 -1.071  0.695 -0.244  0.543  0.178  0.502 -0.312 -0.269]
+
+image 0: guess 1  true label 0  guess counts per digit: [  2 192   0  97   0 125  60  20   0   4]
+every picked slot holds its row's biggest logit: True
+untrained accuracy: 0.134  chance level: 0.1
+same data, nearest-average-image labeller: 1.0 -> the data is readable; the random knobs are what score ~10%
+
+lesson demo z = x@Wa + b : [[7.5 5.5]]
+two layers (x@Wa)@Wb = [[17. -2.]]  one layer x@(Wa@Wb) = [[17. -2.]] -> the same numbers
+x_mix@Wa = [[ 2.  -2.5]] -> relu -> [[2. 0.]]
+with the bend: [[ 2. -2.]]  folded flat: [[-3.  -4.5]] -> NOT the same, so with a bend the stack is no longer one linear layer
+
+zero biases : pre [[ 2.  -2.5]] -> relu [[2. 0.]] -> logits [[ 2. -2.]]
+with biases : pre [[2.5 0.5]] -> relu [[2.5 0.5]] -> logits [[ 2.5 -1.5]]
+adding b1 = [0.5 3. ] and b2 = [-1.   0.5] moved every number -> the two '+ b' terms are doing work
+
+✅ you got it

@@ -1,0 +1,34 @@
+d_model = 4  hidden = 16  W1 (4, 16)  W2 (16, 4)
+
+one word through the workshop — watch the width go 4 -> 16 -> 4:
+  in        (4,) -> [ 0.1257 -0.1321  0.6404  0.1049]
+  h=x@W1    (16,) -> [-0.4696 -0.1492  0.6188  1.0705 -0.9691  0.871   0.7576  0.5579 -0.1083
+ -0.3804  1.0929  1.1389  1.1409  0.7039  0.4184 -0.5512]
+  relu(h)   (16,) -> [0.     0.     0.6188 1.0705 0.     0.871  0.7576 0.5579 0.     0.
+ 1.0929 1.1389 1.1409 0.7039 0.4184 0.    ]
+  out=a@W2  (4,) -> [-1.5292  2.2412 -0.6077  1.1303]
+  widths    (4, 16, 4) -> as wide out as in, so it fits the residual stream
+
+W1 @ W2 = one matrix, (4, 4) :
+ [[ 1.2984 -5.2732 -1.3208  0.1147]
+ [ 2.9633 -0.9484  3.4569 -1.8946]
+ [-0.1074  6.6351  0.3903 -1.1048]
+ [-4.9032 -0.0656 -2.1971 -0.6981]]
+(x@W1)@W2     = [-0.8114  3.7047 -0.6033 -0.5161]
+x@(W1@W2)     = [-0.8114  3.7047 -0.6033 -0.5161] -> same numbers: True
+relu(x@W1)@W2 = [-1.5292  2.2412 -0.6077  1.1303] -> the bend changed the answer
+straight path adds up: True  bent path off by: 2.0059 -> the bend cannot be folded into one matrix
+
+negative values in the wide space: [-0.4696 -0.1492 -0.9691 -0.1083 -0.3804 -0.5512]
+dark benches predicted from those signs: 6  benches relu set to exactly 0: 6 of 16
+gelu on those same benches: [-0.15   -0.0658 -0.1613 -0.0495 -0.1338 -0.1603]
+benches gelu leaves at a hard 0: 0 of 16 -> tiny non-zero numbers, so a whisper of slope stays
+boundary case [-0.5   0.    0.25] -> relu [0.   0.   0.25] : negatives 1 but dark benches 2 -> exactly 0 is dark without being negative
+
+three words at once -> (3, 4) in, (3, 4) out
+ [[-1.5292  2.2412 -0.6077  1.1303]
+ [-0.5495 -4.489  -0.231  -1.6653]
+ [-4.8062 -9.1648 -1.4448  3.0331]]
+swapped word 1 -> its own answer moved 3.6047 and its two neighbours moved 0.0 -> no word touched another
+
+✅ you got it

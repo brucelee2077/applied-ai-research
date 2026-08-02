@@ -1,0 +1,45 @@
+picture shape: (3, 32, 32) (channels, height, width)
+bright pixels per channel: [60, 80, 32]
+
+formula predicts after each conv: (16, 32, 32) -> (32, 16, 16) -> (64, 8, 8)
+        and after each pool: (16, 16, 16) -> (32, 8, 8) -> (64, 4, 4) -> flatten 1024 numbers
+
+running the funnel:
+  block 1 conv (16 filters, 3×3, same) -> (16, 32, 32) 2901 of 16384 values came out negative
+  block 1 relu (keep positives)        -> (16, 32, 32) min is now 0.0000, 13925 values sit at 0
+  block 1 pool (2×2, stride 2)         -> (16, 16, 16) grid halved, channels unchanged
+  block 2 conv (32 filters, 3×3, same) -> (32, 16, 16) 2750 of 8192 values came out negative
+  block 2 relu (keep positives)        -> (32, 16, 16) min is now 0.0000, 5278 values sit at 0
+  block 2 pool (2×2, stride 2)         -> (32, 8, 8)   grid halved, channels unchanged
+  block 3 conv (64 filters, 3×3, same) -> (64, 8, 8)   1871 of 4096 values came out negative
+  block 3 relu (keep positives)        -> (64, 8, 8)   min is now 0.0000, 2063 values sit at 0
+  block 3 pool (2×2, stride 2)         -> (64, 4, 4)   grid halved, channels unchanged
+shape march: (3, 32, 32) -> (16, 16, 16) -> (32, 8, 8) -> (64, 4, 4)
+
+block 1 detail — smallest conv value before the bend: -1.0496, after it: 0.0000
+  channel 0, rows 2-3 × cols 8-9: [0.2249 0.1391 0.1443 0.5226]
+  pool kept 0.5226 (the max) — the MEAN of that window would be 0.2577
+  value on the top edge under the diagonal: -0.2169 — the zero padding supplied the missing row above
+
+"same" padding at two kernel sizes, on an 8×8 corner (3, 8, 8)
+  K=3 -> P=(K−1)/2 = 1, formula says side 8, actual (2, 8, 8)  cell(5,6) 6.0000, total 143.6000
+  K=5 -> P=(K−1)/2 = 2, formula says side 8, actual (2, 8, 8)  cell(5,6) 8.0000, total 311.6000
+
+flatten: (64, 4, 4) -> (1024,) = 64 × 4 × 4 = 1024 numbers
+  biggest feature value: 0.7778, at position 308 in the list
+
+head: (10, 1024) @ (1024,) -> (10,)
+  logits: 0.9524  2.3005  -3.9897  -0.5339  3.1951  1.7214  -2.4551  -1.8453  1.4541  -0.9565
+  raw scores, NOT probabilities — the biggest is class 4
+
+probs:  0.0539  0.2075  0.0004  0.0122  0.5076  0.1163  0.0018  0.0033  0.0890  0.0080
+  they add to 1.000000000000, and the biggest slice is 0.5076 for class 4
+
+cross-entropy with true_class = 0: -log(0.0539) = 2.9207
+  if the true class were 4 (p = 0.5076, its favourite):   loss 0.6780 — small
+  if the true class were 2 (p = 0.0004, its least liked): loss 7.8628 — large
+  surprise ladder: p=0.010 -> loss 4.61  p=0.300 -> loss 1.20  p=0.910 -> loss 0.09  p=0.999 -> loss 0.00
+
+image -> blocks (grid shrinks, channels grow) -> flatten -> dense head -> 10 logits -> softmax (probs add to 1) -> cross-entropy (how wrong); that is one forward pass and the loss training minimizes.
+
+✅ you got it

@@ -1,0 +1,85 @@
+X shape: (1024, 784)  y shape: (1024,)  first labels: [0, 0, 0, 0, 0, 1, 3, 7]
+X type: Tensor - the same grid of numbers a numpy array holds, plus the power to record how it was computed, so gradients can flow back
+this X is plain data, so there is nothing to record: X.requires_grad = False - the weights below say True, which is why gradients reach them
+
+parameters: [('fc1.weight', (128, 784)), ('fc1.bias', (128,)), ('fc2.weight', (10, 128)), ('fc2.bias', (10,))] 
+numbers to learn: 101770 = 784*128 + 128 + 128*10 + 10 
+every weight records its history: True
+
+predict: fewer lines than the ~500 hand-written ones, or more?
+counted from this file: the model + its whole training loop = 24 lines of code -> about 20x less typing for the same network
+
+inside torch.no_grad() that forward recorded nothing: grad_fn None; the same line outside records one: grad_fn SoftmaxBackward0 - recording is a switch you control, not something a tensor always does
+
+untrained model: 7.5% of labels right, and its most confident single guess is only 0.209 - flat guessing, chance is 10.0%
+predict: so epoch 0 loss should sit near ln(10) = 2.3026, then fall
+nn.CrossEntropyLoss(raw scores) 2.32391 == day 4's -log(p) on softmax output 2.32391 -> the same objective, entered from the other side
+the same loss handed PROBABILITIES: 2.30287 — no error, but softmax ran twice and the top probability collapsed 0.209 -> 0.111, so the number looks better while the model it scores has been flattened
+with zero_grad():
+  epoch  0  loss 2.3239  gradient size 1.460
+  epoch  1  loss 1.7964  gradient size 1.091
+  epoch  2  loss 1.4901  gradient size 0.766
+  epoch  3  loss 1.3589  gradient size 0.378
+  epoch  4  loss 1.3263  gradient size 0.236
+  epoch  5  loss 1.3108  gradient size 0.212
+  epoch  6  loss 1.2977  gradient size 0.201
+  epoch  7  loss 1.2860  gradient size 0.191
+  epoch  8  loss 1.2755  gradient size 0.184
+  epoch  9  loss 1.2656  gradient size 0.178
+  epoch 10  loss 1.2564  gradient size 0.174
+  epoch 11  loss 1.2476  gradient size 0.170
+  epoch 12  loss 1.2393  gradient size 0.167
+  epoch 13  loss 1.2312  gradient size 0.164
+  epoch 14  loss 1.2234  gradient size 0.162
+  epoch 15  loss 1.2159  gradient size 0.160
+  epoch 16  loss 1.2085  gradient size 0.158
+  epoch 17  loss 1.2013  gradient size 0.157
+  epoch 18  loss 1.1943  gradient size 0.155
+  epoch 19  loss 1.1874  gradient size 0.154
+  epoch 20  loss 1.1807  gradient size 0.152
+  epoch 21  loss 1.1741  gradient size 0.151
+  epoch 22  loss 1.1676  gradient size 0.150
+  epoch 23  loss 1.1613  gradient size 0.149
+  epoch 24  loss 1.1550  gradient size 0.149
+prediction check: epoch 0 loss was 2.3239, ln(10) = 2.3026, gap 0.0213
+
+PyTorch: [2.32391, 1.79641, 1.49013, 1.35888, 1.32631, 1.31075, 1.29769, 1.28603] 
+by hand: [2.32391, 1.79641, 1.49013, 1.35888, 1.32631, 1.31075, 1.29769, 1.28603] 
+biggest gap: 2.38e-07  <- same weights, same math, same learning
+
+.grad before backward: None   after: 42.0   <- autograd filled it
+after 1 backward: 3.0   after 2 with no clearing: 6.0  <- it added, it did not replace
+no zero_grad():
+  epoch  0  loss 2.3239  gradient size 1.460
+  epoch  1  loss 1.7964  gradient size 2.456
+  epoch  2  loss 1.3626  gradient size 2.574
+  epoch  3  loss 1.6196  gradient size 2.068   <- went UP
+  epoch  4  loss 1.7832  gradient size 2.254   <- went UP
+  epoch  5  loss 1.4554  gradient size 2.691
+  epoch  6  loss 1.5579  gradient size 2.292   <- went UP
+  epoch  7  loss 1.7247  gradient size 2.428   <- went UP
+  epoch  8  loss 1.4188  gradient size 2.752
+  epoch  9  loss 1.4135  gradient size 2.491
+  epoch 10  loss 1.5858  gradient size 2.538   <- went UP
+  epoch 11  loss 1.3915  gradient size 2.796
+  epoch 12  loss 1.2873  gradient size 2.726
+  epoch 13  loss 1.4461  gradient size 2.755   <- went UP
+  epoch 14  loss 1.3576  gradient size 2.901
+  epoch 15  loss 1.1939  gradient size 2.900
+  epoch 16  loss 1.2513  gradient size 2.867   <- went UP
+  epoch 17  loss 1.2770  gradient size 2.922   <- went UP
+  epoch 18  loss 1.2312  gradient size 2.975
+  epoch 19  loss 1.2278  gradient size 2.999
+  epoch 20  loss 1.3143  gradient size 3.118   <- went UP
+  epoch 21  loss 1.2613  gradient size 3.088
+  epoch 22  loss 1.2362  gradient size 3.130
+  epoch 23  loss 1.2946  gradient size 3.104   <- went UP
+  epoch 24  loss 1.2763  gradient size 3.109
+
+with zero_grad: loss rose in 0 of 24 steps, gradient size 1.46 -> 0.15 (shrinks, as it should)
+without it:     loss rose in 10 of 24 steps, gradient size 1.46 -> 3.11 (a growing pile-up)
+
+hinge net: z1 = [4.0, 0.0] (loss 4.0181) -> dW1 for the live unit [1.964, 3.9281], for the z = 0 unit [0.0, 0.0]
+the same step with a (z >= 0) gate (loss 4.0181, unchanged) hands that dead unit [-1.964, -3.9281] instead — same forward, different weights learned: the one-character change no random run can show you
+
+✅ you got it

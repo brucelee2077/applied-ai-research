@@ -1,0 +1,34 @@
+cls shape: (8,)  (one summary of the whole picture, length D = 8 )
+cls           : [ 0.1257 -0.1321  0.6404  0.1049 -0.5357  0.3616  1.304   0.9471]
+
+before LayerNorm: mean = 0.352  spread(std) = 0.5566 (off-center, uneven scale)
+cls_tidied    : [-0.4065 -0.8698  0.5182 -0.4439 -1.5948  0.0172  1.7104  1.0692]
+after  LayerNorm: mean = 0.0  spread(std) = 1.0 -> centered, scale 1
+
+W shape: (8, 4)  -> predicted logits shape: (4,)  actual: (4,)
+logits        : [-0.3368  0.5745  4.2194  4.6753]   <- one RAW score per class
+logits.sum()  : 9.1324 -> not 1.0, not readable as odds yet
+
+probs         : [0.004  0.01   0.3825 0.6035]  shape: (4,)  sum: 1.0 -> one whole pizza
+argmax(probs) : 3 -> the predicted class index (the biggest slice), winning 0.6035 vs runner-up 0.3825
+bare .sum() == the axis=-1 form on this one row? True -> same rule as Day 3, for a single row
+
+true_class = 0  probs[true_class] = 0.004  loss = -log(probs[true_class]) = 5.5172 -> BIG: a tiny slice
+had the truth been the model's pick (class 3 ), the loss would be 0.5051 -> small
+label it class 2 instead (neither biggest nor smallest): probs = 0.3825  loss = 0.961
+  the smallest slice is 0.004 -> loss 5.5172 · different number, so the loss follows the LABEL, not the lowest slice
+   gave the true class 0.10 -> loss = 2.30
+   gave the true class 0.50 -> loss = 0.69
+   gave the true class 0.90 -> loss = 0.11
+
+tokens shape: (5, 8) ([CLS] in row 0, then 4 tile tokens); closest two rows differ by 1.646 -> WHICH row we read matters
+row 0 ([CLS]) logits: [-0.3368  0.5745  4.2194  4.6753] -> class 3
+row 1 (a tile) logits: [-1.6424  2.1446  2.9167  2.7125] -> class 2 (a different verdict — that row speaks for its own tile, not the picture)
+softmax on the whole (5, 4) block — bare .sum() row totals: [0.6927 0.1648 0.0019 0.0077 0.1329] 
+  the axis=-1 form's row totals: [1. 1. 1. 1. 1.] -> axis=-1 is the rule
+gap shape: (8,)  gap: [ 0.3254  0.8166  0.5257  0.0579  0.1142 -0.7577  0.4903  0.6358] (average DOWN the tiles)
+a mean over ALL 5 rows (wrongly including [CLS]) would sit up to 0.2239 away
+gap_probs     : [0.0035 0.0133 0.6311 0.3521]  argmax: 2  loss for true_class 0 = 5.6564
+-> same head, different summary: 3 ([CLS]) vs 2 (GAP). Which readout you pick can change the verdict.
+
+✅ you got it

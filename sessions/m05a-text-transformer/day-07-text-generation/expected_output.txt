@@ -1,0 +1,49 @@
+LOGITS shape: (5,)  values: [ 3.  -1.   1.5  0.2  1. ]
+the next-word chart (T = 1) - shape (5,) - sums to 1.0
+   mat     logit  3.00  prob 0.6956  ###########################
+   banana  logit -1.00  prob 0.0127  
+   floor   logit  1.50  prob 0.1552  ######
+   sofa    logit  0.20  prob 0.0423  #
+   rug     logit  1.00  prob 0.0941  ###
+
+greedy, 5 calls: ['mat', 'mat', 'mat', 'mat', 'mat'] -> distinct words: 1 | no dice in it, so this chart always gives mat
+
+T = 0.7 (cool: the top bar towers) - shape (5,) - sums to 1.0
+   mat     logit  3.00  prob 0.8359  #################################
+   banana  logit -1.00  prob 0.0028  
+   floor   logit  1.50  prob 0.0981  ###
+   sofa    logit  0.20  prob 0.0153  
+   rug     logit  1.00  prob 0.0480  #
+T = 1.5 (warm: the bars flatten) - shape (5,) - sums to 1.0
+   mat     logit  3.00  prob 0.5389  #####################
+   banana  logit -1.00  prob 0.0374  #
+   floor   logit  1.50  prob 0.1983  #######
+   sofa    logit  0.20  prob 0.0833  ###
+   rug     logit  1.00  prob 0.1421  #####
+predicted surprise rate (1 - top bar): cool 0.1641  warm 0.4611
+sample 5x cool: ['mat', 'mat', 'mat', 'mat', 'mat'] distinct 1 | 5x warm: ['rug', 'floor', 'floor', 'banana', 'rug'] distinct 3
+over 2000 draws, cool [1667    5  202   27   99] -> surprise 0.1665 | warm [1106   74  383  176  261] -> surprise 0.4470 | warmer wins: True
+draw order matches bar order? True ['mat', 'floor', 'rug', 'sofa', 'banana']
+
+top-k (k = 3): the trimmed chart - shape (5,) - sums to 1.0
+   mat     logit  3.00  prob 0.7361  #############################
+   banana  logit -1.00  prob 0.0000  
+   floor   logit  1.50  prob 0.1643  ######
+   sofa    logit  0.20  prob 0.0000  
+   rug     logit  1.00  prob 0.0996  ###
+survivors ['mat', 'floor', 'rug'] | thrown out ['banana', 'sofa']
+plain draws [1383   31  309   91  186] -> the thrown-out words DO come out
+top-k draws [1481    0  308    0  211] -> they escaped the shortlist 0 times out of 2000
+
+top-p (p = 0.9) chart: [0.7361 0.     0.1643 0.     0.0996] - shape (5,)
+survivors ['mat', 'floor', 'rug'] | their bars add up to 0.945 >= 0.9 | one draw: mat
+peaked (tallest bar 0.9697) -> 1 survivor(s) ['mat']                        re-shared [1.]  drew mat
+flat   (tallest bar 0.3958) -> 4 survivor(s) ['mat', 'floor', 'rug', 'sofa'] re-shared [0.4302 0.2361 0.1933 0.1404]  drew floor
+
+edge (a) exact cut-off: bars [0.5     0.25    0.125   0.09375 0.03125] running total [0.5     0.75    0.875   0.96875 1.     ]
+  p = 0.75 lands EXACTLY on the 2nd total -> keeps 2 bar(s), mass 0.75 | 0.7499 -> 2 | 0.7501 -> 3 | 0.875 -> 3
+edge (b) p = 1.0: the chart really sums to 0.9999999999999999 -> keeps 5 of 5 bars (with no clamp the count would read 6)
+edge (c) scores x400 -> chart [1. 0. 0. 0. 0.] sums to 1.0 | every bar a real number: True
+edge (d) one-word chart, 50 draws -> counts [50  0  0  0  0] shape (5,)
+
+✅ you got it

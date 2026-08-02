@@ -1,0 +1,46 @@
+seq = 3  d_model = 8  hidden = 32 (a 4x widen)
+W1: (8, 32)  W2: (32, 8)  x: (3, 8) (3 words, 8 wide)
+  the    [-0.544  -0.1335  1.2979 -0.9678  1.9267  1.8793 -1.7134 -0.141 ]
+  cat    [ 0.3427 -0.7609 -0.7411 -0.2374  0.7392 -0.5113  1.8267  0.29  ]
+  sat    [-0.1026  1.4493  0.6263  0.3693 -0.3311  1.814   0.8118 -0.2034]
+layer_norm(x) shape: (3, 8)
+  the    [-0.5883 -0.2639  0.8671 -0.9232  1.3639  1.3266 -1.5124 -0.2699]
+  cat    [ 0.2724 -1.0685 -1.0444 -0.4324  0.7542 -0.7653  2.0756  0.2084]
+  sat    [-0.8976  1.2233  0.0985 -0.2527 -1.2099  1.7217  0.3521 -1.0354]
+each word's own average: [0.2005 0.1185 0.5542] -> [-0.  0. -0.]  own spread: [1.2655 0.823  0.7317] -> [1. 1. 1.] (re-levelled per word)
+
+ffn widths, all 3 words at once:
+  in : (3, 8) -> h = x@W1 : (3, 32) -> relu(h) : (3, 32) -> out = a@W2 : (3, 8)
+relu boundary probe: [-2.5, -1e-12, -0.0, 0.0, 1e-12, 3.5] -> [0.0, 0.0, 0.0, 0.0, 1e-12, 3.5]
+poke word 0 -> word 1 moves by 0.1667 under attention (MIXES)
+poke word 0 -> word 1 moves by 0.0 under the ffn (per word)
+
+one block, Pre-LN order (norm -> part -> add the input back):
+  input: (3, 8)  after attention sublayer: (3, 8)  after ffn sublayer: (3, 8) <- the shape it came in with
+  the    [-1.0298  0.177   1.7421 -2.5462  2.6288  2.6941 -2.4096 -0.6692]
+  cat    [ 0.1629 -1.2829 -1.1827  0.3945  0.8198 -2.0859  1.2686  0.3556]
+  sat    [-1.4456  2.4196  2.0283 -0.2104 -1.354   2.9022 -0.4974 -0.0835]
+furthest any number moved from its input: 1.5784 -> the block edits the lane, it does not replace it
+
+stacking the SAME block 4 times:
+  after block 1: shape (3, 8)   average word length 4.4954
+  after block 2: shape (3, 8)   average word length 6.8004
+  after block 3: shape (3, 8)   average word length 9.2372
+  after block 4: shape (3, 8)   average word length 11.7813
+every shape identical: True -> that is why a tower of identical blocks fits together
+
+shuffled to ['sat', 'the', 'cat'] -> shape (3, 8)
+  sat    [-1.4456  2.4196  2.0283 -0.2104 -1.354   2.9022 -0.4974 -0.0835]
+  the    [-1.0298  0.177   1.7421 -2.5462  2.6288  2.6941 -2.4096 -0.6692]
+  cat    [ 0.1629 -1.2829 -1.1827  0.3945  0.8198 -2.0859  1.2686  0.3556]
+gap from the shuffled-rows prediction: 0.0 -> rows moved, values did not: permutation-equivariant
+with seat stamps added, the same prediction misses by 1.6095 -> order now changes the answer
+
+word spreads leaving Pre-LN : [1.9682, 1.1003, 1.6142] (lane untouched)
+word spreads leaving Post-LN: [1.0, 1.0, 1.0] (every exit row re-levelled)
+the rows Post-LN hands out (spread 1 cannot tell you these are right):
+  the    [-0.4309  0.3036  0.8539 -1.538   1.2635  1.1643 -1.2378 -0.3786]
+  cat    [ 0.3817 -0.9016 -0.7037  0.8619  0.9346 -1.9797  0.8058  0.6009]
+  sat    [-1.1721  1.1566  1.1795 -0.4723 -1.044   1.3469 -0.8686 -0.1261]
+
+✅ you got it

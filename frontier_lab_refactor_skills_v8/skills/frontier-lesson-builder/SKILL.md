@@ -250,6 +250,16 @@ cross-day pass. Hand-author only when the target is a single day.
 - **Run the gate before you call the day done:** `python3 sessions/_experiment_check.py
   sessions/<module>/<day>/experiment.py` (structural contract + a REAL run).
   `frontier-refactor-qa` owns what that gate does and does not prove.
+- **Then PIN THE GOLDEN REFERENCE, as the last step of authoring the day:**
+  `python3 sessions/_experiment_check.py <path> --write-expected`. It stores the day's stdout as
+  `<day>/expected_output.txt`, and from then on ANY change to what reaches the screen fails the gate.
+  That is the only thing that catches a corruption at the print CALL — an operand swapped inside a
+  `%`-tuple, an index shifted, arithmetic wrapped around a name that is already correctly asserted.
+  Assertions cannot see those: measured on this corpus, 498 such plants, 4 caught. ⚠️ **Read the
+  output before you pin it.** The reference detects DRIFT, not correctness — pin a broken day and the
+  gate defends the breakage forever, which makes this the single most consequential step in
+  authoring the artifact. Because the reference covers the rendering, do NOT also pin rendered text
+  in the file; keep in-file claims on VALUES, and leave the file editable for the learner.
 
 **Writing a self-check that cannot fail is the default failure mode, not an edge case.** Ten
 vacuity patterns and five harder no-op traps were each proven on a real day by planting the bug

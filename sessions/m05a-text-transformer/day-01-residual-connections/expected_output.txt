@@ -1,0 +1,30 @@
+W shape: (4, 4)  x0 shape: (4,)  x0 = [1. 1. 1. 1.]
+F(x0) shape: (4,)  F(x0) = [-0.08 -0.16 -0.96  0.8 ] (the change)
+same shape -> True  F(x0) + x0 = [0.92 0.84 0.04 1.8 ]
+a 3-slot F(x) added onto a 4-slot x raises: ValueError
+
+PLAIN stack, x = F(x) each time (no shortcut):
+   after  0 blocks   |x| = 2.000000e+00
+   after  1 blocks   |x| = 1.262379e+00
+   after  5 blocks   |x| = 3.770688e-01
+   after 10 blocks   |x| = 3.376106e-02
+   after 20 blocks   |x| = 3.260209e-04
+   after 30 blocks   |x| = 3.365176e-06
+   final x = [ 2.56e-06  1.50e-07  1.59e-06 -1.50e-06]  shape (4,)  smaller after every single block? True
+
+SHORTCUT stack, x = F(x) + x each time:
+   after  0 blocks   |x| = 2.000000e+00
+   after  1 blocks   |x| = 2.189429e+00
+   after  5 blocks   |x| = 3.695958e+00
+   after 10 blocks   |x| = 3.066812e+00
+   after 20 blocks   |x| = 3.391588e+00
+   after 30 blocks   |x| = 3.612264e+00
+   final x = [ 3.421581  0.776002  0.773864 -0.374418]  shape (4,)  smallest |x| ever reached: 2.189429e+00
+   it never fell back to 2.0, and it crept UP: tomorrow's layer norm re-levels each TOKEN going into a block, not this lane — Day 4 measures the lane still growing under Pre-LN
+
+F(x) = 0, so output = 0 + x:
+   x = [ 2. -1.  5.]  F(x) = [0. 0. 0.]  output = [ 2. -1.  5.]  np.allclose(output, x) -> True
+   30 zero-blocks WITH the shortcut -> [1. 1. 1. 1.] (exactly x0); WITHOUT it -> [0. 0. 0. 0.] (signal gone)
+   that dead stack: |x| never grows? True  strictly smaller every step? False (0 -> 0 is not smaller)
+
+✅ you got it

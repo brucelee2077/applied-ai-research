@@ -1,0 +1,47 @@
+Part 1 — the fake image
+  img shape: (8, 8) -> H = 8 rows, W = 8 columns
+  img =
+ [[ 0  1  2  3  4  5  6  7]
+ [ 8  9 10 11 12 13 14 15]
+ [16 17 18 19 20 21 22 23]
+ [24 25 26 27 28 29 30 31]
+ [32 33 34 35 36 37 38 39]
+ [40 41 42 43 44 45 46 47]
+ [48 49 50 51 52 53 54 55]
+ [56 57 58 59 60 61 62 63]]
+  top row: [0, 1, 2, 3, 4, 5, 6, 7]  left column: [0, 8, 16, 24, 32, 40, 48, 56]
+
+Part 2 — predict with the formula, then patchify (P = 4)
+  formula (H//P) x (W//P) = (8//4) x (8//4) = 2 x 2 = 4 tiles
+  patchify returned shape: (4, 4, 4) -> tiles from the walk: 4  agrees with the formula? True
+  each tile's top-left pixel: [0, 4, 32, 36] -> across the top strip (0, 4), then the strip below (32, 36)
+  a 4x6 picture at P = 2 -> formula 6 tiles ; patchify (6, 2, 2)  top-left pixels: [0, 2, 4, 12, 14, 16] 
+  -> (2 down) x (3 across), never (3 down) x (2 across)
+  a 5x5 picture at P = 2 (P divides neither side) -> formula 4 tiles ; patchify cut 4 -> last tile [[12, 13], [17, 18]] ; 9 pixels of 25 left out
+  -> the thin bottom strip and thin right strip are not tiles
+
+Part 3 — flatten a tile into its word-vector
+  tile 0 shape: (4, 4) -> its 4x4 grid:
+ [[ 0  1  2  3]
+ [ 8  9 10 11]
+ [16 17 18 19]
+ [24 25 26 27]]
+  tile.reshape(-1) -> shape (16,)  length 16 
+  flat tile 0: [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27] (row 1, row 2, row 3, row 4 in a line)
+  all tiles flattened: (4, 16) = (num_patches, P*P) -> a sequence
+  sequence row 1: [4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31] -> the tile RIGHT of tile 0
+  total inside each tile: [216, 280, 728, 792]  image total: 2016
+  every pixel used exactly once? True
+
+Part 4 — same image, smaller tiles (P = 2)
+  formula: (8//2) x (8//2) = 4 x 4 = 16 tiles ; patchify returned (16, 2, 2)
+  counting only the extra tiles ACROSS would give 8 - reality: 16  ratio: 4.0 
+  -> smaller tiles = far more tiles = longer sequence = more compute
+  first P=2 tile: [[0, 1], [8, 9]]  top-left pixel of each: [0, 2, 4, 6, 16, 18, 20, 22, 32, 34, 36, 38, 48, 50, 52, 54]
+
+Part 5 — flattening a color tile (P x P x 3)
+  GRAY tile (16, 16) -> flattens to 256 numbers
+  COLOR tile (16, 16, 3) -> flattens to 768 numbers = 16*16*3 -> 3x longer than gray, because the channels stack up
+  first 6 flat color numbers: [0, 100, 200, 1, 101, 201] -> pixel 0's R,G,B, then pixel 1's
+
+✅ you got it

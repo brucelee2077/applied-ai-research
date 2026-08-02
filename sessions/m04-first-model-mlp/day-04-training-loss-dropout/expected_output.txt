@@ -1,0 +1,61 @@
+MSE  gaps [0.5, 1.0, 2.0, 4.0] -> squared [0.25, 1.0, 4.0, 16.0] -> MSE 5.3125
+cross-entropy, 0.90 on the true class -> loss 0.11
+cross-entropy, 0.50 on the true class -> loss 0.69
+cross-entropy, 0.01 on the true class -> loss 4.61
+-> confident-and-wrong (0.01) hurts about 40x confident-and-right (0.90)  (4.61 / 0.11 = 41.9)
+
+train images (300, 64) labels (300,) | held-out val (500, 64) labels (500,)
+model 64 -> 128 -> 10 = 9472 weights for 300 training examples (over-powered on purpose)
+stamp values run (-4.76, 4.36) — NOT day 1's [0.0, 1.0] byte pixels: these are centred near 0 with spread ~1, the other standard input scaling
+predict: (1) train loss -> near 0 while validation turns UP; (2) the rising curve is VALIDATION; (3) dropout makes the gap SMALLER
+
+lesson's table [0.62, 0.44, 0.35, 0.36, 0.42, 0.51] -> the bottom-finder says epoch 3 (the lesson read epoch 3, loss 0.35)
+
+--- Run A: NO dropout ---
+  epoch  1   train 2.8215   validation 2.0670
+  epoch  5   train 1.0810   validation 1.3061
+  epoch  9   train 0.6088   validation 1.2307  <-- validation bottom (best model)
+  epoch 13   train 0.3485   validation 1.2734
+  epoch 17   train 0.2151   validation 1.3266
+  epoch 21   train 0.1431   validation 1.3367
+  epoch 25   train 0.1041   validation 1.3689
+  epoch 29   train 0.0799   validation 1.3845
+  epoch 33   train 0.0648   validation 1.4037
+  epoch 37   train 0.0531   validation 1.4122
+  epoch 40   train 0.0471   validation 1.4218
+  validation was lowest at epoch 9, then rose by 0.191 while train dived
+  final gap (validation - train) = 1.375 <- this growing gap IS overfitting
+  biases started at 0 and learned: b1 spread 0.0268, b2 top 0.0689
+
+--- Run B: dropout p = 0.5 (train mode only, survivors x2.0) ---
+  epoch  1   train 3.5068   validation 2.1104
+  epoch  5   train 1.6926   validation 1.2385
+  epoch  9   train 1.2433   validation 1.1024
+  epoch 13   train 0.9952   validation 1.0843
+  epoch 14   train 1.1009   validation 1.0750  <-- validation bottom (best model)
+  epoch 17   train 0.8786   validation 1.1090
+  epoch 21   train 0.7775   validation 1.0965
+  epoch 25   train 0.6485   validation 1.1101
+  epoch 29   train 0.5363   validation 1.0917
+  epoch 33   train 0.4924   validation 1.1245
+  epoch 37   train 0.3821   validation 1.1429
+  epoch 40   train 0.3796   validation 1.1219
+  best validation 1.075 at epoch 14 (Run A reached 1.231)
+  final gap 0.742 vs Run A's 1.375; late rise 0.047 vs 0.191
+  not free: after the same 40 epochs its train loss is 0.380, not 0.047
+
+4 units kept as-is -> total 4.0 | 2 benched, survivors x2.0 -> total 4.0
+same ladder at p = 0.75 -> 1 kept, survivors x4.0 -> total 4.0 | 4000 real maskings: 0.245 survived, each x4.0
+eval signal 60.939 | dropout averages 60.811 (scaled) vs 30.405 (if you forget to scale)
+
+hinge net: z1 = [5. 0.] (loss 5.0067) -> dW1 for the live unit [2.9799 0.9933], for the z = 0 unit [0. 0.]
+the same step with a (z >= 0) gate (loss 5.0067, unchanged) hands that dead unit [-2.9799 -0.9933] instead — same forward, different weights: the one-character bug a random run never shows
+
+same picture, dropout still ON -> digit [7, 0, 0] confidence [0.481, 0.954, 0.753]
+same picture, eval mode        -> digit [0, 0, 0] confidence [0.919, 0.919, 0.919]
+
+remember: a low TRAINING loss proves nothing about new data — the held-out loss is
+the honest number. And dropout is not free: it learns slower, and it can hurt a model
+that already generalizes. Reach for it when you SEE the gap grow.
+
+✅ you got it

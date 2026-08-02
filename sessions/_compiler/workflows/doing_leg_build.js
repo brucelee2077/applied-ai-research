@@ -136,6 +136,10 @@ const WRITE_SCHEMA = {
     gate_pass: { type: 'boolean' },
     gate_output: { type: 'string' },
     deterministic: { type: 'boolean' },
+    golden_pinned: { type: 'boolean',
+      description: 'true only if --write-expected wrote expected_output.txt for this day' },
+    golden_skipped_why: { type: 'string',
+      description: 'if golden_pinned is false, why the day must not be pinned (e.g. output legitimately varies)' },
     lines: { type: 'integer' },
     claims: { type: 'array', items: { type: 'string' },
       description: 'one line per pinned claim the self-check asserts' },
@@ -149,7 +153,7 @@ const WRITE_SCHEMA = {
     substitutions: { type: 'string', description: 'what the produce step asked for that this box cannot do, and what was built instead' },
     stdout_tail: { type: 'string' },
   },
-  required: ['wrote', 'gate_pass', 'gate_output', 'deterministic', 'plants'],
+  required: ['wrote', 'gate_pass', 'gate_output', 'deterministic', 'golden_pinned', 'plants'],
 }
 
 const REVIEW_SCHEMA = {
@@ -319,7 +323,23 @@ async function writeRound(day, round, findings) {
 7. PLANT YOUR OWN DEFECTS — at least ${PLANTS_MIN}, and choose them where THIS day's mechanism could plausibly be misspelled. ${PLANT_METHOD}
    Optional review aid: python3 sessions/_experiment_mutate.py ${path} perturbs one numeric literal at a time. It edits the file IN PLACE and restores it, so if it is interrupted, check git diff --stat before you finish. A surviving mutant is a LEAD, not a verdict, and it is blind to every structural case in step 4.
 
-Report: wrote; gate_pass (only true if _experiment_check.py exited 0 — paste its output in gate_output); deterministic (the two-run diff was empty); lines; claims (one line per pinned claim); plants (defect, caught, how, stdout_diffed); substitutions; stdout_tail (last ~20 lines of a real run).${fb}`,
+8. PIN THE GOLDEN REFERENCE — the LAST step, and only after 5, 6 and 7 all pass:
+     python3 sessions/_experiment_check.py ${path} --write-expected
+   This stores the day's stdout as expected_output.txt beside the artifact. From then on the gate
+   fails on ANY change to what reaches the screen — an operand swapped inside a %-tuple, an index
+   shifted at the print site, arithmetic wrapped around a name your self-check already pins
+   correctly. Your assertions are structurally blind to all of those, because the corruption happens
+   at the print CALL, after the assertion's view of the world ends (measured on this repo: 498 such
+   plants, 4 caught).
+   ⚠️ READ THE OUTPUT BEFORE YOU PIN IT. The reference detects DRIFT, never correctness: pin a broken
+   day and the gate defends the breakage forever. This is the single most consequential line you
+   will run, which is exactly why it comes after your own plants rather than before.
+   ⚠️ Do NOT pin a day whose output legitimately varies (an unseeded draw that IS the lesson). Report
+   it instead — one such day exists in this curriculum and correctly has no reference.
+   Because the reference covers the RENDERING, do not also pin rendered line text inside the file:
+   keep your in-file claims on VALUES, and leave the file pleasant for a learner to edit.
+
+Report: wrote; gate_pass (only true if _experiment_check.py exited 0 — paste its output in gate_output); deterministic (the two-run diff was empty); golden_pinned (true only if step 8 wrote expected_output.txt, or state why the day must not have one); lines; claims (one line per pinned claim); plants (defect, caught, how, stdout_diffed); substitutions; stdout_tail (last ~20 lines of a real run).${fb}`,
     { label: `write ${day} r${round}`, phase: 'Write', schema: WRITE_SCHEMA, agentType: 'general-purpose' })
 }
 
@@ -334,6 +354,15 @@ function selfFindings(r) {
     out.push({ day: '', kind: 'not_deterministic', severity: 'P0',
       why: 'two runs were not byte-identical — the reviewer diffs two runs, and a learner cannot tell a real change from noise',
       fix: 'seed every source of randomness; do not widen a tolerance to hide it' })
+  }
+  // A day with no golden reference leaves the whole print-site class open: a corruption at the
+  // print CALL is invisible to every assertion in the file (measured: 498 plants, 4 caught). An
+  // explicit reason is a valid answer — one day in this curriculum legitimately varies — but
+  // silence is not, or the class quietly stays open on every future day.
+  if (!r.golden_pinned && !(r.golden_skipped_why || '').trim()) {
+    out.push({ day: '', kind: 'no_golden_reference', severity: 'P0',
+      why: 'expected_output.txt was not pinned and no reason was given. Without it, an operand swapped inside a %-tuple, an index shifted at the print site, or arithmetic wrapped around an already-asserted name all pass silently and the learner reads a wrong number under a ✅.',
+      fix: 'after the gate, determinism and your plants all pass, READ the output and then run: python3 sessions/_experiment_check.py <path> --write-expected. If the day legitimately varies, say so in golden_skipped_why instead.' })
   }
   const plants = r.plants || []
   const caught = plants.filter(p => p.caught)

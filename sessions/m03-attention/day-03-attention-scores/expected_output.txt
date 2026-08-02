@@ -1,0 +1,50 @@
+Q (3, 4)  K (3, 4)  V (3, 2)  d_k = 4  sqrt(d_k) = 2.0
+d_v = 2 and d_k = 4 -> a Value's width is still a free choice
+
+--- Part 2: the score matrix (row = who asks, column = who is offered) ---
+[[2. 2. 2.]
+ [2. 4. 2.]
+ [2. 6. 4.]]
+the @ shortcut and the by-hand loop agree: True
+bank's row [2. 6. 4.] -> bank leans on river
+key-first K @ Q.T gives bank's row [2. 2. 4.] -> bank would lean on bank instead. Query first, always.
+
+--- Part 3: scaled scores (every cell divided by sqrt(d_k)) ---
+[[1. 1. 1.]
+ [1. 2. 1.]
+ [1. 3. 2.]]
+widths          : [4, 9, 64]
+sqrt(width)     : [2.0, 3.0, 8.0]  width/2 (the wrong law): [2.0, 4.5, 32.0]
+   [2,6,4] / sqrt(4 ) -> [1. 3. 2.]
+   [2,6,4] / sqrt(9 ) -> [0.6667 2.     1.3333]
+   [2,6,4] / sqrt(64) -> [0.25 0.75 0.5 ]
+ranking before: [('the', 2.0), ('bank', 4.0), ('river', 6.0)]
+ranking after : [('the', 1.0), ('bank', 2.0), ('river', 3.0)]
+same order: True  same numbers: False (division moved every number and left the order alone)
+
+--- Part 4: softmax over each row (the attention weights) ---
+[[0.3333 0.3333 0.3333]
+ [0.2119 0.5761 0.2119]
+ [0.09   0.6652 0.2447]]
+row sums: [1. 1. 1.] (one whole budget per asking word)
+whole grid at once == one row at a time: True
+with no axis at all, the row sums would be: [0.1594 0.2506 0.59  ] and bank's row [0.0531 0.3925 0.1444] -> not one budget per word
+predicted biggest share: river  actual: river
+
+--- Part 5: masking (a forbidden word gets a huge negative score) ---
+labels  : ['the', 'river', 'FUTURE', 'pad']
+no mask : [0.0871 0.6439 0.2369 0.0321]  sum 1.0
+masked  : [0.1192 0.8808 0.     0.    ]  sum 1.0
+change  : [ 0.0321  0.2369 -0.2369 -0.0321] (freed budget moves to allowed words)
+biggest share left on a forbidden word, mask -1e9 : 0.0
+biggest share left on a forbidden word, mask -12   : 2.69e-07 (a mask that is only a bit negative still leaks budget)
+
+--- Part 6: blend the Values by bank's shares ---
+shares [0.09   0.6652 0.2447] @ V -> [7.6313 2.8496]
+predicted nearest Value: river  actual: river  distances: [8.256 2.516 3.809]
+all three rows of softmax(Q @ K.T / sqrt(d_k)) @ V:
+   the    -> [4.6667 4.    ]
+   river  -> [6.6089 3.2716]
+   bank   -> [7.6313 2.8496]
+
+✅ you got it

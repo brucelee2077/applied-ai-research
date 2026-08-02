@@ -1,0 +1,42 @@
+tape-measure  O = ⌊(N − K + 2P)/S⌋ + 1
+  valid         N=28 K=3 P=0 S=1  ->  ⌊(28 − 3 + 0)/1⌋ + 1 = 26
+  same          N=28 K=3 P=1 S=1  ->  ⌊(28 − 3 + 2)/1⌋ + 1 = 28
+  same+stride2  N=28 K=3 P=1 S=2  ->  ⌊(28 − 3 + 2)/2⌋ + 1 = 14
+  same 5x5      N=32 K=5 P=2 S=1  ->  ⌊(32 − 5 + 4)/1⌋ + 1 = 32
+counted stops (no formula used): [26, 28, 14, 32]   formula says: [26, 28, 14, 32]
+labels honest (valid -> P=0; same -> odd K with P=(K−1)/2): True
+  same test on 3 deliberately mislabeled rows: [False, False, False] -> all False
+floor check: (28 − 3 + 2)/2 = 13.5 -> rounds down to 13 so O = 14
+stride-3 cross-check  formula: [10, 10]  counted stops: [10, 10]
+
+img = np.zeros((28,28)) -> shape (28, 28)  padded with P=1 -> shape (30, 30) (28 + 2P = 30)
+ACTUAL feature-map shape: (14, 14)  formula predicted: (14, 14)
+but every value in it is 0.0 - an all-zero picture proves the SHAPE and nothing else, so the value pins below use a real picture.
+
+4x4 counting picture, PLAIN sum window, K=2 P=0 S=2 -> shape (2, 2)
+  window totals: [[14, 22], [46, 54]] -> the top-left one is 1+2+5+6 = 14
+  same map from a stencil of ones: True -> summing = weighting by 1
+
+non-square picture (28, 40)  K=(rows 3, cols 5) P=(1, 0) S=(2, 3)
+  rows: ⌊(28 − 3 + 2)/2⌋ + 1 = 14  cols: ⌊(40 − 5 + 0)/3⌋ + 1 = 12
+  ACTUAL shape: (14, 12)  formula predicted: (14, 12)
+  wide_fmap[0,0] = 0.22  whole map sum = 1658.31
+
+picture differs from its mirror and its transpose: True  stencil differs from its 180° flip: True
+weighted feature map, K=3 P=1 S=2 -> shape (14, 14)
+  fmap[0,0]  = -0.013 (top-left: most of this window is padding zeros)
+  fmap[3,11] = 38.764 (sits on the bright patch)
+  fmap[0,11] = 0.432 (same column, top row: no bright patch)
+  fmap.sum() = 735.151 (whole map, one number)
+
+12 filters, K=3 P=1 S=2 -> stacked shape (12, 14, 14)
+12 filters, K=3 P=1 S=1 -> stacked shape (12, 28, 28)
+depth : 12 and 12 -> the same 12, from the filter count
+H x W : (14, 14) and (28, 28) -> these DID move when S moved
+  bank_a[0,0,0]    = -0.4269 (filter 0, top-left stop)
+  bank_a[11,13,13] = 0.4472 (filter 11, last stop)
+distinct grid totals in the stack: 12 -> 12 different filter reports
+
+takeaway: predicted size == actual size, every time; depth = number of filters.
+
+✅ you got it

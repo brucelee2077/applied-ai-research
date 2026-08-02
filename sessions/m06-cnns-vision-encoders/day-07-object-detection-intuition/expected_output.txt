@@ -1,0 +1,44 @@
+Part 1 — three boxes written as [x1, y1, x2, y2] (two opposite corners):
+  cat_true    [x1= 50, y1= 50, x2=150, y2=140]  ->  100 x  90 px, area  9000
+  cat_pred    [x1= 60, y1= 55, x2=158, y2=150]  ->   98 x  95 px, area  9310
+  dog         [x1=300, y1=200, x2=380, y2=300]  ->   80 x 100 px, area  8000
+
+Part 2 — IoU = (area they SHARE) / (area they cover TOGETHER)
+  cat_true vs cat_pred: overlap rect (60, 55, 150, 140) -> 90 x 85 = 7650 shared px
+  union = 9000 + 9310 - 7650 = 10660 px (subtract the shared middle, or it counts twice)
+  iou(cat_true, cat_pred) = 0.7176
+  cat_true vs dog:      overlap rect (300, 200, 150, 140) -> width -150 and height -60 are NEGATIVE, both clamped to 0
+  iou(cat_true, dog)      = 0.0
+  pixel grid shape: (320, 400) (rows = y, cols = x) — counted pixel by pixel, shared = 7650  together = 10660  ratio = 0.7176
+  formula and pixel count land on the same float: True
+  predicted closer to / actually closer to:  cat pair -> 1 / 1  cat vs dog -> 0 / 0
+
+Part 3 — raw detector output: 5 boxes, four on one cat plus one dog
+  score 0.95  [x1= 55, y1= 52, x2=152, y2=142]  ->   97 x  90 px, area  8730
+  score 0.88  [x1= 58, y1= 50, x2=150, y2=140]  ->   92 x  90 px, area  8280
+  score 0.81  [x1= 52, y1= 55, x2=156, y2=145]  ->  104 x  90 px, area  9360
+  score 0.77  [x1= 60, y1= 48, x2=148, y2=138]  ->   88 x  90 px, area  7920
+  score 0.90  [x1=300, y1=200, x2=380, y2=300]  ->   80 x 100 px, area  8000
+
+Part 4 — NMS with IoU cut-off 0.50
+  keep score 0.95 (highest left) -> test every other box against it
+    score 0.90  iou 0.0000  <= 0.50 -> survives (different object)
+    score 0.88  iou 0.9082  > 0.50  -> SUPPRESS (same object)
+    score 0.81  iou 0.8744  > 0.50  -> SUPPRESS (same object)
+    score 0.77  iou 0.8333  > 0.50  -> SUPPRESS (same object)
+  keep score 0.90 (highest left) -> test every other box against it
+  final count = 2 — four cat boxes became one, the dog survived:
+  score 0.95  [x1= 55, y1= 52, x2=152, y2=142]  ->   97 x  90 px, area  8730
+  score 0.90  [x1=300, y1=200, x2=380, y2=300]  ->   80 x 100 px, area  8000
+  boundary: two nested boxes with iou exactly 0.5 -> NMS keeps 2 boxes, because 0.5 is not ABOVE 0.5
+
+Part 5 — filter by score > 0.85 BEFORE NMS
+  scores the threshold keeps: [0.95, 0.88, 0.9]  scores it drops: [0.81, 0.77]
+  a box scoring exactly 0.85: dropped -> the dial is strict, so equal-to-the-threshold does not survive
+  NMS on that shorter pile keeps: [0.95, 0.9] -> the dial changed the input, not the one-box-per-object result
+
+takeaway: detection outputs many boxes with confidence scores; IoU measures
+  how well two boxes overlap; NMS keeps one tidy box per object; the number
+  of final boxes is variable (0, 1, or many).
+
+✅ you got it

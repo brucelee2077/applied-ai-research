@@ -1,0 +1,59 @@
+Part 1 — one FULL-width head (d_k = 4), asked ONE question. words: ['tired', 'cat', 'mat']
+  x (3, 4) -> its Q, K, V are each (3, 4) — full width, nothing sliced yet
+  'cat' row shares     : [  0.9867   0.0066   0.0066]  row sum = 1.0000000000000002
+  row  vs  column      : cat's ROW peaks at 0.9867 but cat's COLUMN peaks at 0.3333 -> row = the asker
+  its blended answer   : [  0.9867   0.0066   0.0000   0.0000] 
+                         reads [how much tired, how much mat, 0, 0] -> nearly all 'tired': crisp
+
+Part 2 — the same full-width head asked to do BOTH jobs at once
+  'cat' row shares     : [  0.4983   0.0034   0.4983] -> tired and mat get the SAME share
+  its blended answer   : [  0.4983   0.4983   0.0000   0.0000] -> half and half: muddy
+
+Part 3 — split -> attend -> join -> mix, with d_model = 4 and h = 2
+  predicted widths     : [(3, 2), (3, 4), (3, 4)] (one head, joined, final)
+  each head's recipes  : W_Q (4, 2) W_K (4, 2) W_V (4, 2) -> half the model width
+  d_k = 2 and d_v = 2 -> a Value's width is still free (Day 3 used 2 against 4); 
+                         we CHOOSE d_v = d_k here so h x d_v = 4 = d_model on the join
+  head A 'cat' shares  : [  0.9983   0.0008   0.0008] -> nearly all 'tired'
+  head A 'cat' answer  : [  0.9983   0.0008] = [how much tired, how much mat]
+  head B 'cat' shares  : [  0.0008   0.0008   0.9983] -> nearly all 'mat'
+  head B 'cat' answer  : [  0.0008   0.9983] = same two slots, the other word
+  two heads of width 2 each stay sharp where ONE head of width 4 went half and half
+  input x (3, 4) -> head A (3, 2) + head B (3, 2) = half the model width each
+  joined (concatenate) : (3, 4) = back to full width;   final (after W_O): (3, 4) = one vector per word
+  final values         :
+ [[0.7333 0.6333 0.7667 0.6667]
+ [1.5978 0.6001 0.7002 1.1986]
+ [0.7333 0.6333 0.7667 0.6667]]
+  note: only 'cat' asks a question in this toy, so the 'tired' and 'mat' rows have no 
+        Query to speak of and spread their shares evenly.
+
+Part 3b — run the same rule at three dial settings, panel and all
+  d_model  4, h 2 -> d_k 2;  one head  2 wide, joined  4, final  4
+  d_model 12, h 3 -> d_k 4;  one head  4 wide, joined 12, final 12
+  d_model 64, h 8 -> d_k 8;  one head  8 wide, joined 64, final 64
+
+Part 3c — same two heads, a word asking ONLY the place question
+  head A 'cat' shares  : [  0.3333   0.3333   0.3333] -> flat: head A's Query is silent here
+  head B 'cat' shares  : [  0.0008   0.0008   0.9983] -> still nearly all 'mat'
+  tie head B's KEY recipe to head A's and both heads answer [  0.9983   0.0008] -> identical
+
+Part 4 — drop head B, then compare the mixing W_O with a no-mixing one
+  mixing W_O    : the first 2 final slots move by at least 0.1001 -> head B had a say in them
+  no-mixing W_O : the same slots move by 0.0 -> they never heard head B at all
+                  its own last 2 slots still move by at least 0.4002
+  each of those first 2 slots, word by word:
+ [[0.26667 0.13333]
+ [0.59915 0.10008]
+ [0.26667 0.13333]]
+
+Part 5 — more heads, same budget. 'Budget' = stored numbers here, not Day 3's 
+         budget of attention shares. The panel's Q/K/V recipes hold 48 numbers; the one full-width head holds 48 -> same budget, sliced thinner
+  (that counts Q/K/V only. W_O adds 16 more numbers, and a full-width head needs 
+   an output matrix of its own in a real model too.)
+
+Part 6 — the same panel again, now with two random sets of recipes (seed 0)
+  widths               : head (3, 2) + head (3, 2) -> joined (3, 4) -> final (3, 4) = the same width story
+  biggest 'cat' share any random head gives: 0.732 -> nowhere near the 0.9983 above: untuned heads do not specialize
+
+✅ you got it — one full-width head asked both questions blurs to 0.4983 / 0.4983; two heads with their OWN width-2 recipes each hold 0.9983 on their own word (here it is their KEY recipe that separates them — cat asks both questions equally, so both heads get the same Query), they join to width 4, and W_O hands back width 4
