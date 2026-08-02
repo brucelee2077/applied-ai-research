@@ -1,5 +1,6 @@
 // Run: node sessions/_compiler/tests/test_shelf.mjs   (exit 0 = pass)
-import { isUnlocked, TOYS, shelfSummary } from '../shells/js/shelf.js'
+import { isUnlocked, TOYS, shelfSummary,
+         VIZ_MSG_TYPE, clampHeight, nextOpen, acceptHeight } from '../shells/js/shelf.js'
 import assert from 'node:assert'
 
 // isUnlocked takes the RAW localStorage string (or null) — never touches localStorage itself.
@@ -70,3 +71,27 @@ assert.equal(blocked.unlocked.length, 0, 'blocked storage -> nothing unlocked')
 assert.equal(blocked.locked.length, TOYS.length, 'blocked storage -> everything locked')
 
 console.log('test_shelf: TOYS table + summary OK')
+
+assert.equal(VIZ_MSG_TYPE, 'viz-height', 'must match sessions/_compiler/shells/v9-base.donor')
+assert.equal(clampHeight(500), 500)
+assert.equal(clampHeight(10), 320,   'floor matches the lesson receiver')
+assert.equal(clampHeight(99999), 3200, 'ceiling matches the lesson receiver')
+assert.equal(clampHeight('600'), null, 'non-number is rejected, not coerced')
+assert.equal(clampHeight(NaN), null,   'NaN is rejected')
+
+// open/collapse transition — the "single panel open" rule
+assert.equal(nextOpen(null, 'viz/a.html'), 'viz/a.html',   'opening from closed')
+assert.equal(nextOpen('viz/a.html', 'viz/b.html'), 'viz/b.html', 'switching swaps')
+assert.equal(nextOpen('viz/a.html', 'viz/a.html'), null,    'clicking the open toy collapses it')
+
+// height-message gate — the "post-collapse message ignored" rule.
+// The ~1600ms sender tail means messages really do outlive the panel.
+const msg = { type: 'viz-height', px: 500 }
+assert.equal(acceptHeight(msg, true, true), 500,  'live frame, matching source -> accept')
+assert.equal(acceptHeight(msg, false, true), null, 'collapsed mid-flight -> ignore, no throw')
+assert.equal(acceptHeight(msg, true, false), null, 'foreign/stale sender -> ignore')
+assert.equal(acceptHeight({ type: 'other', px: 500 }, true, true), null, 'wrong type -> ignore')
+assert.equal(acceptHeight(null, true, true), null, 'null payload -> ignore, no throw')
+assert.equal(acceptHeight({ type: 'viz-height' }, true, true), null, 'missing px -> ignore')
+
+console.log('test_shelf: height protocol + panel transitions OK')

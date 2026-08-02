@@ -7,6 +7,7 @@ Checks:
   2. every TOYS owner quest-id appears as a data-quest-id on some tracked page
   3. no viz page that IS embedded by a lesson is silently missing from TOYS
   4. the copy of shelf.js inlined in index.html matches the module source
+  5. shelf.js's viz message type still matches the donor the lessons compile against
 
 Run: python3 sessions/_shelf_audit.py      (exit 0 = pass)
 """
@@ -139,6 +140,17 @@ def main():
             fails.append("index.html's inlined shelf logic has DRIFTED from shelf.js "
                          "(re-inline with: sed 's/^export //' "
                          "sessions/_compiler/shells/js/shelf.js)")
+
+    # 5 — the message type must match the donor the lessons compile against
+    donor = os.path.join(BASE, "_compiler", "shells", "v9-base.donor")
+    dtxt = open(donor, encoding="utf-8").read()
+    dm = re.search(r"d\.type\s*!==\s*'([a-z-]+)'", dtxt)
+    jm = re.search(r"VIZ_MSG_TYPE = '([a-z-]+)'", js)
+    if not dm or not jm:
+        fails.append("could not read the viz message type from donor and/or shelf.js")
+    elif dm.group(1) != jm.group(1):
+        fails.append(f"message type drift: donor says '{dm.group(1)}', "
+                     f"shelf.js says '{jm.group(1)}'")
 
     return report(len(toys))
 

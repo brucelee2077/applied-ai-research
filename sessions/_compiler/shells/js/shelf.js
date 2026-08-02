@@ -56,3 +56,31 @@ export function shelfSummary(read){
   }
   return { total: TOYS.length, unlocked: unlocked, locked: locked };
 }
+
+// ── viz iframe height protocol ────────────────────────────────────────────────
+// Must stay equal to the type in _compiler/shells/v9-base.donor (line ~606).
+// Compiled lessons get that parity free from visual_integrity_gate.py, which reads
+// the type from the donor; index.html is NOT compiled, so _shelf_audit.py checks it.
+export var VIZ_MSG_TYPE = 'viz-height';
+
+// Same clamp the lesson receiver uses. Returns null for anything not a real number.
+export function clampHeight(px){
+  if (typeof px !== 'number' || !isFinite(px)) return null;
+  return Math.min(Math.max(px, 320), 3200);
+}
+
+// Which toy should be open after a click? null means "closed".
+// Kept pure so the single-panel rule is testable without a DOM.
+export function nextOpen(currentlyOpen, clicked){
+  return currentlyOpen === clicked ? null : clicked;
+}
+
+// Should this height message be applied, and to what height?
+// Returns null to ignore. Senders keep firing for ~1600ms after load
+// (viz/xor-limit.html:262 fires at 80/300/800/1600ms, plus 60/420ms per click),
+// so a message routinely outlives the panel that requested it.
+export function acceptHeight(msg, hasLiveFrame, sourceMatches){
+  if (!msg || msg.type !== VIZ_MSG_TYPE) return null;
+  if (!hasLiveFrame || !sourceMatches) return null;
+  return clampHeight(msg.px);
+}
