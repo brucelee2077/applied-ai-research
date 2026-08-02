@@ -1,11 +1,13 @@
 // Run: node sessions/_compiler/tests/test_shelf.mjs   (exit 0 = pass)
-import { isUnlocked } from '../shells/js/shelf.js'
+import { isUnlocked, TOYS, shelfSummary } from '../shells/js/shelf.js'
 import assert from 'node:assert'
 
 // isUnlocked takes the RAW localStorage string (or null) — never touches localStorage itself.
 assert.equal(isUnlocked(null), false, 'no stored state -> locked')
 assert.equal(isUnlocked(''), false, 'empty string -> locked')
 assert.equal(isUnlocked('not json{'), false, 'corrupt JSON must not throw')
+assert.equal(isUnlocked('{}'), false, 'no done key -> locked')
+assert.equal(isUnlocked('{"sr":{"x":{"next":1}}}'), false, 'sr alone does not unlock')
 assert.equal(isUnlocked('{"done":{}}'), false, 'visited but nothing done -> locked')
 assert.equal(isUnlocked('{"done":{"c1":true}}'), true, 'any done section -> unlocked')
 assert.equal(isUnlocked('{"done":{"produce":true}}'), true, 'produce also unlocks')
@@ -13,8 +15,6 @@ assert.equal(isUnlocked('{"done":{"produce":true}}'), true, 'produce also unlock
 assert.equal(isUnlocked('{"done":{"c1":true},"sr":{"x":{"next":1}}}'), true, 'sr key is ignored')
 
 console.log('test_shelf: unlock rule OK')
-
-import { TOYS, shelfSummary } from '../shells/js/shelf.js'
 
 assert.equal(TOYS.length, 17, 'exactly 17 shelf-eligible viz pages')
 
@@ -26,8 +26,8 @@ for (const t of TOYS) {
 }
 
 // no duplicate pages, no duplicate names
-assert.equal(new Set(TOYS.map(t => t[4])).size, 17, 'no duplicate page paths')
-assert.equal(new Set(TOYS.map(t => t[0])).size, 17, 'no duplicate display names')
+assert.equal(new Set(TOYS.map(t => t[4])).size, TOYS.length, 'no duplicate page paths')
+assert.equal(new Set(TOYS.map(t => t[0])).size, TOYS.length, 'no duplicate display names')
 
 // the five unembedded pages must NOT be present
 for (const bad of ['attention-heatmap','attention-multihead','attention-pipeline',
@@ -37,8 +37,8 @@ for (const bad of ['attention-heatmap','attention-multihead','attention-pipeline
 // but diffusion-noising IS embedded (by a flat week-m22b page) and must be present
 assert.ok(TOYS.some(t => t[4] === 'viz/diffusion-noising.html'), 'diffusion-noising is owned')
 
-// curated ownership overrides
-const owner = n => TOYS.find(t => t[4] === 'viz/' + n + '.html')[2]
+// curated ownership overrides — `|| []` so a rename shows an assertion diff, not a TypeError
+const owner = n => (TOYS.find(t => t[4] === 'viz/' + n + '.html') || [])[2]
 assert.equal(owner('neuron-boundary'), 'wf2-d01-neuron', 'curated: day-01 holds it inline')
 assert.equal(owner('xor-limit'),       'wf2-d01-neuron', 'curated: day-01 holds xor-c inline')
 assert.equal(owner('matmul'),          'wf1-d04-matmul', 'simple case: earliest embedder')
@@ -49,11 +49,11 @@ const REAL_TODAY = ['wf1-d01-arrays','wf1-d02-indexing','wf1-d03-broadcasting','
 const read = qid => REAL_TODAY.includes(qid) ? '{"done":{"c1":true}}' : null
 
 const sum = shelfSummary(read)
-assert.equal(sum.total, 17)
+assert.equal(sum.total, TOYS.length)
 assert.equal(sum.unlocked.length, 5, 'learner has exactly 5 toys today')
 assert.deepEqual(sum.unlocked.map(t => t[0]).sort(),
   ['Activation curves','Broadcasting','Matmul shapes','Neuron weights','XOR limit'])
-assert.equal(sum.locked.length, 12)
+assert.equal(sum.locked.length, TOYS.length - 5)
 // order is preserved from TOYS (curriculum order): Broadcasting is m01, so it comes first
 assert.equal(sum.unlocked[0][0], 'Broadcasting', 'unlocked list keeps TOYS order')
 assert.equal(sum.unlocked[sum.unlocked.length - 1][0], 'Activation curves', 'and ends at m02 Day 2')
@@ -61,6 +61,12 @@ assert.equal(sum.unlocked[sum.unlocked.length - 1][0], 'Activation curves', 'and
 // empty store -> nothing unlocked, still no throw
 const none = shelfSummary(() => null)
 assert.equal(none.unlocked.length, 0)
-assert.equal(none.locked.length, 17)
+assert.equal(none.locked.length, TOYS.length)
+
+// blocked site data makes localStorage.getItem throw SecurityError. That throw must
+// not escape shelfSummary, or one browser setting stops the whole hub rendering.
+const blocked = shelfSummary(() => { throw new Error('SecurityError: storage blocked') })
+assert.equal(blocked.unlocked.length, 0, 'blocked storage -> nothing unlocked')
+assert.equal(blocked.locked.length, TOYS.length, 'blocked storage -> everything locked')
 
 console.log('test_shelf: TOYS table + summary OK')

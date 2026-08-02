@@ -48,7 +48,11 @@ export var TOYS = [
 export function shelfSummary(read){
   var unlocked = [], locked = [];
   for (var i = 0; i < TOYS.length; i++){
-    (isUnlocked(read(TOYS[i][2])) ? unlocked : locked).push(TOYS[i]);
+    var raw = null;
+    // localStorage.getItem throws SecurityError when site data is blocked —
+    // a locked shelf is fine, a hub that stops rendering is not.
+    try { raw = read(TOYS[i][2]); } catch (e) { raw = null; }
+    (isUnlocked(raw) ? unlocked : locked).push(TOYS[i]);
   }
   return { total: TOYS.length, unlocked: unlocked, locked: locked };
 }
