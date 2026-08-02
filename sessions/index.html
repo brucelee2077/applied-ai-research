@@ -895,6 +895,80 @@ function renderPhaseJump(){
   });
 }
 
+// ── Toy Shelf render ──────────────────────────────────────────────────────────
+var _openToy = null;      // page path of the open toy, or null
+var _openFrame = null;    // the live iframe element, or null
+
+function readQuest(qid){
+  try { return localStorage.getItem('frontier-lesson:' + qid); }
+  catch (e) { return null; }        // private mode / disabled storage
+}
+
+function closeToy(){
+  var host = document.getElementById('tpFrame');
+  if (host) host.innerHTML = '';    // destroys the iframe
+  _openFrame = null;
+  _openToy = null;
+  var panel = document.getElementById('toyPlay');
+  if (panel) panel.hidden = true;
+  var btns = document.querySelectorAll('.toy[aria-pressed="true"]');
+  for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', 'false');
+}
+
+function openToy(toy, btn){
+  if (_openToy === toy[4]) { closeToy(); return; }   // clicking the open toy collapses it
+  closeToy();
+  _openToy = toy[4];
+  btn.setAttribute('aria-pressed', 'true');
+  document.getElementById('tpTitle').textContent = toy[0];
+  document.getElementById('tpMeta').innerHTML =
+    toy[1] + ' · ' + toy[3] + ' · <a href="' + toy[4] +
+    '" target="_blank" rel="noopener">open full screen</a>';
+  // Lazily create the iframe so N toys cost zero iframes at rest.
+  var host = document.getElementById('tpFrame');
+  var f = document.createElement('iframe');
+  f.setAttribute('title', toy[0]);
+  f.setAttribute('loading', 'lazy');
+  f.src = toy[4];
+  host.appendChild(f);
+  _openFrame = f;
+  document.getElementById('toyPlay').hidden = false;
+}
+
+function renderShelf(gate){
+  var host = document.getElementById('shelf');
+  if (!host) return;
+  var sum = shelfSummary(readQuest);
+  document.getElementById('shelfCount').textContent = sum.unlocked.length;
+
+  // Subtitle: reuse the hub's own forward-looking gate line.
+  var sub = document.getElementById('shelfSub');
+  if (gate) {
+    sub.textContent = gate.remaining + ' lesson' + (gate.remaining === 1 ? '' : 's') +
+                      ' to clear the M' + gate.m.n + ' gate';
+  } else {
+    sub.textContent = 'all gates cleared 🎉';
+  }
+
+  host.innerHTML = '';
+  function card(toy, unlocked){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toy' + (unlocked ? '' : ' locked');
+    b.setAttribute('aria-pressed', 'false');
+    if (!unlocked) b.disabled = true;
+    b.innerHTML = '<div class="toy-n"></div><div class="toy-m"></div><div class="toy-v"></div>';
+    b.querySelector('.toy-n').textContent = toy[0];
+    b.querySelector('.toy-m').textContent = toy[1];
+    b.querySelector('.toy-v').textContent = unlocked ? toy[3] : '🔒 locked';
+    if (unlocked) b.addEventListener('click', function(){ openToy(toy, b); });
+    return b;
+  }
+  // unlocked first, then locked — locked ones read as anticipation, not a scold
+  for (var i = 0; i < sum.unlocked.length; i++) host.appendChild(card(sum.unlocked[i], true));
+  for (var j = 0; j < sum.locked.length; j++)   host.appendChild(card(sum.locked[j], false));
+}
+
 function render(){
   renderCapFilters();
 
@@ -1106,6 +1180,10 @@ function render(){
   renderPhaseJump();
   applyFilter();
 }
+(function(){
+  var x = document.getElementById('tpClose');
+  if (x) x.addEventListener('click', closeToy);
+})();
 render();
 
 // ── appearance switcher (same localStorage key as every lesson) ──
