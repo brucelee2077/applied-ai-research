@@ -96,10 +96,17 @@ if __name__ == "__main__":
     # the six numbers each curve actually SHOWS, rounded once and pinned below as shown
     curve_big_cells = [round(x, 3) for x in curve_big[:6]]
     curve_good_cells = ["%.4g" % x for x in curve_good[:6]]
-    print("\nlr = 1.0 loss per step (too big -> stuck bouncing at 4):",
-          curve_big_cells, "...")
-    print("lr = 0.1 loss per step (just right -> drops to ~0):",
-          curve_good_cells, "...")
+    # Each of these two lines is rendered ONCE as the text it will print, and that text is
+    # pinned below. Both lists are already pinned as values, so what is left loose is which
+    # list lands under which LABEL: hand the "too big -> stuck bouncing at 4" line the
+    # falling curve and the day's headline evidence reads backwards with nothing to object.
+    curve_big_line = ("lr = 1.0 loss per step (too big -> stuck bouncing at 4): %s ..."
+                      % (curve_big_cells,))
+    curve_good_line = ("lr = 0.1 loss per step (just right -> drops to ~0): %s ..."
+                       % (curve_good_cells,))
+    print()
+    print(curve_big_line)
+    print(curve_good_line)
 
     # Every number above is a SQUARE, and squaring hides the sign — so "lr = 1.0 makes
     # the weight flip sign" has been a sentence, not evidence. Here is the sign itself:
@@ -108,8 +115,15 @@ if __name__ == "__main__":
     # bottom and just shrinks toward it.
     signed_big = ["%+.3f" % w for w in path_big[:4]]
     signed_good = ["%+.3f" % w for w in path_good[:4]]
-    print("lr = 1.0 SIGNED weight per step (flips side, same size):", " ".join(signed_big), "...")
-    print("lr = 0.1 SIGNED weight per step (same side, shrinking): ", " ".join(signed_good), "...")
+    # Same reasoning, and it matters more here: "flips side" vs "same side" is one of the
+    # day's four headline claims, and it is carried entirely by which row of signs sits
+    # under which label. So pin the rendered rows, not only the two lists.
+    signed_big_line = ("lr = 1.0 SIGNED weight per step (flips side, same size): %s ..."
+                       % " ".join(signed_big))
+    signed_good_line = ("lr = 0.1 SIGNED weight per step (same side, shrinking):  %s ..."
+                        % " ".join(signed_good))
+    print(signed_big_line)
+    print(signed_good_line)
 
     # -----------------------------------------------------------------
     # Why those four verdicts belong to THIS surface (curvature), not to the numbers.
@@ -131,8 +145,14 @@ if __name__ == "__main__":
     measured_cells = ["lr %-5s -> %+.3f" % (lr, measured_shrinks[lr]) for lr in rates]
     measured_good_shrink = measured_shrinks[0.1]    # 0.80 — "just right" here
     measured_crawl_shrink = measured_shrinks[0.01]  # 0.98 — "crawl" here
-    print("\nper-step weight shrink 1 - lr*C on this bowl (C = %g, stable while lr < %g):"
-          % (curvature, stability_limit))
+    # `curvature == 2.0` and `stability_limit == 1.0` are both pinned below — and that is
+    # not enough, because this header reads them in an ORDER, and the order IS the lesson.
+    # Swapped, the same two pinned numbers print "C = 1, stable while lr < 2", which makes
+    # lr = 1.0's bounce look like a comfortably stable rate. So pin the rendered header.
+    shrink_header = ("per-step weight shrink 1 - lr*C on this bowl (C = %g, stable while lr < %g):"
+                     % (curvature, stability_limit))
+    print()
+    print(shrink_header)
     print("  formula  1 - lr*C: " + " | ".join(shrink_cells))
     print("  measured from real hops: " + " | ".join(measured_cells))
     print("  lr = 1.0 sits exactly on -1.000: the sign flips, the size does not — a bounce,"
@@ -170,8 +190,13 @@ if __name__ == "__main__":
                           "%+.3f" % bridge[0.01],            # …is the healthy one there
                           "%+.3f" % bridge[0.1],             # 0.1 lands dead on target
                           "%.0f" % abs(bridge[1.0]))         # 1.0 throws the miss 9x out
-    print("same rates on Day 6's neuron (C = 2*(x*x+1) = %g, stable while lr < %g):"
-          % (day06_curvature, day06_limit))
+    # Same trap as the header above, one day further: `day06_curvature == 10.0` and
+    # `day06_limit == 0.2` are both pinned, so the only thing loose is the order they are
+    # read in — and swapped they print "C = 2*(x*x+1) = 0.2, stable while lr < 10", which
+    # says every rate in this file is safe on a neuron that lr = 1.0 blows up.
+    bridge_header = ("same rates on Day 6's neuron (C = 2*(x*x+1) = %g, stable while lr < %g):"
+                     % (day06_curvature, day06_limit))
+    print(bridge_header)
     print("  one lap multiplies its miss by: " + " | ".join(bridge_cells))
     print("  so 0.01 — the 'crawl' rate here (%s) — is the HEALTHY one there (%s),"
           " 0.1 lands dead on the target in ONE lap (%s), and 1.0 — the harmless"
@@ -203,9 +228,15 @@ if __name__ == "__main__":
     blowup_decades = math.log10(blowup_loss)
     # rendered ONCE — the size on screen is the size pinned at the bottom
     blowup_cells = ("%g" % blowup_lr, "%.6g" % blowup_loss, "%.2f" % blowup_decades)
-    print("\na hair over the line: lr = %s for 60 steps -> loss %s (10^%s), while"
-          " lr = 1.0 just bounces at 4. The line is at lr = %g."
-          % (blowup_cells + (stability_limit,)))
+    # and the finished LINE rendered once as well, because read in the wrong order the same
+    # pinned cells print "lr = 1.27002e+10 for 60 steps -> loss 1.1", which turns a blow-up
+    # into a tiny loss. The stability line is quoted here too, so the pin ties this sentence
+    # to the same `stability_limit` the shrink header printed.
+    blowup_line = ("a hair over the line: lr = %s for 60 steps -> loss %s (10^%s), while"
+                   " lr = 1.0 just bounces at 4. The line is at lr = %g."
+                   % (blowup_cells + (stability_limit,)))
+    print()
+    print(blowup_line)
 
     # bonus: the halving schedule with a 0.1 floor
     sched_loss, sched_lr = train_with_schedule()
@@ -324,7 +355,29 @@ if __name__ == "__main__":
         on_line_a < 1e-28 and
         on_line_b < 1e-28 and
         # …and the three heights as the sentence printed them
-        bottom_cells == ('1', '0', '0')
+        bottom_cells == ('1', '0', '0') and
+        # And the seven claim-carrying LINES, pinned as the exact text that reached the
+        # screen. Every number on them is pinned as a value above; what is pinned here is
+        # the ORDER the line reads them in, which is where each claim lives. Without these,
+        # swapping two operands at a print call prints "C = 1, stable while lr < 2" (making
+        # a bouncing rate look stable), or "C = 2*(x*x+1) = 0.2, stable while lr < 10"
+        # (making an exploding rate look safe), or hands the "too big" label the falling
+        # curve — with every existing assert still green.
+        curve_big_line == ("lr = 1.0 loss per step (too big -> stuck bouncing at 4): "
+                           "[4.0, 4.0, 4.0, 4.0, 4.0, 4.0] ...") and
+        curve_good_line == ("lr = 0.1 loss per step (just right -> drops to ~0): "
+                            "['2.56', '1.638', '1.049', '0.6711', '0.4295', '0.2749'] ...") and
+        signed_big_line == ("lr = 1.0 SIGNED weight per step (flips side, same size): "
+                            "-2.000 +2.000 -2.000 +2.000 ...") and
+        signed_good_line == ("lr = 0.1 SIGNED weight per step (same side, shrinking):  "
+                             "+1.600 +1.280 +1.024 +0.819 ...") and
+        shrink_header == ("per-step weight shrink 1 - lr*C on this bowl "
+                          "(C = 2, stable while lr < 1):") and
+        bridge_header == ("same rates on Day 6's neuron "
+                          "(C = 2*(x*x+1) = 10, stable while lr < 0.2):") and
+        blowup_line == ("a hair over the line: lr = 1.1 for 60 steps -> loss 1.27002e+10"
+                        " (10^10.10), while lr = 1.0 just bounces at 4."
+                        " The line is at lr = 1.")
     )
 
     if ok:

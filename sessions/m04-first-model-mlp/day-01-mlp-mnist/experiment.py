@@ -168,9 +168,17 @@ if __name__ == "__main__":
     print("\nimage 0: guess", shown_guess0, " true label", shown_label0,
           " guess counts per digit:", shown_guess_counts)
     print("every picked slot holds its row's biggest logit:", argmax_ok)
-    print("untrained accuracy:", shown_accuracy, " chance level:", predicted_accuracy)
-    print("same data, nearest-average-image labeller:", shown_data_accuracy,
-          "-> the data is readable; the random knobs are what score ~10%")
+    # These next two lines ARE the day's headline claim ("the wiring is right, the knobs are
+    # random, so it guesses ~10%"), so each is built ONCE as text, pinned as text below, and
+    # then printed. Pinning the value alone leaves the print CALL free: a `* 3.0` wrapped
+    # around a name at the print, or the accuracy and chance-level columns swapped, would both
+    # read as a passing run while the page taught the opposite.
+    accuracy_line = ("untrained accuracy: %s  chance level: %s"
+                     % (shown_accuracy, predicted_accuracy))
+    data_line = ("same data, nearest-average-image labeller: %s -> the data is readable; "
+                 "the random knobs are what score ~10%%" % shown_data_accuracy)
+    print(accuracy_line)
+    print(data_line)
 
     # --- Part 6: why the two layers need a bend between them --------------
     # Small hand-checkable stand-ins for W1 and W2 (the lesson's 3-input, 2-judge demo).
@@ -191,8 +199,12 @@ if __name__ == "__main__":
     bent = mix_bent @ Wb                     # bend first, then the second matmul
     folded = x_mix @ (Wa @ Wb)               # the two layers folded into one matrix
     print("x_mix@Wa =", mix_pre, "-> relu ->", mix_bent)
-    print("with the bend:", bent, " folded flat:", folded,
-          "-> NOT the same, so with a bend the stack is no longer one linear layer")
+    # The whole reason a bend exists is the DIRECTION of this comparison: bent and folded must
+    # not match. Swap the two columns and the sentence still says "NOT the same" while now
+    # blaming the wrong path, so this line is pinned as the text it prints, not as two values.
+    bend_line = ("with the bend: %s  folded flat: %s -> NOT the same, so with a bend the stack "
+                 "is no longer one linear layer" % (bent, folded))
+    print(bend_line)
 
     # --- Part 7: what the two bias vectors do, once they are not zero ------
     # Above, b1 and b2 are all zeros, so "+ b1" and "+ b2" add nothing yet. Give the SAME
@@ -203,10 +215,15 @@ if __name__ == "__main__":
     b2_demo = np.array([-1.0, 0.5])      # a head start for each of the 2 output scores
     zero_pre, zero_hidden, zero_logits = forward(x_mix, Wa, np.zeros(2), Wb, np.zeros(2))
     biased_pre, biased_hidden, biased_logits = forward(x_mix, Wa, b1_demo, Wb, b2_demo)
-    print("\nzero biases : pre", zero_pre, "-> relu", zero_hidden,
-          "-> logits", zero_logits)
-    print("with biases : pre", biased_pre, "-> relu", biased_hidden,
-          "-> logits", biased_logits)
+    # Two rows that only mean something as a PAIR: which row is the zero-bias one, and which
+    # numbers belong to which stage. Built as text and pinned as text, so neither the two rows
+    # nor the pre / relu / logits columns inside a row can be exchanged.
+    zero_line = ("zero biases : pre %s -> relu %s -> logits %s"
+                 % (zero_pre, zero_hidden, zero_logits))
+    biased_line = ("with biases : pre %s -> relu %s -> logits %s"
+                   % (biased_pre, biased_hidden, biased_logits))
+    print("\n" + zero_line)
+    print(biased_line)
     print("adding b1 =", b1_demo, "and b2 =", b2_demo,
           "moved every number -> the two '+ b' terms are doing work")
 
@@ -226,7 +243,10 @@ if __name__ == "__main__":
                and shown_cast_gap <= 0.5)
     # A clipped stand-in keeps a big exactly-black background — but not an all-black one:
     # wraparound leaves 0.9% black, a dead wobble (std 0.0) leaves 84.3% and identical twins.
-    wobble_ok = 30.0 < shown_black_pct < 60.0 and shown_pair_gap > 0.05
+    # The pair gap is pinned to the EXACT printed figure. A floor (`> 0.05`) cannot see a
+    # corruption: 4x that gap prints 2.036 on pixels this same file pins to [0.0, 1.0], where
+    # no difference can exceed 1.0, and the floor would still say yes.
+    wobble_ok = 30.0 < shown_black_pct < 60.0 and shown_pair_gap == 0.518
     params_ok = (n_params == 101770                      # the lesson's ~100k knobs
                  and (w1_count, b1_count, w2_count, b2_count) == (100352, 128, 1280, 10)
                  and w1_shape == (784, 128) and b1_shape == (128,)
@@ -235,8 +255,10 @@ if __name__ == "__main__":
              and abs(shown_w2_std - 0.1250) < 0.008      # sqrt(2/128) = 0.125
              and not b1.any() and not b2.any())
     # He init is zero-mean, so roughly half the hidden notes start negative and the bend
-    # deletes them. An all-positive or all-negative layer would be a broken bend.
-    bend_ok = (shown_z1_min < 0.0 and shown_hidden_min == 0.0
+    # deletes them. An all-positive or all-negative layer would be a broken bend. "Negative"
+    # alone is too loose to be evidence for the He spread above — it holds just as well at
+    # -3.524 — so the printed minimum is pinned to the exact figure as well as to its sign.
+    bend_ok = (shown_z1_min == -2.262 and shown_z1_min < 0.0 and shown_hidden_min == 0.0
                and 30.0 < shown_zero_pct < 70.0)
     # The printed row of 10 scores IS the evidence for the argmax below, so pin it to the
     # numbers this seed really produced (checked by running it, not by expecting it).
@@ -251,7 +273,8 @@ if __name__ == "__main__":
     # A tight band around chance: 0.05 rules out the lesson's other offers (50%, 95%).
     chance_ok = (abs(shown_accuracy - predicted_accuracy) < 0.05
                  and shown_predicted_accuracy == 0.1)
-    data_ok = shown_data_accuracy > 0.95                 # so ~10% is not the data's fault
+    data_ok = shown_data_accuracy == 1.0    # so ~10% is not the data's fault. Exact, not a
+    #  floor: `> 0.95` also waves through an "accuracy" of 3.0, which is not an accuracy.
     # Both paths must land on the SAME written-down numbers — not merely on each other.
     numbers_ok = (np.allclose(lesson_pre, [[7.5, 5.5]])
                   and np.allclose(two_layer, [[17.0, -2.0]])
@@ -267,6 +290,19 @@ if __name__ == "__main__":
                and np.allclose(biased_pre, [[2.5, 0.5]])
                and np.allclose(biased_hidden, [[2.5, 0.5]])
                and np.allclose(biased_logits, [[2.5, -1.5]]))
+    # The four lines above that carry a CLAIM in their layout — the headline "~10%" pair, the
+    # bend-vs-folded contrast, and the zero-bias / with-bias pair — pinned as the exact text
+    # that reached the screen. A value pin ends at the assert; this one reaches the page, so a
+    # doubled number, a swapped pair of columns or two exchanged rows all fail here.
+    rendered_lines_ok = (
+        accuracy_line == "untrained accuracy: 0.134  chance level: 0.1"
+        and data_line == ("same data, nearest-average-image labeller: 1.0 -> the data is "
+                          "readable; the random knobs are what score ~10%")
+        and bend_line == ("with the bend: [[ 2. -2.]]  folded flat: [[-3.  -4.5]] -> NOT the "
+                          "same, so with a bend the stack is no longer one linear layer")
+        and zero_line == "zero biases : pre [[ 2.  -2.5]] -> relu [[2. 0.]] -> logits [[ 2. -2.]]"
+        and biased_line == ("with biases : pre [[2.5 0.5]] -> relu [[2.5 0.5]] "
+                            "-> logits [[ 2.5 -1.5]]"))
 
     claims = [
         (shapes_ok, "shapes flowing (500,784) -> (500,128) -> (500,10)"),
@@ -274,13 +310,14 @@ if __name__ == "__main__":
         (cast_ok, "clip-then-cast: pre-cast floats inside [0.0, 255.0] and the round moving "
                   "a pixel by at most 0.5 (no uint8 wraparound, no truncation)"),
         (wobble_ok, "live pen wobble: 30-60% of pixels exactly black and two samples of one "
-                    "class differing by more than 0.05"),
+                    "class differing by exactly the printed 0.518"),
         (layout_ok, "slot k of the flat row holding grid pixel (k // 28, k % 28), so slots "
                     "0,1,28 are cells (0,0), (0,1), (1,0)"),
         (params_ok, "784*128 + 128 + 128*10 + 10 = 101770 parameters, from W1 (784,128), "
                     "b1 (128,), W2 (128,10), b2 (10,)"),
         (he_ok, "He init: W1 std ~0.0505, W2 std ~0.125, biases exactly zero"),
-        (bend_ok, "relu clipping real negatives to exactly 0, zeroing 30-70% of the notes"),
+        (bend_ok, "relu clipping real negatives (a pre-bend minimum of exactly -2.262) to "
+                  "exactly 0, zeroing 30-70% of the notes"),
         (row0_ok, "image 0's printed logit row being the row this seed produces, "
                   "starting [0.084, 1.124, -1.071, ...]"),
         (argmax_ok, "the guessed slot being the position of the row's largest logit"),
@@ -294,6 +331,10 @@ if __name__ == "__main__":
         (bias_ok, "the '+ b' terms carrying their weight: b1=[0.5,3.0] turning pre-bend "
                   "[[2,-2.5]] into [[2.5,0.5]], then b2=[-1,0.5] turning logits [[3.5,-2]] "
                   "into [[2.5,-1.5]] (and zero biases reproducing [[2,-2]])"),
+        (rendered_lines_ok, "the four claim-carrying lines reading, word for word, "
+                            "'untrained accuracy: 0.134  chance level: 0.1', the readable-data "
+                            "line, 'with the bend: [[ 2. -2.]]  folded flat: [[-3.  -4.5]]', "
+                            "and the zero-bias row before the with-bias row"),
     ]
     if all(ok for ok, _ in claims):
         print("\n✅ you got it")

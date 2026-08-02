@@ -80,7 +80,11 @@ if __name__ == "__main__":
     # The three counts are read ONCE into names, so the line the learner reads and the
     # counts the self-check pins are the same three values, not two separate lookups.
     n_all, n_train, n_val = len(x), len(x_train), len(x_val)
-    print("dataset: %d points  ->  train %d / val %d" % (n_all, n_train, n_val))
+    # The whole LINE is rendered once and pinned as text below, because pinning the three
+    # counts leaves their ORDER on the line free: "32 points -> train 40 / val 8" is a
+    # different, wrong story told with the same three correctly-pinned numbers.
+    dataset_line = "dataset: %d points  ->  train %d / val %d" % (n_all, n_train, n_val)
+    print(dataset_line)
 
     # ---- 2. turn the flexibility knob up step by step (the CAPACITY axis) -----
     degrees = list(range(1, 16))  # degree 1 (smooth line) ... degree 15 (very wiggly)
@@ -113,8 +117,12 @@ if __name__ == "__main__":
     # at the raw float would be two expressions for one number: corrupt the printed one and
     # the learner reads a wrong loss under a passing ✅.
     best_val_cell = "%.4f" % best_val
-    print("\nlowest validation loss at degree %d  (val_loss = %s)  <- best model / early-stopping point"
-          % (best_degree, best_val_cell))
+    # …and the headline LINE rendered once too, so the degree and the loss cannot trade
+    # places on screen while both stay correctly pinned as values.
+    best_line = ("lowest validation loss at degree %d  (val_loss = %s)"
+                 "  <- best model / early-stopping point" % (best_degree, best_val_cell))
+    print()
+    print(best_line)
 
     # the story of overfitting, made visible:
     first_degree, last_degree = degrees[0], degrees[-1]
@@ -122,10 +130,17 @@ if __name__ == "__main__":
     train_end_cell = "%.4f" % train_losses[-1]
     most_flexible_val = val_losses[-1]                 # the 'most-flexible' figure…
     most_flexible_cell = "%.4f" % most_flexible_val    # …rendered once, pinned below
-    print("train_loss keeps dropping: degree %d = %s  ->  degree %d = %s"
-          % (first_degree, train_start_cell, last_degree, train_end_cell))
-    print("but validation RISES past the minimum: best = %s  ->  most-flexible = %s"
-          % (best_val_cell, most_flexible_cell))
+    # Both of these lines are DIRECTION claims, and a direction lives in the ORDER of two
+    # cells, not in either cell. Swapping the two operands of the second line prints
+    # "best = 0.1077  ->  most-flexible = 0.0935" — validation FALLING, directly under a
+    # label that says it RISES — with both cells still individually correct. So render each
+    # line once, pin the rendered TEXT below, and print the pinned string.
+    train_drop_line = ("train_loss keeps dropping: degree %d = %s  ->  degree %d = %s"
+                       % (first_degree, train_start_cell, last_degree, train_end_cell))
+    val_rise_line = ("but validation RISES past the minimum: best = %s  ->  most-flexible = %s"
+                     % (best_val_cell, most_flexible_cell))
+    print(train_drop_line)
+    print(val_rise_line)
 
     # ---- 4b. the day's headline claim, measured: does the GAP really WIDEN? ---
     # One row is not a trend, and this validation pile holds only 8 points — so a single
@@ -146,10 +161,14 @@ if __name__ == "__main__":
     gap_late_mean_cell = "%.4f" % late_gap_mean
     gap_ratio_cell = "%.1fx" % gap_ratio
     gap_widest_cell = "%.4f" % gap_late
-    print("the GAP widens with flexibility: %s at degree %d  ->  %s averaged over degrees"
-          " %d-%d (%s wider), widest %s at degree %d"
-          % (gap_best_cell, best_degree, gap_late_mean_cell, late_degrees[0],
-             late_degrees[-1], gap_ratio_cell, gap_widest_cell, widest_degree))
+    # Eight cells on one line, every one of them pinned as a value and every one of them
+    # free to move: read in the wrong order this line reports the gap SHRINKING with
+    # flexibility. Render once, pin the text, print the pinned string.
+    gap_line = ("the GAP widens with flexibility: %s at degree %d  ->  %s averaged over degrees"
+                " %d-%d (%s wider), widest %s at degree %d"
+                % (gap_best_cell, best_degree, gap_late_mean_cell, late_degrees[0],
+                   late_degrees[-1], gap_ratio_cell, gap_widest_cell, widest_degree))
+    print(gap_line)
 
     # and the bumps, measured rather than glossed over: every degree whose gap came out
     # NARROWER than the degree before it. Small val pile -> a jumpy val curve, which is
@@ -163,9 +182,21 @@ if __name__ == "__main__":
     # the acceptance step's last ask: how far past the best point would you have gone if
     # you had only ever looked at the training curve? It never turns around, so: all of it.
     overshoot = last_degree - best_degree
-    print("had you watched only the training curve, you would have kept turning the knob"
-          " %d more degrees past the best (degree %d -> %d)"
-          % (overshoot, best_degree, last_degree))
+    # "past the best" is a direction too: printed the other way round it reads
+    # "(degree 15 -> 5)", which is turning the knob DOWN, the opposite of the warning.
+    overshoot_line = ("had you watched only the training curve, you would have kept turning"
+                      " the knob %d more degrees past the best (degree %d -> %d)"
+                      % (overshoot, best_degree, last_degree))
+    print(overshoot_line)
+
+    # The victory line quotes four cells that are all pinned already, so the only thing left
+    # loose in it is the order — and "the gap widens from 0.2020 there to 0.0154" is the
+    # day's claim backwards. Rendered here, pinned as text below, printed only when ok.
+    victory_line = ("✅ you got it — train loss falls forever, but validation bottoms out at "
+                    "degree %d then rises: the gap widens from %s there to %s across degrees "
+                    "%d-%d. That widening IS overfitting."
+                    % (best_degree, gap_best_cell, gap_late_mean_cell,
+                       late_degrees[0], late_degrees[-1]))
 
     # ---- 5. self-check: assert the expected story holds ----------------------
     expected_best_degree = 5  # with seed=42, validation bottoms out here
@@ -269,21 +300,45 @@ if __name__ == "__main__":
         "  15   :     0.0364    0.1077  0.0713",
     ]
 
+    # (g) the six STORY lines, pinned as the exact text that reached the screen. Every
+    #     number on them is already pinned above as a value — what is pinned here is the
+    #     ORDER those numbers appear in, which is where each claim actually lives. Without
+    #     these, swapping two operands at a print call prints "best = 0.1077 -> most-
+    #     flexible = 0.0935" (validation falling, under a label saying it rises), or
+    #     "32 points -> train 40", or a GAP line that reports shrinking — every cell still
+    #     correct, every existing assert still green.
+    lines_pinned = (
+        dataset_line == "dataset: 40 points  ->  train 32 / val 8"
+        and best_line == ("lowest validation loss at degree 5  (val_loss = 0.0935)"
+                          "  <- best model / early-stopping point")
+        and train_drop_line == ("train_loss keeps dropping: degree 1 = 0.2886"
+                                "  ->  degree 15 = 0.0364")
+        and val_rise_line == ("but validation RISES past the minimum: best = 0.0935"
+                              "  ->  most-flexible = 0.1077")
+        and gap_line == ("the GAP widens with flexibility: 0.0154 at degree 5  ->  0.2020"
+                         " averaged over degrees 11-15 (13.1x wider), widest 0.3277 at"
+                         " degree 14")
+        and overshoot_line == ("had you watched only the training curve, you would have kept"
+                               " turning the knob 10 more degrees past the best"
+                               " (degree 5 -> 15)")
+        and victory_line == ("✅ you got it — train loss falls forever, but validation bottoms"
+                             " out at degree 5 then rises: the gap widens from 0.0154 there to"
+                             " 0.2020 across degrees 11-15. That widening IS overfitting.")
+    )
+
     ok = (best_degree == expected_best_degree
           and train_monotone
           and train_scale_pinned and train_end_pinned and val_scale_pinned
           and sweep_ends_pinned and most_flexible_pinned
           and overfits_absolutely and gap_widens and gap_trend_widens
           and split_frac_pinned
-          and rows_pinned)
+          and rows_pinned
+          and lines_pinned)
 
     if ok:
-        # the victory line quotes the two numbers it was just handed — no retyped figure
-        print("\n✅ you got it — train loss falls forever, but validation bottoms out at "
-              "degree %d then rises: the gap widens from %s there to %s across degrees "
-              "%d-%d. That widening IS overfitting."
-              % (best_degree, gap_best_cell, gap_late_mean_cell,
-                 late_degrees[0], late_degrees[-1]))
+        # the victory line was rendered — and pinned — above; here it is only printed
+        print()
+        print(victory_line)
     else:
         print("\n❌ not yet — expected lowest validation loss at degree %d, train loss "
               "monotone-down, train_loss[deg 1] = 0.2886 / val_loss[deg 5] = 0.0935 "

@@ -91,6 +91,14 @@ def epoch_row(epoch, losses, grad_sizes):
     return (epoch, round(losses[epoch], 4), round(grad_sizes[epoch], 3),
             "   <- went UP" if epoch and losses[epoch] > losses[epoch - 1] else "")
 
+def epoch_line(row):
+    """The exact TEXT one table row puts on the screen, built from that row and nothing else. The
+    loop below prints what this returns, and the self-check pins these strings against the text
+    written down from a real run — so swapping the loss and gradient columns, wrapping either one
+    in arithmetic, or flipping the marker all change this string and are caught. Like epoch_row,
+    it is deliberately NOT counted as part of the loop's length."""
+    return f"  epoch {row[0]:2d}  loss {row[1]:.4f}  gradient size {row[2]:.3f}{row[3]}"
+
 def run_loop(model, X, y, clear_gradients):
     """The whole training loop. Line 1 is the one everybody forgets, so Part 5 can switch
     it off — that single line is the ONLY difference between the two runs.
@@ -110,7 +118,7 @@ def run_loop(model, X, y, clear_gradients):
         optimizer.step()                      # 5 nudge every weight
         losses.append(loss.item())            # .item() pulls a plain number out of the tensor
         row = epoch_row(epoch, losses, grad_sizes)     # the one rule for what this row shows
-        print(f"  epoch {row[0]:2d}  loss {row[1]:.4f}  gradient size {row[2]:.3f}{row[3]}")
+        print(epoch_line(row))                         # the one rule for how that row is WRITTEN
     return losses, grad_sizes
 
 def relu_gate(z):
@@ -186,9 +194,11 @@ if __name__ == "__main__":
     print(f"\npredict: fewer lines than the ~{HAND_WRITTEN_LINES} hand-written ones, or more?")
     torch_lines = code_lines("MLP", "run_loop")
     shown_shrink = HAND_WRITTEN_LINES // torch_lines    # the "about 20x" the next line prints
-    print("counted from this file: the model + its whole training loop =", torch_lines,
-          "lines of code", f"-> about {shown_shrink}x less typing"
-          " for the same network")
+    # Built as ONE string, pinned below, then printed: the line's whole point is which number is
+    # the line count and which is the shrink, so swapping them would sell the opposite story.
+    shrink_line = (f"counted from this file: the model + its whole training loop = {torch_lines}"
+                   f" lines of code -> about {shown_shrink}x less typing for the same network")
+    print(shrink_line)
 
     # --- Part 3: the five-line loop, with zero_grad in place ---------------
     # Predict before running: an untrained model has learned nothing, so it should be no better
@@ -235,9 +245,13 @@ if __name__ == "__main__":
     # The table that was just printed, read back through the SAME row rule the prints used, plus
     # the gap the next line shows. Nothing here re-derives a printed number a second way.
     good_table = [epoch_row(e, good_losses, good_grads) for e in range(EPOCHS)]
+    good_lines = [epoch_line(row) for row in good_table]     # the 25 lines the table just printed
     shown_start_gap = round(abs(good_losses[0] - predicted_start), 4)
-    print(f"prediction check: epoch 0 loss was {good_losses[0]:.4f}, ln({CLASSES}) ="
-          f" {predicted_start:.4f}, gap {shown_start_gap:.4f}")
+    # One string, pinned below, then printed: the measured loss and ln(10) sit side by side here,
+    # so swapping them (or wrapping either) would read as a prediction that was never made.
+    check_line = (f"prediction check: epoch 0 loss was {good_losses[0]:.4f}, ln({CLASSES}) ="
+                  f" {predicted_start:.4f}, gap {shown_start_gap:.4f}")
+    print(check_line)
 
     # --- Part 4: the taste test against the hand-written twin --------------
     twin_epochs = 8
@@ -267,14 +281,21 @@ if __name__ == "__main__":
     # the table showed instead of re-deciding which epochs rose, and the good run's rise count is
     # counted the same way rather than typed as a 0 into the sentence below.
     bug_table = [epoch_row(e, bug_losses, bug_grads) for e in range(EPOCHS)]
+    bug_lines = [epoch_line(row) for row in bug_table]       # the 25 lines the bug table printed
     rises = sum(1 for row in bug_table if row[3])
     good_rises = sum(1 for row in good_table if row[3])
     shown_good_first, shown_good_last = round(good_grads[0], 2), round(good_grads[-1], 2)
     shown_bug_first, shown_bug_last = round(bug_grads[0], 2), round(bug_grads[-1], 2)
-    print(f"\nwith zero_grad: loss rose in {good_rises} of {EPOCHS - 1} steps, gradient size"
-          f" {shown_good_first:.2f} -> {shown_good_last:.2f} (shrinks, as it should)\n"
-          f"without it:     loss rose in {rises} of {EPOCHS - 1} steps, gradient size"
-          f" {shown_bug_first:.2f} -> {shown_bug_last:.2f} (a growing pile-up)")
+    shown_steps = EPOCHS - 1        # 25 epochs, so 24 steps BETWEEN them — bound, not left at the
+                                    # print, where "of 25 steps" would slip past every check
+    # The day's headline contrast, built as ONE string and pinned below before it is printed. Both
+    # halves quote the same two columns, so a swap here would say the buggy run is the tidy one.
+    contrast_lines = (
+        f"\nwith zero_grad: loss rose in {good_rises} of {shown_steps} steps, gradient size"
+        f" {shown_good_first:.2f} -> {shown_good_last:.2f} (shrinks, as it should)\n"
+        f"without it:     loss rose in {rises} of {shown_steps} steps, gradient size"
+        f" {shown_bug_first:.2f} -> {shown_bug_last:.2f} (a growing pile-up)")
+    print(contrast_lines)
 
     # --- Part 6: the ReLU gate is strict — a unit exactly on the bend -------
     # Every z1 in the twin above came from random weights, so not one of them was ever exactly 0.0
@@ -299,11 +320,17 @@ if __name__ == "__main__":
     shown_live_row = [round(float(v), 4) for v in hinge_grads[0][0]]
     shown_dead_row = [round(float(v), 4) for v in hinge_grads[0][1]]
     shown_loose_dead_row = [round(float(v), 4) for v in loose_grads[0][1]]
-    print(f"\nhinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live unit"
-          f" {shown_live_row}, for the z = 0 unit {shown_dead_row}")
-    print(f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands that dead"
-          f" unit {shown_loose_dead_row} instead — same forward, different weights learned: the"
-          " one-character change no random run can show you")
+    # Two strings, pinned below, then printed. Which row belongs to the LIVE unit and which to the
+    # z = 0 unit is the entire claim, so the labels and the rows are frozen together as text.
+    hinge_lines = [
+        f"\nhinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live unit"
+        f" {shown_live_row}, for the z = 0 unit {shown_dead_row}",
+        f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands that dead"
+        f" unit {shown_loose_dead_row} instead — same forward, different weights learned: the"
+        " one-character change no random run can show you",
+    ]
+    for hinge_line in hinge_lines:
+        print(hinge_line)
 
     # --- Self-check: one boolean per claim ---------------------------------
     # The pinned numbers below were WRITTEN DOWN after running this file, so they do not come
@@ -317,13 +344,17 @@ if __name__ == "__main__":
             shown_X_shape == (1024, 784) and shown_y_shape == (1024,)
             and shown_first_labels == [0, 0, 0, 0, 0, 1, 3, 7] and shown_X_type == "Tensor",
         "plain data with requires_grad False, every weight with requires_grad True, and the"
-        " no_grad block recording nothing while the same forward outside it records a grad_fn":
+        " no_grad block recording nothing while the same forward outside it records the"
+        " SoftmaxBackward0 step by name":
             shown_X_requires_grad is False and X.requires_grad is False and weights_track_history
             and guarded and shown_quiet_grad_fn is None
             and watched.requires_grad and watched.grad_fn is not None
-            and "Backward" in shown_watched_grad_fn,
-        "the model plus its whole loop in 24 lines of code, 20x shorter than the ~500 by hand":
-            torch_lines == 24 and shown_shrink == 20,
+            and shown_watched_grad_fn == "SoftmaxBackward0",
+        "the model plus its whole loop in 24 lines of code, 20x shorter than the ~500 by hand,"
+        " printed in that order":
+            torch_lines == 24 and shown_shrink == 20 and HAND_WRITTEN_LINES == 500
+            and shrink_line == ("counted from this file: the model + its whole training loop = 24"
+                                " lines of code -> about 20x less typing for the same network"),
         "an untrained model no better than guessing: 7.5% right, no single guess above 0.25,"
         " against a 1-in-10 chance":
             abs(untrained_accuracy - 0.07520) < 0.002 and top_probability < 0.25
@@ -346,7 +377,11 @@ if __name__ == "__main__":
             and shown_start_gap == 0.0213 and shown_start_gap < 0.1
             and abs(good_losses[-1] - 1.15495) < 0.002
             and abs(good_grads[0] - 1.4597) < 0.005
-            and abs(good_grads[-1] - 0.14857) < 0.002,
+            and abs(good_grads[-1] - 0.14857) < 0.002
+            # and the prediction-check line as TEXT, so the measured loss and ln(10) cannot trade
+            # places and turn the check into a claim about numbers nobody computed
+            and check_line == ("prediction check: epoch 0 loss was 2.3239, ln(10) = 2.3026,"
+                               " gap 0.0213"),
         "the printed table to show exactly those numbers: epoch 0 at loss 2.3239 / gradient 1.46"
         " and epoch 24 at 1.155 / 0.149, and the summary line to quote 1.46 -> 0.15":
             good_table[0] == (0, 2.3239, 1.46, "") and good_table[-1] == (24, 1.155, 0.149, "")
@@ -354,6 +389,20 @@ if __name__ == "__main__":
         "the loss to fall in every one of the 24 steps, with no '<- went UP' marker printed":
             all(good_losses[i] < good_losses[i - 1] for i in range(1, EPOCHS))
             and good_rises == 0 and all(row[3] == "" for row in good_table),
+        # The good table's claim-carrying rows, pinned as the exact TEXT that reached the screen:
+        # the row it OPENS on and the row it ENDS on. Those two are what keep the loss and gradient
+        # COLUMNS honest — swap them or wrap one in arithmetic and these strings stop matching.
+        # What the 23 rows BETWEEN them were there to show is that not one of them wore the
+        # "<- went UP" marker, and that is said once, structurally, in the last clause: one
+        # sentence about the whole table that a change of field width cannot defeat, where 25
+        # verbatim rows said it 25 times and broke on one. The fall itself is asserted, step by
+        # step, by the monotonicity clause in the claim above.
+        "the with-zero_grad table to open on epoch 0's row, end on epoch 24's, and print no"
+        " '<- went UP' marker on any of its 25 rows":
+            len(good_lines) == 25
+            and good_lines[0] == '  epoch  0  loss 2.3239  gradient size 1.460'
+            and good_lines[-1] == '  epoch 24  loss 1.1550  gradient size 0.149'
+            and not any('went UP' in line for line in good_lines),
         "autograd to match the hand-derived backward pass within 1e-5": biggest_gap < 1e-5,
         "the hand-written twin to reach 1.28603 after its 8 epochs, printed beside PyTorch's"
         " 2.32391 -> 1.28603 row":
@@ -372,6 +421,39 @@ if __name__ == "__main__":
             and rises == 10 and abs(bug_losses[-1] - 1.27627) < 0.002
             and abs(bug_grads[-1] - 3.10903) < 0.002
             and shown_bug_first == 1.46 and shown_bug_last == 3.11,
+        # The buggy table's claim-carrying rows as TEXT. Here the MARKER column is the story, so
+        # every marked row is pinned — read out of the table by filtering on the marker itself, so
+        # the list also says that these are the ONLY marked rows. An inverted marker (UP on the
+        # epochs that FELL) turns that list into the 14 other rows, and a deleted one empties it.
+        # The row the table opens on and the row it ends on are pinned beside them. The unmarked
+        # rows in between carry no claim: "10 of 24 steps rose" is already counted above.
+        "the no-zero_grad table to open on epoch 0's row, end on epoch 24's, and wear the"
+        " '<- went UP' marker on exactly these 10 rows":
+            len(bug_lines) == 25
+            and bug_lines[0] == '  epoch  0  loss 2.3239  gradient size 1.460'
+            and bug_lines[-1] == '  epoch 24  loss 1.2763  gradient size 3.109'
+            and [line for line in bug_lines if 'went UP' in line] == [
+                '  epoch  3  loss 1.6196  gradient size 2.068   <- went UP',
+                '  epoch  4  loss 1.7832  gradient size 2.254   <- went UP',
+                '  epoch  6  loss 1.5579  gradient size 2.292   <- went UP',
+                '  epoch  7  loss 1.7247  gradient size 2.428   <- went UP',
+                '  epoch 10  loss 1.5858  gradient size 2.538   <- went UP',
+                '  epoch 13  loss 1.4461  gradient size 2.755   <- went UP',
+                '  epoch 16  loss 1.2513  gradient size 2.867   <- went UP',
+                '  epoch 17  loss 1.2770  gradient size 2.922   <- went UP',
+                '  epoch 20  loss 1.3143  gradient size 3.118   <- went UP',
+                '  epoch 23  loss 1.2946  gradient size 3.104   <- went UP',
+            ],
+        # The summary contrast, pinned as the two lines the reader compares. 24 is the number of
+        # STEPS between 25 epochs, printed from a bound name, and the two runs' columns are frozen
+        # in place — so neither the denominator nor the direction of the story can drift.
+        "the summary to read '0 of 24' with the gradient shrinking 1.46 -> 0.15 against '10 of 24'"
+        " with it piling up 1.46 -> 3.11":
+            shown_steps == 24 and contrast_lines == (
+                "\nwith zero_grad: loss rose in 0 of 24 steps, gradient size 1.46 -> 0.15"
+                " (shrinks, as it should)\n"
+                "without it:     loss rose in 10 of 24 steps, gradient size 1.46 -> 3.11"
+                " (a growing pile-up)"),
         "the hand-written gate to be STRICT: a hidden unit whose z1 is exactly 0.0 must receive a"
         " dW1 row of exactly [0.0, 0.0], where the (z >= 0) spelling hands it [-1.964, -3.9281]"
         " from the very same forward pass and loss 4.0181 — a difference no random run can show":
@@ -379,7 +461,16 @@ if __name__ == "__main__":
             and shown_hinge_loss == 4.0181 and shown_loose_loss == shown_hinge_loss
             and shown_dead_row == [0.0, 0.0] and shown_live_row == [1.964, 3.9281]
             and shown_loose_dead_row == [-1.964, -3.9281]
-            and bool(relu_gate(0.0)) is False and bool(relu_gate(1e-12)) is True,
+            and bool(relu_gate(0.0)) is False and bool(relu_gate(1e-12)) is True
+            # and the two lines as TEXT: which row is labelled "live" and which "z = 0" IS the
+            # claim, so the labels and the rows are pinned together, not one value at a time
+            and hinge_lines == [
+                "\nhinge net: z1 = [4.0, 0.0] (loss 4.0181) -> dW1 for the live unit"
+                " [1.964, 3.9281], for the z = 0 unit [0.0, 0.0]",
+                "the same step with a (z >= 0) gate (loss 4.0181, unchanged) hands that dead unit"
+                " [-1.964, -3.9281] instead — same forward, different weights learned: the"
+                " one-character change no random run can show you",
+            ],
     }
     if all(claims.values()):
         print("\n✅ you got it")

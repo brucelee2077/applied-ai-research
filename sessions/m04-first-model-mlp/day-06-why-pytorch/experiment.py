@@ -182,9 +182,13 @@ if __name__ == "__main__":
     print(f"loss  by hand {wide_hand_loss:.6f}  PyTorch {shown_wide_torch_loss:.6f}")
     print("dW row 0  by hand", shown_wide_hand_dW, " W.grad",
           shown_wide_grad_dW, f"| gap {wide_gap:.2e}")
-    print("dW row 0  dividing by rows instead", shown_rows_dW,
-          f"| {shown_wide_elements}/{shown_wide_rows} = {shown_wide_ratio}x too"
-          f" big, {shown_rows_gap:.3f} away from autograd")
+    # This line CARRIES the wrong-denominator claim: the row, the ratio and the distance have to
+    # agree with each other or the annotation contradicts the numbers beside it. So it is built as
+    # ONE string, pinned below against the text a real run printed, and only then printed.
+    rows_line = ("dW row 0  dividing by rows instead %s | %d/%d = %dx too big, %.3f away from"
+                 " autograd" % (shown_rows_dW, shown_wide_elements, shown_wide_rows,
+                                shown_wide_ratio, shown_rows_gap))
+    print(rows_line)
 
     # --- Part 3: the five-line loop, with the drop predicted first ----------
     # For a linear model scored by MSE, the effect of ONE step is exactly predictable:
@@ -209,7 +213,7 @@ if __name__ == "__main__":
           f"  (the sign flips at lr={shown_flip_lr:.4f})")
     model = fresh_model()
     optimizer = optim.SGD(model.parameters(), lr=LR)
-    losses, good_grads, good_table = [], [], []
+    losses, good_grads, good_table, good_lines = [], [], [], []
     for epoch in range(EPOCHS):
         optimizer.zero_grad()          # 1 clear the piled-up gradients
         out = model(X)                 # 2 forward
@@ -220,8 +224,11 @@ if __name__ == "__main__":
         losses.append(loss.item())     # .item() pulls a plain number out of the tensor
         # the row is rounded ONCE, printed, and kept — so the self-check reads the printed table
         good_table.append((epoch, round(losses[-1], 5), round(good_grads[-1], 3)))
-        print(f"epoch {good_table[-1][0]:2d}  loss {good_table[-1][1]:8.5f}"
-              f"  gradient size {good_table[-1][2]:6.3f}")
+        # and the LINE is built once from that row, kept, and printed. The self-check pins these
+        # strings, so swapping the loss and gradient columns or wrapping one of them in arithmetic
+        # at the print — where no check on the values could see it — changes the text and fails.
+        good_lines.append("epoch %2d  loss %8.5f  gradient size %6.3f" % good_table[-1])
+        print(good_lines[-1])
     actual_drop = losses[0] - losses[1]
     # Now the same five lines once, with the step size the prediction says will fail.
     big_model = fresh_model()
@@ -239,10 +246,17 @@ if __name__ == "__main__":
     shown_actual_drop, shown_big_before = round(abs(actual_drop), 4), round(big_before.item(), 4)
     shown_big_after, shown_signed_pred = round(big_after, 4), round(predicted_drop, 4)
     shown_signed_big_pred = round(big_predicted_drop, 4)
-    print(f"step 1 at lr={LR} really moved it {shown_actual_word} by"
-          f" {shown_actual_drop:.4f} (predicted {shown_signed_pred:+.4f})")
-    print(f"step 1 at lr={BIG_LR} really moved it {shown_big_word}:"
-          f" {shown_big_before:.4f} -> {shown_big_after:.4f} (predicted {shown_signed_big_pred:+.4f})")
+    # Both verdict lines are built as strings and pinned below before printing. The direction is
+    # the whole lesson: "11.3416 -> 22.8040" read backwards would show the too-big step HELPING,
+    # while every single number in it stayed correctly pinned.
+    verdict_lines = [
+        f"step 1 at lr={LR} really moved it {shown_actual_word} by"
+        f" {shown_actual_drop:.4f} (predicted {shown_signed_pred:+.4f})",
+        f"step 1 at lr={BIG_LR} really moved it {shown_big_word}:"
+        f" {shown_big_before:.4f} -> {shown_big_after:.4f} (predicted {shown_signed_big_pred:+.4f})",
+    ]
+    for verdict_line in verdict_lines:
+        print(verdict_line)
     # That prediction has Part 2's blind spot inside it: N above was 8 elements over 8 rows, so
     # the wrong denominator would have predicted the same number. So run the SAME formula once
     # on the 2-column model, where N is 16 and rows are 8, and let the real step judge both.
@@ -287,7 +301,7 @@ if __name__ == "__main__":
           "| after a 2nd backward, divided by the 1st:", shown_ratios)
     bug_model = fresh_model()
     bug_optimizer = optim.SGD(bug_model.parameters(), lr=LR)
-    bug_losses, bug_grads, marked_up, bug_table = [], [], 0, []
+    bug_losses, bug_grads, marked_up, bug_table, bug_lines = [], [], 0, [], []
     for epoch in range(EPOCHS):
         # optimizer.zero_grad() is MISSING here on purpose — that is the experiment.
         bug_loss = criterion(bug_model(X), Y)
@@ -299,18 +313,29 @@ if __name__ == "__main__":
         marked_up += int(rose)         # count the markers we print, so the count is checkable
         # the row as printed: epoch, loss, gradient size, and whether the UP marker was shown
         bug_table.append((epoch, round(bug_losses[-1], 4), round(bug_grads[-1], 3), rose))
-        print(f"no zero_grad  epoch {bug_table[-1][0]:2d}  loss {bug_table[-1][1]:8.4f}"
-              f"  gradient size {bug_table[-1][2]:7.3f}{'   <- went UP' if rose else ''}")
+        # The marker is no longer decided a second time at the print. The LINE — marker included —
+        # is built once from the kept row, pinned as text in the self-check, then printed. That is
+        # what stops an inverted marker from putting "went UP" on the epochs that fell.
+        bug_lines.append("no zero_grad  epoch %2d  loss %8.4f  gradient size %7.3f%s"
+                         % (bug_table[-1][0], bug_table[-1][1], bug_table[-1][2],
+                            "   <- went UP" if bug_table[-1][3] else ""))
+        print(bug_lines[-1])
     rises = sum(1 for i in range(1, EPOCHS) if bug_losses[i] > bug_losses[i - 1])
     good_rises = sum(1 for i in range(1, EPOCHS) if losses[i] > losses[i - 1])
     # The six numbers the two summary lines quote, bound at the width they are shown at.
     shown_good_last, shown_bug_last = round(losses[-1], 4), round(bug_losses[-1], 4)
     shown_good_g_first, shown_good_g_last = round(good_grads[0], 2), round(good_grads[-1], 2)
     shown_bug_g_first, shown_bug_g_last = round(bug_grads[0], 2), round(bug_grads[-1], 2)
-    print(f"with zero_grad: {good_rises} rises, ends {shown_good_last:.4f}, gradient"
-          f" {shown_good_g_first:.2f} -> {shown_good_g_last:.2f} (shrinks, as it should)")
-    print(f"without it:     {rises} rises, ends {shown_bug_last:.4f}, gradient"
-          f" {shown_bug_g_first:.2f} -> {shown_bug_g_last:.2f} (a pile-up that never settles)")
+    # The two summary lines the reader compares, built as strings and pinned below. Both quote the
+    # same three columns, so a swap between them would hand the buggy run the tidy run's story.
+    summary_lines = [
+        f"with zero_grad: {good_rises} rises, ends {shown_good_last:.4f}, gradient"
+        f" {shown_good_g_first:.2f} -> {shown_good_g_last:.2f} (shrinks, as it should)",
+        f"without it:     {rises} rises, ends {shown_bug_last:.4f}, gradient"
+        f" {shown_bug_g_first:.2f} -> {shown_bug_g_last:.2f} (a pile-up that never settles)",
+    ]
+    for summary_line in summary_lines:
+        print(summary_line)
 
     # --- Part 5: victory lap — switch the graph off -------------------------
     tracked = model(X)                              # graph on: this output is recorded
@@ -380,7 +405,17 @@ if __name__ == "__main__":
                          and shown_wide_rows == 8 and shown_wide_ratio == 2
                          and rows_ratio_off < 1e-6
                          and abs(rows_gap - 2.50695) < PIN and shown_rows_gap == 2.507
-                         and shown_rows_dW.tolist() != shown_wide_grad_dW.tolist())
+                         # the rows-denominator row pinned to the values it really holds, not just
+                         # "different from autograd" — an inequality a doubled row also satisfies
+                         and np.allclose(shown_rows_dW, [-3.2828, 0.1943, -5.0139, -3.554],
+                                         atol=1e-6)
+                         and shown_rows_dW.tolist() != shown_wide_grad_dW.tolist()
+                         # and the printed line as TEXT, so the row, the 2x and the 2.507 cannot
+                         # drift apart and leave an annotation that contradicts its own numbers
+                         and rows_line == ("dW row 0  dividing by rows instead"
+                                           " [-3.2828  0.1943 -5.0139 -3.554 ] | 16/8 = 2x too"
+                                           " big, 2.507 away from autograd"))
+
     # A real prediction that can disagree: one formula, two step sizes, opposite signs —
     # and each sign is checked against the step SGD actually took, INCLUDING the two verdict
     # words the printout uses. The same formula is then run at a second dial setting (2 output
@@ -403,7 +438,15 @@ if __name__ == "__main__":
                      and abs(wide_predicted - 1.52394) < PIN and wide_pred_gap < 1e-5
                      and shown_wide_predicted == 1.52394 and shown_rows_predicted == 1.42358
                      and shown_rows_pred_gap == 0.10036
-                     and rows_pred_gap > 0.05)  # rows as N misses the real step by 0.10036
+                     and rows_pred_gap > 0.05  # rows as N misses the real step by 0.10036
+                     # and both verdict lines as TEXT: the before -> after pair is the direction
+                     # of the story, and a swap there survives every check on the values alone
+                     and verdict_lines == [
+                         "step 1 at lr=0.1 really moved it down by 4.1403 (predicted +4.1403)",
+                         "step 1 at lr=1.0 really moved it up: 11.3416 -> 22.8040"
+                         " (predicted -11.4624)",
+                     ])
+
     loop_ok = (good_rises == 0 and all(losses[i] < losses[i - 1] for i in range(1, EPOCHS))
                and abs(losses[0] - 11.34160) < PIN and abs(losses[-1] - 0.68164) < PIN
                and abs(good_grads[0] - 6.87584) < PIN      # the gradient shrinks as it learns
@@ -411,7 +454,17 @@ if __name__ == "__main__":
                # and the table that was printed says the same, first row and last
                and good_table[0] == (0, 11.3416, 6.876) and good_table[-1] == (11, 0.68164, 0.857)
                and shown_good_last == 0.6816
-               and shown_good_g_first == 6.88 and shown_good_g_last == 0.86)
+               and shown_good_g_first == 6.88 and shown_good_g_last == 0.86
+               # and the two claim-carrying rows as the exact TEXT that reached the screen: the row
+               # the table opens on and the row it ends on. Those keep the loss and gradient COLUMNS
+               # from trading places. What the 10 rows between them showed — that every printed row
+               # keeps falling — is said once instead, over the rounded values the table really
+               # holds, so the claim survives a change of field width while a row-by-row pin did not.
+               and len(good_lines) == 12
+               and good_lines[0] == 'epoch  0  loss 11.34160  gradient size  6.876'
+               and good_lines[-1] == 'epoch 11  loss  0.68164  gradient size  0.857'
+               and all(good_table[i][1] < good_table[i - 1][1] for i in range(1, EPOCHS)))
+
     bug_is_visible = (pile_gap < 1e-6 and rises == 5 and marked_up == rises
                       and bug_losses[-1] > losses[-1]
                       and abs(bug_losses[-1] - 5.21676) < PIN     # stuck, not learning
@@ -420,7 +473,40 @@ if __name__ == "__main__":
                       and np.allclose(shown_ratios, [2.0, 2.0, 2.0, 2.0], atol=1e-6)
                       and np.allclose(shown_first_grad, [-3.147, 0.19, -4.942, -3.577], atol=1e-6)
                       and shown_bug_last == 5.2168
-                      and shown_bug_g_first == 6.88 and shown_bug_g_last == 11.61)
+                      and shown_bug_g_first == 6.88 and shown_bug_g_last == 11.61
+                      # the buggy table's claim-carrying rows as TEXT, markers included: this is the
+                      # one line the marker story lives on, so a marker decided again at the print
+                      # cannot invert it. The marked rows are read out by filtering on the marker
+                      # itself, so this list also says they are the ONLY marked rows — invert the
+                      # test and it becomes the other seven, delete it and it empties. The row the
+                      # table opens on and the row it ends on are pinned beside them; the unmarked
+                      # rows between carry no claim of their own, and "5 rises" is counted above.
+                      and len(bug_lines) == 12
+                      and bug_lines[0] == ('no zero_grad  epoch  0  loss  11.3416'
+                                           '  gradient size   6.876')
+                      and bug_lines[-1] == ('no zero_grad  epoch 11  loss   5.2168'
+                                            '  gradient size  11.607   <- went UP')
+                      and [line for line in bug_lines if 'went UP' in line] == [
+                          'no zero_grad  epoch  4  loss   4.2606  gradient size  10.891'
+                          '   <- went UP',
+                          'no zero_grad  epoch  5  loss   7.5202  gradient size   8.479'
+                          '   <- went UP',
+                          'no zero_grad  epoch  6  loss   8.4995  gradient size   8.930'
+                          '   <- went UP',
+                          'no zero_grad  epoch 10  loss   5.0225  gradient size  11.669'
+                          '   <- went UP',
+                          'no zero_grad  epoch 11  loss   5.2168  gradient size  11.607'
+                          '   <- went UP',
+                      ]
+                      # and the two summary lines, so the tidy run and the pile-up cannot swap
+                      # columns while every number in them stays individually correct
+                      and summary_lines == [
+                          "with zero_grad: 0 rises, ends 0.6816, gradient 6.88 -> 0.86"
+                          " (shrinks, as it should)",
+                          "without it:     5 rises, ends 5.2168, gradient 6.88 -> 11.61"
+                          " (a pile-up that never settles)",
+                      ])
+
     no_grad_ok = (shown_tracked_no_graph is False and shown_tracked_tracks and same_numbers
                   and shown_untracked_no_graph and not shown_untracked_tracks
                   and grad_mode_outside and not grad_mode_inside and not derived_tracks)

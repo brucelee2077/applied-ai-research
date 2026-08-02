@@ -116,7 +116,12 @@ if __name__ == "__main__":
     shown_describe_shares = row(w_describe[CAT])
     shown_describe_row_sum = float(w_describe[CAT].sum())
     shown_describe_answer = row(out_describe[CAT])
-    print("Part 1 — one FULL-width head (d_k = 4), asked ONE question. words:", words)
+    # The sentence's word ORDER reaches the page on this one line and nowhere else, so build
+    # the line and pin the text: reversed, `words` would print "mat, cat, tired" — a
+    # different sentence — while every number below stayed correct.
+    words_line = ("Part 1 — one FULL-width head (d_k = %d), asked ONE question. words: %s"
+                  % (d_model, words))
+    print(words_line)
     print("  x", shown_x_shape, "-> its Q, K, V are each", shown_qkv_shape, "— full width, nothing sliced yet")
     print("  'cat' row shares     :", shown_describe_shares, " row sum =", shown_describe_row_sum)
     # QUERY-FIRST, measured rather than assumed: cat is the word ASKING, so its sharp share
@@ -126,8 +131,12 @@ if __name__ == "__main__":
     cat_column_top = float(w_describe[:, CAT].max())
     shown_row_top = round(cat_row_top, 4)          # the rounded number the page shows,
     shown_column_top = round(cat_column_top, 4)    # and the one the self-check pins
-    print("  row  vs  column      : cat's ROW peaks at", shown_row_top,
-          "but cat's COLUMN peaks at", shown_column_top, "-> row = the asker")
+    # Which of the two numbers sits on which side of "but" IS the claim, so pin the rendered
+    # line: swapped, the page says the sharpness lives in cat's column.
+    row_vs_column_line = ("  row  vs  column      : cat's ROW peaks at %s but cat's COLUMN "
+                          "peaks at %s -> row = the asker"
+                          % (shown_row_top, shown_column_top))
+    print(row_vs_column_line)
     print("  its blended answer   :", shown_describe_answer,
           "\n                         reads [how much tired, how much mat, 0, 0] -> nearly all 'tired': crisp")
 
@@ -190,7 +199,11 @@ if __name__ == "__main__":
     print("  head A 'cat' answer  :", shown_head_a_answer, "= [how much tired, how much mat]")
     print("  head B 'cat' shares  :", shown_head_b_shares, "-> nearly all 'mat'")
     print("  head B 'cat' answer  :", shown_head_b_answer, "= same two slots, the other word")
-    print("  two heads of width", d_k, "each stay sharp where ONE head of width", d_model, "went half and half")
+    # Today's whole width story is a contrast between two numbers, so pin the rendered line:
+    # swap them and the page says two heads of width 4 beat one head of width 2.
+    width_contrast_line = ("  two heads of width %d each stay sharp where ONE head of width "
+                           "%d went half and half" % (d_k, d_model))
+    print(width_contrast_line)
     print("  input x", shown_x_shape, "-> head A", shown_head_a_shape, "+ head B", shown_head_b_shape,
           "= half the model width each")
     print("  joined (concatenate) :", shown_joined_shape, "= back to full width;   final (after W_O):",
@@ -328,8 +341,12 @@ if __name__ == "__main__":
     print("\nPart 6 — the same panel again, now with two random sets of recipes (seed 0)")
     print("  widths               : head", shown_rnd_a_shape, "+ head", shown_rnd_b_shape, "-> joined",
           shown_rnd_joined_shape, "-> final", shown_rnd_final_shape, "= the same width story")
-    print("  biggest 'cat' share any random head gives:", shown_random_top,
-          "-> nowhere near the", shown_panel_top, "above: untuned heads do not specialize")
+    # The conclusion — hand-typed beats untuned — is again the ORDER of two numbers, so pin
+    # the rendered line. Swapped, it says the random heads are the sharp ones.
+    random_vs_panel_line = ("  biggest 'cat' share any random head gives: %s -> nowhere near "
+                            "the %s above: untuned heads do not specialize"
+                            % (shown_random_top, shown_panel_top))
+    print(random_vs_panel_line)
 
     # --- Self-check: one boolean per claim --------------------------------
     # Every expected number below is written down here, read off a real run of this
@@ -483,6 +500,21 @@ if __name__ == "__main__":
                           and shown_tied_answer == EXPECTED_ROWS["tied answer"]
                           # and the two rows that must differ really do read differently
                           and shown_head_a_shares != shown_head_b_shares)
+    # The four SENTENCES whose meaning is the order of what is in them, pinned as the text
+    # that reaches the page. Every number on these lines is already checked; what these
+    # claims add is that the numbers reach the reader on the correct side of "but", "where"
+    # and "nowhere near" — and that the sentence itself names the toy sentence in order.
+    printed_sentences_match = (
+        words == ["tired", "cat", "mat"]
+        and words_line == ("Part 1 — one FULL-width head (d_k = 4), asked ONE question. "
+                           "words: ['tired', 'cat', 'mat']")
+        and row_vs_column_line == ("  row  vs  column      : cat's ROW peaks at 0.9867 but "
+                                   "cat's COLUMN peaks at 0.3333 -> row = the asker")
+        and width_contrast_line == ("  two heads of width 2 each stay sharp where ONE head "
+                                    "of width 4 went half and half")
+        and random_vs_panel_line == ("  biggest 'cat' share any random head gives: 0.732 -> "
+                                     "nowhere near the 0.9983 above: untuned heads do not "
+                                     "specialize"))
     budget_is_the_same = (params_panel == 48 and params_one_wide_head == 48 and w_o_numbers == 16)
     # A tolerance is only worth something if it can still tell our own numbers apart. The
     # panel's sharp share (0.9983), the full-width head's one-job share (0.9867), the muddy
@@ -523,6 +555,7 @@ if __name__ == "__main__":
             heads_ask_their_own_questions, corners_both_zeroed,
             widths_as_predicted, join_layout_exact, heads_differ,
             w_o_reaches_across_heads, final_values_match, printed_claim_matches, printed_rows_match,
+            printed_sentences_match,
             printed_verdict_matches, budget_is_the_same,
             tolerance_is_tight_enough, random_panel_widths_match, random_heads_are_not_sharp]):
         print(verdict_line)
@@ -567,6 +600,9 @@ if __name__ == "__main__":
                                " written down in EXPECTED_ROWS — the printed line IS the evidence")
     assert printed_verdict_matches, ("the ✅ sentence must read 0.4983 / 0.4983, width-2 heads holding 0.9983,"
                                      " and width 4 both after the join and after W_O")
+    assert printed_sentences_match, ("the sentence must name the toy words in order (tired, cat, mat), put"
+                                     " 0.9867 on cat's ROW and 0.3333 on its COLUMN, say two heads of width"
+                                     " 2 against ONE head of width 4, and 0.732 against the panel's 0.9983")
     assert budget_is_the_same, "two heads of width 2 must hold as many numbers as one head of width 4"
     assert tolerance_is_tight_enough, "close() must still tell 0.9983, 0.9867, 0.4983 and 0.0008 apart"
     assert random_panel_widths_match, "the random panel must reach (3,2) per head, (3,4) joined, (3,4) final too"

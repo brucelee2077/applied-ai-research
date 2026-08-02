@@ -55,8 +55,13 @@ if __name__ == "__main__":
     # reader sees and the line the self-check reads are then one value, not two guesses.
     table_shape = E.shape
     cat_row = embed("cat")
-    print("table shape:", table_shape, " 'the cat' ->", token_ids,
-          f"(the->{vocab['the']}, cat->{vocab['cat']})")
+    # This line carries the whole "a ticket number IS a row number" claim, so build it ONCE
+    # as TEXT and check that same text below. Checking only the ids would leave the two
+    # numbers in the brackets free: a swap there prints "(the->4, cat->0)" beside a correct
+    # [3, 0] and teaches a lookup this table does not have.
+    lookup_line = ("table shape: %s  'the cat' -> %s (the->%d, cat->%d)"
+                   % (table_shape, token_ids, vocab["the"], vocab["cat"]))
+    print(lookup_line)
     print("row for 'cat' (id 0):", cat_row, "<- that is the whole lookup")
     # A glue word like "the" sits near the middle of the map, so its arrow is short.
     the_length = round(float(np.linalg.norm(embed("the"))), 2)
@@ -81,8 +86,12 @@ if __name__ == "__main__":
     len_dog = round(float(np.linalg.norm(embed("dog"))), 2)
     cat_dog = round(cosine(embed("cat"), embed("dog")), 2)
     cat_car = round(cosine(embed("cat"), embed("car")), 2)
-    print("cosine(cat, dog) =", dot_cat_dog, "/ (", len_cat, "x", len_dog, ") =", cat_dog,
-          "  cosine(cat, car) =", cat_car)
+    # Today's headline is a CONTRAST, and a contrast lives in the order of the two numbers
+    # on the page: swap them and the line says cat is a car. So render the whole comparison
+    # once, check the rendered text, then print it.
+    cosine_line = ("cosine(cat, dog) = %s / ( %s x %s ) = %s   cosine(cat, car) = %s"
+                   % (dot_cat_dog, len_cat, len_dog, cat_dog, cat_car))
+    print(cosine_line)
     measured = "cat-dog" if cat_dog > cat_car else "cat-car"
     prediction_held = measured == predicted    # printed AND asserted from this one name
     print("measured winner:", measured, " prediction held?", prediction_held)
@@ -160,14 +169,26 @@ if __name__ == "__main__":
                 and same_ordered is False and np.array_equal(bag_b, bag_a)
                 and stack_shape == (3, 4) and bag_text == "[1.3 1.1 0. 1.2]"
                 and np.array_equal(bag_a, np.array([1.3, 1.1, 0.0, 1.2])))
+    # The summary a learner remembers is a comparison too, so build it ONCE as text here and
+    # pin that text — then the ✅ line cannot say cat~car beats cat~dog.
+    victory_line = (f"\n✅ you got it — cat~dog {cat_dog} beats cat~car {cat_car} "
+                    f"({dot_cat_dog} / ({len_cat} x {len_dog})),")
+    # The three lines above whose ORDER carries the meaning, pinned as the exact text that
+    # reaches the screen. Pinning the values alone leaves the print call free to swap or
+    # re-wrap them, and a swapped contrast teaches the opposite of today's lesson.
+    rendered_ok = (
+        lookup_line == "table shape: (7, 4)  'the cat' -> [3, 0] (the->3, cat->0)"
+        and cosine_line == ("cosine(cat, dog) = 1.56 / ( 1.24 x 1.27 ) = 0.99"
+                            "   cosine(cat, car) = 0.08")
+        and victory_line == ("\n✅ you got it — cat~dog 0.99 beats cat~car 0.08 "
+                             "(1.56 / (1.24 x 1.27)),"))
     claims = {"lookup": lookup_ok, "scores": scores_ok, "prediction": predict_ok,
               "columns": columns_ok, "size": size_ok, "frozen": bank_ok,
-              "one-hot": onehot_ok, "order": order_ok}
+              "one-hot": onehot_ok, "order": order_ok, "rendered": rendered_ok}
     if all(claims.values()):
         # Every number in the victory message is read back from a checked name, so the
         # summary cannot state a total the run did not produce.
-        print(f"\n✅ you got it — cat~dog {cat_dog} beats cat~car {cat_car} "
-              f"({dot_cat_dog} / ({len_cat} x {len_dog})),")
+        print(victory_line)
         print(f"   one-hot gives every pair {onehot_shared}, both 'bank' lookups "
               f"return {bank_from_river},")
         print(f"   and both word orders add up to the same {bag_text}.")
@@ -186,3 +207,6 @@ if __name__ == "__main__":
     assert bank_ok, "both sentences must fetch the same frozen row [0.4 0.4 0.4 0.4]"
     assert onehot_ok, "one-hot must be 7 wide and score 0.0 for every pair"
     assert order_ok, "expected ids [1,5,6] vs [6,5,1], different stacks, total [1.3 1.1 0. 1.2]"
+    assert rendered_ok, ("the lines the reader actually sees must read 'the cat' -> [3, 0] "
+                         "(the->3, cat->0), cosine 1.56 / ( 1.24 x 1.27 ) = 0.99 against "
+                         "cat-car 0.08, and a ✅ line with cat~dog 0.99 BEATING cat~car 0.08")

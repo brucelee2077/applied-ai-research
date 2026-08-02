@@ -135,18 +135,27 @@ def show_curve(history, every=4):
     # handed back is a number this function PRINTED: each row is rounded ONCE into shown_rows and
     # that same value is both printed and returned, so the summary lines and the self-check below
     # read the table the learner reads. Corrupt a printed loss and the claims move with it.
+    # Rounding once is still not enough for two things that are decided AT the print: which row
+    # wears the "best model" marker, and which order the three columns come out in. So each row
+    # is built as one line of TEXT, that text is what gets printed, and the exact list of lines
+    # is handed back for the self-check to pin. An inverted marker (`i != bottom`), a deleted
+    # marker, and a train/validation column swap all change the text and so all fail there.
     bottom = validation_bottom([v for _, v in history]) - 1
     shown_rows = []                       # (epoch, train loss, validation loss) exactly as printed
+    shown_lines = []                      # the same rows as the exact text that reached the screen
     for i, (t, v) in enumerate(history):
         if i % every == 0 or i == bottom or i == len(history) - 1:
             epoch, shown_t, shown_v = i + 1, round(t, 4), round(v, 4)
             shown_rows.append((epoch, shown_t, shown_v))
-            print("  epoch %2d   train %.4f   validation %.4f%s" % (epoch, shown_t, shown_v,
-                  "  <-- validation bottom (best model)" if i == bottom else ""))
+            marker = "  <-- validation bottom (best model)" if i == bottom else ""
+            line = "  epoch %2d   train %.4f   validation %.4f%s" % (epoch, shown_t, shown_v,
+                                                                     marker)
+            shown_lines.append(line)
+            print(line)
     last_train, last_val = shown_rows[-1][1], shown_rows[-1][2]
     # the lowest held-out loss is read off the row the printout MARKED, not recomputed here
     bottom_val = [v for epoch, _, v in shown_rows if epoch == bottom + 1][0]
-    return bottom + 1, last_train, last_val, bottom_val
+    return bottom + 1, last_train, last_val, bottom_val, shown_lines
 
 
 if __name__ == "__main__":
@@ -156,19 +165,32 @@ if __name__ == "__main__":
     # so the squares and the MSE on the page and the checked numbers cannot drift apart.
     shown_squares = [g * g for g in gaps]
     shown_mse = round(mse(gaps), 4)
-    print("MSE  gaps", gaps, "-> squared", shown_squares, "-> MSE", shown_mse)
+    # Built as one line, pinned as that line, then printed: "gaps -> squared -> MSE" only teaches
+    # squaring if those three columns come out in that order.
+    mse_line = "MSE  gaps %s -> squared %s -> MSE %s" % (gaps, shown_squares, shown_mse)
+    print(mse_line)
     demo_probs = (0.90, 0.50, 0.01)          # confident-and-right, hedging, confident-and-wrong
     # Score each row through the SAME cross_entropy the training loop uses: two columns, the
     # true class is column 0, so the loss is -log(the probability given to the true class).
     demo_losses = [round(cross_entropy(np.array([[p, 1 - p]]), np.array([0])), 2)
                    for p in demo_probs]
-    for p_true, loss in zip(demo_probs, demo_losses):
-        print(f"cross-entropy, {p_true:.2f} on the true class -> loss {loss:.2f}")
+    # The three rows are the probability -> loss MAP, so the pairing is the claim. Build the rows
+    # as text and pin the whole list below: a reversed zip would print 0.90 next to 4.61 while
+    # both lists stayed individually correct.
+    ce_lines = [f"cross-entropy, {p_true:.2f} on the true class -> loss {loss:.2f}"
+                for p_true, loss in zip(demo_probs, demo_losses)]
+    for line in ce_lines:
+        print(line)
     pain_ratio = demo_losses[2] / demo_losses[0]        # 4.61 / 0.11 — how much worse it hurts
     shown_pain_ratio = round(pain_ratio, 1)             # the 41.9 the next line prints
     pain_shown = round(pain_ratio / 10) * 10            # to the nearest ten, as the lesson quotes
-    print(f"-> confident-and-wrong (0.01) hurts about {pain_shown}x confident-and-right (0.90)"
-          f"  ({demo_losses[2]:.2f} / {demo_losses[0]:.2f} = {shown_pain_ratio:.1f})")
+    # The two losses in the bracket are read out of the list AT the print, by index. Swap those
+    # two indices and the page says confident-and-WRONG is the cheap one — the exact opposite of
+    # the day's point — with every value still pinned. So the rendered line is pinned instead.
+    pain_line = (f"-> confident-and-wrong (0.01) hurts about {pain_shown}x confident-and-right"
+                 f" (0.90)  ({demo_losses[2]:.2f} / {demo_losses[0]:.2f}"
+                 f" = {shown_pain_ratio:.1f})")
+    print(pain_line)
 
     # --- Part 2: split the data into train and held-out validation ---------
     rng = np.random.default_rng(0)
@@ -208,34 +230,49 @@ if __name__ == "__main__":
           f" {shown_lesson_bottom} (the lesson read epoch 3, loss {shown_lesson_min})")
     print("\n--- Run A: NO dropout ---")
     hist_a, params_a = train_run(train_x, train_y, val_x, val_y, drop_p=0.0)
-    best_a, train_a, val_a, best_val_a = show_curve(hist_a)
+    best_a, train_a, val_a, best_val_a, lines_a = show_curve(hist_a)
     rise_a, gap_a = val_a - best_val_a, val_a - train_a
     shown_rise_a, shown_gap_a = round(rise_a, 3), round(gap_a, 3)   # the two summary numbers
-    print(f"  validation was lowest at epoch {best_a}, then rose by {shown_rise_a:.3f}"
-          " while train dived")
-    print(f"  final gap (validation - train) = {shown_gap_a:.3f} <- this growing gap IS overfitting")
-    # The two bias rows started as exact zeros, so whatever they hold now was learned by the two
-    # bias update lines in the loop. Both numbers are pinned tightly in the self-check.
     b1_a, b2_a = params_a[1], params_a[3]
     shown_b1_spread, shown_b2_top = round(float(b1_a.std()), 4), round(float(b2_a.max()), 4)
-    print(f"  biases started at 0 and learned: b1 spread {shown_b1_spread:.4f},"
-          f" b2 top {shown_b2_top:.4f}")
+    # Run A's verdict, in the same shape Run B's gets below: the three lines are built once, pinned
+    # as text in the self-check, and printed from that text. The gap on the second line is the day's
+    # headline number and Run B re-quotes it, so a value doubled at THIS print would put two
+    # different "Run A gaps" on one page. The two bias rows started as exact zeros, so whatever they
+    # hold now was learned by the loop's two bias update lines.
+    summary_lines_a = [
+        f"  validation was lowest at epoch {best_a}, then rose by {shown_rise_a:.3f}"
+        " while train dived",
+        f"  final gap (validation - train) = {shown_gap_a:.3f} <- this growing gap IS overfitting",
+        f"  biases started at 0 and learned: b1 spread {shown_b1_spread:.4f},"
+        f" b2 top {shown_b2_top:.4f}",
+    ]
+    for line in summary_lines_a:
+        print(line)
 
     # --- Part 4: Run B — the same run, now with dropout p = 0.5 ------------
     shown_keep = keep_scale(DROP_P)          # the survivor boost this run really used
     print(f"\n--- Run B: dropout p = {DROP_P} (train mode only, survivors x{shown_keep}) ---")
     hist_b, params_b = train_run(train_x, train_y, val_x, val_y, drop_p=DROP_P)
-    best_b, train_b, val_b, best_val_b = show_curve(hist_b)
+    best_b, train_b, val_b, best_val_b, lines_b = show_curve(hist_b)
     rise_b, gap_b = val_b - best_val_b, val_b - train_b
     shown_rise_b, shown_gap_b = round(rise_b, 3), round(gap_b, 3)
     shown_best_val_b, shown_best_val_a = round(best_val_b, 3), round(best_val_a, 3)
     shown_train_b, shown_train_a = round(train_b, 3), round(train_a, 3)
-    print(f"  best validation {shown_best_val_b:.3f} at epoch {best_b}"
-          f" (Run A reached {shown_best_val_a:.3f})")
-    print(f"  final gap {shown_gap_b:.3f} vs Run A's {shown_gap_a:.3f};"
-          f" late rise {shown_rise_b:.3f} vs {shown_rise_a:.3f}")
-    print(f"  not free: after the same {EPOCHS} epochs its train loss is {shown_train_b:.3f},"
-          f" not {shown_train_a:.3f}")
+    # These three lines are the day's verdict, and each one is a Run B vs Run A CONTRAST: swap the
+    # two operands in any of them and the page says dropout made the gap wider, reached a worse
+    # best, or cost nothing — while every value in it stays correctly pinned. So the three
+    # rendered lines are pinned as text below and printed from that same text.
+    compare_lines = [
+        f"  best validation {shown_best_val_b:.3f} at epoch {best_b}"
+        f" (Run A reached {shown_best_val_a:.3f})",
+        f"  final gap {shown_gap_b:.3f} vs Run A's {shown_gap_a:.3f};"
+        f" late rise {shown_rise_b:.3f} vs {shown_rise_a:.3f}",
+        f"  not free: after the same {EPOCHS} epochs its train loss is {shown_train_b:.3f},"
+        f" not {shown_train_a:.3f}",
+    ]
+    for line in compare_lines:
+        print(line)
 
     # --- Part 5: why the 1/(1-p) scaling is there --------------------------
     kept_total = 2 * 1.0 * keep_scale(DROP_P)    # lesson's ladder: 4 units worth 1, keep 2, x2
@@ -262,8 +299,12 @@ if __name__ == "__main__":
     # The three signal totals: bound once, printed, and compared to each other in the self-check.
     shown_eval_signal = round(eval_signal, 3)
     shown_scaled_mean, shown_unscaled_mean = round(scaled_mean, 3), round(unscaled_mean, 3)
-    print(f"eval signal {shown_eval_signal:.3f} | dropout averages {shown_scaled_mean:.3f} (scaled)"
-          f" vs {shown_unscaled_mean:.3f} (if you forget to scale)")
+    # Which of these two averages is the SCALED one is the whole 1/(1-p) lesson. Swapped columns
+    # would teach that scaling halves the signal, so the line is pinned as the text it prints.
+    signal_line = (f"eval signal {shown_eval_signal:.3f} | dropout averages"
+                   f" {shown_scaled_mean:.3f} (scaled)"
+                   f" vs {shown_unscaled_mean:.3f} (if you forget to scale)")
+    print(signal_line)
 
     # --- Part 6: the gate is STRICT — a unit sitting exactly on the bend ----
     # Every z1 in the two runs above came from random weights, so none of them was ever exactly
@@ -282,11 +323,16 @@ if __name__ == "__main__":
     shown_hinge_loss, shown_loose_loss = round(hinge_loss, 4), round(loose_loss, 4)
     shown_live_col, shown_dead_col = np.round(hinge_dW1[:, 0], 4), np.round(hinge_dW1[:, 1], 4)
     shown_loose_dead_col = np.round(loose_dW1[:, 1], 4)
-    print(f"\nhinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live"
-          f" unit {shown_live_col}, for the z = 0 unit {shown_dead_col}")
-    print(f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands that dead"
-          f" unit {shown_loose_dead_col} instead — same forward, different weights: the"
-          " one-character bug a random run never shows")
+    # The point is WHICH unit gets the blame: live unit -> a real gradient, z = 0 unit -> exactly
+    # zero, and the loose gate handing that same dead unit a gradient instead. Exchange the two
+    # columns and the page teaches the bug as the fix, so both lines are pinned as rendered text.
+    hinge_line = (f"hinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live"
+                  f" unit {shown_live_col}, for the z = 0 unit {shown_dead_col}")
+    loose_line = (f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands"
+                  f" that dead unit {shown_loose_dead_col} instead — same forward, different"
+                  " weights: the one-character bug a random run never shows")
+    print("\n" + hinge_line)
+    print(loose_line)
 
     # --- Part 7: the silent bug — dropout left ON at prediction time -------
     # Both sets of rows go through the SAME forward_eval the loop scored validation with; the
@@ -302,10 +348,15 @@ if __name__ == "__main__":
     flicker_conf = [round(float(r.max()), 3) for r in flicker_rows]
     steady_digits = [int(r.argmax()) for r in steady_rows]
     steady_conf = [round(float(r.max()), 3) for r in steady_rows]
-    print("\nsame picture, dropout still ON -> digit", flicker_digits,
-          "confidence", flicker_conf)
-    print("same picture, eval mode        -> digit", steady_digits,
-          "confidence", steady_conf)
+    # Two lines whose MEANING is which label sits with which list: dropout-ON must be the row that
+    # disagrees with itself, eval mode the row that repeats. Swap the payloads and the page blames
+    # eval mode for the flicker. Pinned as the exact two lines that reached the screen.
+    predict_lines = [
+        "same picture, dropout still ON -> digit %s confidence %s" % (flicker_digits, flicker_conf),
+        "same picture, eval mode        -> digit %s confidence %s" % (steady_digits, steady_conf),
+    ]
+    print("\n" + predict_lines[0])
+    print(predict_lines[1])
     print("\nremember: a low TRAINING loss proves nothing about new data — the held-out loss is")
     print("the honest number. And dropout is not free: it learns slower, and it can hurt a model")
     print("that already generalizes. Reach for it when you SEE the gap grow.")
@@ -383,13 +434,18 @@ if __name__ == "__main__":
     # The eval-mode bug: three dropout-ON passes all disagree, three eval passes are identical,
     # and leaving dropout on flipped the predicted digit on at least one pass. Both sets came out
     # of forward_eval, so dropout leaking into that path breaks the "identical" clause. The digit
-    # and confidence clauses read the four lists that were printed.
+    # and confidence clauses read the four lists that were printed — and they read them in ORDER,
+    # pinned to the exact printed lists. "at least one digit differs" and "three distinct
+    # confidences" are both blind to a reversed list, so each is now backed by an exact pin.
     steady, top = steady_rows[0], steady_digits[0]
     eval_bug_ok = (len({r.tobytes() for r in flicker_rows}) == 3
                    and len({r.tobytes() for r in steady_rows}) == 1
                    and steady_digits == [top, top, top] and len(set(steady_conf)) == 1
                    and any(d != top for d in flicker_digits)
+                   and flicker_digits == [7, 0, 0]
                    and len(set(flicker_conf)) == 3
+                   and flicker_conf == [0.481, 0.954, 0.753]
+                   and steady_digits == [0, 0, 0] and steady_conf == [0.919, 0.919, 0.919]
                    and max(float(steady.max() - r[top]) for r in flicker_rows) > 0.30)
     # The gate's strictness, the one thing no random run can show: this net's second hidden unit
     # sits exactly ON the bend, so the strict (z > 0) gate must hand it EXACTLY zero blame while
@@ -404,9 +460,66 @@ if __name__ == "__main__":
                 and np.array_equal(shown_live_col, [2.9799, 0.9933])
                 and np.array_equal(shown_loose_dead_col, [-2.9799, -0.9933])
                 and np.array_equal(np.round(loose_dW1[:, 0], 4), shown_live_col))
+    # The two curve TABLES, pinned as the exact text that reached the screen — the rows that carry a
+    # claim, not every row. Each table's FIRST row (where the two curves start), its LAST row (where
+    # they end up) and the row wearing the "<-- validation bottom (best model)" marker are what the
+    # story is told with, and the marked row is read out by FILTERING on the marker, so the list also
+    # says it is the ONLY marked row: inverting the test to `i != bottom` fills that list with the
+    # other rows, deleting the marker empties it. Those three rows per table also make the epoch /
+    # train / validation COLUMN order part of the claim. The rows in between are a monotone stretch
+    # of the same curve — "validation bottoms out at epoch 9 then rises" is already asserted, epoch
+    # by epoch, by val_climbed_back and gap_smaller_all_along over the recorded history.
+    table_lines_ok = (
+        len(lines_a) == 11
+        and lines_a[0] == "  epoch  1   train 2.8215   validation 2.0670"
+        and [line for line in lines_a if "validation bottom" in line] == [
+            "  epoch  9   train 0.6088   validation 1.2307  <-- validation bottom (best model)",
+        ]
+        and lines_a[-1] == "  epoch 40   train 0.0471   validation 1.4218"
+        and len(lines_b) == 12
+        and lines_b[0] == "  epoch  1   train 3.5068   validation 2.1104"
+        and [line for line in lines_b if "validation bottom" in line] == [
+            "  epoch 14   train 1.1009   validation 1.0750  <-- validation bottom (best model)",
+        ]
+        and lines_b[-1] == "  epoch 40   train 0.3796   validation 1.1219")
+    # The other lines whose LAYOUT carries the claim, pinned the same way: the loss demos in Part
+    # 1, the three Run B vs Run A contrasts, the scaled-vs-unscaled signal, the strict-gate pair,
+    # and the flicker-vs-repeat pair. Every value in them is already pinned above; what is pinned
+    # HERE is the sentence the learner actually reads, which no value pin can reach.
+    rendered_lines_ok = (
+        mse_line == "MSE  gaps [0.5, 1.0, 2.0, 4.0] -> squared [0.25, 1.0, 4.0, 16.0] -> MSE 5.3125"
+        and ce_lines == [
+            "cross-entropy, 0.90 on the true class -> loss 0.11",
+            "cross-entropy, 0.50 on the true class -> loss 0.69",
+            "cross-entropy, 0.01 on the true class -> loss 4.61",
+        ]
+        and pain_line == ("-> confident-and-wrong (0.01) hurts about 40x confident-and-right "
+                          "(0.90)  (4.61 / 0.11 = 41.9)")
+        and summary_lines_a == [
+            "  validation was lowest at epoch 9, then rose by 0.191 while train dived",
+            "  final gap (validation - train) = 1.375 <- this growing gap IS overfitting",
+            "  biases started at 0 and learned: b1 spread 0.0268, b2 top 0.0689",
+        ]
+        and compare_lines == [
+            "  best validation 1.075 at epoch 14 (Run A reached 1.231)",
+            "  final gap 0.742 vs Run A's 1.375; late rise 0.047 vs 0.191",
+            "  not free: after the same 40 epochs its train loss is 0.380, not 0.047",
+        ]
+        and signal_line == ("eval signal 60.939 | dropout averages 60.811 (scaled) vs 30.405 "
+                            "(if you forget to scale)")
+        and hinge_line == ("hinge net: z1 = [5. 0.] (loss 5.0067) -> dW1 for the live unit "
+                           "[2.9799 0.9933], for the z = 0 unit [0. 0.]")
+        and loose_line == ("the same step with a (z >= 0) gate (loss 5.0067, unchanged) hands "
+                           "that dead unit [-2.9799 -0.9933] instead — same forward, different "
+                           "weights: the one-character bug a random run never shows")
+        and predict_lines == [
+            "same picture, dropout still ON -> digit [7, 0, 0] confidence [0.481, 0.954, 0.753]",
+            "same picture, eval mode        -> digit [0, 0, 0] confidence [0.919, 0.919, 0.919]",
+        ])
 
     if (lesson_numbers_ok and scale_ok and split_ok and dropout_ok and eval_bug_ok
-            and biases_learned_ok and inputs_ok and hinge_ok):
+            and biases_learned_ok and inputs_ok and hinge_ok
+            and table_lines_ok and rendered_lines_ok):
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected MSE 5.3125, cross-entropy 0.11/0.69/4.61 (about 40x the "
@@ -419,7 +532,9 @@ if __name__ == "__main__":
               "Run A's learned biases at b1 spread 0.0268 / b2 top 0.0689, "
               "the hinge net's z = 0 unit to receive exactly [0, 0] where a (z >= 0) gate would "
               "hand it [-2.9799, -0.9933], and "
-              "dropout-ON predictions to differ while eval-mode ones repeat")
+              "dropout-ON predictions to differ while eval-mode ones repeat, and every one of "
+              "those lines to read on the page exactly as it reads here — same columns, same "
+              "order, and the bottom marker on the epoch that really is the bottom")
 
     assert lesson_numbers_ok, "MSE 5.3125, cross-entropy 0.11/0.69/4.61, bottom-finder epoch 3"
     assert inputs_ok, ("today's deliberate deviations: a 64-pixel input in PIXELS, HIDDEN, "
@@ -431,3 +546,11 @@ if __name__ == "__main__":
     assert eval_bug_ok, "dropout left ON must give different answers; eval mode must repeat"
     assert hinge_ok, ("the ReLU gate must be STRICT: at z = 0 exactly, the dead unit gets [0, 0], "
                       "where a (z >= 0) gate would hand it [-2.9799, -0.9933]")
+    assert table_lines_ok, ("both curve tables must print epoch / train / validation in that "
+                            "order on their first and last rows, with the bottom marker on exactly "
+                            "one row — Run A's epoch 9 and Run B's epoch 14")
+    assert rendered_lines_ok, ("every claim-carrying line must reach the screen as written: the "
+                               "loss demos, Run A's gap 1.375 and learned biases, the three Run B "
+                               "vs Run A contrasts, scaled 60.811 vs "
+                               "unscaled 30.405, the live/dead gradient pair, and dropout-ON "
+                               "flickering where eval mode repeats")

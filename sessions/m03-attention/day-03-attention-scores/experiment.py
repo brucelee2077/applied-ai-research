@@ -86,13 +86,19 @@ if __name__ == "__main__":
     print("\n--- Part 2: the score matrix (row = who asks, column = who is offered) ---")
     print(raw_scores)
     print("the @ shortcut and the by-hand loop agree:", hand_agrees)
-    print("bank's row", raw_scores[2], "-> bank leans on", bank_leans_on)
+    # A row and the word it leans on only mean something TOGETHER, and that pairing exists
+    # nowhere but the rendered line: pinning the row and the word separately still lets the
+    # print call wrap either one. So build the line, pin the text, then print it.
+    bank_row_line = "bank's row %s -> bank leans on %s" % (raw_scores[2], bank_leans_on)
+    print(bank_row_line)
     # Which way round matters. Spell it KEY-first — K @ Q.T — and you get the TRANSPOSE:
     # a grid that looks just as reasonable and answers a different question.
     key_first = K @ Q.T
     key_first_leans_on = words[int(np.argmax(key_first[2]))]
-    print("key-first K @ Q.T gives bank's row", key_first[2], "-> bank would lean on",
-          key_first_leans_on, "instead. Query first, always.")
+    key_first_line = ("key-first K @ Q.T gives bank's row %s -> bank would lean on %s "
+                      "instead. Query first, always."
+                      % (key_first[2], key_first_leans_on))
+    print(key_first_line)
 
     # --- Part 3: turn the volume down by dividing by sqrt(d_k) ---------------
     scaled_scores = scale_by_sqrt(raw_scores, d_k)
@@ -111,9 +117,17 @@ if __name__ == "__main__":
     probe_label = "[" + ",".join(str(int(cell)) for cell in probe_row) + "]"
     probe_rows = [np.round(scale_by_sqrt(probe_row, w), 4) for w in probe_widths]
     print("widths          :", width_list)
-    print("sqrt(width)     :", sqrt_divisors, " width/2 (the wrong law):", half_divisors)
-    for width, got in zip(probe_widths, probe_rows):
-        print("   {} / sqrt({:<2}) -> {}".format(probe_label, width, got))
+    # Two laws on one line: which list sits under which heading IS the teaching, so swapping
+    # them would advertise width/2 as the real divisor while both lists stay correct.
+    divisor_line = ("sqrt(width)     : %s  width/2 (the wrong law): %s"
+                    % (sqrt_divisors, half_divisors))
+    print(divisor_line)
+    # The width and the row it produced, paired on the page. Build the three lines, pin the
+    # list, then print them — that one claim covers a mismatched width and a dropped row.
+    probe_lines = ["   {} / sqrt({:<2}) -> {}".format(probe_label, width, got)
+                   for width, got in zip(probe_widths, probe_rows)]
+    for probe_line in probe_lines:
+        print(probe_line)
     # Who beats whom, weakest first — twice, from two different rows of numbers.
     raw_row = raw_scores[2]                  # bank's row BEFORE the division: [2, 6, 4]
     scaled_row = scaled_scores[2]            # bank's row AFTER  the division: [1, 3, 2]
@@ -176,12 +190,22 @@ if __name__ == "__main__":
     change_shown = np.round(masked_shares - open_shares, 4)
     print("\n--- Part 5: masking (a forbidden word gets a huge negative score) ---")
     print("labels  :", mask_labels)
-    print("no mask :", open_shown, " sum", open_sum)
-    print("masked  :", masked_shown, " sum", masked_sum)
-    print("change  :", change_shown, "(freed budget moves to allowed words)")
-    print("biggest share left on a forbidden word, mask -1e9 :", biggest_masked_share)
-    print("biggest share left on a forbidden word, mask -12   :", mild_leak_text,
-          "(a mask that is only a bit negative still leaks budget)")
+    # Three rows of one small table, and the whole point is WHICH row is the masked one.
+    # Swap the first two and the page teaches that masking leaves a share on a forbidden
+    # word, with both arrays still individually correct — so pin the rendered rows.
+    mask_lines = ["no mask : %s  sum %s" % (open_shown, open_sum),
+                  "masked  : %s  sum %s" % (masked_shown, masked_sum),
+                  "change  : %s (freed budget moves to allowed words)" % (change_shown,)]
+    for mask_line in mask_lines:
+        print(mask_line)
+    # The same for the two leak lines: their order is the claim that -1e9 is clean while a
+    # merely-low -12 still leaks. Swapped, they say exactly the opposite.
+    leak_lines = ["biggest share left on a forbidden word, mask -1e9 : %s"
+                  % (biggest_masked_share,),
+                  "biggest share left on a forbidden word, mask -12   : %s (a mask that is"
+                  " only a bit negative still leaks budget)" % (mild_leak_text,)]
+    for leak_line in leak_lines:
+        print(leak_line)
 
     # --- Part 6: spend the budget on the Values -----------------------------
     bank_shares = weights[2]
@@ -195,14 +219,20 @@ if __name__ == "__main__":
     blended_shown = np.round(blended, 4)
     distances_shown = np.round(distances, 3)
     print("\n--- Part 6: blend the Values by bank's shares ---")
-    print("shares", bank_shares_shown, "@ V ->", blended_shown)
+    # Today's headline, so pin it as the text it prints: shares in, blend out.
+    blend_line = "shares %s @ V -> %s" % (bank_shares_shown, blended_shown)
+    print(blend_line)
     print("predicted nearest Value:", predicted_nearest, " actual:", actual_nearest,
           " distances:", distances_shown)
     print("all three rows of softmax(Q @ K.T / sqrt(d_k)) @ V:")
     all_outputs = weights @ V                # one blended list per asking word, not just bank's
     all_outputs_shown = np.round(all_outputs, 4)
-    for name, row in zip(words, all_outputs_shown):
-        print("   {:<6} -> {}".format(name, row))
+    # One row per asking word: the NAME beside the numbers is what makes the table readable,
+    # so pin the rendered rows and a reordered or dropped row cannot slip through.
+    output_lines = ["   {:<6} -> {}".format(name, row)
+                    for name, row in zip(words, all_outputs_shown)]
+    for output_line in output_lines:
+        print(output_line)
 
     # --- Self-check: one boolean per claim ----------------------------------
     # Every expected value is written down here, so nothing is checked against a re-derived number.
@@ -274,7 +304,9 @@ if __name__ == "__main__":
                and masked_sum == 1.0
                and np.allclose(masked_shares.sum(), 1.0))
     # And the size of the negative number is the reason it is nothing: -12 leaks 2.69e-07.
-    magnitude_ok = mild_leak > 1e-9 and mild_leak_text == "2.69e-07" and biggest_masked_share == 0.0
+    # The band is two-sided: "bigger than 1e-9" alone would let a leak of 0.9 print here.
+    magnitude_ok = (1e-9 < mild_leak < 1e-5 and mild_leak_text == "2.69e-07"
+                    and biggest_masked_share == 0.0)
     freed_ok = (masked_shares[0] > open_shares[0] and masked_shares[1] > open_shares[1]
                 and np.array_equal(change_shown,
                                    np.array([0.0321, 0.2369, -0.2369, -0.0321])))
@@ -287,11 +319,40 @@ if __name__ == "__main__":
     distance_ok = (distances.shape == (3,)
                    and np.array_equal(distances_shown, np.array([8.256, 2.516, 3.809]))
                    and np.allclose(distances, [8.25604315, 2.51642872, 3.80919649]))
+    # --- the RENDERED TEXT of the lines whose meaning lives in their layout -------------
+    # A value bound to a name is still free at the print CALL: two swapped operands, or one
+    # of them wrapped in arithmetic, leave every name untouched. So the lines that carry a
+    # pairing or a direction are pinned as the exact strings that reach the screen.
+    printed_orientation_ok = (
+        bank_row_line == "bank's row [2. 6. 4.] -> bank leans on river"
+        and key_first_line == ("key-first K @ Q.T gives bank's row [2. 2. 4.] -> bank would "
+                               "lean on bank instead. Query first, always."))
+    printed_law_ok = (
+        divisor_line == ("sqrt(width)     : [2.0, 3.0, 8.0]  width/2 (the wrong law): "
+                         "[2.0, 4.5, 32.0]")
+        and probe_lines == ["   [2,6,4] / sqrt(4 ) -> [1. 3. 2.]",
+                            "   [2,6,4] / sqrt(9 ) -> [0.6667 2.     1.3333]",
+                            "   [2,6,4] / sqrt(64) -> [0.25 0.75 0.5 ]"])
+    printed_mask_ok = (
+        mask_lines == ["no mask : [0.0871 0.6439 0.2369 0.0321]  sum 1.0",
+                       "masked  : [0.1192 0.8808 0.     0.    ]  sum 1.0",
+                       "change  : [ 0.0321  0.2369 -0.2369 -0.0321] (freed budget moves to "
+                       "allowed words)"]
+        and leak_lines == ["biggest share left on a forbidden word, mask -1e9 : 0.0",
+                           "biggest share left on a forbidden word, mask -12   : 2.69e-07 "
+                           "(a mask that is only a bit negative still leaks budget)"])
+    printed_blend_ok = (
+        blend_line == "shares [0.09   0.6652 0.2447] @ V -> [7.6313 2.8496]"
+        and output_lines == ["   the    -> [4.6667 4.    ]",
+                             "   river  -> [6.6089 3.2716]",
+                             "   bank   -> [7.6313 2.8496]"])
 
     if (grid_ok and orientation_ok and value_width_ok and scale_ok and law_ok and order_ok
             and shares_ok and rows_ok and budget_ok and axis_ok
             and winner_ok and open_ok and mask_ok and magnitude_ok and freed_ok and blend_ok
-            and nearest_ok and distance_ok):
+            and nearest_ok and distance_ok
+            and printed_orientation_ok and printed_law_ok and printed_mask_ok
+            and printed_blend_ok):
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected the grid [[2,2,2],[2,4,2],[2,6,4]], bank's scaled row [1,3,2] "
@@ -331,3 +392,11 @@ if __name__ == "__main__":
     assert nearest_ok, "the blend must land nearest river's Value, the word holding most budget"
     assert distance_ok, ("there must be one distance per word — [8.2560, 2.5164, 3.8092] — so a "
                          "collapsed or wrong-axis distance list cannot supply the argmin")
+    assert printed_orientation_ok, ("the page must read \"bank's row [2. 6. 4.] -> bank leans on "
+                                    "river\", and the key-first line must hand the win to 'bank'")
+    assert printed_law_ok, ("the printed law lines must keep sqrt(width) and width/2 under their "
+                           "own headings, and pair each width with the row it produced")
+    assert printed_mask_ok, ("the masked row on the page must be the one with 0. on both "
+                            "forbidden words, and the -1e9 line the one reading 0.0")
+    assert printed_blend_ok, ("the page must read 'shares [0.09   0.6652 0.2447] @ V -> "
+                             "[7.6313 2.8496]' and name each of the three output rows")
