@@ -91,29 +91,38 @@ if __name__ == "__main__":
     # --- Part 1: an empty .grad slot, then autograd fills it ----------------
     w = torch.tensor([2.0], requires_grad=True)     # flag ON: keep the margin notes
     grad_before = w.grad                            # nothing has been computed yet
-    print("w:", w.tolist(), " shape:", tuple(w.shape), " dtype:", w.dtype,
-          " device:", w.device, " grad slot before backward:", grad_before)
+    # Every value on the next line is bound first and printed second, so the self-check can read
+    # the same names the page shows instead of asking the tensor a second time.
+    shown_w, shown_w_shape = w.tolist(), tuple(w.shape)
+    shown_dtype, shown_device = str(w.dtype), str(w.device)
+    print("w:", shown_w, " shape:", shown_w_shape, " dtype:", shown_dtype,
+          " device:", shown_device, " grad slot before backward:", grad_before)
     # By hand, the slope of (3w+1)^2 is 2*(3w+1)*3, worked out from w itself — a real
     # prediction, not a typed-in answer: change w and the prediction changes with it.
     hand_slope = chain_slope(w.item())
     demo_loss = (3 * w + 1) ** 2                    # forward: autograd records each step
     demo_recorded = demo_loss.grad_fn is not None   # the tensor carries a graph
     demo_loss.backward()                            # walk that graph back -> fill w.grad
+    shown_w_value, shown_autograd_slope = w.item(), w.grad.item()   # printed AND checked below
     print("the loss tensor carries a graph:", demo_recorded,
-          f"| hand-derived slope at w={w.item()}: {hand_slope}  autograd w.grad: {w.grad.item()}")
+          f"| hand-derived slope at w={shown_w_value}: {hand_slope}"
+          f"  autograd w.grad: {shown_autograd_slope}")
     # The same formula at a second w, to show it really is a formula. At w=-1 the slope is
     # NEGATIVE, so the single number 42 cannot stand in for the derivation.
     w_neg = torch.tensor([-1.0], requires_grad=True)
     ((3 * w_neg + 1) ** 2).backward()
-    neg_slope_matches = w_neg.grad.item() == chain_slope(w_neg.item()) == -12.0
-    print(f"same formula at w={w_neg.item()}: hand-derived {chain_slope(w_neg.item())}"
-          f"  autograd w.grad: {w_neg.grad.item()}  (the slope flipped sign — 42 was no constant)")
+    shown_w_neg = w_neg.item()
+    shown_neg_hand, shown_neg_autograd = chain_slope(shown_w_neg), w_neg.grad.item()
+    neg_slope_matches = shown_neg_autograd == shown_neg_hand == -12.0
+    print(f"same formula at w={shown_w_neg}: hand-derived {shown_neg_hand}"
+          f"  autograd w.grad: {shown_neg_autograd}  (the slope flipped sign — 42 was no constant)")
 
     # --- Part 2: one gradient, two ways (the whole point of today) ----------
     X, Y, wide_Y = make_data()
     model = fresh_model()
     layout = [(name, tuple(p.shape)) for name, p in model.named_parameters()]
-    print("\nX shape:", tuple(X.shape), " Y shape:", tuple(Y.shape), " parameters:", layout)
+    shown_X_shape, shown_Y_shape = tuple(X.shape), tuple(Y.shape)   # printed, then checked below
+    print("\nX shape:", shown_X_shape, " Y shape:", shown_Y_shape, " parameters:", layout)
     start_W = model.weight.detach().numpy().copy()  # one starting point for both paths
     start_b = model.bias.detach().numpy().copy()
     hand_loss, hand_dW, hand_db = hand_backward(start_W, start_b, X.numpy(), Y.numpy())
@@ -122,10 +131,16 @@ if __name__ == "__main__":
     torch_loss.backward()
     grad_gap = max(float(np.abs(model.weight.grad.numpy() - hand_dW).max()),
                    float(np.abs(model.bias.grad.numpy() - hand_db).max()))
-    print(f"loss  by hand {hand_loss:.6f}  PyTorch {torch_loss.item():.6f}")
-    print("dW    by hand", np.round(hand_dW[0], 4), " db by hand", np.round(hand_db, 4))
-    print("dW    W.grad ", np.round(model.weight.grad.numpy()[0], 4),
-          " db b.grad  ", np.round(model.bias.grad.numpy(), 4),
+    # The four rows of numbers this part shows, bound once each. The claims below read these, so
+    # the "same numbers" headline is checked on the numbers the reader actually sees.
+    shown_torch_loss = torch_loss.item()
+    shown_hand_dW, shown_hand_db = np.round(hand_dW[0], 4), np.round(hand_db, 4)
+    shown_grad_dW = np.round(model.weight.grad.numpy()[0], 4)
+    shown_grad_db = np.round(model.bias.grad.numpy(), 4)
+    print(f"loss  by hand {hand_loss:.6f}  PyTorch {shown_torch_loss:.6f}")
+    print("dW    by hand", shown_hand_dW, " db by hand", shown_hand_db)
+    print("dW    W.grad ", shown_grad_dW,
+          " db b.grad  ", shown_grad_db,
           f"\n-> biggest gap between hand-derived and autograd: {grad_gap:.2e} (the same numbers)")
 
     # The check above has one blind spot. With 8 rows and 1 column, "divide by the number of
@@ -152,14 +167,24 @@ if __name__ == "__main__":
     rows_dW = (2.0 * wide_err / wide_err.shape[0]).T @ X.numpy()   # rows, not elements
     rows_ratio_off = float(np.abs(rows_dW / wide_hand_dW - 2.0).max())
     rows_gap = float(np.abs(rows_dW - wide_model.weight.grad.numpy()).max())
-    print(f"\nwide target shape: {tuple(wide_Y.shape)}  -> {wide_err.size} elements over"
-          f" {wide_err.shape[0]} rows, so the denominator now shows")
-    print(f"loss  by hand {wide_hand_loss:.6f}  PyTorch {wide_torch_loss.item():.6f}")
-    print("dW row 0  by hand", np.round(wide_hand_dW[0], 4), " W.grad",
-          np.round(wide_model.weight.grad.numpy()[0], 4), f"| gap {wide_gap:.2e}")
-    print("dW row 0  dividing by rows instead", np.round(rows_dW[0], 4),
-          f"| {wide_err.size}/{wide_err.shape[0]} = {wide_err.size // wide_err.shape[0]}x too"
-          f" big, {rows_gap:.3f} away from autograd")
+    # The wide mirror's own printed numbers, bound once: the shape, the two counts, the loss the
+    # framework reported, the two gradient rows, and how far the wrong denominator lands.
+    shown_wide_shape = tuple(wide_Y.shape)
+    shown_wide_elements, shown_wide_rows = wide_err.size, wide_err.shape[0]
+    shown_wide_ratio = shown_wide_elements // shown_wide_rows
+    shown_wide_torch_loss = wide_torch_loss.item()
+    shown_wide_hand_dW = np.round(wide_hand_dW[0], 4)
+    shown_wide_grad_dW = np.round(wide_model.weight.grad.numpy()[0], 4)
+    shown_rows_dW = np.round(rows_dW[0], 4)
+    shown_rows_gap = round(rows_gap, 3)
+    print(f"\nwide target shape: {shown_wide_shape}  -> {shown_wide_elements} elements over"
+          f" {shown_wide_rows} rows, so the denominator now shows")
+    print(f"loss  by hand {wide_hand_loss:.6f}  PyTorch {shown_wide_torch_loss:.6f}")
+    print("dW row 0  by hand", shown_wide_hand_dW, " W.grad",
+          shown_wide_grad_dW, f"| gap {wide_gap:.2e}")
+    print("dW row 0  dividing by rows instead", shown_rows_dW,
+          f"| {shown_wide_elements}/{shown_wide_rows} = {shown_wide_ratio}x too"
+          f" big, {shown_rows_gap:.3f} away from autograd")
 
     # --- Part 3: the five-line loop, with the drop predicted first ----------
     # For a linear model scored by MSE, the effect of ONE step is exactly predictable:
@@ -176,12 +201,15 @@ if __name__ == "__main__":
     big_predicted_drop = predicted_drop_of(BIG_LR, grad_sq, overshoot)
     direction = "down" if predicted_drop > 0 else "up"
     big_direction = "down" if big_predicted_drop > 0 else "up"
-    print(f"\npredict: step 1 at lr={LR} moves the loss {direction} by {abs(predicted_drop):.4f};"
-          f" at lr={BIG_LR} it moves {big_direction} by {abs(big_predicted_drop):.4f}"
-          f"  (the sign flips at lr={flip_lr:.4f})")
+    # The three printed magnitudes, bound at the sizes the line shows them at.
+    shown_pred_drop, shown_big_pred_drop = round(abs(predicted_drop), 4), round(abs(big_predicted_drop), 4)
+    shown_flip_lr = round(flip_lr, 4)
+    print(f"\npredict: step 1 at lr={LR} moves the loss {direction} by {shown_pred_drop:.4f};"
+          f" at lr={BIG_LR} it moves {big_direction} by {shown_big_pred_drop:.4f}"
+          f"  (the sign flips at lr={shown_flip_lr:.4f})")
     model = fresh_model()
     optimizer = optim.SGD(model.parameters(), lr=LR)
-    losses, good_grads = [], []
+    losses, good_grads, good_table = [], [], []
     for epoch in range(EPOCHS):
         optimizer.zero_grad()          # 1 clear the piled-up gradients
         out = model(X)                 # 2 forward
@@ -190,7 +218,10 @@ if __name__ == "__main__":
         good_grads.append(grad_size(model))
         optimizer.step()               # 5 nudge every parameter at once
         losses.append(loss.item())     # .item() pulls a plain number out of the tensor
-        print(f"epoch {epoch:2d}  loss {losses[-1]:8.5f}  gradient size {good_grads[-1]:6.3f}")
+        # the row is rounded ONCE, printed, and kept — so the self-check reads the printed table
+        good_table.append((epoch, round(losses[-1], 5), round(good_grads[-1], 3)))
+        print(f"epoch {good_table[-1][0]:2d}  loss {good_table[-1][1]:8.5f}"
+              f"  gradient size {good_table[-1][2]:6.3f}")
     actual_drop = losses[0] - losses[1]
     # Now the same five lines once, with the step size the prediction says will fail.
     big_model = fresh_model()
@@ -201,10 +232,17 @@ if __name__ == "__main__":
     big_optimizer.step()
     big_after = criterion(big_model(X), Y).item()
     big_actual_drop = big_before.item() - big_after
-    print(f"step 1 at lr={LR} really moved it {'down' if actual_drop > 0 else 'up'} by"
-          f" {abs(actual_drop):.4f} (predicted {predicted_drop:+.4f})")
-    print(f"step 1 at lr={BIG_LR} really moved it {'down' if big_actual_drop > 0 else 'up'}:"
-          f" {big_before.item():.4f} -> {big_after:.4f} (predicted {big_predicted_drop:+.4f})")
+    # The two verdict words and the four numbers beside them, bound before they are printed: the
+    # word IS the claim ("it really moved down"), so it must be checked as the value it is.
+    shown_actual_word = "down" if actual_drop > 0 else "up"
+    shown_big_word = "down" if big_actual_drop > 0 else "up"
+    shown_actual_drop, shown_big_before = round(abs(actual_drop), 4), round(big_before.item(), 4)
+    shown_big_after, shown_signed_pred = round(big_after, 4), round(predicted_drop, 4)
+    shown_signed_big_pred = round(big_predicted_drop, 4)
+    print(f"step 1 at lr={LR} really moved it {shown_actual_word} by"
+          f" {shown_actual_drop:.4f} (predicted {shown_signed_pred:+.4f})")
+    print(f"step 1 at lr={BIG_LR} really moved it {shown_big_word}:"
+          f" {shown_big_before:.4f} -> {shown_big_after:.4f} (predicted {shown_signed_big_pred:+.4f})")
     # That prediction has Part 2's blind spot inside it: N above was 8 elements over 8 rows, so
     # the wrong denominator would have predicted the same number. So run the SAME formula once
     # on the 2-column model, where N is 16 and rows are 8, and let the real step judge both.
@@ -223,13 +261,18 @@ if __name__ == "__main__":
     wide_actual_drop = wide_before.item() - criterion(step_model(X), wide_Y).item()
     wide_pred_gap = abs(wide_predicted - wide_actual_drop)
     rows_pred_gap = abs(rows_predicted - wide_actual_drop)
-    print(f"same formula, 2-column model (N = {wide_err.size} elements, not {wide_err.shape[0]}"
-          f" rows): predicted {wide_predicted:+.5f}, step 1 really moved {wide_actual_drop:+.5f}"
-          f" | with rows as N it would predict {rows_predicted:+.5f}, {rows_pred_gap:.5f} off")
+    shown_wide_predicted, shown_wide_actual = round(wide_predicted, 5), round(wide_actual_drop, 5)
+    shown_rows_predicted, shown_rows_pred_gap = round(rows_predicted, 5), round(rows_pred_gap, 5)
+    print(f"same formula, 2-column model (N = {shown_wide_elements} elements, not"
+          f" {shown_wide_rows} rows): predicted {shown_wide_predicted:+.5f}, step 1 really moved"
+          f" {shown_wide_actual:+.5f} | with rows as N it would predict"
+          f" {shown_rows_predicted:+.5f}, {shown_rows_pred_gap:.5f} off")
     twin_losses = numpy_twin(start_W, start_b, X.numpy(), Y.numpy(), EPOCHS)
     twin_gap = max(abs(a - b) for a, b in zip(losses, twin_losses))
-    print("PyTorch:", [round(v, 5) for v in losses[:4]], "... | all numpy:",
-          [round(v, 5) for v in twin_losses[:4]], f"... | biggest gap {twin_gap:.2e}")
+    shown_torch_head = [round(v, 5) for v in losses[:4]]      # the two rows the next line prints
+    shown_twin_head = [round(v, 5) for v in twin_losses[:4]]
+    print("PyTorch:", shown_torch_head, "... | all numpy:",
+          shown_twin_head, f"... | biggest gap {twin_gap:.2e}")
 
     # --- Part 4: remove zero_grad() on purpose ------------------------------
     # First the plain fact: two backwards with nothing cleared ADD, they do not replace.
@@ -239,11 +282,12 @@ if __name__ == "__main__":
     criterion(piled(X), Y).backward()               # a second backward, nothing cleared
     ratios = (piled.weight.grad / first_grad).numpy()[0]
     pile_gap = float(np.abs(ratios - 2.0).max())
-    print("\ngrad after 1 backward:", np.round(first_grad.numpy()[0], 3),
-          "| after a 2nd backward, divided by the 1st:", np.round(ratios, 4))
+    shown_first_grad, shown_ratios = np.round(first_grad.numpy()[0], 3), np.round(ratios, 4)
+    print("\ngrad after 1 backward:", shown_first_grad,
+          "| after a 2nd backward, divided by the 1st:", shown_ratios)
     bug_model = fresh_model()
     bug_optimizer = optim.SGD(bug_model.parameters(), lr=LR)
-    bug_losses, bug_grads, marked_up = [], [], 0
+    bug_losses, bug_grads, marked_up, bug_table = [], [], 0, []
     for epoch in range(EPOCHS):
         # optimizer.zero_grad() is MISSING here on purpose — that is the experiment.
         bug_loss = criterion(bug_model(X), Y)
@@ -253,14 +297,20 @@ if __name__ == "__main__":
         bug_losses.append(bug_loss.item())
         rose = epoch > 0 and bug_losses[-1] > bug_losses[-2]
         marked_up += int(rose)         # count the markers we print, so the count is checkable
-        print(f"no zero_grad  epoch {epoch:2d}  loss {bug_losses[-1]:8.4f}"
-              f"  gradient size {bug_grads[-1]:7.3f}{'   <- went UP' if rose else ''}")
+        # the row as printed: epoch, loss, gradient size, and whether the UP marker was shown
+        bug_table.append((epoch, round(bug_losses[-1], 4), round(bug_grads[-1], 3), rose))
+        print(f"no zero_grad  epoch {bug_table[-1][0]:2d}  loss {bug_table[-1][1]:8.4f}"
+              f"  gradient size {bug_table[-1][2]:7.3f}{'   <- went UP' if rose else ''}")
     rises = sum(1 for i in range(1, EPOCHS) if bug_losses[i] > bug_losses[i - 1])
     good_rises = sum(1 for i in range(1, EPOCHS) if losses[i] > losses[i - 1])
-    print(f"with zero_grad: {good_rises} rises, ends {losses[-1]:.4f}, gradient"
-          f" {good_grads[0]:.2f} -> {good_grads[-1]:.2f} (shrinks, as it should)")
-    print(f"without it:     {rises} rises, ends {bug_losses[-1]:.4f}, gradient"
-          f" {bug_grads[0]:.2f} -> {bug_grads[-1]:.2f} (a pile-up that never settles)")
+    # The six numbers the two summary lines quote, bound at the width they are shown at.
+    shown_good_last, shown_bug_last = round(losses[-1], 4), round(bug_losses[-1], 4)
+    shown_good_g_first, shown_good_g_last = round(good_grads[0], 2), round(good_grads[-1], 2)
+    shown_bug_g_first, shown_bug_g_last = round(bug_grads[0], 2), round(bug_grads[-1], 2)
+    print(f"with zero_grad: {good_rises} rises, ends {shown_good_last:.4f}, gradient"
+          f" {shown_good_g_first:.2f} -> {shown_good_g_last:.2f} (shrinks, as it should)")
+    print(f"without it:     {rises} rises, ends {shown_bug_last:.4f}, gradient"
+          f" {shown_bug_g_first:.2f} -> {shown_bug_g_last:.2f} (a pile-up that never settles)")
 
     # --- Part 5: victory lap — switch the graph off -------------------------
     tracked = model(X)                              # graph on: this output is recorded
@@ -271,9 +321,13 @@ if __name__ == "__main__":
         # The block switches recording off for EVERYTHING inside it, weights included — which
         # is why a fresh combination of a weight built here carries no history either.
         derived_tracks = (untracked * 2 + model.bias).requires_grad
-    print("\ngraph on: requires_grad", tracked.requires_grad, " grad_fn is None:",
-          tracked.grad_fn is None, "| in no_grad: requires_grad", untracked.requires_grad,
-          " grad_fn is None:", untracked.grad_fn is None)
+    # The six flags the next two lines show, bound once each so the claims read the printed page.
+    shown_tracked_tracks, shown_tracked_no_graph = tracked.requires_grad, tracked.grad_fn is None
+    shown_untracked_tracks = untracked.requires_grad
+    shown_untracked_no_graph = untracked.grad_fn is None
+    print("\ngraph on: requires_grad", shown_tracked_tracks, " grad_fn is None:",
+          shown_tracked_no_graph, "| in no_grad: requires_grad", shown_untracked_tracks,
+          " grad_fn is None:", shown_untracked_no_graph)
     print("recording on outside the block:", grad_mode_outside, " inside:", grad_mode_inside,
           "| a weight combined inside still tracks history:", derived_tracks,
           "- detaching one tensor would not have done that")
@@ -288,7 +342,8 @@ if __name__ == "__main__":
         second_backward = None
     except RuntimeError:
         second_backward = RuntimeError
-    print("a 2nd backward() on one loss raised:", getattr(second_backward, "__name__", "nothing"))
+    shown_second_backward = getattr(second_backward, "__name__", "nothing")
+    print("a 2nd backward() on one loss raised:", shown_second_backward)
 
     # --- Self-check: one boolean per claim ---------------------------------
     # The expected numbers below were WRITTEN DOWN after running this file, so they are
@@ -296,29 +351,43 @@ if __name__ == "__main__":
     # quoted to five decimals, so PIN is the tolerance for "matches what we wrote down".
     PIN = 2e-4
     autograd_ok = (grad_before is None and demo_recorded
-                   and w.grad.item() == 42.0 and hand_slope == 42.0
+                   and shown_autograd_slope == 42.0 and hand_slope == 42.0
+                   and shown_w == [2.0] and shown_w_value == 2.0 and shown_w_shape == (1,)
+                   and shown_dtype == "torch.float32" and shown_device == "cpu"
+                   and shown_w_neg == -1.0
                    and neg_slope_matches)     # the same formula, checked at a second w
     start_pinned = (layout == [("weight", (1, 4)), ("bias", (1,))]
-                    and tuple(X.shape) == (8, 4) and tuple(Y.shape) == (8, 1)
+                    and shown_X_shape == (8, 4) and shown_Y_shape == (8, 1)
                     and np.allclose(hand_dW[0], [-3.1470, 0.1902, -4.9423, -3.5771], atol=PIN)
                     and abs(float(hand_db[0]) - 0.3394) < PIN
                     and abs(hand_loss - 11.34160) < PIN
-                    and abs(wide_hand_loss - 7.72439) < PIN)
+                    and abs(wide_hand_loss - 7.72439) < PIN
+                    # and the four rows Part 2 PRINTED, which is where the reader reads them
+                    and np.allclose(shown_hand_dW, [-3.147, 0.1902, -4.9423, -3.5771], atol=1e-6)
+                    and np.allclose(shown_hand_db, [0.3394], atol=1e-6)
+                    and shown_hand_dW.tolist() == shown_grad_dW.tolist()
+                    and shown_hand_db.tolist() == shown_grad_db.tolist())
     # Two independent code paths must agree: autograd, and the numpy chain rule by hand — on
     # the 1-column target AND on the 2-column one, where a wrong denominator cannot hide.
-    mirror_ok = (grad_gap < 1e-6 and abs(hand_loss - torch_loss.item()) < 1e-6
-                 and wide_gap < 1e-6 and abs(wide_hand_loss - wide_torch_loss.item()) < 1e-6
-                 and twin_gap < 1e-5)
+    mirror_ok = (grad_gap < 1e-6 and abs(hand_loss - shown_torch_loss) < 1e-6
+                 and wide_gap < 1e-6 and abs(wide_hand_loss - shown_wide_torch_loss) < 1e-6
+                 and twin_gap < 1e-5
+                 and shown_wide_hand_dW.tolist() == shown_wide_grad_dW.tolist()
+                 and shown_torch_head[0] == 11.3416 and shown_twin_head[0] == 11.3416)
     # And this is what gives that second mirror its teeth: 16 elements over 8 rows, so
     # dividing by rows is exactly 2x wrong and lands a measured distance from autograd.
-    reduction_visible = (tuple(wide_Y.shape) == (ROWS, 2) and wide_err.size == 16
-                         and wide_err.shape[0] == 8 and rows_ratio_off < 1e-6
-                         and abs(rows_gap - 2.50695) < PIN)
+    reduction_visible = (shown_wide_shape == (ROWS, 2) and shown_wide_elements == 16
+                         and shown_wide_rows == 8 and shown_wide_ratio == 2
+                         and rows_ratio_off < 1e-6
+                         and abs(rows_gap - 2.50695) < PIN and shown_rows_gap == 2.507
+                         and shown_rows_dW.tolist() != shown_wide_grad_dW.tolist())
     # A real prediction that can disagree: one formula, two step sizes, opposite signs —
-    # and each sign is checked against the step SGD actually took. The same formula is then
-    # run at a second dial setting (2 output columns) where its N is 16, not 8 = the row
-    # count, so the denominator inside the prediction is measured, not assumed.
+    # and each sign is checked against the step SGD actually took, INCLUDING the two verdict
+    # words the printout uses. The same formula is then run at a second dial setting (2 output
+    # columns) where its N is 16, not 8 = the row count, so the denominator inside the
+    # prediction is measured, not assumed.
     prediction_ok = (direction == "down" and big_direction == "up"
+                     and shown_actual_word == "down" and shown_big_word == "up"
                      and abs(predicted_drop - 4.14032) < PIN
                      and abs(big_predicted_drop + 11.46238) < PIN
                      and abs(flip_lr - 0.80486) < PIN
@@ -326,20 +395,36 @@ if __name__ == "__main__":
                      and abs(big_actual_drop - big_predicted_drop) < PIN
                      and actual_drop > 0 > big_actual_drop
                      and abs(big_after - 22.80399) < PIN
+                     # the printed forms of all of that
+                     and shown_pred_drop == 4.1403 and shown_big_pred_drop == 11.4624
+                     and shown_flip_lr == 0.8049 and shown_actual_drop == 4.1403
+                     and shown_signed_pred == 4.1403 and shown_signed_big_pred == -11.4624
+                     and shown_big_before == 11.3416 and shown_big_after == 22.804
                      and abs(wide_predicted - 1.52394) < PIN and wide_pred_gap < 1e-5
+                     and shown_wide_predicted == 1.52394 and shown_rows_predicted == 1.42358
+                     and shown_rows_pred_gap == 0.10036
                      and rows_pred_gap > 0.05)  # rows as N misses the real step by 0.10036
     loop_ok = (good_rises == 0 and all(losses[i] < losses[i - 1] for i in range(1, EPOCHS))
                and abs(losses[0] - 11.34160) < PIN and abs(losses[-1] - 0.68164) < PIN
                and abs(good_grads[0] - 6.87584) < PIN      # the gradient shrinks as it learns
-               and abs(good_grads[-1] - 0.85665) < PIN)
+               and abs(good_grads[-1] - 0.85665) < PIN
+               # and the table that was printed says the same, first row and last
+               and good_table[0] == (0, 11.3416, 6.876) and good_table[-1] == (11, 0.68164, 0.857)
+               and shown_good_last == 0.6816
+               and shown_good_g_first == 6.88 and shown_good_g_last == 0.86)
     bug_is_visible = (pile_gap < 1e-6 and rises == 5 and marked_up == rises
                       and bug_losses[-1] > losses[-1]
                       and abs(bug_losses[-1] - 5.21676) < PIN     # stuck, not learning
-                      and abs(bug_grads[-1] - 11.60718) < PIN)    # and piled up, not shrinking
-    no_grad_ok = (tracked.grad_fn is not None and tracked.requires_grad and same_numbers
-                  and untracked.grad_fn is None and not untracked.requires_grad
+                      and abs(bug_grads[-1] - 11.60718) < PIN     # and piled up, not shrinking
+                      and sum(1 for row in bug_table if row[3]) == marked_up
+                      and np.allclose(shown_ratios, [2.0, 2.0, 2.0, 2.0], atol=1e-6)
+                      and np.allclose(shown_first_grad, [-3.147, 0.19, -4.942, -3.577], atol=1e-6)
+                      and shown_bug_last == 5.2168
+                      and shown_bug_g_first == 6.88 and shown_bug_g_last == 11.61)
+    no_grad_ok = (shown_tracked_no_graph is False and shown_tracked_tracks and same_numbers
+                  and shown_untracked_no_graph and not shown_untracked_tracks
                   and grad_mode_outside and not grad_mode_inside and not derived_tracks)
-    freed_graph_ok = second_backward is RuntimeError
+    freed_graph_ok = second_backward is RuntimeError and shown_second_backward == "RuntimeError"
 
     if (autograd_ok and start_pinned and mirror_ok and reduction_visible and prediction_ok
             and loop_ok and bug_is_visible and no_grad_ok and freed_graph_ok):

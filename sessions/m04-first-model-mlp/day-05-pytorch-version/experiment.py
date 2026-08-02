@@ -5,7 +5,8 @@
 #   Its loss falls the same way, because autograd redoes your hand-derived backward pass.
 #
 # Parts: (1) stand-in data, (2) the model and how few lines it takes, (3) the five-line loop,
-# (4) a taste test against a hand-written numpy twin, (5) the same loop with zero_grad() deleted.
+# (4) a taste test against a hand-written numpy twin, (5) the same loop with zero_grad() deleted,
+# (6) the hand-derived ReLU gate at exactly z = 0, where (z > 0) and (z >= 0) part ways.
 # Run it:  python3 sessions/m04-first-model-mlp/day-05-pytorch-version/experiment.py
 
 import ast                   # ast reads this file's own code, to count how short it is
@@ -81,6 +82,15 @@ def gradient_size(model):
     return math.sqrt(sum(float(p.grad.norm()) ** 2 if p.grad is not None else 0.0
                          for p in model.parameters()))
 
+def epoch_row(epoch, losses, grad_sizes):
+    """Everything one row of the training table shows: the epoch, its loss and gradient size
+    rounded EXACTLY as printed, and the "<- went UP" marker. The loop below prints what this
+    returns and the self-check reads the same rows back, so the table on the page and the numbers
+    the claims quote are one thing, computed once. Note it is deliberately NOT counted as part of
+    the loop's length below — it is this artifact's bookkeeping, not the PyTorch loop."""
+    return (epoch, round(losses[epoch], 4), round(grad_sizes[epoch], 3),
+            "   <- went UP" if epoch and losses[epoch] > losses[epoch - 1] else "")
+
 def run_loop(model, X, y, clear_gradients):
     """The whole training loop. Line 1 is the one everybody forgets, so Part 5 can switch
     it off — that single line is the ONLY difference between the two runs.
@@ -99,31 +109,47 @@ def run_loop(model, X, y, clear_gradients):
         grad_sizes.append(gradient_size(model))
         optimizer.step()                      # 5 nudge every weight
         losses.append(loss.item())            # .item() pulls a plain number out of the tensor
-        rose = "   <- went UP" if epoch and losses[-1] > losses[-2] else ""
-        print(f"  epoch {epoch:2d}  loss {losses[-1]:.4f}  gradient size {grad_sizes[-1]:.3f}{rose}")
+        row = epoch_row(epoch, losses, grad_sizes)     # the one rule for what this row shows
+        print(f"  epoch {row[0]:2d}  loss {row[1]:.4f}  gradient size {row[2]:.3f}{row[3]}")
     return losses, grad_sizes
+
+def relu_gate(z):
+    # The gate the hand-written backward pass multiplies by: STRICTLY greater than zero. A unit
+    # sitting exactly ON the bend (z = 0) is OFF and must receive no blame. No z1 in the twin below
+    # is ever exactly 0.0, so writing (z >= 0) here would change nothing you could see — which is
+    # why Part 6 builds a net whose z1 IS 0 and runs this gate both ways.
+    return z > 0
+
+def twin_step(W1, b1, W2, b2, X, y, onehot, gate=relu_gate):
+    """One forward + backward of the hand-written twin: the chain rule days 1-4 derived, with no
+    autograd anywhere. Pulled out of the epoch loop so Part 6 can run the SAME lines on a small
+    hand-built net whose z1 lands exactly on the ReLU bend."""
+    z1 = X @ W1.T + b1                       # nn.Linear, by hand
+    hidden = np.maximum(0, z1)               # nn.ReLU, by hand
+    out = hidden @ W2.T + b2                 # the second nn.Linear -> day 1's logits
+    P = np.exp(out - out.max(axis=1, keepdims=True)); P /= P.sum(axis=1, keepdims=True)
+    rows = len(y)
+    loss = float(-np.log(P[np.arange(rows), y]).mean())    # cross-entropy, by hand
+    d_out = (P - onehot) / rows              # the chain rule, derived by hand
+    dW2, db2, d_hidden = d_out.T @ hidden, d_out.sum(axis=0), d_out @ W2
+    d_z1 = d_hidden * gate(z1)               # the ReLU gate blocks the non-positive positions
+    dW1, db1 = d_z1.T @ X, d_z1.sum(axis=0)
+    return loss, z1, (dW1, db1, dW2, db2)
 
 def numpy_twin_losses(model, X, y, epochs):
     """The day-2 / day-4 version: same starting weights, but forward, backward and update
     written out by hand in numpy. Nothing here uses autograd, so agreement means something.
-    The names are days 1-4's: z1 for the pre-activation, hidden for the bent values, out for
-    the raw scores, d_out for day 2's seed delta. W1/W2 come out of nn.Linear, so they are
-    stored (out, in) — the transpose of days 1-3 — which is why every matmul takes a .T."""
+    The names inside twin_step are days 1-4's: z1 for the pre-activation, hidden for the bent
+    values, out for the raw scores, d_out for day 2's seed delta. W1/W2 come out of nn.Linear, so
+    they are stored (out, in) — the transpose of days 1-3 — which is why every matmul takes a .T."""
     W1 = model.fc1.weight.detach().numpy().copy(); b1 = model.fc1.bias.detach().numpy().copy()
     W2 = model.fc2.weight.detach().numpy().copy(); b2 = model.fc2.bias.detach().numpy().copy()
     X, y, losses = X.numpy(), y.numpy(), []
     # onehot[i] is a row of zeros with a single 1 in the true class — the target we compare to
-    rows, onehot = len(y), np.eye(CLASSES, dtype=np.float32)[y]
+    onehot = np.eye(CLASSES, dtype=np.float32)[y]
     for _ in range(epochs):
-        z1 = X @ W1.T + b1                       # nn.Linear, by hand
-        hidden = np.maximum(0, z1)               # nn.ReLU, by hand
-        out = hidden @ W2.T + b2                 # the second nn.Linear -> day 1's logits
-        P = np.exp(out - out.max(axis=1, keepdims=True)); P /= P.sum(axis=1, keepdims=True)
-        losses.append(float(-np.log(P[np.arange(rows), y]).mean()))   # cross-entropy, by hand
-        d_out = (P - onehot) / rows              # the chain rule, derived by hand
-        dW2, db2, d_hidden = d_out.T @ hidden, d_out.sum(axis=0), d_out @ W2
-        d_z1 = d_hidden * (z1 > 0)               # the ReLU gate blocks the negative positions
-        dW1, db1 = d_z1.T @ X, d_z1.sum(axis=0)
+        loss, _, (dW1, db1, dW2, db2) = twin_step(W1, b1, W2, b2, X, y, onehot)
+        losses.append(loss)
         W1 -= LR * dW1; b1 -= LR * db1; W2 -= LR * dW2; b2 -= LR * db2   # optimizer.step(), by hand
     return losses
 
@@ -131,10 +157,18 @@ def numpy_twin_losses(model, X, y, epochs):
 if __name__ == "__main__":
     # --- Part 1: the data (a seeded stand-in, not real MNIST) --------------
     X, y = make_digit_data()
-    print("X shape:", tuple(X.shape), " y shape:", tuple(y.shape), " first labels:", y[:8].tolist())
-    print("X type:", type(X).__name__, "- the same grid of numbers a numpy array holds, plus the"
+    # Bound once, printed, and read back by the self-check: the two shapes, the first labels, the
+    # class name, and the requires_grad flag are all evidence the day rests on.
+    shown_X_shape, shown_y_shape = tuple(X.shape), tuple(y.shape)
+    shown_first_labels = y[:8].tolist()
+    shown_X_type = type(X).__name__
+    shown_X_requires_grad = X.requires_grad
+    print("X shape:", shown_X_shape, " y shape:", shown_y_shape,
+          " first labels:", shown_first_labels)
+    print("X type:", shown_X_type, "- the same grid of numbers a numpy array holds, plus the"
           " power to record how it was computed, so gradients can flow back")
-    print("this X is plain data, so there is nothing to record:", f"X.requires_grad = {X.requires_grad}",
+    print("this X is plain data, so there is nothing to record:",
+          f"X.requires_grad = {shown_X_requires_grad}",
           "- the weights below say True, which is why gradients reach them")
 
     # --- Part 2: the model, how short it is, and the handle that finds every weight ---
@@ -151,8 +185,9 @@ if __name__ == "__main__":
     # (The Part 4 twin is a squeezed-down copy of that build, so it is not the ~500-line rival.)
     print(f"\npredict: fewer lines than the ~{HAND_WRITTEN_LINES} hand-written ones, or more?")
     torch_lines = code_lines("MLP", "run_loop")
+    shown_shrink = HAND_WRITTEN_LINES // torch_lines    # the "about 20x" the next line prints
     print("counted from this file: the model + its whole training loop =", torch_lines,
-          "lines of code", f"-> about {HAND_WRITTEN_LINES // torch_lines}x less typing"
+          "lines of code", f"-> about {shown_shrink}x less typing"
           " for the same network")
 
     # --- Part 3: the five-line loop, with zero_grad in place ---------------
@@ -166,11 +201,16 @@ if __name__ == "__main__":
     top_probability = float(start_probs.max())
     guarded = start_probs.requires_grad is False and start_probs.grad_fn is None
     watched = torch.softmax(model(X), dim=1)   # the SAME forward, outside the no_grad block
-    print(f"\ninside torch.no_grad() that forward recorded nothing: grad_fn {start_probs.grad_fn};"
-          f" the same line outside records one: grad_fn {type(watched.grad_fn).__name__}"
+    # The two grad_fn readings and the chance line, bound before they are printed. `guarded` above
+    # asks the tensor itself; these are what the page shows, and both are checked below.
+    shown_quiet_grad_fn = start_probs.grad_fn                     # None, inside no_grad
+    shown_watched_grad_fn = type(watched.grad_fn).__name__        # a real recorded step, outside it
+    shown_chance = 1 / CLASSES
+    print(f"\ninside torch.no_grad() that forward recorded nothing: grad_fn {shown_quiet_grad_fn};"
+          f" the same line outside records one: grad_fn {shown_watched_grad_fn}"
           " - recording is a switch you control, not something a tensor always does")
     print(f"\nuntrained model: {untrained_accuracy:.1%} of labels right, and its most confident"
-          f" single guess is only {top_probability:.3f} - flat guessing, chance is {1 / CLASSES:.1%}"
+          f" single guess is only {top_probability:.3f} - flat guessing, chance is {shown_chance:.1%}"
           f"\npredict: so epoch 0 loss should sit near ln({CLASSES}) = {predicted_start:.4f},"
           " then fall")
     # What nn.CrossEntropyLoss eats — the one day-4 habit that must NOT carry over. Day 4's
@@ -192,15 +232,22 @@ if __name__ == "__main__":
           " so the number looks better while the model it scores has been flattened")
     print("with zero_grad():")
     good_losses, good_grads = run_loop(model, X, y, clear_gradients=True)
+    # The table that was just printed, read back through the SAME row rule the prints used, plus
+    # the gap the next line shows. Nothing here re-derives a printed number a second way.
+    good_table = [epoch_row(e, good_losses, good_grads) for e in range(EPOCHS)]
+    shown_start_gap = round(abs(good_losses[0] - predicted_start), 4)
     print(f"prediction check: epoch 0 loss was {good_losses[0]:.4f}, ln({CLASSES}) ="
-          f" {predicted_start:.4f}, gap {abs(good_losses[0] - predicted_start):.4f}")
+          f" {predicted_start:.4f}, gap {shown_start_gap:.4f}")
 
     # --- Part 4: the taste test against the hand-written twin --------------
     twin_epochs = 8
     twin_losses = numpy_twin_losses(fresh_model(), X, y, twin_epochs)
     biggest_gap = max(abs(a - b) for a, b in zip(good_losses[:twin_epochs], twin_losses))
-    print("\nPyTorch:", [round(v, 5) for v in good_losses[:twin_epochs]],
-          "\nby hand:", [round(v, 5) for v in twin_losses],
+    # The two rows of numbers, bound before printing so the claims quote the printed rows.
+    shown_torch_row = [round(v, 5) for v in good_losses[:twin_epochs]]
+    shown_twin_row = [round(v, 5) for v in twin_losses]
+    print("\nPyTorch:", shown_torch_row,
+          "\nby hand:", shown_twin_row,
           f"\nbiggest gap: {biggest_gap:.2e}  <- same weights, same math, same learning")
 
     # --- Part 5: the same loop with zero_grad() deleted --------------------
@@ -216,11 +263,47 @@ if __name__ == "__main__":
           f"\nafter 1 backward: {one_backward}   after 2 with no clearing: {two_backwards}"
           "  <- it added, it did not replace\nno zero_grad():")
     bug_losses, bug_grads = run_loop(fresh_model(), X, y, clear_gradients=False)
-    rises = sum(1 for i in range(1, EPOCHS) if bug_losses[i] > bug_losses[i - 1])
-    print(f"\nwith zero_grad: loss rose in 0 of {EPOCHS - 1} steps, gradient size"
-          f" {good_grads[0]:.2f} -> {good_grads[-1]:.2f} (shrinks, as it should)\n"
+    # Both tables, read back through the row rule that printed them. `rises` now COUNTS THE MARKERS
+    # the table showed instead of re-deciding which epochs rose, and the good run's rise count is
+    # counted the same way rather than typed as a 0 into the sentence below.
+    bug_table = [epoch_row(e, bug_losses, bug_grads) for e in range(EPOCHS)]
+    rises = sum(1 for row in bug_table if row[3])
+    good_rises = sum(1 for row in good_table if row[3])
+    shown_good_first, shown_good_last = round(good_grads[0], 2), round(good_grads[-1], 2)
+    shown_bug_first, shown_bug_last = round(bug_grads[0], 2), round(bug_grads[-1], 2)
+    print(f"\nwith zero_grad: loss rose in {good_rises} of {EPOCHS - 1} steps, gradient size"
+          f" {shown_good_first:.2f} -> {shown_good_last:.2f} (shrinks, as it should)\n"
           f"without it:     loss rose in {rises} of {EPOCHS - 1} steps, gradient size"
-          f" {bug_grads[0]:.2f} -> {bug_grads[-1]:.2f} (a growing pile-up)")
+          f" {shown_bug_first:.2f} -> {shown_bug_last:.2f} (a growing pile-up)")
+
+    # --- Part 6: the ReLU gate is strict — a unit exactly on the bend -------
+    # Every z1 in the twin above came from random weights, so not one of them was ever exactly 0.0
+    # and the difference between (z > 0) and (z >= 0) could not show. This hand-built net puts the
+    # second hidden unit exactly ON the bend — 2*2 + 4*(-1) = 0 — and runs the twin's own step
+    # twice, once with each spelling. The numbers are chosen to differ from the earlier days'
+    # hinge nets, and the layout is PyTorch's (out, in), the same one the twin uses.
+    hinge_X = np.array([[2.0, 4.0]], dtype=np.float32)
+    hinge_W1 = np.array([[1.0, 0.5], [2.0, -1.0]], dtype=np.float32)   # row 2 cancels to exactly 0
+    hinge_W2 = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)    # one hidden unit per class
+    hinge_b1, hinge_b2 = np.zeros(2, dtype=np.float32), np.zeros(2, dtype=np.float32)
+    hinge_y = np.array([1])                          # the true class is the dead unit's own class
+    hinge_onehot = np.eye(2, dtype=np.float32)[hinge_y]
+    hinge_loss, hinge_z1, hinge_grads = twin_step(
+        hinge_W1, hinge_b1, hinge_W2, hinge_b2, hinge_X, hinge_y, hinge_onehot)
+    loose_loss, loose_z1, loose_grads = twin_step(
+        hinge_W1, hinge_b1, hinge_W2, hinge_b2, hinge_X, hinge_y, hinge_onehot,
+        gate=lambda z: z >= 0)
+    shown_hinge_z1 = [round(float(v), 4) for v in hinge_z1[0]]
+    shown_hinge_loss, shown_loose_loss = round(hinge_loss, 4), round(loose_loss, 4)
+    # dW1 rows: one per hidden unit, rounded to what the two lines below print
+    shown_live_row = [round(float(v), 4) for v in hinge_grads[0][0]]
+    shown_dead_row = [round(float(v), 4) for v in hinge_grads[0][1]]
+    shown_loose_dead_row = [round(float(v), 4) for v in loose_grads[0][1]]
+    print(f"\nhinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live unit"
+          f" {shown_live_row}, for the z = 0 unit {shown_dead_row}")
+    print(f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands that dead"
+          f" unit {shown_loose_dead_row} instead — same forward, different weights learned: the"
+          " one-character change no random run can show you")
 
     # --- Self-check: one boolean per claim ---------------------------------
     # The pinned numbers below were WRITTEN DOWN after running this file, so they do not come
@@ -230,14 +313,21 @@ if __name__ == "__main__":
     claims = {
         "the 784->128->10 layout and 101770 numbers in total":
             layout == want_layout and total_numbers == 101770,
+        "1024 stand-in images of 784 pixels, 1024 labels, and [0, 0, 0, 0, 0, 1, 3, 7] first up":
+            shown_X_shape == (1024, 784) and shown_y_shape == (1024,)
+            and shown_first_labels == [0, 0, 0, 0, 0, 1, 3, 7] and shown_X_type == "Tensor",
         "plain data with requires_grad False, every weight with requires_grad True, and the"
         " no_grad block recording nothing while the same forward outside it records a grad_fn":
-            X.requires_grad is False and weights_track_history
-            and guarded and watched.requires_grad and watched.grad_fn is not None,
+            shown_X_requires_grad is False and X.requires_grad is False and weights_track_history
+            and guarded and shown_quiet_grad_fn is None
+            and watched.requires_grad and watched.grad_fn is not None
+            and "Backward" in shown_watched_grad_fn,
         "the model plus its whole loop in 24 lines of code, 20x shorter than the ~500 by hand":
-            torch_lines == 24 and HAND_WRITTEN_LINES // torch_lines == 20,
-        "an untrained model no better than guessing: 7.5% right, no single guess above 0.25":
-            abs(untrained_accuracy - 0.07520) < 0.002 and top_probability < 0.25,
+            torch_lines == 24 and shown_shrink == 20,
+        "an untrained model no better than guessing: 7.5% right, no single guess above 0.25,"
+        " against a 1-in-10 chance":
+            abs(untrained_accuracy - 0.07520) < 0.002 and top_probability < 0.25
+            and shown_chance == 0.1,
         "nn.CrossEntropyLoss to eat RAW SCORES — landing on the same 2.32391 as day 4's -log(p)"
         " applied to softmax output, and as epoch 0 of the real loop — while handing it"
         " probabilities instead softmaxes twice: 2.30287, with the top probability squashed from"
@@ -249,28 +339,47 @@ if __name__ == "__main__":
             and abs(loss_on_probs - 2.30287) < 0.002
             and abs(top_probability - 0.20852) < 0.002
             and abs(twice_top - 0.11135) < 0.002,
-        "loss 2.32391 at epoch 0 — that is within 0.1 of the untrained ln(10) = 2.30259 —"
-        " 1.15495 at epoch 24, gradient size 1.4597 -> 0.14857":
+        "loss 2.32391 at epoch 0 — that is within 0.1 of the untrained ln(10) = 2.30259, a printed"
+        " gap of 0.0213 — 1.15495 at epoch 24, gradient size 1.4597 -> 0.14857":
             abs(good_losses[0] - 2.32391) < 0.002
             and abs(predicted_start - 2.30259) < 1e-5
+            and shown_start_gap == 0.0213 and shown_start_gap < 0.1
             and abs(good_losses[-1] - 1.15495) < 0.002
             and abs(good_grads[0] - 1.4597) < 0.005
             and abs(good_grads[-1] - 0.14857) < 0.002,
-        "the loss to fall in every one of the 24 steps":
-            all(good_losses[i] < good_losses[i - 1] for i in range(1, EPOCHS)),
+        "the printed table to show exactly those numbers: epoch 0 at loss 2.3239 / gradient 1.46"
+        " and epoch 24 at 1.155 / 0.149, and the summary line to quote 1.46 -> 0.15":
+            good_table[0] == (0, 2.3239, 1.46, "") and good_table[-1] == (24, 1.155, 0.149, "")
+            and shown_good_first == 1.46 and shown_good_last == 0.15,
+        "the loss to fall in every one of the 24 steps, with no '<- went UP' marker printed":
+            all(good_losses[i] < good_losses[i - 1] for i in range(1, EPOCHS))
+            and good_rises == 0 and all(row[3] == "" for row in good_table),
         "autograd to match the hand-derived backward pass within 1e-5": biggest_gap < 1e-5,
-        "the hand-written twin to reach 1.28603 after its 8 epochs":
-            len(twin_losses) == 8 and abs(twin_losses[-1] - 1.28603) < 0.002,
+        "the hand-written twin to reach 1.28603 after its 8 epochs, printed beside PyTorch's"
+        " 2.32391 -> 1.28603 row":
+            len(twin_losses) == 8 and abs(twin_losses[-1] - 1.28603) < 0.002
+            and shown_twin_row[-1] == 1.28603 and shown_torch_row[0] == 2.32391
+            and len(shown_torch_row) == 8 == len(shown_twin_row),
         "an empty .grad slot before backward and 42.0 in it after, at w=2":
             empty_slot is None and filled_slot == 42.0,
         "two backwards with no clearing to give 3.0 then 6.0 (it adds, it does not replace)":
             one_backward == 3.0 and two_backwards == 6.0,
         "without zero_grad: the same epoch 0 as the good run (loss and gradient identical, so"
-        " zero_grad really is the only difference), then the loss rising in 10 of 24 steps, loss"
-        " 1.27627 at epoch 24, and the gradient piling up 1.4597 -> 3.10903":
+        " zero_grad really is the only difference), then the loss rising in 10 of 24 steps — one"
+        " printed '<- went UP' marker each — loss 1.27627 at epoch 24, and the gradient piling up"
+        " 1.4597 -> 3.10903, quoted as 1.46 -> 3.11":
             bug_losses[0] == good_losses[0] and abs(bug_grads[0] - good_grads[0]) < 1e-9
             and rises == 10 and abs(bug_losses[-1] - 1.27627) < 0.002
-            and abs(bug_grads[-1] - 3.10903) < 0.002,
+            and abs(bug_grads[-1] - 3.10903) < 0.002
+            and shown_bug_first == 1.46 and shown_bug_last == 3.11,
+        "the hand-written gate to be STRICT: a hidden unit whose z1 is exactly 0.0 must receive a"
+        " dW1 row of exactly [0.0, 0.0], where the (z >= 0) spelling hands it [-1.964, -3.9281]"
+        " from the very same forward pass and loss 4.0181 — a difference no random run can show":
+            shown_hinge_z1 == [4.0, 0.0] and loose_z1.tolist() == hinge_z1.tolist()
+            and shown_hinge_loss == 4.0181 and shown_loose_loss == shown_hinge_loss
+            and shown_dead_row == [0.0, 0.0] and shown_live_row == [1.964, 3.9281]
+            and shown_loose_dead_row == [-1.964, -3.9281]
+            and bool(relu_gate(0.0)) is False and bool(relu_gate(1e-12)) is True,
     }
     if all(claims.values()):
         print("\n✅ you got it")

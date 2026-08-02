@@ -61,7 +61,12 @@ if __name__ == "__main__":
 
     close_mse = round(float(mse(pred, target)), 3)   # a CLOSE guess
     close_mae = round(float(mae(pred, target)), 3)
-    print("close guess  -> MSE", close_mse, " MAE", close_mae)
+    # Every printed row below is BUILT ONCE into a named string, printed, and pinned
+    # at the bottom. Handing MSE and MAE to print as separate arguments would let the
+    # two columns be swapped with both numbers still "correct" — in the wrong places,
+    # which is exactly how today's outlier claim could print upside-down under a ✅.
+    close_line = f"close guess  -> MSE {close_mse}  MAE {close_mae}"
+    print(close_line)
 
     # ================= Part 2: the outlier hijack, on a CROWD ===============
     # Twenty ordinary houses, each missed by exactly 0.5.
@@ -76,8 +81,10 @@ if __name__ == "__main__":
     clean_a = round(float(mae(clean_pred, clean_target)), 3)
     wild_m = round(float(mse(wild_pred, wild_target)), 1)
     wild_a = round(float(mae(wild_pred, wild_target)), 1)
-    print("20 ordinary misses    -> MSE", clean_m, " MAE", clean_a)
-    print("same 20 + ONE mansion -> MSE", wild_m, " MAE", wild_a)
+    crowd_clean_line = f"20 ordinary misses    -> MSE {clean_m}  MAE {clean_a}"
+    crowd_wild_line = f"same 20 + ONE mansion -> MSE {wild_m}  MAE {wild_a}"
+    print(crowd_clean_line)
+    print(crowd_wild_line)
 
     # The honest comparison: BOTH scores grow, but by wildly different factors.
     # MSE squares the 100 (-> 10000), so the score is AMPLIFIED about 1900x.
@@ -85,7 +92,8 @@ if __name__ == "__main__":
     # FELT, not amplified, and the twenty honest misses keep their say.
     grow_m = round(wild_m / clean_m)
     grow_a = round(wild_a / clean_a, 1)
-    print("growth factor         -> MSE x", grow_m, " MAE x", grow_a)
+    growth_line = f"growth factor         -> MSE x {grow_m}  MAE x {grow_a}"
+    print(growth_line)
 
     # ================= Part 2b: a LOPSIDED batch (contrast control) ==========
     # The crowd above is deliberately tidy: every miss is exactly 0.5, so its
@@ -99,9 +107,16 @@ if __name__ == "__main__":
     # The two things MAE is NOT: the middle miss, and the worst miss.
     lop_middle = round(float(np.median(np.abs(lop_pred - lop_target))), 3)
     lop_worst = round(float(np.max(np.abs(lop_pred - lop_target))), 3)
-    print("lopsided misses [+0.2,-0.4,+0.6,-3.0] -> MSE", lop_m, " MAE", lop_a)
-    print("   ... middle |miss|", lop_middle, " worst |miss|", lop_worst,
-          "-> MAE averages ALL four, it does not pick one")
+    # The label carries teaching weight too — it is what tells the learner WHICH
+    # four misses produced these two scores. So bind it once, print that binding,
+    # and pin it to the array actually scored (below), instead of typing the
+    # numbers a second time inside the print where nothing could contradict them.
+    lop_label = "[+0.2,-0.4,+0.6,-3.0]"
+    lop_line = f"lopsided misses {lop_label} -> MSE {lop_m}  MAE {lop_a}"
+    spread_line = (f"   ... middle |miss| {lop_middle}  worst |miss| {lop_worst}"
+                   " -> MAE averages ALL four, it does not pick one")
+    print(lop_line)
+    print(spread_line)
 
     # ================= Part 3: cross-entropy rewards confidence =============
     # As p (probability on the CORRECT answer) climbs 0.1 -> 0.99, the loss falls.
@@ -111,7 +126,11 @@ if __name__ == "__main__":
     ce_probe_ps = [0.99, 0.6, 0.1, 1e-7]
     ce_exact = [float(cross_entropy(p)) for p in ce_probe_ps]
     ce_values = [round(v, 3) for v in ce_exact]
-    print("cross-entropy for p=[0.99, 0.6, 0.1, 1e-7]:", ce_values)
+    # Same care for the row heading: it claims which four probabilities these four
+    # scores belong to, so it is bound and pinned to ce_probe_ps at the bottom.
+    ce_probe_label = "[0.99, 0.6, 0.1, 1e-7]"
+    ce_table_line = f"cross-entropy for p={ce_probe_label}: {ce_values}"
+    print(ce_table_line)
 
     # WHERE does cross-entropy change fastest? Compare two equal-looking climbs.
     # Going 0.1 -> 0.6 buys a much bigger drop than 0.6 -> 0.99, so the loss is
@@ -119,8 +138,9 @@ if __name__ == "__main__":
     # Both drops are differences of the SAME scores printed in the table above.
     drop_low = round(ce_exact[2] - ce_exact[1], 3)    # p = 0.1  ->  p = 0.6
     drop_high = round(ce_exact[1] - ce_exact[0], 3)   # p = 0.6  ->  p = 0.99
-    print("drop p=0.1->0.6:", drop_low, " drop p=0.6->0.99:", drop_high,
-          "-> steepest near p=0 (confident + wrong), flat near p=1")
+    drops_line = (f"drop p=0.1->0.6: {drop_low}  drop p=0.6->0.99: {drop_high}"
+                  " -> steepest near p=0 (confident + wrong), flat near p=1")
+    print(drops_line)
 
     # The p=0 case, clamped, stays FINITE (~16.1) instead of +infinity.
     ce_zero = round(float(cross_entropy(0.0)), 1)
@@ -159,13 +179,37 @@ if __name__ == "__main__":
         # middle miss (0.5) nor the worst (3.0), and the signs are gone.
         assert (lop_m, lop_a) == (2.39, 1.05), (lop_m, lop_a)
         assert (lop_middle, lop_worst) == (0.5, 3.0), (lop_middle, lop_worst)
+        # ... and the printed heading really is those four misses. Read the label
+        # back into numbers and compare it to the array that was scored, so a
+        # heading that drifts from the data fails instead of misleading quietly.
+        assert [float(t) for t in lop_label.strip("[]").split(",")] \
+            == [float(v) for v in lop_pred], lop_label
         # The whole printed cross-entropy table, row by row: rewards confidence
         # (0.01 at p=0.99), stings a confident-wrong guess (2.303 at p=0.1), and
         # stays finite at the clip (16.118). The two drops below are differences of
         # these same four numbers, so the table and the drops cannot disagree.
         assert ce_values == [0.01, 0.511, 2.303, 16.118], ce_values
+        # and the heading above that table names exactly the four p values scored
+        assert [float(t) for t in ce_probe_label.strip("[]").split(",")] \
+            == ce_probe_ps, ce_probe_label
         assert drop_low == 1.792, drop_low              # steepest near p=0 ...
         assert drop_high == 0.501, drop_high            # ... and flat near p=1
+        # And the printed ROWS themselves, as rendered text. Each row above was built
+        # once and then printed, so these pin the very characters the learner reads —
+        # including which cell each number landed in. Swapping the MSE and MAE columns
+        # (or the two drops, which would invert "steepest at the confident-wrong end")
+        # keeps every number above valid and still fails right here.
+        assert close_line == "close guess  -> MSE 0.167  MAE 0.333", close_line
+        assert crowd_clean_line == "20 ordinary misses    -> MSE 0.25  MAE 0.5", crowd_clean_line
+        assert crowd_wild_line == "same 20 + ONE mansion -> MSE 476.4  MAE 5.2", crowd_wild_line
+        assert growth_line == "growth factor         -> MSE x 1906  MAE x 10.4", growth_line
+        assert lop_line == ("lopsided misses [+0.2,-0.4,+0.6,-3.0]"
+                            " -> MSE 2.39  MAE 1.05"), lop_line
+        assert spread_line.startswith("   ... middle |miss| 0.5  worst |miss| 3.0"), spread_line
+        assert ce_table_line == ("cross-entropy for p=[0.99, 0.6, 0.1, 1e-7]:"
+                                 " [0.01, 0.511, 2.303, 16.118]"), ce_table_line
+        assert drops_line.startswith("drop p=0.1->0.6: 1.792"
+                                     "  drop p=0.6->0.99: 0.501"), drops_line
         print("✅ you got it")
     except AssertionError as bad:
         print("❌ not yet — expected MSE 0.167, crowd MSE 476.4 vs MAE 5.2,"

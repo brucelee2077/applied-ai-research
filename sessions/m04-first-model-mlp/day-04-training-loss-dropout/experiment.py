@@ -39,6 +39,13 @@ def keep_scale(p):
     # so the average train-time signal matches what eval time (everyone kept) will see.
     return 1.0 / (1.0 - p)
 
+def relu_gate(z):
+    # The gate the backward pass multiplies by: STRICTLY greater than zero. A unit sitting exactly
+    # ON the bend (z = 0) is OFF and must receive no blame. Writing (z >= 0) here changes nothing
+    # in any random run — no seeded value lands on 0.0 — so Part 6 builds a net whose z IS 0 and
+    # runs the gate both ways to make the one-character difference visible.
+    return z > 0
+
 def dropout_mask(dice, shape, p):
     # Bench each unit with probability p — so KEEP it with probability (1-p) — and give every
     # survivor the 1/(1-p) boost. A benched unit gets 0, a survivor gets 1/(1-p).
@@ -46,8 +53,8 @@ def dropout_mask(dice, shape, p):
 
 def forward_eval(x, W1, b1, W2, b2, dice=None, drop_p=0.0):
     # THE eval path, used in three places: the per-epoch validation score inside the loop, the
-    # signal ladder in Part 5, and Part 6's "steady" predictions. Dropout stays off unless a
-    # caller hands over dice, so if dropout ever leaked into this path Part 6's three repeats
+    # signal ladder in Part 5, and Part 7's "steady" predictions. Dropout stays off unless a
+    # caller hands over dice, so if dropout ever leaked into this path Part 7's three repeats
     # would stop matching — the one code change that makes eval mode stop repeating.
     hidden = np.maximum(0, x @ W1 + b1)
     if drop_p:
@@ -95,7 +102,7 @@ def train_run(train_x, train_y, val_x, val_y, drop_p, epochs=EPOCHS, lr=0.05, ba
             d_out = probs.copy()                       # day 2's seed delta, for softmax+x-entropy
             d_out[np.arange(len(y)), y] -= 1
             d_out /= len(y)
-            d_hidden = (d_out @ W2.T) * mask * (z1 > 0)        # benched units get no gradient
+            d_hidden = (d_out @ W2.T) * mask * relu_gate(z1)   # benched units get no gradient
             W2 -= lr * (hidden.T @ d_out); b2 -= lr * d_out.sum(axis=0)
             W1 -= lr * (x.T @ d_hidden);   b1 -= lr * d_hidden.sum(axis=0)
         # --- eval mode: dropout OFF, every unit kept, no scaling ---
@@ -104,23 +111,52 @@ def train_run(train_x, train_y, val_x, val_y, drop_p, epochs=EPOCHS, lr=0.05, ba
     return history, (W1, b1, W2, b2)
 
 def validation_bottom(val_losses):
-    # The early-stopping point: the 1-based epoch whose held-out loss is the lowest.
+    # The early-stopping point: the 1-based epoch whose held-out loss is the lowest. TIES GO TO THE
+    # EARLIER epoch (np.argmin returns the first minimum) — the cheaper model wins a draw. Every
+    # real curve here has a unique minimum, so the tie rule never shows up in a run; the self-check
+    # feeds it two drawn curves on purpose so the policy is tested rather than assumed.
     return int(np.argmin(val_losses)) + 1
 
+def one_backward_step(x, W1, b1, W2, b2, labels, gate=relu_gate):
+    """The training loop's own forward + backward, small enough to run on hand-built weights so a
+    net whose z1 is exactly 0 can be checked. `gate` is the loop's strict rule by default; Part 6
+    passes the loose (z >= 0) spelling to show what that one character would cost."""
+    z1 = x @ W1 + b1
+    hidden = np.maximum(0, z1)
+    probs = softmax_rows(hidden @ W2 + b2)
+    d_out = probs.copy()                       # day 2's seed delta, for softmax + cross-entropy
+    d_out[np.arange(len(labels)), labels] -= 1
+    d_out /= len(labels)
+    d_hidden = (d_out @ W2.T) * gate(z1)       # the gate under test
+    return z1, cross_entropy(probs, labels), x.T @ d_hidden
+
 def show_curve(history, every=4):
-    # Print epoch / train loss / validation loss, and mark the validation bottom.
+    # Print epoch / train loss / validation loss, and mark the validation bottom. Every number
+    # handed back is a number this function PRINTED: each row is rounded ONCE into shown_rows and
+    # that same value is both printed and returned, so the summary lines and the self-check below
+    # read the table the learner reads. Corrupt a printed loss and the claims move with it.
     bottom = validation_bottom([v for _, v in history]) - 1
+    shown_rows = []                       # (epoch, train loss, validation loss) exactly as printed
     for i, (t, v) in enumerate(history):
         if i % every == 0 or i == bottom or i == len(history) - 1:
-            print("  epoch %2d   train %.4f   validation %.4f%s" % (i + 1, t, v,
+            epoch, shown_t, shown_v = i + 1, round(t, 4), round(v, 4)
+            shown_rows.append((epoch, shown_t, shown_v))
+            print("  epoch %2d   train %.4f   validation %.4f%s" % (epoch, shown_t, shown_v,
                   "  <-- validation bottom (best model)" if i == bottom else ""))
-    return bottom + 1, history[-1][0], history[-1][1], min(v for _, v in history)
+    last_train, last_val = shown_rows[-1][1], shown_rows[-1][2]
+    # the lowest held-out loss is read off the row the printout MARKED, not recomputed here
+    bottom_val = [v for epoch, _, v in shown_rows if epoch == bottom + 1][0]
+    return bottom + 1, last_train, last_val, bottom_val
 
 
 if __name__ == "__main__":
     # --- Part 1: the two loss flavors, on the lesson's own numbers ---------
     gaps = [0.5, 1.0, 2.0, 4.0]
-    print("MSE  gaps", gaps, "-> squared", [g * g for g in gaps], "-> MSE", round(mse(gaps), 4))
+    # Bind what gets printed, then print THAT — the self-check below reads these same two names,
+    # so the squares and the MSE on the page and the checked numbers cannot drift apart.
+    shown_squares = [g * g for g in gaps]
+    shown_mse = round(mse(gaps), 4)
+    print("MSE  gaps", gaps, "-> squared", shown_squares, "-> MSE", shown_mse)
     demo_probs = (0.90, 0.50, 0.01)          # confident-and-right, hedging, confident-and-wrong
     # Score each row through the SAME cross_entropy the training loop uses: two columns, the
     # true class is column 0, so the loss is -log(the probability given to the true class).
@@ -129,9 +165,10 @@ if __name__ == "__main__":
     for p_true, loss in zip(demo_probs, demo_losses):
         print(f"cross-entropy, {p_true:.2f} on the true class -> loss {loss:.2f}")
     pain_ratio = demo_losses[2] / demo_losses[0]        # 4.61 / 0.11 — how much worse it hurts
+    shown_pain_ratio = round(pain_ratio, 1)             # the 41.9 the next line prints
     pain_shown = round(pain_ratio / 10) * 10            # to the nearest ten, as the lesson quotes
     print(f"-> confident-and-wrong (0.01) hurts about {pain_shown}x confident-and-right (0.90)"
-          f"  ({demo_losses[2]:.2f} / {demo_losses[0]:.2f} = {pain_ratio:.1f})")
+          f"  ({demo_losses[2]:.2f} / {demo_losses[0]:.2f} = {shown_pain_ratio:.1f})")
 
     # --- Part 2: split the data into train and held-out validation ---------
     rng = np.random.default_rng(0)
@@ -142,15 +179,21 @@ if __name__ == "__main__":
     # (the biases would add HIDDEN + CLASSES = 138); it is the number the over-powered argument
     # rests on, so the two days are quoting two different quantities under similar words.
     weights = PIXELS * HIDDEN + HIDDEN * CLASSES
-    print(f"\ntrain images {train_x.shape} labels {train_y.shape}"
-          f" | held-out val {val_x.shape} labels {val_y.shape}")
-    print(f"model {PIXELS} -> {HIDDEN} -> {CLASSES} = {weights} weights for {len(train_y)}"
+    # The four shapes and the example count are bound here and printed below, so the self-check
+    # reads the very numbers on the page instead of asking the arrays a second time.
+    shown_train_shape, shown_train_labels = train_x.shape, train_y.shape
+    shown_val_shape, shown_val_labels = val_x.shape, val_y.shape
+    shown_train_count = len(train_y)
+    print(f"\ntrain images {shown_train_shape} labels {shown_train_labels}"
+          f" | held-out val {shown_val_shape} labels {shown_val_labels}")
+    print(f"model {PIXELS} -> {HIDDEN} -> {CLASSES} = {weights} weights for {shown_train_count}"
           " training examples (over-powered on purpose)")
     # The pixel-range deviation, measured. Day 1's rule was bytes scaled into exactly [0.0, 1.0];
     # these stamp values are prototype + N(0, 1), so they run negative and are not bounded by 1.
     stamp_lo, stamp_hi = float(train_x.min()), float(train_x.max())
-    print(f"stamp values run ({stamp_lo:.2f}, {stamp_hi:.2f}) — NOT day 1's [0.0, 1.0] byte"
-          " pixels: these are centred near 0 with spread ~1, the other standard input scaling")
+    shown_stamp_lo, shown_stamp_hi = round(stamp_lo, 2), round(stamp_hi, 2)   # printed AND checked
+    print(f"stamp values run ({shown_stamp_lo:.2f}, {shown_stamp_hi:.2f}) — NOT day 1's [0.0, 1.0]"
+          " byte pixels: these are centred near 0 with spread ~1, the other standard input scaling")
     # Three predictions, written down BEFORE the runs and tested in the self-check below.
     print("predict: (1) train loss -> near 0 while validation turns UP; (2) the rising curve is"
           " VALIDATION; (3) dropout makes the gap SMALLER")
@@ -159,33 +202,56 @@ if __name__ == "__main__":
     # Warm-up: hand the lesson's own six-epoch table to the same bottom-finder that is about to
     # mark the real run, and see that it lands where the lesson read the bottom by eye.
     lesson_val = [0.62, 0.44, 0.35, 0.36, 0.42, 0.51]             # the lesson's 6-epoch table
+    shown_lesson_bottom = validation_bottom(lesson_val)   # printed here, checked below, once each
+    shown_lesson_min = min(lesson_val)
     print(f"\nlesson's table {lesson_val} -> the bottom-finder says epoch"
-          f" {validation_bottom(lesson_val)} (the lesson read epoch 3, loss {min(lesson_val)})")
+          f" {shown_lesson_bottom} (the lesson read epoch 3, loss {shown_lesson_min})")
     print("\n--- Run A: NO dropout ---")
     hist_a, params_a = train_run(train_x, train_y, val_x, val_y, drop_p=0.0)
     best_a, train_a, val_a, best_val_a = show_curve(hist_a)
     rise_a, gap_a = val_a - best_val_a, val_a - train_a
-    print(f"  validation was lowest at epoch {best_a}, then rose by {rise_a:.3f} while train dived")
-    print(f"  final gap (validation - train) = {gap_a:.3f} <- this growing gap IS overfitting")
+    shown_rise_a, shown_gap_a = round(rise_a, 3), round(gap_a, 3)   # the two summary numbers
+    print(f"  validation was lowest at epoch {best_a}, then rose by {shown_rise_a:.3f}"
+          " while train dived")
+    print(f"  final gap (validation - train) = {shown_gap_a:.3f} <- this growing gap IS overfitting")
     # The two bias rows started as exact zeros, so whatever they hold now was learned by the two
     # bias update lines in the loop. Both numbers are pinned tightly in the self-check.
     b1_a, b2_a = params_a[1], params_a[3]
-    print(f"  biases started at 0 and learned: b1 spread {b1_a.std():.4f}, b2 top {b2_a.max():.4f}")
+    shown_b1_spread, shown_b2_top = round(float(b1_a.std()), 4), round(float(b2_a.max()), 4)
+    print(f"  biases started at 0 and learned: b1 spread {shown_b1_spread:.4f},"
+          f" b2 top {shown_b2_top:.4f}")
 
     # --- Part 4: Run B — the same run, now with dropout p = 0.5 ------------
-    print(f"\n--- Run B: dropout p = {DROP_P} (train mode only, survivors x{keep_scale(DROP_P)}) ---")
+    shown_keep = keep_scale(DROP_P)          # the survivor boost this run really used
+    print(f"\n--- Run B: dropout p = {DROP_P} (train mode only, survivors x{shown_keep}) ---")
     hist_b, params_b = train_run(train_x, train_y, val_x, val_y, drop_p=DROP_P)
     best_b, train_b, val_b, best_val_b = show_curve(hist_b)
     rise_b, gap_b = val_b - best_val_b, val_b - train_b
-    print(f"  best validation {best_val_b:.3f} at epoch {best_b} (Run A reached {best_val_a:.3f})")
-    print(f"  final gap {gap_b:.3f} vs Run A's {gap_a:.3f}; late rise {rise_b:.3f} vs {rise_a:.3f}")
-    print(f"  not free: after the same {EPOCHS} epochs its train loss is {train_b:.3f},"
-          f" not {train_a:.3f}")
+    shown_rise_b, shown_gap_b = round(rise_b, 3), round(gap_b, 3)
+    shown_best_val_b, shown_best_val_a = round(best_val_b, 3), round(best_val_a, 3)
+    shown_train_b, shown_train_a = round(train_b, 3), round(train_a, 3)
+    print(f"  best validation {shown_best_val_b:.3f} at epoch {best_b}"
+          f" (Run A reached {shown_best_val_a:.3f})")
+    print(f"  final gap {shown_gap_b:.3f} vs Run A's {shown_gap_a:.3f};"
+          f" late rise {shown_rise_b:.3f} vs {shown_rise_a:.3f}")
+    print(f"  not free: after the same {EPOCHS} epochs its train loss is {shown_train_b:.3f},"
+          f" not {shown_train_a:.3f}")
 
     # --- Part 5: why the 1/(1-p) scaling is there --------------------------
     kept_total = 2 * 1.0 * keep_scale(DROP_P)    # lesson's ladder: 4 units worth 1, keep 2, x2
-    print(f"\n4 units kept as-is -> total {4 * 1.0} | 2 benched, survivors"
-          f" x{keep_scale(DROP_P)} -> total {kept_total}")
+    all_kept_total = 4 * 1.0                     # the same four units with nobody benched
+    print(f"\n4 units kept as-is -> total {all_kept_total} | 2 benched, survivors"
+          f" x{shown_keep} -> total {kept_total}")
+    # The same ladder at a SECOND rate, so the line above cannot be a constant in disguise: at
+    # p = 0.75 the surviving count and the boost both change (1 unit, x4) while the total still
+    # comes back to 4 — no single hardcoded number is right for both rungs. The boost is then
+    # measured on 4000 real maskings, so the printed factor is the one dropout_mask really applies.
+    shown_keep_075 = keep_scale(0.75)
+    kept_total_075 = 1 * 1.0 * shown_keep_075
+    probe = dropout_mask(np.random.default_rng(5), (4000,), 0.75)
+    probe_kept, probe_boost = round(float((probe > 0).mean()), 3), float(probe.max())
+    print(f"same ladder at p = 0.75 -> 1 kept, survivors x{shown_keep_075} -> total"
+          f" {kept_total_075} | 4000 real maskings: {probe_kept:.3f} survived, each x{probe_boost}")
     W1, b1, W2, b2 = params_b
     hidden_eval, _ = forward_eval(val_x[:1], W1, b1, W2, b2)   # eval mode: all units kept
     dice = np.random.default_rng(11)
@@ -193,10 +259,36 @@ if __name__ == "__main__":
     eval_signal = float(hidden_eval.sum())
     scaled_mean = float((hidden_eval * masks).sum(axis=(1, 2)).mean())
     unscaled_mean = float((hidden_eval * (masks > 0)).sum(axis=(1, 2)).mean())
-    print(f"eval signal {eval_signal:.3f} | dropout averages {scaled_mean:.3f} (scaled)"
-          f" vs {unscaled_mean:.3f} (if you forget to scale)")
+    # The three signal totals: bound once, printed, and compared to each other in the self-check.
+    shown_eval_signal = round(eval_signal, 3)
+    shown_scaled_mean, shown_unscaled_mean = round(scaled_mean, 3), round(unscaled_mean, 3)
+    print(f"eval signal {shown_eval_signal:.3f} | dropout averages {shown_scaled_mean:.3f} (scaled)"
+          f" vs {shown_unscaled_mean:.3f} (if you forget to scale)")
 
-    # --- Part 6: the silent bug — dropout left ON at prediction time -------
+    # --- Part 6: the gate is STRICT — a unit sitting exactly on the bend ----
+    # Every z1 in the two runs above came from random weights, so none of them was ever exactly
+    # 0.0 and the difference between (z > 0) and (z >= 0) never showed. Here is a hand-built net
+    # whose second hidden unit lands exactly ON the bend: 3*1 + 1*(-3) = 0. Distinct numbers from
+    # the earlier days' hinge nets, run through the loop's own backward step.
+    hinge_x = np.array([[3.0, 1.0]])                        # one row, two features
+    hinge_W1 = np.array([[2.0, 1.0], [-1.0, -3.0]])         # column 2 cancels to exactly 0
+    hinge_W2 = np.array([[1.0, 0.0], [0.0, 1.0]])           # each hidden unit feeds one class
+    hinge_y = np.array([1])                                 # the true class is the dead unit's
+    hinge_z1, hinge_loss, hinge_dW1 = one_backward_step(
+        hinge_x, hinge_W1, np.zeros(2), hinge_W2, np.zeros(2), hinge_y)
+    loose_z1, loose_loss, loose_dW1 = one_backward_step(
+        hinge_x, hinge_W1, np.zeros(2), hinge_W2, np.zeros(2), hinge_y, gate=lambda z: z >= 0)
+    shown_hinge_z1 = np.round(hinge_z1[0], 4)
+    shown_hinge_loss, shown_loose_loss = round(hinge_loss, 4), round(loose_loss, 4)
+    shown_live_col, shown_dead_col = np.round(hinge_dW1[:, 0], 4), np.round(hinge_dW1[:, 1], 4)
+    shown_loose_dead_col = np.round(loose_dW1[:, 1], 4)
+    print(f"\nhinge net: z1 = {shown_hinge_z1} (loss {shown_hinge_loss}) -> dW1 for the live"
+          f" unit {shown_live_col}, for the z = 0 unit {shown_dead_col}")
+    print(f"the same step with a (z >= 0) gate (loss {shown_loose_loss}, unchanged) hands that dead"
+          f" unit {shown_loose_dead_col} instead — same forward, different weights: the"
+          " one-character bug a random run never shows")
+
+    # --- Part 7: the silent bug — dropout left ON at prediction time -------
     # Both sets of rows go through the SAME forward_eval the loop scored validation with; the
     # ONLY difference is whether dice and a drop rate are handed in. So "eval mode repeats" is a
     # claim about that code path, not about re-reading one expression three times.
@@ -204,10 +296,16 @@ if __name__ == "__main__":
     dice = np.random.default_rng(7)
     flicker_rows = [forward_eval(val_x[:1], W1, b1, W2, b2, dice, DROP_P)[1][0]       # oops: ON
                     for _ in range(3)]
-    print("\nsame picture, dropout still ON -> digit", [int(r.argmax()) for r in flicker_rows],
-          "confidence", [round(float(r.max()), 3) for r in flicker_rows])
-    print("same picture, eval mode        -> digit", [int(r.argmax()) for r in steady_rows],
-          "confidence", [round(float(r.max()), 3) for r in steady_rows])
+    # The four printed lists, bound once each: the self-check reads THESE, so a corrupted digit or
+    # confidence in the printout can no longer sit under a passing tick.
+    flicker_digits = [int(r.argmax()) for r in flicker_rows]
+    flicker_conf = [round(float(r.max()), 3) for r in flicker_rows]
+    steady_digits = [int(r.argmax()) for r in steady_rows]
+    steady_conf = [round(float(r.max()), 3) for r in steady_rows]
+    print("\nsame picture, dropout still ON -> digit", flicker_digits,
+          "confidence", flicker_conf)
+    print("same picture, eval mode        -> digit", steady_digits,
+          "confidence", steady_conf)
     print("\nremember: a low TRAINING loss proves nothing about new data — the held-out loss is")
     print("the honest number. And dropout is not free: it learns slower, and it can hurt a model")
     print("that already generalizes. Reach for it when you SEE the gap grow.")
@@ -218,30 +316,42 @@ if __name__ == "__main__":
     # The shape claims read the recorded history of the two runs, so a model that learned
     # nothing (a flat curve) fails them instead of agreeing with itself.
     lesson_numbers_ok = (
-        abs(mse(gaps) - 5.3125) < 1e-9                            # lesson demo: MSE 5.31
+        shown_squares == [0.25, 1.0, 4.0, 16.0]                   # the squares Part 1 printed
+        and shown_mse == 5.3125                                   # lesson demo: MSE 5.31
         and demo_losses == [0.11, 0.69, 4.61]                     # lesson: 0.11 / 0.69 / 4.61
         and pain_shown == 40                                      # the "about 40x" Part 1 printed
+        and shown_pain_ratio == 41.9                              # and the exact ratio beside it
         # The bottom-finder that marked BOTH runs above, on three curves whose answer is known
         # by hand: the lesson's table (bottom at epoch 3), a curve still falling at the end
         # (bottom = the last epoch), and one rising from the start (bottom = the first epoch).
-        and validation_bottom(lesson_val) == 3
+        and shown_lesson_bottom == 3 and shown_lesson_min == 0.35
         and validation_bottom([0.9, 0.8, 0.7]) == 3
-        and validation_bottom([0.7, 0.8, 0.9]) == 1)
+        and validation_bottom([0.7, 0.8, 0.9]) == 1
+        # And the tie rule, which is otherwise invisible: two epochs equally low, EARLIEST wins.
+        # Switching argmin for a last-minimum policy would flip these two from 2 to 3 and from 1
+        # to 3 — with a plain min() there would be nothing here to notice.
+        and validation_bottom([0.5, 0.4, 0.4, 0.6]) == 2
+        and validation_bottom([0.4, 0.6, 0.4]) == 1)
     # The two places this day leaves the module's spine, pinned so neither can pass as an
     # accident: a 64-pixel input (days 1/2/3/5 use 784) with the tuple still in PIXELS, HIDDEN,
     # CLASSES order, and stamp values that really do leave day 1's [0.0, 1.0] band on BOTH sides.
+    # The shapes and the weight count are the ones Part 2 printed, read back here.
     inputs_ok = ((PIXELS, HIDDEN, CLASSES) == (64, 128, 10)
-                 and abs(stamp_lo + 4.76) < 0.02 and abs(stamp_hi - 4.36) < 0.02
-                 and stamp_lo < 0.0 < 1.0 < stamp_hi)
+                 and shown_stamp_lo == -4.76 and shown_stamp_hi == 4.36
+                 and stamp_lo < 0.0 < 1.0 < stamp_hi
+                 and shown_train_shape == (300, 64) and shown_train_labels == (300,)
+                 and shown_val_shape == (500, 64) and shown_val_labels == (500,)
+                 and shown_train_count == 300 and weights == 9472)
     # A wrong scale factor shows up here: scaled must match eval, unscaled must be half of it.
-    # A mask that KEPT with probability p would look fine at p = 0.5, so probe an uneven rate
-    # too: at p = 0.75 only about a quarter of the units may survive, each boosted by 4.
-    probe = dropout_mask(np.random.default_rng(5), (4000,), 0.75)
-    scale_ok = (abs(keep_scale(0.5) - 2.0) < 1e-12 and abs(kept_total - 4.0) < 1e-12
-                and abs(scaled_mean - eval_signal) / eval_signal < 0.02
-                and abs(unscaled_mean / eval_signal - 0.5) < 0.02
-                and abs(float((probe > 0).mean()) - 0.25) < 0.02
-                and abs(float(probe.max()) - 4.0) < 1e-12)
+    # A mask that KEPT with probability p would look fine at p = 0.5, so the second rung Part 5
+    # printed is pinned too: at p = 0.75 only about a quarter of 4000 units may survive, each
+    # boosted by 4 — numbers no constant folded into the p = 0.5 rung could satisfy.
+    scale_ok = (shown_keep == 2.0 and abs(kept_total - 4.0) < 1e-12 and all_kept_total == 4.0
+                and abs(shown_scaled_mean - shown_eval_signal) / shown_eval_signal < 0.02
+                and abs(shown_unscaled_mean / shown_eval_signal - 0.5) < 0.02
+                and shown_keep_075 == 4.0 and abs(kept_total_075 - 4.0) < 1e-12
+                and abs(probe_kept - 0.25) < 0.02
+                and abs(probe_boost - 4.0) < 1e-12)
     # Predictions 1 and 2, read off Run A's own recorded history. TRAIN is the curve that keeps
     # falling — every one of the last ten epochs, and it ends far below where it started. The
     # VALIDATION curve must make a real U: it drops a long way into the epoch the printout
@@ -252,42 +362,63 @@ if __name__ == "__main__":
     val_fell_into_bottom = hist_a[0][1] - best_val_a > 0.50    # 2.067 -> 1.231, a fall of 0.84
     val_climbed_back = all(v > best_val_a + 0.05 for _, v in hist_a[-10:])   # margins 0.158 up
     split_ok = (train_keeps_falling and train_dived and val_fell_into_bottom and val_climbed_back
-                and 2 <= best_a <= 30 and rise_a > 0.10
-                and abs(train_a - 0.047) < 0.05
+                and 2 <= best_a <= 30 and shown_rise_a > 0.10
+                and abs(shown_train_a - 0.047) < 0.05
                 and abs(best_val_a - 1.231) < 0.05 and abs(val_a - 1.422) < 0.05)
     # Prediction 3: dropout halves the gap (1.375 -> 0.742), reaches a better best, rises less,
     # and costs something — its train loss is still high after the same EPOCHS epochs. The gap is
     # narrower at every one of the last ten epochs, not only on the epoch that gets printed.
     gap_smaller_all_along = all(hist_b[i][1] - hist_b[i][0] < hist_a[i][1] - hist_a[i][0]
                                 for i in range(EPOCHS - 10, EPOCHS))
-    dropout_ok = (abs(gap_a - 1.375) < 0.05 and abs(gap_b - 0.742) < 0.05
+    dropout_ok = (abs(shown_gap_a - 1.375) < 0.05 and abs(shown_gap_b - 0.742) < 0.05
                   and gap_smaller_all_along
-                  and best_val_b < best_val_a and rise_b < rise_a / 2 and train_b > 0.20)
+                  and shown_best_val_b == 1.075 and shown_best_val_a == 1.231
+                  and best_val_b < best_val_a and shown_rise_b < shown_rise_a / 2
+                  and shown_train_b > 0.20)
     # The two bias update lines: b1 and b2 start as exact zeros, so these two pins fail flat (at
-    # 0.0000) if either line stops running, and shift far past 1e-4 if either one uses the wrong
-    # gradient or step. The run is fully seeded, so both numbers are pinned to what it printed.
-    biases_learned_ok = (abs(float(b1_a.std()) - 0.026786) < 1e-4
-                         and abs(float(b2_a.max()) - 0.068894) < 1e-4)
+    # 0.0000) if either line stops running, and shift far past the printed 4 decimals if either
+    # one uses the wrong gradient or step. The run is fully seeded, so both numbers are pinned to
+    # exactly what the line above printed.
+    biases_learned_ok = (shown_b1_spread == 0.0268 and shown_b2_top == 0.0689)
     # The eval-mode bug: three dropout-ON passes all disagree, three eval passes are identical,
     # and leaving dropout on flipped the predicted digit on at least one pass. Both sets came out
-    # of forward_eval, so dropout leaking into that path breaks the "identical" clause.
-    steady, top = steady_rows[0], int(steady_rows[0].argmax())
+    # of forward_eval, so dropout leaking into that path breaks the "identical" clause. The digit
+    # and confidence clauses read the four lists that were printed.
+    steady, top = steady_rows[0], steady_digits[0]
     eval_bug_ok = (len({r.tobytes() for r in flicker_rows}) == 3
                    and len({r.tobytes() for r in steady_rows}) == 1
-                   and any(int(r.argmax()) != top for r in flicker_rows)
+                   and steady_digits == [top, top, top] and len(set(steady_conf)) == 1
+                   and any(d != top for d in flicker_digits)
+                   and len(set(flicker_conf)) == 3
                    and max(float(steady.max() - r[top]) for r in flicker_rows) > 0.30)
+    # The gate's strictness, the one thing no random run can show: this net's second hidden unit
+    # sits exactly ON the bend, so the strict (z > 0) gate must hand it EXACTLY zero blame while
+    # the loose (z >= 0) spelling hands it a real gradient. The forward pass and the loss are the
+    # same either way — only the weights that would be learned differ, which is what makes the
+    # change silent. Every number here is one the two lines above printed.
+    hinge_ok = (np.array_equal(shown_hinge_z1, [5.0, 0.0])
+                and np.array_equal(loose_z1, hinge_z1)
+                and shown_hinge_loss == 5.0067 and shown_loose_loss == shown_hinge_loss
+                and bool(relu_gate(0.0)) is False and bool(relu_gate(1e-12)) is True
+                and np.array_equal(shown_dead_col, [0.0, 0.0])
+                and np.array_equal(shown_live_col, [2.9799, 0.9933])
+                and np.array_equal(shown_loose_dead_col, [-2.9799, -0.9933])
+                and np.array_equal(np.round(loose_dW1[:, 0], 4), shown_live_col))
 
     if (lesson_numbers_ok and scale_ok and split_ok and dropout_ok and eval_bug_ok
-            and biases_learned_ok and inputs_ok):
+            and biases_learned_ok and inputs_ok and hinge_ok):
         print("\n✅ you got it")
     else:
         print("\n❌ not yet — expected MSE 5.3125, cross-entropy 0.11/0.69/4.61 (about 40x the "
-              "pain), the bottom-finder to say epoch 3 on the lesson's table, 1/(1-0.5) == 2, "
+              "pain), the bottom-finder to say epoch 3 on the lesson's table and the EARLIER "
+              "epoch on a tie, 1/(1-0.5) == 2 with the p = 0.75 rung at x4, "
               "a 64 -> 128 -> 10 model on stamp values spanning (-4.76, 4.36) rather than day "
               "1's [0, 1], "
               "Run A to dive to train 0.047 while validation dips to 1.231 and climbs back to "
               "1.422 (gap 1.375), Run B's gap near 0.742 and narrower at every late epoch, "
-              "Run A's learned biases at b1 spread 0.0268 / b2 top 0.0689, and "
+              "Run A's learned biases at b1 spread 0.0268 / b2 top 0.0689, "
+              "the hinge net's z = 0 unit to receive exactly [0, 0] where a (z >= 0) gate would "
+              "hand it [-2.9799, -0.9933], and "
               "dropout-ON predictions to differ while eval-mode ones repeat")
 
     assert lesson_numbers_ok, "MSE 5.3125, cross-entropy 0.11/0.69/4.61, bottom-finder epoch 3"
@@ -298,3 +429,5 @@ if __name__ == "__main__":
     assert dropout_ok, "dropout must shrink the gap all along and the late rise, and cost train"
     assert biases_learned_ok, "both bias update lines must run: b1 spread 0.0268, b2 top 0.0689"
     assert eval_bug_ok, "dropout left ON must give different answers; eval mode must repeat"
+    assert hinge_ok, ("the ReLU gate must be STRICT: at z = 0 exactly, the dead unit gets [0, 0], "
+                      "where a (z >= 0) gate would hand it [-2.9799, -0.9933]")

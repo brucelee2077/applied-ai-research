@@ -78,12 +78,18 @@ if __name__ == "__main__":
     gate, gated_delta = gate_all[:4], gated_all[:4]     # blame arriving from the right, then gated
     predicted_survivors = int(gate.sum())    # the prediction is read off the inputs, not guessed
     actual_survivors = int(np.count_nonzero(gated_delta))
+    # Each printed number is BOUND first and the self-check reads the same name, so the line you
+    # read and the line that is checked are one value, not two expressions that agree today.
+    shown_gate = gate.astype(int)
+    shown_hinge_z = float(z_all[4])
+    shown_hinge_delta = float(delta_all[4])
+    shown_hinge_out = float(gated_all[4])
     print("\nforward inputs :", z_fwd, "\nincoming delta :", upstream_delta)
-    print("gate (on = 1)  :", gate.astype(int), "-> we predict", predicted_survivors, "of 4 live")
+    print("gate (on = 1)  :", shown_gate, "-> we predict", predicted_survivors, "of 4 live")
     print("outgoing delta :", gated_delta, "-> survived:", actual_survivors)
     # The fifth entry: z = 0 counts as OFF, so its 0.6 of blame must vanish too.
-    print("on the hinge   : z =", z_all[4], "with delta", delta_all[4], "-> outgoing",
-          gated_all[4], "(z = 0 is OFF, not on)")
+    print("on the hinge   : z =", shown_hinge_z, "with delta", shown_hinge_delta, "-> outgoing",
+          shown_hinge_out, "(z = 0 is OFF, not on)")
 
     # --- Part 3: forward pass, saving the breadcrumbs ----------------------
     rng = np.random.default_rng(0)
@@ -100,9 +106,14 @@ if __name__ == "__main__":
     z1, h, out = forward(x, W1, b1, W2, b2)   # day 1's tuple, same order
     loss = squared_loss(out, target)
     on_count = int(relu_gate(z1).sum())       # a breadcrumb: how many units were on
-    print("\nx", x.shape, "-> z1", z1.shape, "-> h", h.shape, "-> out", out.shape)
-    print("out[0][:4] =", np.round(out[0][:4], 4), " target[0][:4] =", target[0][:4])
-    print("hidden units on (z1 > 0):", on_count, "of", z1.size, " loss =", round(loss, 8))
+    x_shape, z1_shape, h_shape, out_shape = x.shape, z1.shape, h.shape, out.shape
+    z1_size = z1.size
+    shown_out_row0 = np.round(out[0][:4], 4)
+    shown_target_row0 = target[0][:4]
+    shown_loss = round(loss, 8)
+    print("\nx", x_shape, "-> z1", z1_shape, "-> h", h_shape, "-> out", out_shape)
+    print("out[0][:4] =", shown_out_row0, " target[0][:4] =", shown_target_row0)
+    print("hidden units on (z1 > 0):", on_count, "of", z1_size, " loss =", shown_loss)
     # The denominator, made visible before it is used. This loss is a mean over ELEMENTS, so a
     # 4-row batch of 10 scores divides by 40, not by 4. Seeding the backward pass with the row
     # count instead — the mistake that reads as "average over the batch" — would multiply every
@@ -110,15 +121,22 @@ if __name__ == "__main__":
     rows_seed = 2.0 * (out - target) / out.shape[0]        # the wrong denominator, written out
     element_seed = 2.0 * (out - target) / out.size         # the one backward() really uses
     seed_ratio = float(np.abs(rows_seed / element_seed).max())
-    print("MSE denominator :", out.size, "elements =", out.shape[0], "rows x", n_out,
-          "classes -> dividing by rows instead would make every delta", round(seed_ratio, 1),
+    out_elements, out_rows = out.size, out.shape[0]
+    shown_seed_ratio = round(seed_ratio, 1)
+    print("MSE denominator :", out_elements, "elements =", out_rows, "rows x", n_out,
+          "classes -> dividing by rows instead would make every delta", shown_seed_ratio,
           "x too big")
 
     # --- Part 4: backward pass by hand, and the free shape check -----------
     dW1, db1, dW2, db2 = backward(x, target, z1, h, out, W2)
-    for name, grad, knob in [("dW1", dW1, W1), ("db1", db1, b1), ("dW2", dW2, W2), ("db2", db2, b2)]:
-        print(name, grad.shape, "vs knob", knob.shape, "-> same shape:", grad.shape == knob.shape)
-    print("dW1[0][:3] =", np.round(dW1[0][:3], 8), "\n")
+    # Bind the shape triples ONCE, print them, and let the self-check read the same rows.
+    grad_rows = [(name, grad.shape, knob.shape, grad.shape == knob.shape)
+                 for name, grad, knob in [("dW1", dW1, W1), ("db1", db1, b1),
+                                          ("dW2", dW2, W2), ("db2", db2, b2)]]
+    for name, grad_shape, knob_shape, same_shape in grad_rows:
+        print(name, grad_shape, "vs knob", knob_shape, "-> same shape:", same_shape)
+    shown_dW1_row0 = np.round(dW1[0][:3], 8)
+    print("dW1[0][:3] =", shown_dW1_row0, "\n")
     # The hinge case again, but through the REAL backward pass: a hand-built net whose z1 is
     # exactly [2, 0], so the second unit sits on the bend and must receive no blame at all.
     x_edge, target_edge = np.array([[1.0, 1.0]]), np.zeros((1, 1))
@@ -127,8 +145,11 @@ if __name__ == "__main__":
     z1_edge, h_edge, out_edge = forward(x_edge, W1_edge, b1_edge, W2_edge, b2_edge)
     loss_edge = squared_loss(out_edge, target_edge)
     dW1_edge = backward(x_edge, target_edge, z1_edge, h_edge, out_edge, W2_edge)[0]
-    print("hinge net: z1 =", z1_edge[0], "loss =", loss_edge, "-> dW1 for the live unit",
-          dW1_edge[:, 0], "and for the z=0 unit", dW1_edge[:, 1], "\n")
+    shown_edge_z1 = z1_edge[0]
+    shown_edge_live = dW1_edge[:, 0]     # the unit whose z1 is 2.0 — it must collect blame
+    shown_edge_dead = dW1_edge[:, 1]     # the unit sitting exactly on the hinge — it must not
+    print("hinge net: z1 =", shown_edge_z1, "loss =", loss_edge, "-> dW1 for the live unit",
+          shown_edge_live, "and for the z=0 unit", shown_edge_dead, "\n")
 
     # --- Part 5: gradient check — analytic vs numerical --------------------
     knobs = {"W1": W1, "b1": b1, "W2": W2, "b2": b2}
@@ -138,49 +159,87 @@ if __name__ == "__main__":
     to_check = [("W1", steepest), ("W1", (0, 0)), ("W1", (17, 42)), ("b1", (5,)),
                 ("W2", (20, 7)), ("W2", (100, 2)), ("b2", (4,)), ("b2", (9,))]
     worst_gap = 0.0
+    checked_gaps = []
     for knob, index in to_check:
         hand, nudged = float(analytic[knob][index]), numerical_slope(knob, index, x, target, knobs)
-        worst_gap = max(worst_gap, relative_gap(hand, nudged))
+        gap = relative_gap(hand, nudged)   # computed ONCE: the printed gap is the checked gap
+        checked_gaps.append(gap)
+        worst_gap = max(worst_gap, gap)
         print(f"{knob}{index}: analytic {hand: .8f}  numerical {nudged: .8f}"
-              f"  gap {relative_gap(hand, nudged):.2e}")
-    print("worst relative gap over", len(to_check), "entries =", f"{worst_gap:.2e}", "\n")
+              f"  gap {gap:.2e}")
+    n_checked = len(to_check)
+    shown_worst_gap = f"{worst_gap:.2e}"     # the rendered string is a print site too
+    print("worst relative gap over", n_checked, "entries =", shown_worst_gap, "\n")
 
     # --- Part 6: break the backward pass on purpose -----------------------
     delta2 = element_seed                        # forget the ReLU gate on purpose:
     dW1_no_gate = x.T @ (delta2 @ W2.T)          # this line is missing the  * (z1 > 0)
     spoiled, disagreements = float((np.abs(dW1_no_gate - dW1) > 1e-9).mean()), 0
     # A unit that was on for every image hides this bug, so we look at three entries.
+    no_gate_values, no_gate_on_counts = [], []
     for index in [steepest, (0, 0), (17, 42)]:
         gap = relative_gap(float(dW1_no_gate[index]), numerical_slope("W1", index, x, target, knobs))
         disagreements += int(gap > 1e-3)
-        print(f"no-gate dW1{index}: {float(dW1_no_gate[index]): .8f}  gap {gap:.2e}"
-              f"  (this unit was on for {int(relu_gate(z1[:, index[1]]).sum())} of 4 images)")
+        shown_no_gate = float(dW1_no_gate[index])
+        shown_on_for_unit = int(relu_gate(z1[:, index[1]]).sum())
+        no_gate_values.append(shown_no_gate)
+        no_gate_on_counts.append(shown_on_for_unit)
+        print(f"no-gate dW1{index}: {shown_no_gate: .8f}  gap {gap:.2e}"
+              f"  (this unit was on for {shown_on_for_unit} of 4 images)")
     print("the bug spoils", spoiled, "of dW1, caught on", disagreements, "of the 3 entries")
 
     # --- Self-check: one boolean per claim; pinned numbers come from a real run of this file ---
+    # Every check reads the SAME name that was printed, so a corrupted printed number is a
+    # corrupted checked number.
     chain_ok = abs(chain_product - 18.0) < 1e-12 and abs(downstream - 2.0) < 1e-12
     golf_ok = miss_2 == 9.0 and miss_4 == 1.0   # the two numbers we PRINTED; lesson: L = 9, then 1
     gate_ok = (np.array_equal(z_fwd, [2.0, -1.0, 3.0, -0.5])            # the lesson's inputs
                and np.array_equal(upstream_delta, [0.4, -0.7, 0.9, -0.2])
+               and np.array_equal(shown_gate, [1, 0, 1, 0])             # the printed mask
                and np.array_equal(gated_delta, [0.4, 0.0, 0.9, 0.0]))   # and its outgoing delta
     # The strictness itself: with a ">=" gate the on-the-hinge entry would keep its 0.6, and the
     # hinge net's dead column would collect blame instead of the exact zeros it must get.
-    edge_ok = bool(gate_all[4]) is False and float(gated_all[4]) == 0.0
+    edge_ok = (bool(gate_all[4]) is False and shown_hinge_z == 0.0
+               and shown_hinge_delta == 0.6 and shown_hinge_out == 0.0)
     edge_back_ok = (loss_edge == 4.0 and np.array_equal(z1_edge, [[2.0, 0.0]])
+                    and np.array_equal(shown_edge_z1, [2.0, 0.0])
+                    and np.array_equal(shown_edge_live, [4.0, 4.0])
+                    and np.array_equal(shown_edge_dead, [0.0, 0.0])
                     and np.array_equal(dW1_edge, [[4.0, 0.0], [4.0, 0.0]]))
     survivors_ok = predicted_survivors == 2 and actual_survivors == 2
-    shapes_ok = (dW1.shape == (784, 128) == W1.shape and db1.shape == (128,) == b1.shape
-                 and dW2.shape == (128, 10) == W2.shape and db2.shape == (10,) == b2.shape)
+    shapes_ok = (all(same_shape for _, _, _, same_shape in grad_rows)
+                 and [(name, grad_shape, knob_shape)
+                      for name, grad_shape, knob_shape, _ in grad_rows]
+                 == [("dW1", (784, 128), (784, 128)), ("db1", (128,), (128,)),
+                     ("dW2", (128, 10), (128, 10)), ("db2", (10,), (10,))]
+                 and x_shape == (4, 784) and z1_shape == (4, 128)
+                 and h_shape == (4, 128) and out_shape == (4, 10))
     # The reduction, pinned: this loss divides by ELEMENTS. 40 of them, from 4 rows of 10, so
     # the row-count spelling is exactly n_out = 10 times bigger. Day 3 keeps the same chain rule
     # and deliberately switches to that other reduction — which is why the factor is named here.
-    reduction_ok = (out.size == 40 and out.shape[0] == 4 and seed_ratio == 10.0
+    reduction_ok = (out_elements == 40 and out_rows == 4 and z1_size == 512
+                    and shown_seed_ratio == 10.0
                     and np.allclose(rows_seed, n_out * element_seed, rtol=1e-12, atol=0.0))
-    pinned_ok = (abs(loss - 0.92741551) < 1e-7 and on_count == 263 and steepest == (515, 82)
+    pinned_ok = (abs(shown_loss - 0.92741551) < 1e-7 and on_count == 263
+                 and steepest == (515, 82)
                  and relative_gap(float(dW1[steepest]), 0.15716058) < 1e-6
-                 and relative_gap(float(dW1[0, 0]), -0.0006150285) < 1e-6)
-    check_ok = worst_gap < 1e-5       # two independent code paths agree on all 8 entries
-    bug_caught = disagreements == 1 and abs(spoiled - 0.6953125) < 1e-9
+                 and relative_gap(float(dW1[0, 0]), -0.0006150285) < 1e-6
+                 # the two printed rows of numbers, pinned to what this seed really produces
+                 and np.allclose(shown_out_row0, [-0.7923, 0.9492, -1.0002, 0.1708], atol=5e-5)
+                 and np.array_equal(shown_target_row0, [0.0, 0.0, 0.0, 0.0])
+                 and np.allclose(shown_dW1_row0, [-0.00061503, 0.01880515, 0.00692428],
+                                 rtol=0.0, atol=5e-9))
+    # Two independent code paths agree on all 8 entries — checked on the rendered string too,
+    # so the summary line cannot say one thing while the check reads another.
+    check_ok = (worst_gap < 1e-5 and n_checked == 8 and len(checked_gaps) == 8
+                and max(checked_gaps) == worst_gap and float(shown_worst_gap) < 1e-5)
+    # The bug only shows on a unit that was OFF for some image: entry 2 was on for 1 of 4 and is
+    # the one caught, while the other two were on for all 4 and hide it.
+    bug_caught = (disagreements == 1 and abs(spoiled - 0.6953125) < 1e-9
+                  and no_gate_on_counts == [4, 1, 4]
+                  and disagreements == sum(1 for c in no_gate_on_counts if c < batch)
+                  and np.allclose(no_gate_values, [0.15716058, 0.01715807, 0.09938535],
+                                  rtol=1e-6, atol=0.0))
 
     if (chain_ok and golf_ok and gate_ok and edge_ok and edge_back_ok and survivors_ok
             and shapes_ok and reduction_ok and pinned_ok and check_ok and bug_caught):

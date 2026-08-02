@@ -77,8 +77,10 @@ if __name__ == "__main__":
     TRAIN_FRAC = 0.8  # the promised split: 80% to train, 20% held out for validation
     rng, x, y = build_dataset(seed=42, n=40)
     x_train, y_train, x_val, y_val = shuffle_and_split(rng, x, y, train_frac=TRAIN_FRAC)
-    print("dataset: %d points  ->  train %d / val %d"
-          % (len(x), len(x_train), len(x_val)))
+    # The three counts are read ONCE into names, so the line the learner reads and the
+    # counts the self-check pins are the same three values, not two separate lookups.
+    n_all, n_train, n_val = len(x), len(x_train), len(x_val)
+    print("dataset: %d points  ->  train %d / val %d" % (n_all, n_train, n_val))
 
     # ---- 2. turn the flexibility knob up step by step (the CAPACITY axis) -----
     degrees = list(range(1, 16))  # degree 1 (smooth line) ... degree 15 (very wiggly)
@@ -106,14 +108,64 @@ if __name__ == "__main__":
     # capacity, so this is the same rule applied to model size, not to training length.
     best_degree = degrees[best_idx]
     best_val = val_losses[best_idx]
-    print("\nlowest validation loss at degree %d  (val_loss = %.4f)  <- best model / early-stopping point"
-          % (best_degree, best_val))
+    # Every number the story below quotes is rendered ONCE, here, and the self-check pins
+    # these same strings. Formatting a value again inside the print while the check looked
+    # at the raw float would be two expressions for one number: corrupt the printed one and
+    # the learner reads a wrong loss under a passing ✅.
+    best_val_cell = "%.4f" % best_val
+    print("\nlowest validation loss at degree %d  (val_loss = %s)  <- best model / early-stopping point"
+          % (best_degree, best_val_cell))
 
     # the story of overfitting, made visible:
-    print("train_loss keeps dropping: degree 1 = %.4f  ->  degree %d = %.4f"
-          % (train_losses[0], degrees[-1], train_losses[-1]))
-    print("but validation RISES past the minimum: best = %.4f  ->  most-flexible = %.4f"
-          % (best_val, val_losses[-1]))
+    first_degree, last_degree = degrees[0], degrees[-1]
+    train_start_cell = "%.4f" % train_losses[0]
+    train_end_cell = "%.4f" % train_losses[-1]
+    most_flexible_val = val_losses[-1]                 # the 'most-flexible' figure…
+    most_flexible_cell = "%.4f" % most_flexible_val    # …rendered once, pinned below
+    print("train_loss keeps dropping: degree %d = %s  ->  degree %d = %s"
+          % (first_degree, train_start_cell, last_degree, train_end_cell))
+    print("but validation RISES past the minimum: best = %s  ->  most-flexible = %s"
+          % (best_val_cell, most_flexible_cell))
+
+    # ---- 4b. the day's headline claim, measured: does the GAP really WIDEN? ---
+    # One row is not a trend, and this validation pile holds only 8 points — so a single
+    # degree can get lucky. Degree 15 does: its gap falls back to 0.0713, well under
+    # degree 14's 0.3277. Quoting only the last row would therefore make the printed
+    # summary argue AGAINST the day's claim. So state the claim the way the evidence
+    # supports it: the gap across the flexible END of the sweep against the gap at the
+    # best degree, plus where the gap is widest, plus the bumps themselves — printed, so
+    # the noise is something the learner is told about instead of something we trimmed.
+    gap_at_best = gaps[best_idx]
+    late_degrees = degrees[-5:]                    # the flexible end: degrees 11-15
+    late_gap_mean = sum(gaps[-5:]) / len(gaps[-5:])
+    gap_ratio = late_gap_mean / gap_at_best
+    widest_idx = int(np.argmax(gaps))              # found, not hand-picked
+    widest_degree = degrees[widest_idx]
+    gap_late = gaps[widest_idx]
+    gap_best_cell = "%.4f" % gap_at_best
+    gap_late_mean_cell = "%.4f" % late_gap_mean
+    gap_ratio_cell = "%.1fx" % gap_ratio
+    gap_widest_cell = "%.4f" % gap_late
+    print("the GAP widens with flexibility: %s at degree %d  ->  %s averaged over degrees"
+          " %d-%d (%s wider), widest %s at degree %d"
+          % (gap_best_cell, best_degree, gap_late_mean_cell, late_degrees[0],
+             late_degrees[-1], gap_ratio_cell, gap_widest_cell, widest_degree))
+
+    # and the bumps, measured rather than glossed over: every degree whose gap came out
+    # NARROWER than the degree before it. Small val pile -> a jumpy val curve, which is
+    # the same "unlucky slice" effect the lesson warns about, seen from the other side.
+    dip_degrees = [degrees[i] for i in range(1, len(gaps)) if gaps[i] < gaps[i - 1]]
+    dip_cell = ", ".join(str(d) for d in dip_degrees)
+    print("the rise is bumpy, not smooth: on a validation pile of only %d points the gap"
+          " dips at degrees %s — read the trend across the degrees, never one row"
+          % (n_val, dip_cell))
+
+    # the acceptance step's last ask: how far past the best point would you have gone if
+    # you had only ever looked at the training curve? It never turns around, so: all of it.
+    overshoot = last_degree - best_degree
+    print("had you watched only the training curve, you would have kept turning the knob"
+          " %d more degrees past the best (degree %d -> %d)"
+          % (overshoot, best_degree, last_degree))
 
     # ---- 5. self-check: assert the expected story holds ----------------------
     expected_best_degree = 5  # with seed=42, validation bottoms out here
@@ -128,27 +180,57 @@ if __name__ == "__main__":
     #     So pin the actual printed numbers from BOTH piles. This is what catches the
     #     classic reduction bug — summing instead of averaging, or dividing both piles by
     #     the train count — which leaves the argmin at degree 5 but breaks the comparison.
-    train_scale_pinned = abs(train_losses[0] - 0.2886) < 1e-4   # printed above as 0.2886
-    train_end_pinned = abs(train_losses[-1] - 0.0364) < 1e-4    # printed above as 0.0364
-    val_scale_pinned = abs(val_losses[4] - 0.0935) < 1e-4       # printed above as 0.0935
+    train_scale_pinned = (abs(train_losses[0] - 0.2886) < 1e-4  # printed above as 0.2886
+                          and train_start_cell == "0.2886")     # …and as that exact text
+    train_end_pinned = (abs(train_losses[-1] - 0.0364) < 1e-4   # printed above as 0.0364
+                        and train_end_cell == "0.0364")
+    val_scale_pinned = (abs(val_losses[best_idx] - 0.0935) < 1e-4  # printed as 0.0935
+                        and best_val_cell == "0.0935")
+    # the two ends of the sweep as the story labelled them, so a printed degree label
+    # cannot drift away from the list that was actually swept
+    sweep_ends_pinned = (first_degree, last_degree) == (1, 15)
+
+    # (b2) the 'most-flexible' figure the summary quotes. Before this clause existed the
+    #      number on that line was asserted NOWHERE — every late-stage claim pinned the
+    #      widest degree instead — so the one value the summary ends on could drift freely.
+    #      It is also the honest form of "validation RISES past the minimum": even at the
+    #      luckiest flexible degree, validation still sits ABOVE the degree-5 minimum.
+    most_flexible_pinned = (abs(most_flexible_val - 0.1077) < 1e-4  # printed as 0.1077
+                           and most_flexible_cell == "0.1077"
+                           and most_flexible_val > best_val)
 
     # (c) overfitting in ABSOLUTE terms, not "worse than the minimum" (which is true of any
     #     list whose minimum is not last). Both ends are pinned two-sided to the numbers
     #     printed above: a one-sided "> 0.30" threshold sat far from both 0.3742 and
     #     0.0935, so it could be moved to 0.20 (or 0.15) with no visible effect at all.
-    late_val_pinned = abs(val_losses[13] - 0.3742) < 1e-4    # printed above as 0.3742
+    late_val_pinned = abs(val_losses[widest_idx] - 0.3742) < 1e-4   # printed as 0.3742
     overfits_absolutely = (late_val_pinned
-                           and val_losses[13] > 3.0 * val_losses[4])
+                           and val_losses[widest_idx] > 3.0 * val_losses[best_idx])
 
     # (d) the day's actual claim: the GAP (val - train) WIDENS. Tiny and positive at the
     #     best degree, large late. A loss whose two piles are on different scales makes
     #     this gap shrink or go negative, so this clause fails independently of (b).
     #     These are the SAME numbers the gap column printed, not a second subtraction.
-    gap_at_best = gaps[4]
-    gap_late = gaps[13]
     gap_widens = (0.0 < gap_at_best < 0.05 < 0.25 < gap_late
                   and abs(gap_at_best - 0.0154) < 1e-4     # printed above as 0.0154
-                  and abs(gap_late - 0.3277) < 1e-4)       # printed above as 0.3277
+                  and abs(gap_late - 0.3277) < 1e-4        # printed above as 0.3277
+                  and widest_degree == 14)                 # and that IS the widest gap
+
+    # (d2) the same claim stated across the flexible END rather than at one degree — the
+    #      form the printed summary now uses, because degree 15 alone dips. The trend has
+    #      to survive that dip: the mean gap over degrees 11-15 must still be many times
+    #      the gap at the best degree, and the bumps are pinned as the bumps that exist
+    #      (so quietly smoothing the curve, or losing a dip, fails here).
+    gap_trend_widens = (abs(late_gap_mean - 0.2020) < 1e-4     # printed as 0.2020
+                        and gap_late_mean_cell == "0.2020"
+                        and gap_best_cell == "0.0154"
+                        and gap_widest_cell == "0.3277"
+                        and late_gap_mean > 5.0 * gap_at_best  # widened, not nudged
+                        and gap_ratio_cell == "13.1x"
+                        and late_degrees == [11, 12, 13, 14, 15]
+                        and dip_degrees == [2, 5, 8, 12, 15]   # printed as that list
+                        and dip_cell == "2, 5, 8, 12, 15"
+                        and overshoot == 10)                   # 5 -> 15 on the knob
 
     # (e) the split FRACTION must really be the promised 80/20. At n = 40 the `int()`
     #     absorbs it — train_frac 0.80 and 0.82 both cut at 32 — so the printed
@@ -162,32 +244,58 @@ if __name__ == "__main__":
             np.random.default_rng(0), probe_x, probe_x.copy(), train_frac=TRAIN_FRAC)
         probe_counts.append((len(p_xt), len(p_xv)))
     split_frac_pinned = (probe_counts == [(8, 2), (80, 20), (800, 200)]
-                         # and this run's own printed counts
-                         and (len(x_train), len(x_val)) == (32, 8))
+                         # and this run's own printed counts — the same three values the
+                         # first line printed, not a second pass over the arrays
+                         and (n_all, n_train, n_val) == (40, 32, 8))
 
-    # (f) the two rows the story quotes, pinned as the exact TEXT that was printed.
-    #     This is what makes the gap COLUMN honest and not just the gap variable.
-    rows_pinned = (rows[4] == "   5   :     0.0781    0.0935  0.0154"
-                   and rows[13] == "  14   :     0.0466    0.3742  0.3277")
+    # (f) the WHOLE table, pinned as the exact TEXT that reached the screen. This is what
+    #     makes the gap COLUMN honest and not just the gap variable — and pinning every
+    #     row, not only the two the story quotes, means no row can be quietly rewritten.
+    rows_pinned = rows == [
+        "   1   :     0.2886    0.2416  -0.0470",
+        "   2   :     0.2885    0.2392  -0.0493",
+        "   3   :     0.0782    0.0941  0.0159",
+        "   4   :     0.0782    0.0948  0.0166",
+        "   5   :     0.0781    0.0935  0.0154",
+        "   6   :     0.0717    0.0950  0.0233",
+        "   7   :     0.0602    0.1782  0.1180",
+        "   8   :     0.0595    0.1765  0.1170",
+        "   9   :     0.0567    0.1744  0.1177",
+        "  10   :     0.0553    0.2232  0.1680",
+        "  11   :     0.0518    0.2690  0.2172",
+        "  12   :     0.0491    0.1858  0.1367",
+        "  13   :     0.0470    0.3041  0.2571",
+        "  14   :     0.0466    0.3742  0.3277",
+        "  15   :     0.0364    0.1077  0.0713",
+    ]
 
     ok = (best_degree == expected_best_degree
           and train_monotone
           and train_scale_pinned and train_end_pinned and val_scale_pinned
-          and overfits_absolutely and gap_widens and split_frac_pinned
+          and sweep_ends_pinned and most_flexible_pinned
+          and overfits_absolutely and gap_widens and gap_trend_widens
+          and split_frac_pinned
           and rows_pinned)
 
     if ok:
+        # the victory line quotes the two numbers it was just handed — no retyped figure
         print("\n✅ you got it — train loss falls forever, but validation bottoms out at "
-              "degree %d then rises: the widening gap IS overfitting." % best_degree)
+              "degree %d then rises: the gap widens from %s there to %s across degrees "
+              "%d-%d. That widening IS overfitting."
+              % (best_degree, gap_best_cell, gap_late_mean_cell,
+                 late_degrees[0], late_degrees[-1]))
     else:
         print("\n❌ not yet — expected lowest validation loss at degree %d, train loss "
               "monotone-down, train_loss[deg 1] = 0.2886 / val_loss[deg 5] = 0.0935 "
               "(same scale on both piles), an 80/20 split (%s from the probe sizes "
-              "10/100/1000, and %d/%d here), val_loss[deg 14] = 0.3742, and the gap "
-              "widening from %.4f at the best degree to 0.3277 by degree 14 (got %.4f)"
-              % (expected_best_degree, probe_counts, len(x_train), len(x_val),
-                 gap_at_best, gap_late))
+              "10/100/1000, and %d/%d here), val_loss[deg 14] = 0.3742, the most-flexible "
+              "val_loss = 0.1077 (still above the minimum), and the gap widening from "
+              "%.4f at the best degree to a mean of 0.2020 over degrees 11-15 "
+              "(got %.4f, widest %.4f at degree %d)"
+              % (expected_best_degree, probe_counts, n_train, n_val,
+                 gap_at_best, late_gap_mean, gap_late, widest_degree))
 
     # a hard stop so the gate and the human both know if the demonstration held
     assert ok, ("expected lowest validation loss at degree %d with both piles on the same "
-                "scale and a widening train-val gap" % expected_best_degree)
+                "scale and a train-val gap that widens across the flexible end"
+                % expected_best_degree)

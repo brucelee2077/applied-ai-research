@@ -71,21 +71,28 @@ if __name__ == "__main__":
     # Day 2's free choice, still in force: a Value is never compared to anything, so its
     # width d_v does not have to equal d_k. Here it does not — 2 against 4.
     d_v = V.shape[-1]
-    print("Q", Q.shape, " K", K.shape, " V", V.shape, " d_k =", d_k, " sqrt(d_k) =", np.sqrt(d_k))
+    # Bind every printed number to a name and check THAT name in the self-check, so the
+    # line the reader sees and the line the check reads are one value, not two guesses.
+    q_shape, k_shape, v_shape = Q.shape, K.shape, V.shape
+    sqrt_d_k = np.sqrt(d_k)
+    print("Q", q_shape, " K", k_shape, " V", v_shape, " d_k =", d_k, " sqrt(d_k) =", sqrt_d_k)
     print("d_v =", d_v, "and d_k =", d_k, "-> a Value's width is still a free choice")
 
     # --- Part 2: score every pair (the score matrix) -------------------------
     raw_scores = Q @ K.T                    # every Query row meets every Key column
     by_hand = hand_score_matrix(Q, K)       # the same nine numbers, one paper dot product at a time
+    hand_agrees = np.array_equal(raw_scores, by_hand)
+    bank_leans_on = words[int(np.argmax(raw_scores[2]))]
     print("\n--- Part 2: the score matrix (row = who asks, column = who is offered) ---")
     print(raw_scores)
-    print("the @ shortcut and the by-hand loop agree:", np.array_equal(raw_scores, by_hand))
-    print("bank's row", raw_scores[2], "-> bank leans on", words[int(np.argmax(raw_scores[2]))])
+    print("the @ shortcut and the by-hand loop agree:", hand_agrees)
+    print("bank's row", raw_scores[2], "-> bank leans on", bank_leans_on)
     # Which way round matters. Spell it KEY-first — K @ Q.T — and you get the TRANSPOSE:
     # a grid that looks just as reasonable and answers a different question.
     key_first = K @ Q.T
+    key_first_leans_on = words[int(np.argmax(key_first[2]))]
     print("key-first K @ Q.T gives bank's row", key_first[2], "-> bank would lean on",
-          words[int(np.argmax(key_first[2]))], "instead. Query first, always.")
+          key_first_leans_on, "instead. Query first, always.")
 
     # --- Part 3: turn the volume down by dividing by sqrt(d_k) ---------------
     scaled_scores = scale_by_sqrt(raw_scores, d_k)
@@ -98,10 +105,15 @@ if __name__ == "__main__":
     probe_widths = (4, 9, 64)
     sqrt_divisors = [float(np.sqrt(w)) for w in probe_widths]
     half_divisors = [w / 2 for w in probe_widths]
-    print("widths          :", list(probe_widths))
+    width_list = list(probe_widths)
+    # The row's label is rendered from the row itself, so the caption cannot advertise a
+    # row the scaling never saw.
+    probe_label = "[" + ",".join(str(int(cell)) for cell in probe_row) + "]"
+    probe_rows = [np.round(scale_by_sqrt(probe_row, w), 4) for w in probe_widths]
+    print("widths          :", width_list)
     print("sqrt(width)     :", sqrt_divisors, " width/2 (the wrong law):", half_divisors)
-    for width in probe_widths:
-        print("   [2,6,4] / sqrt({:<2}) -> {}".format(width, np.round(scale_by_sqrt(probe_row, width), 4)))
+    for width, got in zip(probe_widths, probe_rows):
+        print("   {} / sqrt({:<2}) -> {}".format(probe_label, width, got))
     # Who beats whom, weakest first — twice, from two different rows of numbers.
     raw_row = raw_scores[2]                  # bank's row BEFORE the division: [2, 6, 4]
     scaled_row = scaled_scores[2]            # bank's row AFTER  the division: [1, 3, 2]
@@ -109,28 +121,35 @@ if __name__ == "__main__":
     rank_after = ranking_with_values(words, scaled_row)
     names_before = [pair[0] for pair in rank_before]
     names_after = [pair[0] for pair in rank_after]
+    same_order = names_before == names_after
+    same_numbers = rank_before == rank_after
     print("ranking before:", rank_before)
     print("ranking after :", rank_after)
-    print("same order:", names_before == names_after,
-          " same numbers:", rank_before == rank_after,
+    print("same order:", same_order,
+          " same numbers:", same_numbers,
           "(division moved every number and left the order alone)")
 
     # --- Part 4: softmax splits one budget into shares -----------------------
     weights = softmax(scaled_scores)             # the whole grid at once, row by row
     row_by_row = np.array([softmax(row) for row in scaled_scores])   # one row at a time
+    weights_shown = np.round(weights, 4)
+    row_sums = weights.sum(axis=-1)
+    grid_equals_rowwise = np.array_equal(weights, row_by_row)
     print("\n--- Part 4: softmax over each row (the attention weights) ---")
-    print(np.round(weights, 4))
-    print("row sums:", weights.sum(axis=-1), "(one whole budget per asking word)")
-    print("whole grid at once == one row at a time:", np.array_equal(weights, row_by_row))
+    print(weights_shown)
+    print("row sums:", row_sums, "(one whole budget per asking word)")
+    print("whole grid at once == one row at a time:", grid_equals_rowwise)
     # A softmax with NO axis divides by the total of all nine cells instead, so no row
     # gets a whole budget. Same exp, one wrong denominator — measure what it costs.
     no_axis = np.exp(scaled_scores - np.max(scaled_scores))
     no_axis = no_axis / no_axis.sum()
-    print("with no axis at all, the row sums would be:", np.round(no_axis.sum(axis=-1), 4),
-          "and bank's row", np.round(no_axis[2], 4), "-> not one budget per word")
+    no_axis_row_sums = np.round(no_axis.sum(axis=-1), 4)
+    no_axis_bank_row = np.round(no_axis[2], 4)
+    print("with no axis at all, the row sums would be:", no_axis_row_sums,
+          "and bank's row", no_axis_bank_row, "-> not one budget per word")
     # PREDICT from the RAW scores, before reading any share: the biggest score must win
     # the biggest share, because softmax re-scales a row and never re-orders it.
-    predicted_winner = words[int(np.argmax(raw_scores[2]))]
+    predicted_winner = bank_leans_on          # the raw-row argmax, named once in Part 2
     actual_winner = words[int(np.argmax(weights[2]))]
     print("predicted biggest share:", predicted_winner, " actual:", actual_winner)
 
@@ -147,13 +166,21 @@ if __name__ == "__main__":
     # Why "huge" and not merely "low": run the same mask again at only -12 and measure the leak.
     mild_shares = softmax(np.where(forbidden, -12.0, mask_scores))
     mild_leak = float(np.abs(mild_shares[forbidden]).max())
+    # The leak is SHOWN in scientific notation, so bind that rendered text and check it —
+    # "bigger than zero" would let any leak size print under a passing tick.
+    mild_leak_text = "{:.2e}".format(mild_leak)
+    open_shown = np.round(open_shares, 4)
+    open_sum = round(float(open_shares.sum()), 6)
+    masked_shown = np.round(masked_shares, 4)
+    masked_sum = round(float(masked_shares.sum()), 6)
+    change_shown = np.round(masked_shares - open_shares, 4)
     print("\n--- Part 5: masking (a forbidden word gets a huge negative score) ---")
     print("labels  :", mask_labels)
-    print("no mask :", np.round(open_shares, 4), " sum", round(float(open_shares.sum()), 6))
-    print("masked  :", np.round(masked_shares, 4), " sum", round(float(masked_shares.sum()), 6))
-    print("change  :", np.round(masked_shares - open_shares, 4), "(freed budget moves to allowed words)")
+    print("no mask :", open_shown, " sum", open_sum)
+    print("masked  :", masked_shown, " sum", masked_sum)
+    print("change  :", change_shown, "(freed budget moves to allowed words)")
     print("biggest share left on a forbidden word, mask -1e9 :", biggest_masked_share)
-    print("biggest share left on a forbidden word, mask -12   : {:.2e}".format(mild_leak),
+    print("biggest share left on a forbidden word, mask -12   :", mild_leak_text,
           "(a mask that is only a bit negative still leaks budget)")
 
     # --- Part 6: spend the budget on the Values -----------------------------
@@ -164,30 +191,43 @@ if __name__ == "__main__":
     predicted_nearest = words[int(np.argmax(bank_shares))]
     distances = np.linalg.norm(V - blended, axis=-1)
     actual_nearest = words[int(np.argmin(distances))]
+    bank_shares_shown = np.round(bank_shares, 4)
+    blended_shown = np.round(blended, 4)
+    distances_shown = np.round(distances, 3)
     print("\n--- Part 6: blend the Values by bank's shares ---")
-    print("shares", np.round(bank_shares, 4), "@ V ->", np.round(blended, 4))
+    print("shares", bank_shares_shown, "@ V ->", blended_shown)
     print("predicted nearest Value:", predicted_nearest, " actual:", actual_nearest,
-          " distances:", np.round(distances, 3))
+          " distances:", distances_shown)
     print("all three rows of softmax(Q @ K.T / sqrt(d_k)) @ V:")
     all_outputs = weights @ V                # one blended list per asking word, not just bank's
-    for name, row in zip(words, np.round(all_outputs, 4)):
+    all_outputs_shown = np.round(all_outputs, 4)
+    for name, row in zip(words, all_outputs_shown):
         print("   {:<6} -> {}".format(name, row))
 
     # --- Self-check: one boolean per claim ----------------------------------
     # Every expected value is written down here, so nothing is checked against a re-derived number.
     lesson_grid = np.array([[2.0, 2.0, 2.0], [2.0, 4.0, 2.0], [2.0, 6.0, 4.0]])
-    grid_ok = np.array_equal(raw_scores, lesson_grid) and np.array_equal(by_hand, lesson_grid)
+    grid_ok = (np.array_equal(raw_scores, lesson_grid) and np.array_equal(by_hand, lesson_grid)
+               and hand_agrees is True and bank_leans_on == "river"
+               and q_shape == (3, 4) and k_shape == (3, 4) and v_shape == (3, 2))
     # Query-first is the whole grid's meaning, so pin the wrong spelling too: key-first is
     # the transpose, and on bank's row it hands the win to bank itself instead of river.
     orientation_ok = (np.array_equal(key_first, lesson_grid.T)
                       and np.array_equal(key_first[2], np.array([2.0, 2.0, 4.0]))
-                      and words[int(np.argmax(key_first[2]))] == "bank"
+                      and key_first_leans_on == "bank"
                       and not np.array_equal(raw_scores, key_first))
     value_width_ok = d_v == 2 and d_k == 4 and d_v != d_k
-    scale_ok = np.sqrt(d_k) == 2.0 and np.array_equal(scaled_scores[2], np.array([1.0, 3.0, 2.0]))
+    scale_ok = (sqrt_d_k == 2.0 and np.array_equal(scaled_scores[2], np.array([1.0, 3.0, 2.0]))
+                and np.array_equal(scaled_scores,
+                                   np.array([[1.0, 1.0, 1.0], [1.0, 2.0, 1.0], [1.0, 3.0, 2.0]])))
     # sqrt(width) and width/2 agree ONLY at width 4, so pin the divisor at three widths.
     law_ok = (sqrt_divisors == [2.0, 3.0, 8.0]
               and half_divisors == [2.0, 4.5, 32.0]
+              and width_list == [4, 9, 64] and probe_label == "[2,6,4]"
+              # the same three rows the loop above printed, pinned as printed
+              and np.array_equal(probe_rows[0], np.array([1.0, 3.0, 2.0]))
+              and np.array_equal(probe_rows[1], np.array([0.6667, 2.0, 1.3333]))
+              and np.array_equal(probe_rows[2], np.array([0.25, 0.75, 0.5]))
               and np.allclose(scale_by_sqrt(probe_row, 4), [1.0, 3.0, 2.0])
               and np.allclose(scale_by_sqrt(probe_row, 9), [0.66666667, 2.0, 1.33333333])
               and np.allclose(scale_by_sqrt(probe_row, 64), [0.25, 0.75, 0.5]))
@@ -196,37 +236,56 @@ if __name__ == "__main__":
     # row ([2,4,6] only exists before the division, [1,2,3] only after).
     order_ok = (names_before == ["the", "bank", "river"]
                 and names_after == names_before
+                and same_order is True and same_numbers is False
                 and rank_before == [("the", 2.0), ("bank", 4.0), ("river", 6.0)]
                 and rank_after == [("the", 1.0), ("bank", 2.0), ("river", 3.0)])
-    shares_ok = np.allclose(weights[2], [0.09003057, 0.66524096, 0.24472847])
+    shares_ok = (np.allclose(weights[2], [0.09003057, 0.66524096, 0.24472847])
+                 and np.array_equal(weights_shown[2], np.array([0.09, 0.6652, 0.2447])))
     # Every asking word gets its OWN budget, so pin all three rows, not just bank's: a row
     # that quietly copies bank's shares still sums to 1 and would slip past budget_ok.
     rows_ok = (np.allclose(weights[0], [0.33333333, 0.33333333, 0.33333333])
                and np.allclose(weights[1], [0.21194156, 0.57611688, 0.21194156])
+               and np.array_equal(weights_shown[0], np.array([0.3333, 0.3333, 0.3333]))
+               and np.array_equal(weights_shown[1], np.array([0.2119, 0.5761, 0.2119]))
                and np.allclose(all_outputs[0], [4.66666667, 4.0])
                and np.allclose(all_outputs[1], [6.60893508, 3.27164935])
+               and np.array_equal(all_outputs_shown[0], np.array([4.6667, 4.0]))
+               and np.array_equal(all_outputs_shown[1], np.array([6.6089, 3.2716]))
+               and np.array_equal(all_outputs_shown[2], blended_shown)
                and np.allclose(all_outputs[2], blended))
-    budget_ok = np.allclose(weights.sum(axis=-1), 1.0)
+    # The printed row sums read "[1. 1. 1.]", so pin them at the precision that line shows —
+    # exact float equality would fail on the last bit and teach nothing.
+    budget_ok = (np.allclose(row_sums, 1.0)
+                 and np.array_equal(np.round(row_sums, 6), np.array([1.0, 1.0, 1.0])))
     # The AXIS itself: the whole-grid call must equal the row-by-row one, and the no-axis
     # version must NOT — otherwise "one budget per asking word" is an untested promise.
-    axis_ok = (np.array_equal(weights, row_by_row)
-               and np.allclose(np.round(no_axis.sum(axis=-1), 4), [0.1594, 0.2506, 0.59])
+    axis_ok = (grid_equals_rowwise is True
+               and np.array_equal(no_axis_row_sums, np.array([0.1594, 0.2506, 0.59]))
                and not np.allclose(no_axis.sum(axis=-1), 1.0)
-               and np.allclose(np.round(no_axis[2], 4), [0.0531, 0.3925, 0.1444]))
+               and np.array_equal(no_axis_bank_row, np.array([0.0531, 0.3925, 0.1444])))
     winner_ok = predicted_winner == "river" and actual_winner == "river"
-    open_ok = np.allclose(open_shares, [0.08714432, 0.64391426, 0.23688282, 0.03205860])
+    open_ok = (np.allclose(open_shares, [0.08714432, 0.64391426, 0.23688282, 0.03205860])
+               and np.array_equal(open_shown, np.array([0.0871, 0.6439, 0.2369, 0.0321]))
+               and open_sum == 1.0 and mask_labels == ["the", "river", "FUTURE", "pad"])
     # A forbidden word must keep NOTHING, not merely something that rounds to nothing.
     mask_ok = (np.allclose(masked_shares[:2], [0.11920292, 0.88079708])
                and biggest_masked_share == 0.0
+               and np.array_equal(masked_shown, np.array([0.1192, 0.8808, 0.0, 0.0]))
+               and masked_sum == 1.0
                and np.allclose(masked_shares.sum(), 1.0))
     # And the size of the negative number is the reason it is nothing: -12 leaks 2.69e-07.
-    magnitude_ok = mild_leak > 1e-9 and biggest_masked_share == 0.0
-    freed_ok = masked_shares[0] > open_shares[0] and masked_shares[1] > open_shares[1]
-    blend_ok = np.allclose(blended, [7.63132344, 2.84957923])
+    magnitude_ok = mild_leak > 1e-9 and mild_leak_text == "2.69e-07" and biggest_masked_share == 0.0
+    freed_ok = (masked_shares[0] > open_shares[0] and masked_shares[1] > open_shares[1]
+                and np.array_equal(change_shown,
+                                   np.array([0.0321, 0.2369, -0.2369, -0.0321])))
+    blend_ok = (np.allclose(blended, [7.63132344, 2.84957923])
+                and np.array_equal(blended_shown, np.array([7.6313, 2.8496]))
+                and np.array_equal(bank_shares_shown, np.array([0.09, 0.6652, 0.2447])))
     nearest_ok = predicted_nearest == "river" and actual_nearest == "river"
     # "Nearest" is only evidence if the whole distance table is right: one distance PER word,
     # each pinned. A distance list that collapsed to the wrong length still has an argmin.
     distance_ok = (distances.shape == (3,)
+                   and np.array_equal(distances_shown, np.array([8.256, 2.516, 3.809]))
                    and np.allclose(distances, [8.25604315, 2.51642872, 3.80919649]))
 
     if (grid_ok and orientation_ok and value_width_ok and scale_ok and law_ok and order_ok

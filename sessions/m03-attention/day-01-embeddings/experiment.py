@@ -51,8 +51,13 @@ def onehot(word):
 if __name__ == "__main__":
     # --- Part 1: a word becomes a ticket number, then a row ---------------
     token_ids = row_ids("the cat")   # split the sentence, then look up each ticket
-    print("table shape:", E.shape, " 'the cat' ->", token_ids, "(the->3, cat->0)")
-    print("row for 'cat' (id 0):", embed("cat"), "<- that is the whole lookup")
+    # Bind every number BEFORE printing it, then check that same name below: the line the
+    # reader sees and the line the self-check reads are then one value, not two guesses.
+    table_shape = E.shape
+    cat_row = embed("cat")
+    print("table shape:", table_shape, " 'the cat' ->", token_ids,
+          f"(the->{vocab['the']}, cat->{vocab['cat']})")
+    print("row for 'cat' (id 0):", cat_row, "<- that is the whole lookup")
     # A glue word like "the" sits near the middle of the map, so its arrow is short.
     the_length = round(float(np.linalg.norm(embed("the"))), 2)
     print("arrow length of 'the':", the_length, "(short arrows swing direction easily)")
@@ -68,7 +73,8 @@ if __name__ == "__main__":
     # slot is not a shared one, so "above zero" has to stay strict. The loose count is
     # the contrast control: >= 0 would call that empty column shared and report 4.
     loose_dog = int(np.sum((embed("cat") >= 0) & (embed("dog") >= 0)))
-    print("column 2 is", embed("cat")[2], "in cat and", embed("dog")[2], "in dog ->",
+    cat_col2, dog_col2 = cat_row[2], embed("dog")[2]
+    print("column 2 is", cat_col2, "in cat and", dog_col2, "in dog ->",
           "strict >0 counts", shared_dog, " loose >=0 counts", loose_dog)
     dot_cat_dog = round(float(np.dot(embed("cat"), embed("dog"))), 2)
     len_cat = round(float(np.linalg.norm(embed("cat"))), 2)
@@ -78,7 +84,8 @@ if __name__ == "__main__":
     print("cosine(cat, dog) =", dot_cat_dog, "/ (", len_cat, "x", len_dog, ") =", cat_dog,
           "  cosine(cat, car) =", cat_car)
     measured = "cat-dog" if cat_dog > cat_car else "cat-car"
-    print("measured winner:", measured, " prediction held?", measured == predicted)
+    prediction_held = measured == predicted    # printed AND asserted from this one name
+    print("measured winner:", measured, " prediction held?", prediction_held)
     # Same word, arrow twice as long: the raw total doubles, the cosine does not.
     doubled = 2.0 * embed("cat")
     dot_plain = round(float(np.dot(embed("cat"), embed("cat"))), 2)
@@ -104,7 +111,11 @@ if __name__ == "__main__":
     # --- Part 4: the one-hot contrast ------------------------------------
     onehot_cos = {a + "-" + b: round(cosine(onehot(a), onehot(b)), 2)
                   for a, b in [("cat", "dog"), ("cat", "car"), ("dog", "car")]}
-    print("\none-hot 'cat':", onehot("cat"), " width:", len(onehot("cat")), "slots")
+    onehot_scores = sorted(set(onehot_cos.values()))   # ONE entry = every pair really tied
+    onehot_shared = onehot_scores[0]
+    cat_onehot = onehot("cat")
+    onehot_width = len(cat_onehot)
+    print("\none-hot 'cat':", cat_onehot, " width:", onehot_width, "slots")
     print("one-hot cosines:", onehot_cos, "<- every pair scores the same, all blind")
 
     # --- Part 5: limit two — nothing inside a row marks its seat ----------
@@ -115,38 +126,51 @@ if __name__ == "__main__":
     # Compute each printed answer ONCE, so the print and the self-check cannot drift apart.
     same_set = set(ids_a) == set(ids_b)
     same_ordered = np.array_equal(stack_a, stack_b)
-    print("\n'dog bites man' ->", ids_a, " 'man bites dog' ->", ids_b, " stacks:", stack_a.shape)
+    stack_shape = stack_a.shape
+    print("\n'dog bites man' ->", ids_a, " 'man bites dog' ->", ids_b, " stacks:", stack_shape)
     print("same SET of rows?", same_set, " same ORDERED rows?", same_ordered,
           " added up:", bag_a, "vs", bag_b)
 
     # --- Self-check: one boolean per claim, pinned to numbers read off a real run --
-    lookup_ok = (token_ids == [3, 0] and E.shape == (7, 4) and the_length == 0.17
-                 and np.array_equal(embed("cat"), np.array([0.9, 0.8, 0.0, 0.3])))
+    # The victory message re-shows the bag total, so render it ONCE here and check the
+    # rendered text too — otherwise the summary line is a second, unchecked copy. numpy
+    # right-pads "0." inside an array, so re-join the cells with a single space.
+    bag_text = "[" + " ".join(np.array2string(bag_a).strip("[]").split()) + "]"
+    lookup_ok = (token_ids == [3, 0] and table_shape == (7, 4) and the_length == 0.17
+                 and np.array_equal(cat_row, np.array([0.9, 0.8, 0.0, 0.3])))
     scores_ok = (dot_cat_dog == 1.56 and len_cat == 1.24 and len_dog == 1.27
                  and cat_dog == 0.99 and cat_car == 0.08)
-    predict_ok = predicted == measured     # a computed guess against a measurement
+    predict_ok = prediction_held is True   # a computed guess against a measurement
     # Pin the counts themselves, not just their order: 3 vs 1 is WHY cat-dog was picked,
     # and the loose count pins the boundary column to the not-shared side.
-    columns_ok = shared_dog == 3 and shared_car == 1 and loose_dog == 4
+    columns_ok = (shared_dog == 3 and shared_car == 1 and loose_dog == 4
+                  and cat_col2 == 0.0 and dog_col2 == 0.0)
     size_ok = (dot_plain == 1.54 and dot_doubled == 3.08 and cos_doubled == 1.0)
     # The frozen ROW, not the self-similarity score, carries the claim here.
     bank_ok = (np.array_equal(bank_from_river, np.array([0.4, 0.4, 0.4, 0.4]))
                and np.array_equal(bank_from_money, bank_from_river) and bank_score == 1.0
                and river_ids == [3, 4] and money_ids == [6, 4])
-    onehot_ok = (np.array_equal(onehot("cat"), np.array([1.0, 0, 0, 0, 0, 0, 0]))
-                 and len(onehot("cat")) == 7 and set(onehot_cos.values()) == {0.0})
+    onehot_ok = (np.array_equal(cat_onehot, np.array([1.0, 0, 0, 0, 0, 0, 0]))
+                 and onehot_width == 7 and onehot_scores == [0.0]
+                 and onehot_shared == 0.0)
     # A set cannot notice a reordering, so pin the exact id lists and the total. The two
-    # booleans asserted here are the SAME values that were printed above.
-    order_ok = (ids_a == [1, 5, 6] and ids_b == [6, 5, 1] and same_set
-                and not same_ordered and np.array_equal(bag_b, bag_a)
+    # booleans asserted here are the SAME values that were printed above, and `is True` /
+    # `is False` pin the printed WORD, not merely something truthy.
+    order_ok = (ids_a == [1, 5, 6] and ids_b == [6, 5, 1] and same_set is True
+                and same_ordered is False and np.array_equal(bag_b, bag_a)
+                and stack_shape == (3, 4) and bag_text == "[1.3 1.1 0. 1.2]"
                 and np.array_equal(bag_a, np.array([1.3, 1.1, 0.0, 1.2])))
     claims = {"lookup": lookup_ok, "scores": scores_ok, "prediction": predict_ok,
               "columns": columns_ok, "size": size_ok, "frozen": bank_ok,
               "one-hot": onehot_ok, "order": order_ok}
     if all(claims.values()):
-        print("\n✅ you got it — cat~dog 0.99 beats cat~car 0.08 (1.56 / (1.24 x 1.27)),")
-        print("   one-hot gives every pair 0.0, both 'bank' lookups return [0.4 0.4 0.4 0.4],")
-        print("   and both word orders add up to the same [1.3 1.1 0. 1.2].")
+        # Every number in the victory message is read back from a checked name, so the
+        # summary cannot state a total the run did not produce.
+        print(f"\n✅ you got it — cat~dog {cat_dog} beats cat~car {cat_car} "
+              f"({dot_cat_dog} / ({len_cat} x {len_dog})),")
+        print(f"   one-hot gives every pair {onehot_shared}, both 'bank' lookups "
+              f"return {bank_from_river},")
+        print(f"   and both word orders add up to the same {bag_text}.")
     else:
         print("\n❌ not yet — expected ids [3, 0] / length('the') 0.17 / dot 1.56 / cosines")
         print("   0.99 and 0.08 / 1.54 -> 3.08, cosine 1.0 / bank [0.4 0.4 0.4 0.4] from ids")

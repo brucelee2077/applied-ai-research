@@ -60,7 +60,11 @@ if __name__ == "__main__":
                   [0.0, 0.2, 0.0, 0.0],    # 3 "the"     — filler again
                   [1.0, 1.0, 0.0, 0.0],    # 4 "river"   — watery AND a place
                   [0.0, 1.0, 1.0, 0.0]])   # 5 "bank"    — a place, unsure about money
-    print("Part 1 — embeddings x, shape", x.shape, " d_model =", x.shape[-1])
+    # Bind every printed number to a name and check THAT name below, so the line the
+    # reader sees and the line the self-check reads can never be two different sums.
+    x_shape = x.shape
+    d_model = x_shape[-1]
+    print("Part 1 — embeddings x, shape", x_shape, " d_model =", d_model)
 
     # --- Part 2: one card, three DIFFERENT recipes -> Q, K, V ---------------
     # A recipe is a grid you multiply the card by: row = input slot, column =
@@ -84,12 +88,14 @@ if __name__ == "__main__":
                     [0.2, 0.0]])           #     action slot -> a little watery content
     Q, K, V = x @ W_Q, x @ W_K, x @ W_V
     d_k, d_v = Q.shape[-1], V.shape[-1]
-    print("Part 2 — Q", Q.shape, " K", K.shape, " V", V.shape,
+    q_shape, k_shape, v_shape = Q.shape, K.shape, V.shape
+    print("Part 2 — Q", q_shape, " K", k_shape, " V", v_shape,
           " (d_k =", d_k, ", d_v =", d_v, ")")
     for i, word in enumerate(WORDS):
         print("         %-8s Q=%s K=%s V=%s" % (word, Q[i], K[i], V[i]))
     # Two different grids, so a word's question and its label are different lists.
-    print("         is Q the same numbers as K?", np.array_equal(Q, K), "-> must be False")
+    q_equals_k = np.array_equal(Q, K)
+    print("         is Q the same numbers as K?", q_equals_k, "-> must be False")
     # W_K above is a pure diagonal, so x @ W_K and x @ W_K.T print the same numbers —
     # today's Key grid cannot show that "row = input slot, column = output slot" is
     # the rule. Pin the rule on a lopsided stand-in (day-05's W_K looks like this):
@@ -97,8 +103,9 @@ if __name__ == "__main__":
     W_K_lopsided = W_K.copy()
     W_K_lopsided[2, 0] = 1.0               # money row -> water column
     bank_key_lopsided = x[bank] @ W_K_lopsided
+    bank_key_column_first = x[bank] @ W_K_lopsided.T   # the wrong reading, bound once
     print("         lopsided W_K: bank's Key =", bank_key_lopsided,
-          " but read column-first it would be", x[bank] @ W_K_lopsided.T)
+          " but read column-first it would be", bank_key_column_first)
 
     # --- Part 3: "bank" scores its Query against every Key ------------------
     # A dot product multiplies two lists slot by slot and adds the products up.
@@ -118,23 +125,30 @@ if __name__ == "__main__":
           % (raw_scores[river], river_to_bank))
     # The whole grid, so the convention has a LAYOUT to point at, not just a habit.
     raw_grid = Q @ K.T
-    print("         full grid Q @ K.T:", raw_grid.shape,
+    raw_grid_shape = raw_grid.shape
+    bank_to_river_cell = raw_grid[bank, river]     # the two promised cells, read from the grid
+    river_to_bank_cell = raw_grid[river, bank]
+    bank_row_matches = np.array_equal(raw_grid[bank], raw_scores)
+    print("         full grid Q @ K.T:", raw_grid_shape,
           "row = the asker, column = the word offered")
-    print("         so bank->river 5.4 sits at [%d, %d] and river->bank 1.2 at [%d, %d];"
-          % (bank, river, river, bank), "row", bank, "IS bank's row:",
-          np.array_equal(raw_grid[bank], raw_scores))
+    print("         so bank->river %.1f sits at [%d, %d] and river->bank %.1f at [%d, %d];"
+          % (bank_to_river_cell, bank, river, river_to_bank_cell, river, bank),
+          "row", bank, "IS bank's row:", bank_row_matches)
     # Spelling it KEY-first instead gives K @ Q.T — the TRANSPOSE, a different table.
     # It looks just as plausible and it moves bank's biggest match off "river".
     key_first_grid = K @ Q.T
+    key_first_best = int(np.argmax(key_first_grid[bank]))
+    key_first_best_word = WORDS[key_first_best]
     print("         key-first K @ Q.T row", bank, "=", key_first_grid[bank],
-          "-> biggest match '%s', not 'river'" % WORDS[int(np.argmax(key_first_grid[bank]))])
+          "-> biggest match '%s', not 'river'" % key_first_best_word)
     # Reconciling the two spellings, because the lesson's own Produce step writes the
     # ONE-ASKER form K @ Q[5]: for a single asker the two agree exactly, since a dot
     # product does not care which list comes first. It is only when a whole GRID is built
     # that the choice matters — and then the module's choice is Q @ K.T, every time.
     one_asker_key_first = K @ Q[bank]
+    one_asker_agrees = np.array_equal(one_asker_key_first, raw_scores)
     print("         the Produce step's K @ Q[%d] gives the same row:" % bank,
-          np.array_equal(one_asker_key_first, raw_scores),
+          one_asker_agrees,
           "-> one asker, no difference; a whole grid, the transpose")
 
     # --- Part 4: scale the raw scores by sqrt(d_k) --------------------------
@@ -146,26 +160,38 @@ if __name__ == "__main__":
     # big scores make softmax hand everything to one word. Dividing by sqrt(d_k)
     # cancels that growth — the "scaled" in the name.
     scaled_scores = scale_by_sqrt_width(raw_scores, d_k)
+    sqrt_d_k = float(np.sqrt(d_k))
     print("\nPart 4 — divide every score by sqrt(d_k) = sqrt(%d) = %.1f"
-          % (d_k, np.sqrt(d_k)))
+          % (d_k, sqrt_d_k))
     print("         scaled scores:", scaled_scores, " (same ranking, calmer numbers)")
     # Careful: at d_k = 4 the right divisor sqrt(4) = 2.0 is the same number as half
     # the width (4/2) and as d_v (2), so this width alone proves nothing about the
     # law. Push river's same 5.4 through the SAME function at two wider Keys, where
     # the three candidate laws split apart.
     WIDTHS = (4, 9, 64)
-    river_scaled = [float(scale_by_sqrt_width(raw_scores[river], w)) for w in WIDTHS]
-    for w, got in zip(WIDTHS, river_scaled):
-        print("         d_k = %2d -> sqrt(d_k) = %.1f, river's 5.4 becomes %.4f"
+    river_raw = raw_scores[river]
+    river_scaled = [float(scale_by_sqrt_width(river_raw, w)) for w in WIDTHS]
+    # The two LOSING laws are printed too, so bind them as well — an unchecked contrast
+    # number is exactly as misleading as an unchecked headline number.
+    sqrt_law_divisors = [float(np.sqrt(w)) for w in WIDTHS]
+    half_width_law = [float(river_raw / (w / 2)) for w in WIDTHS]
+    d_v_law = [float(river_raw / d_v) for _ in WIDTHS]
+    for w, divisor, got, half, dv in zip(WIDTHS, sqrt_law_divisors, river_scaled,
+                                         half_width_law, d_v_law):
+        print("         d_k = %2d -> sqrt(d_k) = %.1f, river's %.1f becomes %.4f"
               "  (half-width law: %.4f, d_v law: %.4f)"
-              % (w, np.sqrt(w), got, raw_scores[river] / (w / 2), raw_scores[river] / d_v))
+              % (w, divisor, river_raw, got, half, dv))
 
     # --- Part 5: softmax the scaled scores into shares ----------------------
     weights = softmax(scaled_scores)
     winner = int(np.argmax(weights))
-    print("\nPart 5 — attention weights (shares):", np.round(weights, 3))
-    print("         they add up to:", round(float(weights.sum()), 6))
-    print("         biggest slice: word %d = '%s'" % (winner, WORDS[winner]))
+    weights_shown = np.round(weights, 3)
+    weights_total = round(float(weights.sum()), 6)
+    winner_word = WORDS[winner]
+    river_share_pct = round(float(weights[river] * 100), 1)   # the victory line's headline
+    print("\nPart 5 — attention weights (shares):", weights_shown)
+    print("         they add up to:", weights_total)
+    print("         biggest slice: word %d = '%s'" % (winner, winner_word))
     # Today only one word asks, so a softmax with no axis at all would look right
     # here — and would be wrong the moment a whole grid arrives on Day 3. Hand it
     # a TWO-row block and check each row separately: with the last axis, both rows
@@ -180,12 +206,16 @@ if __name__ == "__main__":
     # --- Part 6: blend the Values by those shares ---------------------------
     # Weighted sum: pour in each word's Value scaled by its share, then add up.
     output = weights @ V
-    print("\nPart 6 — the new context-aware 'bank':", np.round(output, 3))
-    for i, word in enumerate(WORDS):
-        print("         %.3f x V(%-7s) = %s"
-              % (weights[i], word, np.round(weights[i] * V[i], 3)))
-    dist_to_river = np.linalg.norm(output - V[river])
-    dist_to_old_bank = np.linalg.norm(output - V[bank])
+    output_shown = np.round(output, 3)
+    print("\nPart 6 — the new context-aware 'bank':", output_shown)
+    # The blend table is evidence too: bind each printed row, then check that the six of
+    # them really do add up to the output printed above.
+    contributions = [np.round(weights[i] * V[i], 3) for i in range(len(WORDS))]
+    for word, share, contribution in zip(WORDS, weights_shown, contributions):
+        print("         %.3f x V(%-7s) = %s" % (share, word, contribution))
+    contributions_total = np.round(np.sum(contributions, axis=0), 3)
+    dist_to_river = round(float(np.linalg.norm(output - V[river])), 2)
+    dist_to_old_bank = round(float(np.linalg.norm(output - V[bank])), 2)
     print("         distance to river's Value %.2f   to bank's old Value %.2f"
           % (dist_to_river, dist_to_old_bank))
 
@@ -195,9 +225,10 @@ if __name__ == "__main__":
     money_query = np.array([0.0, 0.5, 1.0, 0.0])
     money_scores = money_query @ K.T       # Query first again: one row of the grid
     money_winner = int(np.argmax(money_scores))
+    money_winner_word = WORDS[money_winner]
     print("\nPart 7 — same Keys, a money-flavoured question:", money_scores)
     print("         winner is now word %d = '%s' — a money-bank, not a river-bank"
-          % (money_winner, WORDS[money_winner]))
+          % (money_winner, money_winner_word))
 
     # --- Self-check: the numbers the lesson says you should see -------------
     # Every expected value below is WRITTEN DOWN here (most are quoted on the lesson
@@ -211,62 +242,80 @@ if __name__ == "__main__":
              [0, 0.4, 0, 0], [4.4, 2.0, 0, 0], [0, 2.0, 4.0, 0]]
     exp_V = [[0.02, 0.02], [0.22, 0.02], [0.24, 0.04],
              [0.02, 0.02], [1.0, 0.1], [0.1, 1.0]]
+    # The blend table as the reader sees it, written down: share x Value, per word.
+    exp_contributions = [[0.001, 0.001], [0.012, 0.001], [0.014, 0.002],
+                         [0.001, 0.001], [0.706, 0.071], [0.008, 0.078]]
     claims = [
-        (Q.shape == (6, 4) and K.shape == (6, 4) and V.shape == (6, 2)
-         and (d_k, d_v) == (4, 2), "expected Q (6,4), K (6,4), V (6,2), d_k 4, d_v 2"),
+        (x_shape == (6, 4) and d_model == 4 and q_shape == (6, 4) and k_shape == (6, 4)
+         and v_shape == (6, 2) and (d_k, d_v) == (4, 2),
+         "expected x (6,4) with d_model 4, Q (6,4), K (6,4), V (6,2), d_k 4, d_v 2"),
         (matches(Q, exp_Q) and matches(K, exp_K) and matches(V, exp_V),
          "one card through three different grids should give the lesson's Q, K and V rows"),
-        (not np.array_equal(Q, K), "Q and K must differ, or the score grid turns symmetric"),
+        (q_equals_k is False, "Q and K must differ, or the score grid turns symmetric"),
         (matches(bank_key_lopsided, [1.0, 2.0, 4.0, 0.0])
-         and not np.array_equal(bank_key_lopsided, x[bank] @ W_K_lopsided.T),
+         and matches(bank_key_column_first, [0.0, 2.0, 4.0, 0.0])
+         and not np.array_equal(bank_key_lopsided, bank_key_column_first),
          "row = input slot: through a lopsided W_K bank's Key is [1. 2. 4. 0.], "
-         "and reading the grid column-first gives a different list"),
+         "and reading the grid column-first gives a different list, [0. 2. 4. 0.]"),
         (matches(raw_scores, [0.2, 0.2, 0.4, 0.2, 5.4, 1.0]),
          "raw scores should be [0.2 0.2 0.4 0.2 5.4 1.0], with river the 5.4"),
         (matches(river_to_bank, 1.2), "river->bank should score 1.2, not bank->river's 5.4"),
         # The ORIENTATION, pinned on the day's own two promised numbers: 5.4 must sit at
         # [bank, river] and 1.2 at [river, bank]. The key-first spelling is the transpose,
         # so it fails both and moves bank's biggest match to 'crossed'.
-        (raw_grid.shape == (6, 6) and np.array_equal(raw_grid[bank], raw_scores)
-         and matches(raw_grid[bank, river], 5.4) and matches(raw_grid[river, bank], 1.2)
+        (raw_grid_shape == (6, 6) and bank_row_matches is True
+         and matches(bank_to_river_cell, 5.4) and matches(river_to_bank_cell, 1.2)
          and np.allclose(key_first_grid, raw_grid.T)
          and matches(key_first_grid[bank], [0.2, 2.2, 2.4, 0.2, 1.2, 1.0])
-         and int(np.argmax(key_first_grid[bank])) == 2 and WORDS[2] == "crossed"
+         and key_first_best == 2 and key_first_best_word == "crossed"
          # one asker: both spellings agree; a whole grid: they are transposes
-         and np.array_equal(one_asker_key_first, raw_scores)
+         and one_asker_agrees is True
          and not np.array_equal(key_first_grid, raw_grid),
          "the grid is Q @ K.T with row = the asker, so bank->river 5.4 sits at [5, 4] "
          "and river->bank 1.2 at [4, 5]; the Produce step's one-asker K @ Q[5] gives the "
          "same row, but the key-first GRID K @ Q.T is its transpose and makes bank's "
          "biggest match 'crossed'"),
-        (matches(scaled_scores, [0.1, 0.1, 0.2, 0.1, 2.7, 0.5]),
+        (matches(scaled_scores, [0.1, 0.1, 0.2, 0.1, 2.7, 0.5]) and sqrt_d_k == 2.0,
          "scaled scores should be [0.1 0.1 0.2 0.1 2.7 0.5] — raw divided by 2"),
-        (matches(np.round(river_scaled, 4), [2.7, 1.8, 0.675]),
+        (matches(np.round(river_scaled, 4), [2.7, 1.8, 0.675])
+         and matches(river_raw, 5.4) and matches(sqrt_law_divisors, [2.0, 3.0, 8.0])
+         # the two losing laws are printed as the contrast, so pin their numbers too
+         and matches(half_width_law, [2.7, 1.2, 0.16875])
+         and matches(d_v_law, [2.7, 2.7, 2.7]),
          "the divisor is sqrt(d_k), so river's 5.4 becomes 2.7 / 1.8 / 0.675 at "
          "d_k = 4 / 9 / 64 — half the width would say 2.7 / 1.2 / 0.169, d_v 2.7 every time"),
-        (bool(np.all(weights >= 0)) and matches(weights.sum(), 1.0),
+        (bool(np.all(weights >= 0)) and weights_total == 1.0,
          "every share must be positive and the six must add up to 1"),
         # The AXIS, pinned: two rows in must come back as two whole budgets of 1, not
         # one budget of 1 split across the block (which would print 0.5 and 0.5).
         (matches(two_row_sums, [1.0, 1.0]) and matches(whole_block_sums, [0.5, 0.5]),
          "softmax must normalise the LAST AXIS: a two-row block gives row sums "
          "[1. 1.], where one shared budget would give [0.5 0.5]"),
-        (matches(np.round(weights, 3), [0.052, 0.052, 0.058, 0.052, 0.706, 0.078]),
+        (matches(weights_shown, [0.052, 0.052, 0.058, 0.052, 0.706, 0.078]),
          "shares should be [0.052 0.052 0.058 0.052 0.706 0.078]"),
-        (winner == 4 and WORDS[4] == "river", "the biggest share should land on 'river'"),
-        (matches(np.round(output, 3), [0.742, 0.154]), "output should be [0.742, 0.154]"),
-        (matches(np.round(dist_to_river, 2), 0.26)
-         and matches(np.round(dist_to_old_bank, 2), 1.06),
+        (winner == 4 and winner_word == "river", "the biggest share should land on 'river'"),
+        (matches(output_shown, [0.742, 0.154]), "output should be [0.742, 0.154]"),
+        # The printed blend table must be the printed output, item by item and in total.
+        (matches(contributions, exp_contributions)
+         and matches(contributions_total, [0.742, 0.154])
+         and np.array_equal(contributions_total, output_shown),
+         "each printed share x Value row should match the lesson's blend table, and the "
+         "six rows should add up to the printed output [0.742 0.154]"),
+        (matches(dist_to_river, 0.26) and matches(dist_to_old_bank, 1.06),
          "output should sit 0.26 from river's Value and 1.06 from bank's old Value"),
-        (money_winner == 5 and WORDS[5] == "bank"
+        (money_winner == 5 and money_winner_word == "bank"
          and matches(money_scores, [0.2, 0.2, 0.4, 0.2, 1.0, 5.0]),
          "a money question should move the win to 'bank', scores [.. 1.0 5.0]"),
+        (river_share_pct == 70.6,
+         "the victory line's headline share should be river's 70.6%"),
     ]
     missed = [why for ok, why in claims if not ok]
     if not missed:
+        # Both numbers here are read back from checked names, so the victory line cannot
+        # quote a share or a vector this run did not actually produce.
         print("\n✅ you got it — 'bank' put %.1f%% of its attention on 'river', and its new"
               " vector %s leans watery, not money. That is self-attention."
-              % (weights[river] * 100, np.round(output, 3)))
+              % (river_share_pct, output_shown))
     else:
         print("\n❌ not yet — " + " | ".join(missed))
     for ok, why in claims:

@@ -53,12 +53,14 @@ def search_single_lines():
     # reach that best score.
     best = 0.0
     ties = 0            # how many (w1, w2, b) settings score exactly 3 of 4
+    searched = 0        # how many settings we actually tried (the denominator we print)
     # 17 candidate values per dial. This is a SEARCH SPACE over settings — Day 3 uses
     # the word "grid" for a weight matrix, so keep the two ideas under two names.
     dial_values = np.linspace(-4, 4, 17)
     for w1 in dial_values:
         for w2 in dial_values:
             for b in dial_values:
+                searched += 1
                 w = np.array([w1, w2])
                 # How many of the 4 XOR points does THIS one line get right?
                 correct = 0
@@ -72,7 +74,7 @@ def search_single_lines():
                     best = accuracy
                 if accuracy == 0.75:
                     ties += 1
-    return best, ties
+    return best, ties, searched
 
 
 if __name__ == "__main__":
@@ -90,14 +92,19 @@ if __name__ == "__main__":
 
     z, out = neuron(x, w, b)      # weigh -> add -> decide, all at once
 
+    # Bind every number we are about to SHOW, then print the bound name and check
+    # that same bound name. One value, read twice — so a wrong printed number can
+    # never sit under a passing check.
+    shown_out = round(out, 3)
+
     # Show the two numbers the lesson told us to watch.
     print("inputs x =", x, " weights w =", w, " bias b =", b)
     print("z (weighted sum) =", z)              # should be -1.0
-    print("sigmoid(z)       =", round(out, 3))  # should be ~0.269 (a soft "probably no")
+    print("sigmoid(z)       =", shown_out)      # should be ~0.269 (a soft "probably no")
 
     # The lesson's stated expected values: z = -1.0 and sigmoid(z) rounds to 0.269.
     z_ok = (z == -1.0)
-    out_ok = (round(out, 3) == 0.269)
+    out_ok = (shown_out == 0.269)
 
     # ---- Part 2: the bias is the starting lean — turn only that dial ----
     # Three settings, all measured off the SAME b, so one shared number moves the
@@ -105,32 +112,49 @@ if __name__ == "__main__":
     z_high, out_high = neuron(x, w, b + 4.0)   # z = +3.0
     z_bar, out_bar = neuron(x, w, b + 1.0)     # z =  0.0 exactly — on the bar
     z_low, out_low = neuron(x, w, b - 4.0)     # z = -5.0
-    print("bias b+4 -> z =", z_high, " sigmoid =", round(out_high, 3), "(above 0.5)")
-    print("bias b+1 -> z =", z_bar, " sigmoid =", round(out_bar, 3),
-          " step =", float(step(z_bar)), "(exactly on the bar)")
-    print("bias b-4 -> z =", z_low, " sigmoid =", round(out_low, 3), "(below 0.5)")
-    print("-> the answer rises as the bias rises:", round(out_low, 3), "<",
-          round(out, 3), "<", round(out_bar, 3), "<", round(out_high, 3))
+
+    # Bind the three shown answers (and the shown step verdict) before printing them.
+    shown_high = round(out_high, 3)
+    shown_bar = round(out_bar, 3)
+    shown_low = round(out_low, 3)
+    shown_bar_step = float(step(z_bar))
+
+    print("bias b+4 -> z =", z_high, " sigmoid =", shown_high, "(above 0.5)")
+    print("bias b+1 -> z =", z_bar, " sigmoid =", shown_bar,
+          " step =", shown_bar_step, "(exactly on the bar)")
+    print("bias b-4 -> z =", z_low, " sigmoid =", shown_low, "(below 0.5)")
+    print("-> the answer rises as the bias rises:", shown_low, "<",
+          shown_out, "<", shown_bar, "<", shown_high)
 
     # Pin each of the three to its own literal. That is stronger than only checking
-    # the direction: it also fixes HOW FAR the bias moved the score.
-    lean_ok = (round(out_high, 3) == 0.953
-               and out_bar == 0.5
-               and round(out_low, 3) == 0.007)
-    bar_ok = (z_bar == 0.0 and float(step(z_bar)) == 1.0)
+    # the direction: it also fixes HOW FAR the bias moved the score. Every literal
+    # here is compared against the SAME name the line above printed, and the three
+    # raw scores are pinned too, so no shown number is left unchecked.
+    lean_ok = (shown_high == 0.953
+               and out_bar == 0.5 and shown_bar == 0.5
+               and shown_low == 0.007
+               and z_high == 3.0 and z_low == -5.0)
+    bar_ok = (z_bar == 0.0 and shown_bar_step == 1.0)
 
     # ---- Part 3: watch the single-neuron limit on XOR ----
-    best, ties = search_single_lines()
+    best, ties, searched = search_single_lines()
+
+    # Bind both shown forms of the ceiling, and the denominator we show as well.
+    shown_best = round(best, 2)
+    shown_best_of_4 = int(best * 4)
+
     print("best XOR accuracy any single straight line can reach =",
-          round(best, 2), "->", int(best * 4), "of 4")
-    print("settings on the 17-point grid that reach 3 of 4 =", ties, "of 4913")
+          shown_best, "->", shown_best_of_4, "of 4")
+    print("settings on the 17-point grid that reach 3 of 4 =", ties, "of", searched)
 
     # The whole point: one neuron = one straight line, and XOR is NOT linearly
     # separable, so no single line ever gets all 4 right. The ceiling is 3 of 4.
-    ceiling_ok = (best == 0.75)
+    ceiling_ok = (best == 0.75 and shown_best == 0.75 and shown_best_of_4 == 3)
     # A ceiling alone is a weak claim — a search that barely ran also reports 0.75.
     # The tie count is the floor: coarsen the grid, or stop turning w1, and it moves.
-    search_ok = (ties == 732)
+    # `searched` is counted inside the loop, so the denominator we print is the
+    # number of settings we really tried, not a number typed into the string.
+    search_ok = (ties == 732 and searched == 4913)
 
     # ---- Self-check: one boolean per claim, then a verdict ----
     if boundary_ok and z_ok and out_ok and lean_ok and bar_ok and ceiling_ok and search_ok:

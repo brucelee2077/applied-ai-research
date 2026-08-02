@@ -94,48 +94,94 @@ if __name__ == "__main__":
 
     # ---- the main trace: forward, then all four rules backward ----
     t = backward(x, w, b, target)
-    print("forward pass:  z =", t.z, " a =", t.a, " loss =", round(t.loss, 4))
-    print("backprop:      delta =", round(t.delta, 6),
-          " w_grad =", round(t.w_grad, 6), " b_grad =", round(t.b_grad, 6))
+    # Every number below is ROUNDED FOR DISPLAY exactly once, bound to a name, and
+    # then printed. The self-checks at the bottom read these same names, so the line
+    # a learner reads and the line that gets checked are one thing. Rounding inside
+    # the print instead would make them two independent expressions: re-round or
+    # swap a cell there and the number on screen goes wrong under a passing ✅.
+    shown_loss = round(t.loss, 4)
+    shown_delta = round(t.delta, 6)
+    shown_w_grad = round(t.w_grad, 6)
+    shown_b_grad = round(t.b_grad, 6)
+    shown_passed_back = round(t.passed_back, 6)
+    forward_line = f"forward pass:  z = {t.z}  a = {t.a}  loss = {shown_loss}"
+    backprop_line = (f"backprop:      delta = {shown_delta}"
+                     f"  w_grad = {shown_w_grad}  b_grad = {shown_b_grad}")
     # the headline of the day: the weight's blame is exactly x times the bias's.
     # We print w_grad itself here, NOT the product x * b_grad — the product would
     # agree with itself no matter what w_grad came out as.
-    print("check ratio:   w_grad =", x, "× b_grad =", round(t.w_grad, 6))
-    print("to prev layer: delta × w =", round(t.passed_back, 6))
+    ratio_line = f"check ratio:   w_grad = {x} × b_grad = {shown_w_grad}"
+    prev_layer_line = f"to prev layer: delta × w = {shown_passed_back}"
+    print(forward_line)
+    print(backprop_line)
+    print(ratio_line)
+    print(prev_layer_line)
 
     # ---- gradient-check BOTH knobs, so the ratio compares two measurements ----
     measured_w, measured_b = measured_grads(x, w, b, target)
-    print("grad check:    measured =", round(measured_w, 4), " backprop w_grad =", round(t.w_grad, 4))
-    print("grad check b:  measured =", round(measured_b, 4), " backprop b_grad =", round(t.b_grad, 4))
-    print("measured ratio:", round(measured_w, 4), "/", round(measured_b, 4),
-          "=", round(measured_w / measured_b, 4), " (= x, both sides measured)")
+    shown_measured_w = round(measured_w, 4)
+    shown_measured_b = round(measured_b, 4)
+    shown_w_grad4 = round(t.w_grad, 4)
+    shown_b_grad4 = round(t.b_grad, 4)
+    # the ratio is its own printed claim, so it gets its own bound name — printing
+    # a freshly written division here would be a number nothing else ever reads
+    shown_ratio = round(measured_w / measured_b, 4)
+    check_w_line = (f"grad check:    measured = {shown_measured_w}"
+                    f"  backprop w_grad = {shown_w_grad4}")
+    check_b_line = (f"grad check b:  measured = {shown_measured_b}"
+                    f"  backprop b_grad = {shown_b_grad4}")
+    measured_ratio_line = (f"measured ratio: {shown_measured_w} / {shown_measured_b}"
+                           f" = {shown_ratio}  (= x, both sides measured)")
+    print(check_w_line)
+    print(check_b_line)
+    print(measured_ratio_line)
 
     # ---- change x and the ratio changes WITH it — so it is a fact about x ----
     x_big = 3.0
     t_big = backward(x_big, w, b, target)
     measured_w_big, measured_b_big = measured_grads(x_big, w, b, target)
-    print("same at x = 3:", round(measured_w_big, 4), "/", round(measured_b_big, 4),
-          "=", round(measured_w_big / measured_b_big, 4), " (the ratio follows x)")
+    shown_measured_w_big = round(measured_w_big, 4)
+    shown_measured_b_big = round(measured_b_big, 4)
+    shown_ratio_big = round(measured_w_big / measured_b_big, 4)
+    # the "x = 3" in the label is READ FROM x_big, not typed again, so the label
+    # cannot claim one input while the numbers came from another
+    big_ratio_line = (f"same at x = {x_big:g}: {shown_measured_w_big}"
+                      f" / {shown_measured_b_big} = {shown_ratio_big}"
+                      "  (the ratio follows x)")
+    print(big_ratio_line)
 
     # ---- the DEAD ReLU the lesson promises: a big negative b puts z below 0 ----
     b_dead = -3.0
     t_dead = backward(x, w, b_dead, target)
     measured_w_dead, measured_b_dead = measured_grads(x, w, b_dead, target)
-    print("dead relu:     b =", b_dead, "→ z =", t_dead.z, " slope =", t_dead.slope,
-          " w_grad =", tidy(t_dead.w_grad), " b_grad =", tidy(t_dead.b_grad),
-          " to prev =", tidy(t_dead.passed_back))
-    print("               incoming =", round(t_dead.incoming, 4),
-          "(the loss still wants a change) but the measured slopes are",
-          round(measured_w_dead, 4), "and", round(measured_b_dead, 4),
-          "— a genuinely flat spot")
+    # tidy() is applied ONCE per value, here, and the checks below read these same
+    # names — so the helper cannot quietly turn a non-zero gradient into a shown 0.0
+    dead_w_shown = tidy(t_dead.w_grad)
+    dead_b_shown = tidy(t_dead.b_grad)
+    dead_prev_shown = tidy(t_dead.passed_back)
+    shown_dead_incoming = round(t_dead.incoming, 4)
+    shown_measured_w_dead = round(measured_w_dead, 4)
+    shown_measured_b_dead = round(measured_b_dead, 4)
+    dead_line = (f"dead relu:     b = {b_dead} → z = {t_dead.z}"
+                 f"  slope = {t_dead.slope}  w_grad = {dead_w_shown}"
+                 f"  b_grad = {dead_b_shown}  to prev = {dead_prev_shown}")
+    dead_flat_line = (f"               incoming = {shown_dead_incoming}"
+                      " (the loss still wants a change) but the measured slopes are"
+                      f" {shown_measured_w_dead} and {shown_measured_b_dead}"
+                      " — a genuinely flat spot")
+    print(dead_line)
+    print(dead_flat_line)
 
     # ---- exactly ON the boundary: z = 0.5*2.0 - 1.0 = 0.0, so > vs >= decides ----
     # (no gradient check here: z = 0 is the ReLU's kink, where a measured slope
     # reads the sharp corner rather than any single true slope.)
     b_edge = -1.0
     t_edge = backward(x, w, b_edge, target)
-    print("z exactly 0:   b =", b_edge, "→ z =", t_edge.z, " slope =", t_edge.slope,
-          "(the rule is z > 0, not z >= 0)  w_grad =", tidy(t_edge.w_grad))
+    edge_w_shown = tidy(t_edge.w_grad)
+    edge_line = (f"z exactly 0:   b = {b_edge} → z = {t_edge.z}"
+                 f"  slope = {t_edge.slope}"
+                 f" (the rule is z > 0, not z >= 0)  w_grad = {edge_w_shown}")
+    print(edge_line)
 
     # ---- self-checks: every number the lesson's "what you should see" promises ----
     # One table drives both the ❌ guidance line and the asserts, so the two can
@@ -148,6 +194,8 @@ if __name__ == "__main__":
         ("the forward pass's loss should be 0.01 (a = 1.1 against target 1.0)", t.loss, 0.01, 1e-9),
         ("the forward pass's z should be 1.1", t.z, 1.1, 1e-9),
         ("the forward pass's a should be 1.1 (z > 0, so ReLU passes it through)", t.a, 1.1, 1e-9),
+        # delta is printed as the toll survivor, so it is pinned like everything else
+        ("delta — what survives the ReLU's toll — should be 0.2", t.delta, 0.2, 1e-9),
         ("w_grad should be 0.4", t.w_grad, 0.4, 1e-9),
         ("b_grad should be 0.2", t.b_grad, 0.2, 1e-9),
         ("Rule 4: delta × w handed one layer back should be 0.1", t.passed_back, 0.1, 1e-9),
@@ -163,13 +211,19 @@ if __name__ == "__main__":
         # the dead ReLU: the toll is what zeroes these, and the probe is only
         # meaningful because a NON-zero gradient really did arrive from the loss
         ("the dead-ReLU probe must be live: incoming should be -2.0", t_dead.incoming, -2.0, 1e-9),
+        # the printed z is what shows the ReLU is off; without this row it could
+        # print any negative number and every zero below would still look right
+        ("the dead-ReLU setting should put z at -2.0", t_dead.z, -2.0, 1e-9),
         ("with z < 0 the ReLU slope is 0", t_dead.slope, 0.0, 1e-12),
         ("with z < 0 the weight's gradient must be 0", t_dead.w_grad, 0.0, 1e-12),
         ("with z < 0 the bias's gradient must be 0", t_dead.b_grad, 0.0, 1e-12),
         ("with z < 0 nothing is handed to the previous layer", t_dead.passed_back, 0.0, 1e-12),
         ("with z < 0 the measured slope must be 0 too — a genuinely flat loss",
          measured_w_dead, 0.0, 1e-12),
+        # the bias's measured slope is printed on that same line, so pin it as well
+        ("with z < 0 the measured BIAS slope must be 0 too", measured_b_dead, 0.0, 1e-12),
         # the boundary: the rule is z > 0, not z >= 0, so z == 0 gets slope 0
+        ("the boundary setting should put z at exactly 0", t_edge.z, 0.0, 1e-12),
         ("at exactly z = 0 the ReLU slope is 0 (the rule is z > 0)", t_edge.slope, 0.0, 1e-12),
         ("at exactly z = 0 the weight's gradient must be 0", t_edge.w_grad, 0.0, 1e-12),
         # the print helper above is allowed to erase a MINUS SIGN in front of a
@@ -177,8 +231,41 @@ if __name__ == "__main__":
         # those zeros as 0.0 whether they really were zero or not
         ("the -0.0 print helper must leave a real number alone", tidy(-0.4), -0.4, 1e-12),
     ]
+    # The other half of the self-check: the printed LINES, character for character.
+    # Each line was built once and printed once, so this pins what the learner
+    # actually reads — a re-rounded cell, or two correct numbers swapped into each
+    # other's slots, changes the screen without changing any value above, and would
+    # otherwise sail past every row in `expected`.
+    printed_lines = [
+        ("the forward line should read z = 1.1, a = 1.1, loss = 0.01",
+         forward_line, "forward pass:  z = 1.1  a = 1.1  loss = 0.01"),
+        ("the backprop line should read delta = 0.2, w_grad = 0.4, b_grad = 0.2",
+         backprop_line, "backprop:      delta = 0.2  w_grad = 0.4  b_grad = 0.2"),
+        ("the ratio line should show w_grad = 0.4 against x = 2.0",
+         ratio_line, "check ratio:   w_grad = 2.0 × b_grad = 0.4"),
+        ("the hand-back line should read 0.1",
+         prev_layer_line, "to prev layer: delta × w = 0.1"),
+        ("the w gradient check should show 0.4 measured against 0.4 from backprop",
+         check_w_line, "grad check:    measured = 0.4  backprop w_grad = 0.4"),
+        ("the b gradient check should show 0.2 measured against 0.2 from backprop",
+         check_b_line, "grad check b:  measured = 0.2  backprop b_grad = 0.2"),
+        ("the measured ratio should print 0.4 / 0.2 = 2.0 — the w-slope on top",
+         measured_ratio_line, "measured ratio: 0.4 / 0.2 = 2.0  (= x, both sides measured)"),
+        ("at x = 3 the measured ratio should print 3.6 / 1.2 = 3.0",
+         big_ratio_line, "same at x = 3: 3.6 / 1.2 = 3.0  (the ratio follows x)"),
+        ("the dead-ReLU line should show z = -2.0 and three zeros",
+         dead_line, "dead relu:     b = -3.0 → z = -2.0  slope = 0.0"
+                    "  w_grad = 0.0  b_grad = 0.0  to prev = 0.0"),
+        ("the flat-spot line should show a live incoming of -2.0 against two 0.0 slopes",
+         dead_flat_line, "               incoming = -2.0 (the loss still wants a change)"
+                         " but the measured slopes are 0.0 and 0.0 — a genuinely flat spot"),
+        ("the boundary line should show z = 0.0 with slope 0.0 and w_grad 0.0",
+         edge_line, "z exactly 0:   b = -1.0 → z = 0.0  slope = 0.0"
+                    " (the rule is z > 0, not z >= 0)  w_grad = 0.0"),
+    ]
     failures = [(why, got, want) for why, got, want, tol in expected
                 if not math.isclose(got, want, abs_tol=tol)]
+    failures += [(why, got, want) for why, got, want in printed_lines if got != want]
 
     # verdict FIRST, so a learner always sees the guidance line — the asserts
     # below are what turn a failure into a non-zero exit.
@@ -190,3 +277,5 @@ if __name__ == "__main__":
 
     for why, got, want, tol in expected:
         assert math.isclose(got, want, abs_tol=tol), why
+    for why, got, want in printed_lines:
+        assert got == want, why

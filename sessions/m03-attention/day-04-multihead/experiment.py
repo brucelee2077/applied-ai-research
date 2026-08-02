@@ -106,17 +106,29 @@ if __name__ == "__main__":
                           [0.0, STRENGTH, 0.0, 0.0]])      # "where did I happen?" -> mat's key slot
 
     w_describe, out_describe = run_head(x, W_Q_describe, W_K_wide, W_V_wide)
+    # HOW EVERY NUMBER BELOW REACHES THE PAGE. Each one is computed ONCE, bound to a
+    # `shown_*` name, and printed from that name — and the self-check at the bottom reads the
+    # SAME name. So there is only ever one copy of each quantity. Print a wrong number and
+    # the check sees the wrong number too; it cannot pass on a second, separately typed copy
+    # of the same arithmetic while the page shows something else.
+    shown_x_shape = x.shape
+    shown_qkv_shape = (x @ W_Q_describe).shape
+    shown_describe_shares = row(w_describe[CAT])
+    shown_describe_row_sum = float(w_describe[CAT].sum())
+    shown_describe_answer = row(out_describe[CAT])
     print("Part 1 — one FULL-width head (d_k = 4), asked ONE question. words:", words)
-    print("  x", x.shape, "-> its Q, K, V are each", (x @ W_Q_describe).shape, "— full width, nothing sliced yet")
-    print("  'cat' row shares     :", row(w_describe[CAT]), " row sum =", float(w_describe[CAT].sum()))
+    print("  x", shown_x_shape, "-> its Q, K, V are each", shown_qkv_shape, "— full width, nothing sliced yet")
+    print("  'cat' row shares     :", shown_describe_shares, " row sum =", shown_describe_row_sum)
     # QUERY-FIRST, measured rather than assumed: cat is the word ASKING, so its sharp share
     # belongs to cat's ROW. Read the same grid key-first and the sharpness would have to sit
     # in cat's COLUMN, which holds nothing but the flat 1/3 of the two words that ask nothing.
     cat_row_top = float(w_describe[CAT].max())
     cat_column_top = float(w_describe[:, CAT].max())
-    print("  row  vs  column      : cat's ROW peaks at", round(cat_row_top, 4),
-          "but cat's COLUMN peaks at", round(cat_column_top, 4), "-> row = the asker")
-    print("  its blended answer   :", row(out_describe[CAT]),
+    shown_row_top = round(cat_row_top, 4)          # the rounded number the page shows,
+    shown_column_top = round(cat_column_top, 4)    # and the one the self-check pins
+    print("  row  vs  column      : cat's ROW peaks at", shown_row_top,
+          "but cat's COLUMN peaks at", shown_column_top, "-> row = the asker")
+    print("  its blended answer   :", shown_describe_answer,
           "\n                         reads [how much tired, how much mat, 0, 0] -> nearly all 'tired': crisp")
 
     # --- Part 2: the SAME head asked both questions at once ---------------
@@ -124,9 +136,11 @@ if __name__ == "__main__":
     # One head hands back one blend, so it has to average them.
     W_Q_both = W_Q_describe + W_Q_place
     w_both, out_both = run_head(x, W_Q_both, W_K_wide, W_V_wide)
+    shown_both_shares = row(w_both[CAT])
+    shown_both_answer = row(out_both[CAT])
     print("\nPart 2 — the same full-width head asked to do BOTH jobs at once")
-    print("  'cat' row shares     :", row(w_both[CAT]), "-> tired and mat get the SAME share")
-    print("  its blended answer   :", row(out_both[CAT]), "-> half and half: muddy")
+    print("  'cat' row shares     :", shown_both_shares, "-> tired and mat get the SAME share")
+    print("  its blended answer   :", shown_both_answer, "-> half and half: muddy")
 
     # --- Part 3: build the two-head panel the lesson asks for -------------
     # Predict the three widths from d_k = d_model / h, before running anything.
@@ -155,21 +169,32 @@ if __name__ == "__main__":
                     [0.60, 0.10, 0.40, 1.00]])
 
     head_weights, head_outs, joined, final = multi_head(x, heads, W_O)
+    # One bound copy per printed quantity again — shapes included, because a shape read a
+    # second time at the print line is the same divergence as a number recomputed there.
+    shown_wq_shape, shown_wk_shape, shown_wv_shape = W_Q_A.shape, W_K_A.shape, W_V_slice.shape
+    joined_width_from_heads = h * d_v          # printed AND pinned, one copy
+    shown_head_a_shares = row(head_weights[0][CAT])
+    shown_head_a_answer = row(head_outs[0][CAT])
+    shown_head_b_shares = row(head_weights[1][CAT])
+    shown_head_b_answer = row(head_outs[1][CAT])
+    shown_head_a_shape, shown_head_b_shape = head_outs[0].shape, head_outs[1].shape
+    shown_joined_shape, shown_final_shape = joined.shape, final.shape
     print("\nPart 3 — split -> attend -> join -> mix, with d_model = 4 and h = 2")
     print("  predicted widths     :", predicted, "(one head, joined, final)")
-    print("  each head's recipes  : W_Q", W_Q_A.shape, "W_K", W_K_A.shape, "W_V", W_V_slice.shape,
+    print("  each head's recipes  : W_Q", shown_wq_shape, "W_K", shown_wk_shape, "W_V", shown_wv_shape,
           "-> half the model width")
     print("  d_k =", d_k, "and d_v =", d_v, "-> a Value's width is still free (Day 3 used 2 against 4);",
-          "\n                         we CHOOSE d_v = d_k here so h x d_v =", h * d_v, "= d_model on the join")
-    print("  head A 'cat' shares  :", row(head_weights[0][CAT]), "-> nearly all 'tired'")
-    print("  head A 'cat' answer  :", row(head_outs[0][CAT]), "= [how much tired, how much mat]")
-    print("  head B 'cat' shares  :", row(head_weights[1][CAT]), "-> nearly all 'mat'")
-    print("  head B 'cat' answer  :", row(head_outs[1][CAT]), "= same two slots, the other word")
+          "\n                         we CHOOSE d_v = d_k here so h x d_v =", joined_width_from_heads,
+          "= d_model on the join")
+    print("  head A 'cat' shares  :", shown_head_a_shares, "-> nearly all 'tired'")
+    print("  head A 'cat' answer  :", shown_head_a_answer, "= [how much tired, how much mat]")
+    print("  head B 'cat' shares  :", shown_head_b_shares, "-> nearly all 'mat'")
+    print("  head B 'cat' answer  :", shown_head_b_answer, "= same two slots, the other word")
     print("  two heads of width", d_k, "each stay sharp where ONE head of width", d_model, "went half and half")
-    print("  input x", x.shape, "-> head A", head_outs[0].shape, "+ head B", head_outs[1].shape,
+    print("  input x", shown_x_shape, "-> head A", shown_head_a_shape, "+ head B", shown_head_b_shape,
           "= half the model width each")
-    print("  joined (concatenate) :", joined.shape, "= back to full width;   final (after W_O):",
-          final.shape, "= one vector per word")
+    print("  joined (concatenate) :", shown_joined_shape, "= back to full width;   final (after W_O):",
+          shown_final_shape, "= one vector per word")
     final_rounded = np.round(final, 4)   # ONE copy, printed below and pinned in the self-check
     final_block = str(final_rounded)     # the exact block of text the learner reads
     print("  final values         :\n", final_block)
@@ -196,8 +221,13 @@ if __name__ == "__main__":
         dial_widths.append((dial_d_model, dial_h, dial_d_k,
                             dial_outs[0].shape[-1], dial_joined.shape[-1], dial_final.shape[-1]))
     print("\nPart 3b — run the same rule at three dial settings, panel and all")
-    for dial_row in dial_widths:
-        print("  d_model %2d, h %d -> d_k %d;  one head %2d wide, joined %2d, final %2d" % dial_row)
+    # Build the three lines FIRST, then print them, so the text on the page is the same text
+    # the self-check pins. A number reformatted at the print line would slip past a check that
+    # only looked at the tuples behind it.
+    dial_lines = ["  d_model %2d, h %d -> d_k %d;  one head %2d wide, joined %2d, final %2d" % dial_row
+                  for dial_row in dial_widths]
+    for dial_line in dial_lines:
+        print(dial_line)
 
     # --- Part 3c: a probe word that asks only ONE of the two questions -----
     # In the sentence above, "cat" is [0, 0, 1, 1] — it asks both questions equally, so W_Q_A
@@ -209,15 +239,18 @@ if __name__ == "__main__":
                         [0.0, 0.0, 0.0, 1.0],    # asks the PLACE question only
                         [0.0, 1.0, 0.0, 0.0]])   # mat   — unchanged
     probe_weights, probe_outs, _, _ = multi_head(x_probe, heads, W_O)
+    shown_probe_a_shares = row(probe_weights[0][CAT])
+    shown_probe_b_shares = row(probe_weights[1][CAT])
     print("\nPart 3c — same two heads, a word asking ONLY the place question")
-    print("  head A 'cat' shares  :", row(probe_weights[0][CAT]), "-> flat: head A's Query is silent here")
-    print("  head B 'cat' shares  :", row(probe_weights[1][CAT]), "-> still nearly all 'mat'")
+    print("  head A 'cat' shares  :", shown_probe_a_shares, "-> flat: head A's Query is silent here")
+    print("  head B 'cat' shares  :", shown_probe_b_shares, "-> still nearly all 'mat'")
 
     # Contrast control for the KEY recipes: hand head B head A's W_K and the two heads collapse
     # onto one answer, which is the observable behind "each head looks for something different".
     _, tied_key_outs, _, _ = multi_head(
         x, [(W_Q_A, W_K_A, W_V_slice), (W_Q_B, W_K_A, W_V_slice)], W_O)
-    print("  tie head B's KEY recipe to head A's and both heads answer", row(tied_key_outs[1][CAT]),
+    shown_tied_answer = row(tied_key_outs[1][CAT])
+    print("  tie head B's KEY recipe to head A's and both heads answer", shown_tied_answer,
           "-> identical")
 
     # --- Part 4: does W_O really let the heads mix? -----------------------
@@ -246,14 +279,18 @@ if __name__ == "__main__":
     smallest_own_slot_move = float(moved_no_mixing[:, a_cols:].min())
     mixing_line = ("  mixing W_O    : the first %d final slots move by at least %s"
                    " -> head B had a say in them" % (a_cols, round(smallest_mixing_move, 4)))
+    shown_no_mixing_move = round(biggest_no_mixing_move, 4)
+    shown_own_slot_move = round(smallest_own_slot_move, 4)
+    moved_a_rounded = np.round(moved_mixing[:, :a_cols], 5)   # ONE copy: printed, then pinned
+    moved_a_block = str(moved_a_rounded)                      # the exact block of text on the page
     print("\nPart 4 — drop head B, then compare the mixing W_O with a no-mixing one")
     print(mixing_line)
-    print("  no-mixing W_O : the same slots move by", round(biggest_no_mixing_move, 4),
+    print("  no-mixing W_O : the same slots move by", shown_no_mixing_move,
           "-> they never heard head B at all")
     print("                  its own last", a_cols, "slots still move by at least",
-          round(smallest_own_slot_move, 4))
+          shown_own_slot_move)
     print("  each of those first", a_cols, "slots, word by word:\n",
-          np.round(moved_mixing[:, :a_cols], 5))
+          moved_a_block)
 
     # --- Part 5: more heads, same budget ----------------------------------
     # "Budget" here means STORED NUMBERS — the lesson's "same budget, sliced thinner". It is
@@ -262,11 +299,12 @@ if __name__ == "__main__":
     # full-width head from Part 1, whose three recipes are each (d_model, d_model).
     params_panel = sum(w.size for head in heads for w in head)
     params_one_wide_head = W_Q_both.size + W_K_wide.size + W_V_wide.size
+    w_o_numbers = W_O.size          # printed below, and pinned with the two budgets
     print("\nPart 5 — more heads, same budget. 'Budget' = stored numbers here, not Day 3's",
           "\n         budget of attention shares. The panel's Q/K/V recipes hold", params_panel,
           "numbers; the one full-width head holds",
           params_one_wide_head, "-> same budget, sliced thinner")
-    print("  (that counts Q/K/V only. W_O adds", W_O.size, "more numbers, and a full-width head needs",
+    print("  (that counts Q/K/V only. W_O adds", w_o_numbers, "more numbers, and a full-width head needs",
           "\n   an output matrix of its own in a real model too.)")
 
     # --- Part 6: the same panel with RANDOM recipes -----------------------
@@ -283,11 +321,15 @@ if __name__ == "__main__":
     rnd_weights, rnd_outs, rnd_joined, rnd_final = multi_head(x, random_heads, W_O_random)
     biggest_random_share = max(float(w[CAT].max()) for w in rnd_weights)
     panel_top_share = float(head_weights[0][CAT].max())   # printed below AND pinned, one copy
+    shown_random_top = round(biggest_random_share, 4)     # the rounded numbers the page shows
+    shown_panel_top = round(panel_top_share, 4)
+    shown_rnd_a_shape, shown_rnd_b_shape = rnd_outs[0].shape, rnd_outs[1].shape
+    shown_rnd_joined_shape, shown_rnd_final_shape = rnd_joined.shape, rnd_final.shape
     print("\nPart 6 — the same panel again, now with two random sets of recipes (seed 0)")
-    print("  widths               : head", rnd_outs[0].shape, "+ head", rnd_outs[1].shape, "-> joined",
-          rnd_joined.shape, "-> final", rnd_final.shape, "= the same width story")
-    print("  biggest 'cat' share any random head gives:", round(biggest_random_share, 4),
-          "-> nowhere near the", round(panel_top_share, 4), "above: untuned heads do not specialize")
+    print("  widths               : head", shown_rnd_a_shape, "+ head", shown_rnd_b_shape, "-> joined",
+          shown_rnd_joined_shape, "-> final", shown_rnd_final_shape, "= the same width story")
+    print("  biggest 'cat' share any random head gives:", shown_random_top,
+          "-> nowhere near the", shown_panel_top, "above: untuned heads do not specialize")
 
     # --- Self-check: one boolean per claim --------------------------------
     # Every expected number below is written down here, read off a real run of this
@@ -313,10 +355,33 @@ if __name__ == "__main__":
     # d_k = d_model // h, run at three settings so the two rules that also give 2 at (4, 2) —
     # d_model - h and plain h — disagree at (12, 3) and (64, 8).
     EXPECTED_DIAL_WIDTHS = [(4, 2, 2, 2, 4, 4), (12, 3, 4, 4, 12, 12), (64, 8, 8, 8, 64, 64)]
+    # The share and answer rows exactly as they must reach the page. A number is only evidence
+    # if the learner reads the same number the check reads, so the rendered LINE is pinned, not
+    # only the array behind it.
+    EXPECTED_ROWS = {
+        "part1 shares": "[  0.9867   0.0066   0.0066]",
+        "part1 answer": "[  0.9867   0.0066   0.0000   0.0000]",
+        "part2 shares": "[  0.4983   0.0034   0.4983]",
+        "part2 answer": "[  0.4983   0.4983   0.0000   0.0000]",
+        "head A shares": "[  0.9983   0.0008   0.0008]",
+        "head A answer": "[  0.9983   0.0008]",
+        "head B shares": "[  0.0008   0.0008   0.9983]",
+        "head B answer": "[  0.0008   0.9983]",
+        "probe A shares": "[  0.3333   0.3333   0.3333]",
+        "probe B shares": "[  0.0008   0.0008   0.9983]",
+        "tied answer": "[  0.9983   0.0008]",
+    }
+    EXPECTED_DIAL_LINES = [
+        "  d_model  4, h 2 -> d_k 2;  one head  2 wide, joined  4, final  4",
+        "  d_model 12, h 3 -> d_k 4;  one head  4 wide, joined 12, final 12",
+        "  d_model 64, h 8 -> d_k 8;  one head  8 wide, joined 64, final 64",
+    ]
 
     rows_sum_to_one = (all(close(r.sum(), 1.0, SUM_TOL)
                            for w in (w_describe, w_both, head_weights[0], head_weights[1],
                                      probe_weights[0], probe_weights[1]) for r in w)
+                       # The one row sum the page actually shows, read off the printed value.
+                       and close(shown_describe_row_sum, 1.0, SUM_TOL)
                        # A row adds up to 1 only when EVERY word is counted. Tired and mat alone
                        # come to 0.9966 — the leftover 0.0034 sits on "cat" — so SUM_TOL has to
                        # be tight enough to tell that sum apart from 1.
@@ -327,20 +392,27 @@ if __name__ == "__main__":
                       and close(out_both[CAT, 0], MUDDY_SHARE) and close(out_both[CAT, 1], MUDDY_SHARE))
     one_head_can_be_sharp = (close(w_describe[CAT, 0], ONE_JOB_SHARE)      # the head is not broken —
                              and close(out_describe[CAT, 0], ONE_JOB_SHARE))  # one blend is all it has
-    recipes_are_half_width = all(w.shape == (d_model, d_k) for head in heads for w in head)
+    recipes_are_half_width = (all(w.shape == (d_model, d_k) for head in heads for w in head)
+                              # and the three shapes the page shows are those same three shapes
+                              and shown_wq_shape == (d_model, d_k)
+                              and shown_wk_shape == (d_model, d_k)
+                              and shown_wv_shape == (d_model, d_k))
     # d_v is a CHOICE, so state both halves of it: it equals d_k here, and that equality is
     # what makes the join land on d_model. Day 3's d_v was 2 against a d_k of 4, so this is
     # not a rule the module discovered — it is a knob this day sets on purpose.
-    value_width_is_chosen = (d_v == d_k and h * d_v == d_model
+    value_width_is_chosen = (d_v == d_k and joined_width_from_heads == d_model
                              and W_V_slice.shape == (d_model, d_v)
-                             and joined.shape[-1] == h * d_v)
+                             and joined.shape[-1] == joined_width_from_heads)
     # The score grid is QUERY-first, so the asker's sharpness lives in its ROW. If it were
     # read key-first, cat's sharp share would have to appear in cat's COLUMN, which holds
     # only the flat 1/3 of the two words that ask nothing.
     grid_is_query_first = (close(cat_row_top, ONE_JOB_SHARE)
                            and close(cat_column_top, FLAT_SHARE)
-                           and not close(cat_column_top, ONE_JOB_SHARE))
+                           and not close(cat_column_top, ONE_JOB_SHARE)
+                           # the two rounded numbers the sentence on the page carries
+                           and shown_row_top == 0.9867 and shown_column_top == 0.3333)
     split_rule_holds_at_every_dial = (dial_widths == EXPECTED_DIAL_WIDTHS
+                                      and dial_lines == EXPECTED_DIAL_LINES
                                       and d_k == split_width(d_model, h))
     # NOTE on what actually separates these two heads. "cat" is the row [0, 0, 1, 1]: it asks
     # BOTH questions equally, so slot 3 and slot 4 hold the same 1.0, and W_Q_A (which reads
@@ -370,8 +442,11 @@ if __name__ == "__main__":
                               and close(head_outs[1][CAT, 1], PANEL_SHARP)
                               and close(head_outs[0][CAT, 1], PANEL_TINY)
                               and close(head_outs[1][CAT, 0], PANEL_TINY))
-    widths_as_predicted = ([head_outs[0].shape, joined.shape, final.shape] == predicted
-                           and head_outs[1].shape == (3, 2) and joined.shape == (3, 4) and final.shape == (3, 4))
+    widths_as_predicted = ([shown_head_a_shape, shown_joined_shape, shown_final_shape] == predicted
+                           and shown_head_b_shape == (3, 2) and shown_joined_shape == (3, 4)
+                           and shown_final_shape == (3, 4)
+                           # Part 1's full-width shapes are printed too, so pin those as well
+                           and shown_x_shape == (seq, d_model) and shown_qkv_shape == (seq, d_model))
     # concatenate puts head A in the LEFT two columns, head B in the right two.
     join_layout_exact = np.array_equal(joined[:, :2], head_outs[0]) and np.array_equal(joined[:, 2:], head_outs[1])
     heads_differ = not np.allclose(head_outs[0], head_outs[1])   # own recipes -> own answers
@@ -379,17 +454,36 @@ if __name__ == "__main__":
     # cross-head corners zeroed, dropping head B must leave head A's slots bit-for-bit alone.
     w_o_reaches_across_heads = (close(smallest_mixing_move, MOVE_WITH_MIXING)
                                 and moved_mixing.shape == (seq, d_model)
-                                and np.allclose(moved_mixing[:, :a_cols], EXPECTED_MOVED_MIXING_A, atol=1e-5)
-                                and biggest_no_mixing_move == 0.0
+                                # the printed block itself, values and layout, not a second copy
+                                and np.allclose(moved_a_rounded, EXPECTED_MOVED_MIXING_A, atol=1e-5)
+                                and moved_a_block == str(EXPECTED_MOVED_MIXING_A)
+                                and biggest_no_mixing_move == 0.0 and shown_no_mixing_move == 0.0
                                 and np.array_equal(moved_no_mixing[:, :a_cols], np.zeros((seq, a_cols)))
-                                and close(smallest_own_slot_move, MOVE_OF_OWN_SLOTS))
+                                and close(smallest_own_slot_move, MOVE_OF_OWN_SLOTS)
+                                and shown_own_slot_move == 0.4002)
     final_values_match = (bool(np.array_equal(final_rounded, EXPECTED_FINAL))
                           and final_block == str(EXPECTED_FINAL))
     # The one sentence Part 4 is about, pinned as text: whatever number reaches the page, this is
     # the number that has to be on it.
     printed_claim_matches = (mixing_line == "  mixing W_O    : the first 2 final slots move by at"
                                            " least 0.1001 -> head B had a say in them")
-    budget_is_the_same = (params_panel == 48 and params_one_wide_head == 48)
+    # Every share and answer row on the page, checked as the TEXT the learner reads. Each of
+    # these names is the same object that was printed, so a wrong number cannot appear on the
+    # page while a separately written copy of the same maths keeps the ✅.
+    printed_rows_match = (shown_describe_shares == EXPECTED_ROWS["part1 shares"]
+                          and shown_describe_answer == EXPECTED_ROWS["part1 answer"]
+                          and shown_both_shares == EXPECTED_ROWS["part2 shares"]
+                          and shown_both_answer == EXPECTED_ROWS["part2 answer"]
+                          and shown_head_a_shares == EXPECTED_ROWS["head A shares"]
+                          and shown_head_a_answer == EXPECTED_ROWS["head A answer"]
+                          and shown_head_b_shares == EXPECTED_ROWS["head B shares"]
+                          and shown_head_b_answer == EXPECTED_ROWS["head B answer"]
+                          and shown_probe_a_shares == EXPECTED_ROWS["probe A shares"]
+                          and shown_probe_b_shares == EXPECTED_ROWS["probe B shares"]
+                          and shown_tied_answer == EXPECTED_ROWS["tied answer"]
+                          # and the two rows that must differ really do read differently
+                          and shown_head_a_shares != shown_head_b_shares)
+    budget_is_the_same = (params_panel == 48 and params_one_wide_head == 48 and w_o_numbers == 16)
     # A tolerance is only worth something if it can still tell our own numbers apart. The
     # panel's sharp share (0.9983), the full-width head's one-job share (0.9867), the muddy
     # share (0.4983) and the tiny leftover share are four different numbers — close() has to
@@ -398,25 +492,40 @@ if __name__ == "__main__":
                                  and not close(ONE_JOB_SHARE, MUDDY_SHARE)
                                  and not close(PANEL_TINY, 0.0))
     # The random panel: same widths, same join layout — and no head anywhere near sharp.
-    random_panel_widths_match = ([rnd_outs[0].shape, rnd_joined.shape, rnd_final.shape] == predicted
+    random_panel_widths_match = ([shown_rnd_a_shape, shown_rnd_joined_shape, shown_rnd_final_shape] == predicted
+                                 and shown_rnd_b_shape == (seq, d_k)
                                  and np.array_equal(rnd_joined[:, :2], rnd_outs[0])
                                  and np.array_equal(rnd_joined[:, 2:], rnd_outs[1]))
     random_heads_are_not_sharp = (close(biggest_random_share, RANDOM_TOP_SHARE)
                                   and close(panel_top_share, PANEL_SHARP)
-                                  and biggest_random_share < PANEL_SHARP)
+                                  and biggest_random_share < PANEL_SHARP
+                                  # the two rounded numbers the comparison sentence prints
+                                  and shown_random_top == 0.732 and shown_panel_top == 0.9983)
+    # The ✅ sentence itself, built ONCE from the measured numbers above and pinned as text, so
+    # the summary a learner remembers cannot drift from the run that produced it.
+    verdict_line = ("\n✅ you got it — one full-width head asked both questions blurs to"
+                    " %s / %s; two heads with their OWN width-%d recipes each hold %s on their"
+                    " own word (here it is their KEY recipe that separates them — cat asks both"
+                    " questions equally, so both heads get the same Query), they join to width"
+                    " %d, and W_O hands back width %d"
+                    % (round(float(w_both[CAT, 0]), 4), round(float(w_both[CAT, 2]), 4), d_k,
+                       shown_panel_top, shown_joined_shape[-1], shown_final_shape[-1]))
+    printed_verdict_matches = (verdict_line == "\n✅ you got it — one full-width head asked both"
+                               " questions blurs to 0.4983 / 0.4983; two heads with their OWN"
+                               " width-2 recipes each hold 0.9983 on their own word (here it is"
+                               " their KEY recipe that separates them — cat asks both questions"
+                               " equally, so both heads get the same Query), they join to width 4,"
+                               " and W_O hands back width 4")
 
     if all([rows_sum_to_one, one_head_blurs, one_head_can_be_sharp, recipes_are_half_width,
             value_width_is_chosen, grid_is_query_first,
             split_rule_holds_at_every_dial, panel_heads_stay_sharp, heads_own_their_own_keys,
             heads_ask_their_own_questions, corners_both_zeroed,
             widths_as_predicted, join_layout_exact, heads_differ,
-            w_o_reaches_across_heads, final_values_match, printed_claim_matches, budget_is_the_same,
+            w_o_reaches_across_heads, final_values_match, printed_claim_matches, printed_rows_match,
+            printed_verdict_matches, budget_is_the_same,
             tolerance_is_tight_enough, random_panel_widths_match, random_heads_are_not_sharp]):
-        print("\n✅ you got it — one full-width head asked both questions blurs to 0.4983 / 0.4983;"
-              " two heads with their OWN width-2 recipes each hold 0.9983 on their own word"
-              " (here it is their KEY recipe that separates them — cat asks both questions"
-              " equally, so both heads get the same Query), they join to width 4, and W_O"
-              " hands back width 4")
+        print(verdict_line)
     else:
         print("\n❌ not yet — expected the muddy share", MUDDY_SHARE, "the panel's sharp share", PANEL_SHARP,
               "widths (3,2) / (3,4) / (3,4), head A in joined[:, :2] and head B in joined[:, 2:], the first two"
@@ -454,6 +563,10 @@ if __name__ == "__main__":
     assert final_values_match, "the final vectors, rounded to 4 places, must match the written-down ones"
     assert printed_claim_matches, ("the Part-4 sentence must reach the page reading 'move by at least 0.1001'"
                                    " — the same number the self-check pins")
+    assert printed_rows_match, ("every share and answer row must reach the page reading exactly the numbers"
+                               " written down in EXPECTED_ROWS — the printed line IS the evidence")
+    assert printed_verdict_matches, ("the ✅ sentence must read 0.4983 / 0.4983, width-2 heads holding 0.9983,"
+                                     " and width 4 both after the join and after W_O")
     assert budget_is_the_same, "two heads of width 2 must hold as many numbers as one head of width 4"
     assert tolerance_is_tight_enough, "close() must still tell 0.9983, 0.9867, 0.4983 and 0.0008 apart"
     assert random_panel_widths_match, "the random panel must reach (3,2) per head, (3,4) joined, (3,4) final too"

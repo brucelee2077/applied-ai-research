@@ -93,16 +93,29 @@ if __name__ == "__main__":
     # ---- Run 1: a sensible learning rate. The loss should slide down toward 0. ----
     # lr = 0.01 leaves a real CURVE to watch: 1.0 -> 0.12 -> 0.015 -> 0.0018 -> 0.0002.
     healthy, healthy_preds, w_healthy, b_healthy = train_one_neuron(lr=0.01)
-    # Print the curve every 10 loops so we can WATCH it slide downhill.
-    print("lr = 0.01  (healthy, should converge):")
-    for i in range(0, len(healthy), 10):
-        print(f"  loop {i:2d}: loss = {healthy[i]:.6f}")
     final_healthy = healthy[-1]
-    print(f"  final loss = {final_healthy:.6g}  (started at {healthy[0]:.6g})")
+    # Build the curve every 10 loops so we can WATCH it slide downhill. From here on
+    # EVERY printed line is built once into a named string, printed, and then pinned
+    # character-for-character in the self-check. Formatting a number inside the print
+    # instead leaves the screen and the check as two separate expressions — and then
+    # reversing or re-rounding these rows could show this falling loss RISING while
+    # every value-level assert below still passed.
+    curve_rows = [f"  loop {i:2d}: loss = {healthy[i]:.6f}"
+                  for i in range(0, len(healthy), 10)]
+    healthy_final_line = (f"  final loss = {final_healthy:.6g}"
+                          f"  (started at {healthy[0]:.6g})")
     # Show WHICH parameters got there. w and b are both learned; a loss curve alone
-    # cannot tell you whether the bias did any work, so print (and pin) them both.
-    print(f"  learned w = {w_healthy:.6f}, b = {b_healthy:.6f}"
-          f"  ->  pred = {w_healthy * X + b_healthy:.6f}  (target {TARGET:g})")
+    # cannot tell you whether the bias did any work, so print (and pin) them both —
+    # along with the prediction they add up to, which used to exist in the print only
+    # and so was the one number on this line that nothing could contradict.
+    healthy_pred = w_healthy * X + b_healthy
+    healthy_params_line = (f"  learned w = {w_healthy:.6f}, b = {b_healthy:.6f}"
+                           f"  ->  pred = {healthy_pred:.6f}  (target {TARGET:g})")
+    print("lr = 0.01  (healthy, should converge):")
+    for row in curve_rows:
+        print(row)
+    print(healthy_final_line)
+    print(healthy_params_line)
     print()
 
     # ---- Run 2: learning rate WAY too high. Each step overshoots -> loss explodes. ----
@@ -116,13 +129,20 @@ if __name__ == "__main__":
     sign_flips = int(np.sum(high_signs[1:] != high_signs[:-1]))
     # By how much is the miss multiplied each lap? Negative => it jumped past the target.
     miss_ratios = high_misses[1:] / high_misses[:-1]
+    # The lap-by-lap guess is rendered ONCE, so the string on screen is the string
+    # that gets checked — including the fifth lap, which the old list-of-four check
+    # never reached even though it was printed.
+    high_preds_shown = " -> ".join(f"{p:g}" for p in high_preds[:5])
+    high_preds_line = ("  prediction, lap by lap: " + high_preds_shown
+                       + " -> ...   <- it flips sign EVERY lap")
+    high_miss_line = (f"  the miss is multiplied by {miss_ratios[0]:g} each lap"
+                      f"  ->  {sign_flips} of {len(high_preds) - 1} steps flip sign")
+    high_final_line = (f"  final loss = {final_high:.6g}"
+                       "   <- astronomical: the too-high failure, live")
     print("lr = 1.5  (too high -> diverges / blows up):")
-    print("  prediction, lap by lap: "
-          + " -> ".join(f"{p:g}" for p in high_preds[:5])
-          + " -> ...   <- it flips sign EVERY lap")
-    print(f"  the miss is multiplied by {miss_ratios[0]:g} each lap"
-          f"  ->  {sign_flips} of {len(high_preds) - 1} steps flip sign")
-    print(f"  final loss = {final_high:.6g}   <- astronomical: the too-high failure, live")
+    print(high_preds_line)
+    print(high_miss_line)
+    print(high_final_line)
     print("  (the error flips sign every loop and grows -> keep looping and it becomes inf / NaN)")
 
     # Keep looping and it becomes inf / NaN -- that is a claim, so measure it instead
@@ -133,15 +153,19 @@ if __name__ == "__main__":
     saw_inf, saw_nan = np.isinf(long_high), np.isnan(long_high)
     first_inf = int(np.argmax(saw_inf)) if saw_inf.any() else -1
     first_nan = int(np.argmax(saw_nan)) if saw_nan.any() else -1
-    print(f"  measured over 300 laps: loss first becomes inf on lap {first_inf}, "
-          f"then NaN on lap {first_nan}\n")
+    overflow_line = (f"  measured over 300 laps: loss first becomes inf on lap {first_inf}, "
+                     f"then NaN on lap {first_nan}")
+    print(overflow_line)
+    print()
 
     # ---- Run 3: learning rate too low. Each nudge is tiny -> loss barely moves. ----
     too_low, _, _, _ = train_one_neuron(lr=0.00005)
     final_low = too_low[-1]
+    low_line = f"  start loss = {too_low[0]:.6f},  final loss = {final_low:.6f}"
     print("lr = 0.00005  (too low -> crawls):")
-    print(f"  start loss = {too_low[0]:.6f},  final loss = {final_low:.6f}")
-    print("  the loss barely moved after 50 loops -> the too-low failure\n")
+    print(low_line)
+    print("  the loss barely moved after 50 loops -> the too-low failure")
+    print()
 
     # ---- Why "healthy" is RELATIVE: a rate is judged against a CURVATURE ----------
     # One lap multiplies the MISS (pred - target) by (1 - lr * C), where C is this
@@ -151,28 +175,40 @@ if __name__ == "__main__":
     # weight**2, gradient 2*weight) has C = 2 and a limit of lr < 1, so the SAME 0.01
     # shrinks by 0.98 there and earns the label "crawl". Same number, different problem.
     curvature = 2 * (X * X + 1)
+    # the stability limit is a printed claim AND the lr the on-limit run uses, so it
+    # is one bound value feeding both — not the same division written twice
+    stability_limit = 2 / curvature
     formula_shrink = 1 - 0.01 * curvature          # what the formula predicts here
     measured_shrink = (healthy_preds[1] - TARGET) / (healthy_preds[0] - TARGET)
     day08_bowl_shrink = 1 - 0.01 * 2               # the same rate on Day 8's C = 2 bowl
-    print(f"curvature here C = 2*(x*x + 1) = {curvature:g}"
-          f"  ->  stable only while lr < 2/C = {2 / curvature:g}")
-    print(f"  lr = 0.01: measured shrink per lap = {measured_shrink:g}"
-          f" (formula 1 - lr*C = {formula_shrink:g})"
-          f"  vs {day08_bowl_shrink:g} on Day 8's C = 2 bowl -> 'crawl' there")
+    curvature_line = (f"curvature here C = 2*(x*x + 1) = {curvature:g}"
+                      f"  ->  stable only while lr < 2/C = {stability_limit:g}")
+    shrink_line = (f"  lr = 0.01: measured shrink per lap = {measured_shrink:g}"
+                   f" (formula 1 - lr*C = {formula_shrink:g})"
+                   f"  vs {day08_bowl_shrink:g} on Day 8's C = 2 bowl -> 'crawl' there")
+    print(curvature_line)
+    print(shrink_line)
     # Exactly ON the limit the miss flips sign at the SAME size forever: never diverges,
     # never converges. Without this row the "lr < 0.2" claim would be untested.
-    on_limit, on_limit_preds, _, _ = train_one_neuron(lr=2 / curvature)
-    print(f"  lr = {2 / curvature:g} (exactly 2/C): loss stays {on_limit[-1]:g} for all"
-          f" {len(on_limit)} laps while the guess flips {on_limit_preds[1]:g} /"
-          f" {on_limit_preds[2]:g} — on the line, neither converging nor exploding")
+    on_limit, on_limit_preds, _, _ = train_one_neuron(lr=stability_limit)
+    on_limit_line = (f"  lr = {stability_limit:g} (exactly 2/C): loss stays"
+                     f" {on_limit[-1]:g} for all {len(on_limit)} laps while the guess"
+                     f" flips {on_limit_preds[1]:g} / {on_limit_preds[2]:g} — on the"
+                     " line, neither converging nor exploding")
+    print(on_limit_line)
     # The two rates Day 8 blesses, run HERE. 0.1 makes 1 - lr*C exactly 0, so this
     # neuron lands on the target in ONE lap; 1.0 only bounces harmlessly in that bowl.
     day08_good, _, _, _ = train_one_neuron(lr=0.1)
     day08_big, _, _, _ = train_one_neuron(lr=1.0)
-    print(f"  Day 8's 'just right' lr = 0.1 here: shrink {1 - 0.1 * curvature:g}"
-          f" -> loss {day08_good[1]:g} after ONE lap (dead on the target)")
-    print(f"  Day 8's lr = 1.0 (stuck at loss 4 in that bowl) here: final loss"
-          f" {day08_big[-1]:.6g}  <- the same number, the opposite verdict\n")
+    # this shrink used to be arithmetic inside the print, so nothing could contradict it
+    day08_good_shrink = 1 - 0.1 * curvature
+    day08_good_line = (f"  Day 8's 'just right' lr = 0.1 here: shrink {day08_good_shrink:g}"
+                       f" -> loss {day08_good[1]:g} after ONE lap (dead on the target)")
+    day08_big_line = (f"  Day 8's lr = 1.0 (stuck at loss 4 in that bowl) here: final loss"
+                      f" {day08_big[-1]:.6g}  <- the same number, the opposite verdict")
+    print(day08_good_line)
+    print(day08_big_line)
+    print()
 
     # ---- Day 5's Rule 1, put back: with a real bend the toll can be ZERO ----------
     # This day's neuron has no activation, so the toll is 1 and vanishes from the two
@@ -180,11 +216,17 @@ if __name__ == "__main__":
     # w = b = 0, z = 0 is not > 0, the slope is 0, and nothing ever moves.
     dead_losses, dead_w, dead_b = train_with_relu_toll(lr=0.01)
     live_losses, _, _ = train_with_relu_toll(lr=0.01, w=0.6)
+    dead_line = (f"  start w = 0, b = 0 -> z = 0, toll = 0: loss stays {dead_losses[-1]:g}"
+                 f" for all {len(dead_losses)} laps, w = {dead_w:g}, b = {dead_b:g}"
+                 " (a dead unit)")
+    # the two ends of the live curve are rendered once and pinned in order, so the
+    # "loss falls" claim cannot print backwards as a loss that rose
+    live_line = (f"  start w = 0.6      -> z = 1.2, toll = 1: loss falls {live_losses[0]:.6g}"
+                 f" -> {live_losses[-1]:.6g}  <- the toll, not the loop, is the difference")
     print("with Day 5's ReLU toll (same loop, same lr = 0.01):")
-    print(f"  start w = 0, b = 0 -> z = 0, toll = 0: loss stays {dead_losses[-1]:g} for all"
-          f" {len(dead_losses)} laps, w = {dead_w:g}, b = {dead_b:g} (a dead unit)")
-    print(f"  start w = 0.6      -> z = 1.2, toll = 1: loss falls {live_losses[0]:.6g}"
-          f" -> {live_losses[-1]:.6g}  <- the toll, not the loop, is the difference\n")
+    print(dead_line)
+    print(live_line)
+    print()
 
     # ---- Self-check: assert each run behaved exactly as the lesson says it should. ----
     # Loose bands ("final loss < 1e-3", "> 1e6") pass for almost any descent-shaped
@@ -203,6 +245,9 @@ if __name__ == "__main__":
         # 2) Healthy run: BOTH parameters did their share of the work.
         assert abs(w_healthy - 0.397938489917072) < 1e-12, f"learned w: {w_healthy}"
         assert abs(b_healthy - 0.198969244958536) < 1e-12, f"learned b: {b_healthy}"
+        # and the prediction those two add up to — the number the learner reads as
+        # "did it actually reach the target", printed on that same line
+        assert abs(healthy_pred - 0.99484622479268) < 1e-12, f"pred: {healthy_pred}"
         # 3) Too-high run: the guess overshoots and flips sign every single lap.
         assert list(high_preds[:4]) == [0.0, 15.0, -195.0, 2745.0], \
             f"the guess should swing 0 -> 15 -> -195 -> 2745, got {list(high_preds[:4])}"
@@ -223,6 +268,7 @@ if __name__ == "__main__":
             f"too-low run should crawl to 0.952169, got {final_low}"
         # 7) The curvature block: the verdict words are relative, and the numbers say so.
         assert curvature == 10.0, f"C = 2*(x*x+1) should be 10, got {curvature}"
+        assert stability_limit == 0.2, f"2/C should be 0.2, got {stability_limit}"
         assert abs(measured_shrink - 0.9) < 1e-12, \
             f"the measured shrink per lap at lr = 0.01 should be 0.9, got {measured_shrink}"
         assert abs(measured_shrink - formula_shrink) < 1e-12, \
@@ -235,6 +281,8 @@ if __name__ == "__main__":
         assert list(on_limit_preds[:3]) == [0.0, 2.0, 0.0], \
             f"at lr = 2/C the guess should flip 0 -> 2 -> 0, got {list(on_limit_preds[:3])}"
         # Day 8's two blessed rates, judged by THIS problem
+        assert day08_good_shrink == 0.0, \
+            f"lr = 0.1 makes 1 - lr*C exactly 0, got {day08_good_shrink}"
         assert day08_good[1] == 0.0, \
             f"lr = 0.1 gives 1 - lr*C = 0, so lap 1's loss is exactly 0, got {day08_good[1]}"
         assert abs(np.log10(day08_big[-1]) - 93.51576592505384) < 1e-6, \
@@ -252,6 +300,63 @@ if __name__ == "__main__":
         # and it must really have CONVERGED relative to the dead unit beside it
         assert live_losses[-1] < live_losses[0] / 1000.0 < dead_losses[-1], \
             f"with the toll open (z > 0) the same loop must converge, got {live_losses[-1]}"
+        # 9) And the LINES themselves, exactly as they reached the screen. Each was
+        #    built once above and then printed, so this pins what a learner actually
+        #    reads: a re-rounded cell, a reversed curve, or two right numbers swapped
+        #    into each other's slots changes the screen without changing any value
+        #    checked above, and would otherwise pass unnoticed.
+        printed_lines = [
+            ("the healthy curve should fall 1.0 / 0.121577 / 0.014781 / 0.001797 / 0.000218",
+             curve_rows, ["  loop  0: loss = 1.000000",
+                          "  loop 10: loss = 0.121577",
+                          "  loop 20: loss = 0.014781",
+                          "  loop 30: loss = 0.001797",
+                          "  loop 40: loss = 0.000218"]),
+            ("the healthy run should end at 3.27919e-05 having started at 1",
+             healthy_final_line, "  final loss = 3.27919e-05  (started at 1)"),
+            ("the learned parameters line should read w = 0.397938, b = 0.198969, pred = 0.994846",
+             healthy_params_line,
+             "  learned w = 0.397938, b = 0.198969  ->  pred = 0.994846  (target 1)"),
+            ("the too-high guess should print 0 -> 15 -> -195 -> 2745 -> -38415",
+             high_preds_line, "  prediction, lap by lap: 0 -> 15 -> -195 -> 2745 -> -38415"
+                              " -> ...   <- it flips sign EVERY lap"),
+            ("the too-high miss line should read x -14 with 49 of 49 flips",
+             high_miss_line, "  the miss is multiplied by -14 each lap"
+                             "  ->  49 of 49 steps flip sign"),
+            ("the too-high final loss should print 2.09193e+112",
+             high_final_line, "  final loss = 2.09193e+112"
+                              "   <- astronomical: the too-high failure, live"),
+            ("the overflow line should read inf on lap 135, NaN on lap 271",
+             overflow_line, "  measured over 300 laps: loss first becomes inf on lap 135,"
+                            " then NaN on lap 271"),
+            ("the crawl line should read start 1.000000, final 0.952169",
+             low_line, "  start loss = 1.000000,  final loss = 0.952169"),
+            ("the curvature line should read C = 10 with a limit of lr < 0.2",
+             curvature_line, "curvature here C = 2*(x*x + 1) = 10"
+                             "  ->  stable only while lr < 2/C = 0.2"),
+            ("the shrink line should read measured 0.9, formula 0.9, and 0.98 on Day 8's bowl",
+             shrink_line, "  lr = 0.01: measured shrink per lap = 0.9 (formula 1 - lr*C = 0.9)"
+                          "  vs 0.98 on Day 8's C = 2 bowl -> 'crawl' there"),
+            ("the on-the-limit line should read a flat loss of 1 with the guess flipping 2 / 0",
+             on_limit_line, "  lr = 0.2 (exactly 2/C): loss stays 1 for all 50 laps while"
+                            " the guess flips 2 / 0 — on the line, neither converging nor"
+                            " exploding"),
+            ("Day 8's lr = 0.1 line should read shrink 0 and loss 0 after one lap",
+             day08_good_line, "  Day 8's 'just right' lr = 0.1 here: shrink 0 -> loss 0"
+                              " after ONE lap (dead on the target)"),
+            ("Day 8's lr = 1.0 line should read a final loss of 3.27919e+93",
+             day08_big_line, "  Day 8's lr = 1.0 (stuck at loss 4 in that bowl) here:"
+                             " final loss 3.27919e+93  <- the same number, the opposite"
+                             " verdict"),
+            ("the dead-unit line should read a flat loss of 1 with w = 0 and b = 0",
+             dead_line, "  start w = 0, b = 0 -> z = 0, toll = 0: loss stays 1 for all 50"
+                        " laps, w = 0, b = 0 (a dead unit)"),
+            ("the live-probe line should read the loss FALLING 0.04 -> 1.31167e-06",
+             live_line, "  start w = 0.6      -> z = 1.2, toll = 1: loss falls 0.04 ->"
+                        " 1.31167e-06  <- the toll, not the loop, is the difference"),
+        ]
+        for why, got, want in printed_lines:
+            assert got == want, f"{why} · got {got!r}"
         print("✅ you got it")
     except AssertionError as e:
         # If any check fails, say what we expected so it's easy to fix.

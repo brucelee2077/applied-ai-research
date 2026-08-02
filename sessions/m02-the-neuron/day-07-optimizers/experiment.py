@@ -159,11 +159,16 @@ if __name__ == "__main__":
     # Print the table an interviewer could read off in one glance. The three cells are
     # rendered ONCE, here, and the self-check below pins these very strings.
     cells = (show(plain_step), show(mom_step), show(adap_step))
+    # The loss column, rendered ONCE here. The table below prints these three strings and
+    # the self-check pins these same three strings — one value, read twice. (Rendering
+    # fmt(plain_loss) again inside the check would be a SECOND expression for one number:
+    # corrupt the printed one and the learner reads a wrong loss under a passing ✅.)
+    loss_cells = (fmt(plain_loss), fmt(mom_loss), fmt(adap_loss))
     print(f"Valley 0.5*(4*wx^2 + 0.2*wy^2) | start={START} lr={LR} keep={KEEP} steps={STEPS}")
     print(f"First step where loss < {BAR}:")
-    print(f"  {'plain SGD':<18s}: {cells[0]:>8s}   (loss@{STEPS} = {fmt(plain_loss)})")
-    print(f"  {'Momentum':<18s}: {cells[1]:>8s}   (loss@{STEPS} = {fmt(mom_loss)})")
-    print(f"  {'Adaptive (RMSProp)':<18s}: {cells[2]:>8s}   (loss@{STEPS} = {fmt(adap_loss)})")
+    print(f"  {'plain SGD':<18s}: {cells[0]:>8s}   (loss@{STEPS} = {loss_cells[0]})")
+    print(f"  {'Momentum':<18s}: {cells[1]:>8s}   (loss@{STEPS} = {loss_cells[1]})")
+    print(f"  {'Adaptive (RMSProp)':<18s}: {cells[2]:>8s}   (loss@{STEPS} = {loss_cells[2]})")
 
     # What does the shared learning rate DO? One plain step, measured.
     fx, fy = plain_step_factors(LR, START)
@@ -175,19 +180,22 @@ if __name__ == "__main__":
     # And is that rate really SHARED? Halve it and every racer must slow down. A racer
     # that quietly hardcoded 0.3 instead of reading `lr` would keep its number here.
     half_lr = LR / 2
+    half_lr_cell = "%g" % half_lr          # the rate as PRINTED, pinned below
     half_cells = (show(run_plain_sgd(half_lr, STEPS, START)[0]),
                   show(run_momentum(half_lr, STEPS, START, KEEP)[0]),
                   show(run_adaptive(half_lr, STEPS, START)[0]))
-    print(f"Same race at half the rate (lr={half_lr:g}): plain {half_cells[0].strip()},"
+    print(f"Same race at half the rate (lr={half_lr_cell}): plain {half_cells[0].strip()},"
           f" Momentum {half_cells[1].strip()}, adaptive {half_cells[2].strip()}"
           f" — smaller hops, later finishes, and plain SGD runs out of steps.")
 
 
     # No racer ever lands EXACTLY on the bar, so the bar's strictness would go
-    # untested. Probe it directly, on the boundary and one hair under it.
-    on_bar, under_bar = reached(BAR), reached(BAR - 1e-6)
+    # untested. Probe it directly, on the boundary and one hair under it. The hair-under
+    # height is bound ONCE, so the number the line prints is the number reached() judged.
+    hair_under = BAR - 1e-6
+    on_bar, under_bar = reached(BAR), reached(hair_under)
     print(f"Bar is strict: a loss of exactly {BAR} counts as reached? {on_bar}"
-          f" | a loss of {BAR - 1e-6:g}? {under_bar}")
+          f" | a loss of {hair_under:g}? {under_bar}")
 
     if (LR, START, KEEP, STEPS) != DEFAULTS:
         # The learner is experimenting — report, never assert.
@@ -202,7 +210,7 @@ if __name__ == "__main__":
         # to the learner, so both get pinned — against strings written down HERE,
         # never re-derived from the loops above.
         expected_losses = ('5.49e-03', '3.83e-07', '7.97e-28')
-        got_losses = (fmt(plain_loss), fmt(mom_loss), fmt(adap_loss))
+        got_losses = loss_cells          # the very strings the table printed, not a re-render
         steps_ok = cells == expected_cells
         losses_ok = got_losses == expected_losses
         # The bar itself: on-the-line is NOT reached, a hair under it is.
@@ -213,9 +221,13 @@ if __name__ == "__main__":
         expected_factors = ('-0.200', '+0.940')
         expected_half = ('never', 'step 20', 'step 10')
         factors_ok = factor_cells == expected_factors
-        half_ok = half_cells == expected_half
+        # the half-rate race AND the halved rate itself, exactly as the line printed them
+        half_ok = half_cells == expected_half and half_lr_cell == '0.15'
         if steps_ok and losses_ok and bar_ok and factors_ok and half_ok:
-            print("✅ you got it — plain 26, Momentum 13, adaptive 4: each one sooner.")
+            # the three step counts read straight off the pinned run — not retyped here,
+            # so a wrong number cannot appear in this victory line under a passing ✅
+            print(f"✅ you got it — plain {plain_step}, Momentum {mom_step},"
+                  f" adaptive {adap_step}: each one sooner.")
         else:
             print(f"❌ not yet — expected steps {expected_cells} with losses {expected_losses}"
                   f" and a strict bar (False, True); got steps {cells},"
