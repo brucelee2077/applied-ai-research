@@ -459,6 +459,18 @@ Recorded so they are not lost, and explicitly not built now:
    sits in `sessions/`. *Correction to an earlier draft:* this does **not** corrupt shelf
    labels — those are hardcoded literals and the unlock read goes straight to localStorage.
    The real effect is that the hub's "next review gate" goal card is stuck at m08 forever.
+   **DONE** — fixed in commit `aaff3de`; all four modules verified able to reach 100%.
+2b. **A 5th orphan, found only after the fix landed: `wf2-review`.**
+   `sessions/m02-the-neuron/review-part-a.html` carries `data-quest-id="wf2-review"` and
+   appears in **no** hub row. It is live, not dead: `m02/day-03-layers-forward-pass` links it
+   as "Next →", `m02/day-04-loss` links back as "← Prev", and `sessions/nav_audit.py:44`
+   special-cases it into the canonical chain. So m02's real chain is 9 lessons + **2** gates
+   while `MODULES` lists 9 + 1, and m02's hub denominators (`builtLessons`, `gatesTotal`, the
+   ring, and the goal card's `total`) all under-count by one.
+   **Why the fix above missed it:** the verification walked hub → page only. A page → hub
+   sweep over all 291 tracked pages finds this and only this. **Not fixed** — unlike the other
+   four it needs a new `MODULES` row rather than a one-word correction, which shifts the ring
+   denominator and m02's `remaining`. Logged as the next follow-up.
 3. **69 stub `experiment.py` files** and 0-of-115 written `log.md`. Tracked separately in the
    doing-leg backfill; not part of this design.
 4. **Gamification fossils outside `sessions/`.** A dead token shop and unreachable badges in
