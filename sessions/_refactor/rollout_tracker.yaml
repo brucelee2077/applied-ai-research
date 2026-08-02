@@ -177,6 +177,13 @@ summary:
     total: 115
     stub_modules: [m07(6), m08(4), m09a(6), m09c(5), m10a(2), m12(9), m13(4), m14a(5), m14b(1), m15a(2), m15b(4), m16a(6), m17a(6), m17b(5), m26(4)]
     verified: "115 checked, 46 passed, 69 failed (2026-08-01)"
+    golden_references: 45   # <day>/expected_output.txt — pinned stdout, gate fails on ANY drift
+    golden_exception: "m01-shape-of-data/day-06-random-seeds prints deliberately UNSEEDED draws (the varying numbers ARE the lesson). No reference; never pin it. Also the one sanctioned exception to _experiment_env.md's two-runs-byte-identical rule."
+    audited: >-
+      m02(9)+m03(5)+m04(6) and m05a(8)+m05b(4)+m06(8) adversarially audited and repaired 2026-08-01
+      (fb4fa12, a67cad3, a0fe2f7, 079165a). 718 semantic defects planted across the 40 days; 42 + 194
+      survivors and 73 cross-day collisions found and closed. Reports:
+      sessions/_refactor/doing_leg_audit_m02_m04.md and doing_leg_audit_wave2.md.
     note: >-
       A module's rollout status grades its LESSONS only. m07 is `pass` / 0 open P0 with all 6 of its
       doing legs still stubs — i.e. certified while the learner cannot practise it. When asking
@@ -1057,6 +1064,42 @@ skill_history:
       rather than the tighter pass/fail line.
     reports:
       - sessions/_compiler/AUTHORING.md   # section 10 = the canonical doing-leg catalogue
+  - version: v9_2
+    status: shipped
+    change: >-
+      Golden-output references. Closes the one vacuity class in-file assertions structurally cannot
+      reach: `print("x:", shown_x)` -> `print("x:", shown_x * 2)` is invisible to every assertion in
+      the file, because `shown_x` is correctly bound and correctly asserted and the corruption happens
+      at the print CALL. Measured by an independent AST plant engine at 498 real plants / 4 caught
+      (0.8%), none by an assertion. An in-file mitigation (218 rendered-text pins) moved that 0.3pp
+      and was measured as HARMFUL — ~33% of the pins sat on claim-free rows, so a changed EPOCHS or
+      %8.4f width broke 25-50 at once in artifacts meant to be edited by a learner.
+      `_experiment_check.py --write-expected` now stores a day's stdout as
+      `<day>/expected_output.txt` and the gate fails on any drift. OPT-IN by file existence (the 69
+      stubs are untouched; `--all` still reports 115/46/69). FAIL-NEVER-HEAL: a mismatch prints a
+      unified diff and the regenerate command, and replacing a reference needs `--force`, which
+      itself refuses to pin an artifact that fails its own check. CRLF normalised, trailing blank
+      lines ignored, an empty reference is a hard fail. 45 of 46 real days pinned.
+      ⚠️ It detects DRIFT, never correctness — pinning a broken artifact freezes the breakage as
+      truth, so the FIRST pin of a day is the single point of failure. References were therefore
+      pinned only after this session's audits and plant sweeps, and the engine places the pin AFTER
+      the writer's own planted defects. Documented in AUTHORING.md §10, made the last step of
+      authoring in frontier-lesson-builder, registered in frontier-refactor-qa's Doing-Leg Gate, and
+      wired into doing_leg_build.js as step 8 with a required `golden_pinned` field — an unpinned day
+      with no stated reason is a P0. Also adds vacuity pattern 10 (print/assert divergence) to the
+      catalogue, both skills and both engine prompts.
+    mirror: frontier_lab_refactor_skills_v8/
+    installed_matches_mirror: true
+    verified: >-
+      `diff -q` installed vs mirror -> IDENTICAL on all 4 (2026-08-01). Suite 238 -> 260 passed
+      (+22 golden-output tests, 18 of which failed pre-implementation). `--all` unchanged at
+      115/46/69, verified per-module. Determinism swept 3x over all 46 real days before pinning.
+      Print-site corruptions (operand swap in a %-tuple, printed vector swapped for its sibling,
+      wrong bound name at the print site) confirmed CAUGHT via reference; a comment-only edit still
+      passes. NOT verified: doing_leg_build.js has still never been EXECUTED.
+    reports:
+      - sessions/_refactor/doing_leg_audit_m02_m04.md
+      - sessions/_refactor/doing_leg_audit_wave2.md
 
 # -----------------------------------------------------------------------------
 # NEXT-ROLLOUT PLAYBOOK  (how a picking-up session uses this tracker)
