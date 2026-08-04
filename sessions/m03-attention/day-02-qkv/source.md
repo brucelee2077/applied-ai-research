@@ -210,36 +210,7 @@ Notice what just happened: the score never looked at spelling, at word order, or
 
 So far: one number per pair. Now stop reading and go **drive it yourself** — change "bank"'s question and watch who wins.
 
-%%% svg
-<svg id="sc-svg" viewBox="0 0 520 178" role="img" aria-label="Interactive score explorer. Four sliders set what bank's Query is asking about — water, place, money, action. Three bars show the resulting match scores against river's Key, bank's own Key, and crossed's Key, and the winning bar is highlighted."><g font-family="monospace" font-size="10"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="11">Change the question → watch who wins the match</text><text x="14" y="46" fill="#6B645E">river</text><rect x="76" y="34" width="380" height="18" rx="3" fill="#FDF9F3" stroke="#E5DFD6"/><rect id="sc-b0" x="76" y="34" width="205" height="18" rx="3" fill="#2D8B55" opacity="0.8"/><text id="sc-v0" x="470" y="47" text-anchor="end" fill="#276b45" font-weight="bold">5.4</text><text x="14" y="82" fill="#6B645E">bank</text><rect x="76" y="70" width="380" height="18" rx="3" fill="#FDF9F3" stroke="#E5DFD6"/><rect id="sc-b1" x="76" y="70" width="38" height="18" rx="3" fill="#C99A12" opacity="0.8"/><text id="sc-v1" x="470" y="83" text-anchor="end" fill="#8A6D3B" font-weight="bold">1.0</text><text x="14" y="118" fill="#6B645E">crossed</text><rect x="76" y="106" width="380" height="18" rx="3" fill="#FDF9F3" stroke="#E5DFD6"/><rect id="sc-b2" x="76" y="106" width="15" height="18" rx="3" fill="#7C6DAA" opacity="0.8"/><text id="sc-v2" x="470" y="119" text-anchor="end" fill="#5E5191" font-weight="bold">0.4</text><text x="260" y="150" text-anchor="middle" fill="#9A938A" font-size="9">each bar = "bank"'s Query · that word's Key — the raw match score</text><text id="sc-win" x="260" y="168" text-anchor="middle" fill="#276b45" font-size="10">winner: river</text></g></svg>
-<div style="margin-top:8px;font-family:monospace;font-size:.9em;color:#5A544E">
-<div>"bank" is asking about…</div>
-<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:4px">
-<label>water <input id="sc-q0" type="range" min="0" max="1.5" step="0.1" value="1.0" style="accent-color:#2D8B55;vertical-align:middle"></label>
-<label>place <input id="sc-q1" type="range" min="0" max="1.5" step="0.1" value="0.5" style="accent-color:#2A7B9B;vertical-align:middle"></label>
-<label>money <input id="sc-q2" type="range" min="0" max="1.5" step="0.1" value="0" style="accent-color:#C99A12;vertical-align:middle"></label>
-<label>action <input id="sc-q3" type="range" min="0" max="1.5" step="0.1" value="0" style="accent-color:#7C6DAA;vertical-align:middle"></label>
-</div>
-<div id="sc-out" style="margin-top:6px;color:#2C2A28">Q = [1.0, 0.5, 0, 0] → scores <b>river 5.4 · bank 1.0 · crossed 0.4</b>. Now drag <i>money</i> up to 1.0 and <i>water</i> down to 0 — the winner flips to "bank" itself, and you've just turned a river-bank into a money-bank by hand.</div>
-</div>
-<script>(function(){
-  var q0=document.getElementById('sc-q0');if(!q0)return;
-  var q=[q0,document.getElementById('sc-q1'),document.getElementById('sc-q2'),document.getElementById('sc-q3')];
-  var out=document.getElementById('sc-out'),win=document.getElementById('sc-win');
-  var KEYS=[[4.4,2.0,0,0],[0,2.0,4.0,0],[0,0.8,0,4.0]],NAMES=['river','bank','crossed'];
-  var X=76,W=380,SCALE=10;
-  function paint(){
-    var v=q.map(function(el){return +el.value;});
-    var s=KEYS.map(function(k){var t=0;for(var i=0;i<4;i++)t+=v[i]*k[i];return t;});
-    var best=0;for(var j=1;j<3;j++)if(s[j]>s[best])best=j;
-    for(var j=0;j<3;j++){var b=document.getElementById('sc-b'+j),t=document.getElementById('sc-v'+j);
-      if(b){b.setAttribute('width',Math.max(2,Math.min(W,s[j]/SCALE*W)).toFixed(1));b.setAttribute('opacity',j===best?'1':'0.45');}
-      if(t)t.textContent=s[j].toFixed(1);}
-    win.textContent='winner: '+NAMES[best]+' ('+s[best].toFixed(1)+')';
-    out.innerHTML='Q = ['+v.map(function(x){return x.toFixed(1);}).join(', ')+'] → scores <b>river '+s[0].toFixed(1)+' · bank '+s[1].toFixed(1)+' · crossed '+s[2].toFixed(1)+'</b>';
-  }
-  q.forEach(function(el){el.addEventListener('input',paint);});paint();
-})();</script>
+%%% viz src=../../viz/qkv-score-explorer.html title="Score explorer" caption="Drag the four sliders and watch which word wins the match."
 %%%
 
 **One thing to try:** drag *money* up to 1.0 and *water* down to 0. "bank" now asks about money instead of water — and the winner flips from "river" to "bank" itself. You just changed a word's meaning by changing its question.
