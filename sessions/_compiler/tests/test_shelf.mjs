@@ -17,7 +17,7 @@ assert.equal(isUnlocked('{"done":{"c1":true},"sr":{"x":{"next":1}}}'), true, 'sr
 
 console.log('test_shelf: unlock rule OK')
 
-assert.equal(TOYS.length, 17, 'exactly 17 shelf-eligible viz pages')
+assert.equal(TOYS.length, 22, 'exactly 22 shelf-eligible viz pages')
 
 // every row is well-formed
 for (const t of TOYS) {
