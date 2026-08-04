@@ -134,51 +134,7 @@ Meet our sentence for the day: **"the river bank."** The word **bank** is asking
 
 Two things to try. First, make **"the"** the winner — the trick is that "the" only wins when slot 1 **and** slot 2 are *both* below zero, because those are the only slots river and bank use. Then push river's score all the way negative and see what an active mismatch looks like; the caption under the sliders tells you exactly how far to drag from wherever you are.
 
-%%% svg
-<svg id="d3dot-svg" viewBox="0 0 520 226" role="img" aria-label="Interactive dot product. Drag the four slots of bank's Query and watch three match scores update live as bars: the score against the Key for the, for river and for bank. Bars grow right from a zero line for positive scores and left for negative ones, with the multiply-and-add arithmetic written beside each."><g font-family="monospace" font-size="11"><text x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">Drag bank's Query — watch its three match scores redraw</text><text x="20" y="38" fill="#5E5191" font-size="10">Query (bank) =</text><text id="d3dot-q" x="118" y="38" fill="#3A342E" font-size="11">[2, 1, 1, 1]</text><line x1="210" y1="46" x2="210" y2="176" stroke="#B8AEA2"/><text x="210" y="190" text-anchor="middle" fill="#9A938A" font-size="8">0</text><text x="18" y="64" fill="#8A6D3B" font-size="9">Key the</text><text x="18" y="76" fill="#9A938A" font-size="8">[0,0,1,1]</text><rect id="d3dot-b0" x="210" y="52" width="22" height="18" fill="#B8AEA2"/><text id="d3dot-v0" x="440" y="66" fill="#6B645E" font-size="12" font-weight="bold">2</text><text id="d3dot-a0" x="240" y="84" fill="#9A938A" font-size="8">0+0+1+1 = 2</text><text x="18" y="106" fill="#8A6D3B" font-size="9">Key river</text><text x="18" y="118" fill="#9A938A" font-size="8">[2,0,1,1]</text><rect id="d3dot-b1" x="210" y="94" width="66" height="18" fill="#2D8B55"/><text id="d3dot-v1" x="440" y="108" fill="#276b45" font-size="12" font-weight="bold">6</text><text id="d3dot-a1" x="284" y="126" fill="#276b45" font-size="8">4+0+1+1 = 6</text><text x="18" y="148" fill="#8A6D3B" font-size="9">Key bank</text><text x="18" y="160" fill="#9A938A" font-size="8">[0,2,1,1]</text><rect id="d3dot-b2" x="210" y="136" width="44" height="18" fill="#8Cc4a3"/><text id="d3dot-v2" x="440" y="150" fill="#276b45" font-size="12" font-weight="bold">4</text><text id="d3dot-a2" x="262" y="168" fill="#276b45" font-size="8">0+2+1+1 = 4</text><rect x="60" y="198" width="400" height="24" rx="6" fill="#EAF5EE" stroke="#2D8B55" stroke-width="1.5"/><text id="d3dot-win" x="260" y="214" text-anchor="middle" fill="#276b45" font-size="10">river wins (6) — bank leans toward "river"</text></g></svg>
-<div style="margin-top:8px;font-family:monospace;font-size:.9em;color:#5A544E">
-<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-<label>slot 1 <input id="d3dot-s0" type="range" min="-3" max="5" step="1" value="2" style="accent-color:#5E5191;vertical-align:middle"></label>
-<label>slot 2 <input id="d3dot-s1" type="range" min="-3" max="5" step="1" value="1" style="accent-color:#5E5191;vertical-align:middle"></label>
-<label>slot 3 <input id="d3dot-s2" type="range" min="-3" max="5" step="1" value="1" style="accent-color:#5E5191;vertical-align:middle"></label>
-<label>slot 4 <input id="d3dot-s3" type="range" min="-3" max="5" step="1" value="1" style="accent-color:#5E5191;vertical-align:middle"></label>
-</div>
-<div id="d3dot-out" style="margin-top:6px;color:#2C2A28">Query <b>[2, 1, 1, 1]</b> → the <b>2</b>, river <b>6</b>, bank <b>4</b>.</div>
-</div>
-<script>(function(){
-  var s0=document.getElementById('d3dot-s0');if(!s0)return;
-  var s1=document.getElementById('d3dot-s1'),s2=document.getElementById('d3dot-s2'),s3=document.getElementById('d3dot-s3');
-  var KEYS=[[0,0,1,1],[2,0,1,1],[0,2,1,1]],NAMES=['the','river','bank'];
-  var ZERO=210,PX=11;
-  function tip(q,sc){
-    if(sc[1]<0) return 'river’s score is below zero right now — that is an active mismatch, not just a shrug.';
-    var s=q[2]+q[3];
-    for(var t=5;t>=-3;t--){ if(2*t+s<0) return 'to push river below zero from here, drag slot 1 down to '+t+' or lower.'; }
-    return 'slots 3 and 4 are so high that river cannot go negative yet — pull one of them down first.';
-  }
-  function paint(){
-    var q=[+s0.value,+s1.value,+s2.value,+s3.value];
-    document.getElementById('d3dot-q').textContent='['+q.join(', ')+']';
-    var sc=KEYS.map(function(k){return q[0]*k[0]+q[1]*k[1]+q[2]*k[2]+q[3]*k[3];});
-    for(var i=0;i<3;i++){
-      var w=Math.max(2,Math.abs(sc[i])*PX),b=document.getElementById('d3dot-b'+i);
-      b.setAttribute('width',w.toFixed(1));
-      b.setAttribute('x',(sc[i]<0?ZERO-w:ZERO).toFixed(1));
-      b.setAttribute('fill',sc[i]<0?'#C0392B':(i===1?'#2D8B55':(i===2?'#8Cc4a3':'#B8AEA2')));
-      document.getElementById('d3dot-v'+i).textContent=sc[i];
-      var k=KEYS[i];
-      document.getElementById('d3dot-a'+i).textContent=(q[0]*k[0])+'+'+(q[1]*k[1])+'+'+(q[2]*k[2])+'+'+(q[3]*k[3])+' = '+sc[i];
-      document.getElementById('d3dot-a'+i).setAttribute('x',(sc[i]<0?ZERO-w-70:ZERO+w+8).toFixed(1));
-    }
-    var best=0;for(var j=1;j<3;j++){if(sc[j]>sc[best])best=j;}
-    var tied=sc.filter(function(v){return v===sc[best];}).length>1;
-    document.getElementById('d3dot-win').textContent = tied
-      ? 'a tie at '+sc[best]+' — bank has no favourite at all'
-      : NAMES[best]+' wins ('+sc[best]+') — bank leans toward "'+NAMES[best]+'"';
-    document.getElementById('d3dot-out').innerHTML='Query <b>['+q.join(', ')+']</b> → the <b>'+sc[0]+'</b>, river <b>'+sc[1]+'</b>, bank <b>'+sc[2]+'</b> — '+tip(q,sc);
-  }
-  [s0,s1,s2,s3].forEach(function(el){el.addEventListener('input',paint);});paint();
-})();</script>
+%%% viz src=../../viz/dot-product-score.html title="Dot-product scorer" caption="Drag a slot negative and watch the score flip from agreement to mismatch."
 %%%
 
 %%% demo id=dot label="score three Keys against one Query"
@@ -393,31 +349,7 @@ why: only the gaps between scores matter, not how high they sit. This surprising
 #### Play with it — drag the scores and watch the slices move
 Here's the live pizza, starting from our row `[1, 3, 2]`. Drag a slider and watch the shares rebalance. Try pulling river far above the others and watch it swallow almost the whole budget — that is a word "focusing". Then pull all three level and watch attention go vague and spread out.
 
-%%% svg
-<svg id="d3sm-svg" viewBox="0 0 520 196" role="img" aria-label="Interactive softmax. Drag three scaled scores — the, river and bank — and watch the attention shares, drawn as bars, resize. They always stay positive and add up to exactly one whole pizza."><g font-family="monospace" font-size="11" text-anchor="middle"><rect x="40" y="26" width="440" height="140" rx="6" fill="#FDF9F3" stroke="#E5DFD6"/><line x1="60" y1="150" x2="460" y2="150" stroke="#EFE9DF"/><rect id="d3sm-b0" x="110" y="140" width="60" height="10" fill="#B8AEA2"/><text id="d3sm-t0" x="140" y="132" fill="#6B645E">.09</text><text x="140" y="164" fill="#6B645E">the</text><rect id="d3sm-b1" x="230" y="75" width="60" height="75" fill="#2D8B55"/><text id="d3sm-t1" x="260" y="67" fill="#1a5c38">.67</text><text x="260" y="164" fill="#6B645E">river</text><rect id="d3sm-b2" x="350" y="123" width="60" height="27" fill="#C99A12"/><text id="d3sm-t2" x="380" y="115" fill="#9A7208">.24</text><text x="380" y="164" fill="#6B645E">bank</text><text x="260" y="184" fill="#1a5c38" font-size="10">the three shares always add up to one whole pizza (1.00)</text></g></svg>
-<div style="margin-top:8px;font-family:monospace;font-size:.9em;color:#5A544E">
-<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-<label>the <input id="d3sm-s0" type="range" min="-2" max="6" step="0.1" value="1" style="accent-color:#B8AEA2;vertical-align:middle"></label>
-<label>river <input id="d3sm-s1" type="range" min="-2" max="6" step="0.1" value="3" style="accent-color:#2D8B55;vertical-align:middle"></label>
-<label>bank <input id="d3sm-s2" type="range" min="-2" max="6" step="0.1" value="2" style="accent-color:#C99A12;vertical-align:middle"></label>
-</div>
-<div id="d3sm-out" style="margin-top:6px;color:#2C2A28">scores [1.0, 3.0, 2.0] → shares <b>0.09 / 0.67 / 0.24</b> (sum 1.00) — crank one score up and it grabs most of the budget.</div>
-</div>
-<script>(function(){
-  var s0=document.getElementById('d3sm-s0');if(!s0)return;
-  var s1=document.getElementById('d3sm-s1'),s2=document.getElementById('d3sm-s2'),out=document.getElementById('d3sm-out');
-  var BASE=150,MAXH=112;
-  function paint(){
-    var v=[+s0.value,+s1.value,+s2.value];
-    var ex=v.map(function(x){return Math.exp(x);});var Z=ex[0]+ex[1]+ex[2];
-    var sh=ex.map(function(e){return e/Z;});
-    for(var i=0;i<3;i++){var h=Math.max(2,sh[i]*MAXH);var b=document.getElementById('d3sm-b'+i),t=document.getElementById('d3sm-t'+i);
-      if(b){b.setAttribute('y',(BASE-h).toFixed(1));b.setAttribute('height',h.toFixed(1));}
-      if(t){t.setAttribute('y',(BASE-h-8).toFixed(1));t.textContent=sh[i].toFixed(2);}}
-    out.innerHTML='scores ['+v.map(function(x){return x.toFixed(1);}).join(', ')+'] → shares <b>'+sh.map(function(x){return x.toFixed(2);}).join(' / ')+'</b> (sum '+(sh[0]+sh[1]+sh[2]).toFixed(2)+') — crank one score up and it grabs most of the budget.';
-  }
-  [s0,s1,s2].forEach(function(el){el.addEventListener('input',paint);});paint();
-})();</script>
+%%% viz src=../../viz/softmax-shares.html title="Softmax shares" caption="Drag the raw scores and watch how the shares redistribute."
 %%%
 
 !!! c-info 💡
