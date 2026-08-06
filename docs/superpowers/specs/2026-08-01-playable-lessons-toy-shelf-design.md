@@ -104,17 +104,18 @@ Not code. A rule governing when play gets built.
   inert until they are working through `m17a`.
 - **The horizon is forward-only, and that has two costs worth stating.** Lessons already
   passed stay as they are.
-  - `m01-shape-of-data` is 3/6 — `day-01-arrays`, `day-02-indexing-slicing`, and
-    `day-06-random-seeds` have no iframe and no range input, and the learner has already
-    completed all of m01 — so those three remain inert permanently unless separately
-    revisited.
+  - `m01-shape-of-data` was 3/6 — `day-01-arrays`, `day-02-indexing-slicing`, and
+    `day-06-random-seeds` had no iframe and no range input, and the learner had already
+    completed all of m01, so those three would have stayed inert permanently unless
+    separately revisited. **CLOSED 2026-08-06** by exactly the one-time pass this paragraph
+    proposed; m01 now reads 6/6. See §8.5 for what the pass had to do differently, because
+    m01 has no `source.md` and so no compiler path.
   - The larger cost, created by removing the m02 backfill (§4.3): m02's **13** inline widgets
     never reach the shelf unless m02 is revisited. Only the two that already exist as
     standalone pages (`neuron-boundary`, `xor-limit`) are represented, via curated ownership.
-  Neither violates G1, which is scoped to the module the learner is currently on. Both are
-  accepted knowingly rather than overlooked. The cheap remedy, if wanted, is a one-time pass
-  over m01's three inert days folded into the m03 increment — deliberately left out of scope
-  here pending a decision.
+  Neither violates G1, which is scoped to the module the learner is currently on. Both were
+  accepted knowingly rather than overlooked. The m01 remedy has since been taken; the m02 one
+  has not.
 - **Reuse is discovered, not designed.** Build what each lesson needs. Only on the *third*
   time the same widget shape is needed does it become a settings-driven reusable one. This
   follows directly from the user's stated reason for choosing just-in-time.
@@ -483,6 +484,56 @@ Recorded so they are not lost, and explicitly not built now:
    `last_study_date: 2026-04-26`), and a 3-month-stale `DASHBOARD.md`. All out of scope by
    user decision; the paths are noted because they are **not** under `coach/` and so fall
    outside this document's scope line by location as well as by decision.
+5. **The m01 pass — and the one rule in this spec it could not follow.**
+   **DONE 2026-08-06** (plan `docs/superpowers/plans/2026-08-06-m01-play-pass.md`, commits
+   `eae3e0c`…`11db7bb`). m01 went 3/6 → **6/6**; the shelf went 22 → **25** toys and 5 → **8**
+   unlocked, because all three new toys are owned by days the learner has already finished.
+
+   **§4.2 rule 5 does not apply to m01, and this is worth recording rather than glossing.**
+   That rule requires a widget to land through `compile_lesson.py`, and its evidence line is
+   scoped to the modules that have sources: *"All five target lessons already have a
+   `source.md` (verified: m03 5/5, m04 6/6)."* m01 has **none** — it predates the V8/V9
+   source+donor compiler and has been hand-edited ever since (the Coach Layer batches,
+   `_shell_migrate.py`). So there was no compiler path to take, and these three edits went
+   straight into `lesson.html`.
+
+   That gave up two protections the m03 pass relied on: no gate inspected the edit, and no
+   recompile could prove the diff was scoped. Replacements used instead, and all green:
+   - **Diff scope asserted numerically** — each lesson's `git diff --numstat` read exactly
+     `3 1` (three lines added for the embed, one paragraph line rewritten to point at it).
+   - **jsdom render per lesson** — 7 `.module-section`, `data-quest-id` unchanged, checklist
+     still builds 7 rows, exactly one `.build-embed iframe`, exactly one height receiver, 0 JS
+     errors.
+   - **Real-NumPy cross-check of every claim each widget prints**, which is *stronger* than
+     anything the m03 pass had. 240 (value, shape) pairs for the re-shaper; all **150**
+     reachable dial states for the slice picker plus all 16 grid grabs; all **1296** dial
+     states for the seed recipe. This caught one real bug that reasoning had missed: NumPy's
+     empty column slice `g[:, 3:4]` is `[[], []]` with shape `(2, 0)`, not `[]` — the other
+     axis survives.
+
+   Two happy accidents in the existing code made the edits smaller than expected. All three
+   lessons already carried the clamped `viz-height` receiver and the `.build-embed` CSS, so
+   neither had to be added — and all three already ran
+   `document.getElementById('bcastReload')` against ids that did not exist. Giving the new
+   iframe those exact ids turned a dead reference into a working reload button with **zero**
+   script edits.
+
+   What the three widgets are, and what each lets you break — rule 3 is the reviewable one:
+   | page | day | the break |
+   |---|---|---|
+   | `shape-reshaper.html` | 01 | a **legal** re-shape that silently moves 22 of 24 numbers, with a preset where the followed number does not move so a spot-check passes anyway |
+   | `slice-picker.html` | 02 | an out-of-range **index** raises `IndexError`; an out-of-range **slice** returns empty in silence. Plus writing 999 through a view mutating the source |
+   | `seed-recipe.html` | 06 | the lesson's own `f(s) = (5s+3) mod 16` frozen after 2 draws, trapped in a 2-cycle, or unseeded so no run ever repeats |
+
+   Each is built from its lesson's own numbers, not invented ones: days 01 and 02 reproduce
+   lines from their `expected_output.txt`, and day 06 reproduces `experiment.py`'s own
+   assertion `[1, 8, 11, 10]`. Day 06 pins to `experiment.py` and **not** to an
+   `expected_output.txt`, because that day deliberately has none — its unseeded draws differ
+   every run, and that is the lesson.
+
+   `nav_audit` differs from its pre-work baseline by exactly one line: 326 → **329** pages.
+   Chain of 291, 6 broken links and 10 orphans all unchanged, which confirms the three new
+   pages are linked rather than stranded.
 
 ---
 
