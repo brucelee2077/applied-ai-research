@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Break the Recipe — Seeds and PRNGs, Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12; --k:#7C6DAA;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;padding-bottom:1.4rem;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.05),transparent 55%)}
+main{max-width:820px;margin:0 auto;padding:1.2rem 1.1rem 0}
+.intro h1{font-family:var(--display);font-size:1.28rem;font-weight:800;line-height:1.2;margin-bottom:.35rem}
+.intro p{font-size:.95rem;color:var(--text2);max-width:64ch}
+.eyebrow{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.1rem 1.2rem;margin-top:1.1rem}
+.card h2{font-family:var(--display);font-size:.98rem;font-weight:700;margin-bottom:.8rem}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.1rem}
+@media(max-width:720px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.ctrl{display:grid;gap:.3rem;margin-bottom:.85rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:.8rem}
+.ctrl-label{font-size:.87rem;font-weight:600}
+.ctrl-hint{font-size:.76rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.83rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--k);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--k);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]:disabled{opacity:.4;cursor:not-allowed}
+.check{display:flex;align-items:flex-start;gap:.5rem;margin-bottom:.6rem;font-size:.85rem}
+.check input{margin-top:.28rem;accent-color:var(--k);cursor:pointer;flex:none}
+.check label{cursor:pointer}
+.recipe{font-family:var(--mono);font-size:1rem;font-weight:700;padding:.55rem .7rem;border-radius:var(--r-md);
+  background:var(--surface2);border:1px solid var(--border);margin-bottom:.7rem;word-break:break-word}
+.runagain{font-family:var(--body);font-size:.83rem;font-weight:600;padding:.42rem .85rem;border-radius:var(--r-full);
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;margin-bottom:.7rem}
+.runagain:hover{border-color:var(--k);color:var(--k)}
+.presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.pbtn{font-family:var(--mono);font-size:.74rem;font-weight:600;padding:.34rem .6rem;border-radius:var(--r-full);
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer}
+.pbtn:hover{border-color:var(--k);color:var(--k)}
+.readouts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.6rem;margin-top:.7rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.6rem .7rem;min-width:0}
+.ro-k{font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+.ro-v{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--text);word-break:break-word}
+.ro-v.ok{color:var(--ok)} .ro-v.warnc{color:var(--warn)} .ro-v.bad{color:var(--bad)}
+.verdict{margin-top:.7rem;font-size:.9rem;font-weight:600;padding:.55rem .75rem;border-radius:var(--r-md);
+  background:var(--accent-l);border:1px solid #BFDDE8;color:var(--accent-d)}
+.verdict.ok{background:#EFF7F1;border-color:#BEDFC9;color:#1F6B40}
+.verdict.warn{background:#FBF3DA;border-color:#EBDCA6;color:#8A6A08}
+.verdict.bad{background:#FDECEA;border-color:#F0C4BC;color:#A33322}
+.verdict .plain{display:block;font-weight:400;font-size:.83rem;margin-top:.3rem}
+.note{margin-top:.8rem;font-size:.82rem;color:var(--muted);border-left:3px solid var(--border);padding-left:.7rem}
+svg{width:100%;height:auto;display:block}
+.tag{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.5rem}
+</style>
+</head>
+<body>
+<main>
+  <div class="intro">
+    <span class="eyebrow">Module 1 · Day 6 · play with it</span>
+    <h1>Break the recipe — and watch "random" stop being random</h1>
+    <p>This is the lesson's own hand-sized recipe: one hidden number, one fixed rule, and a
+    stream of numbers that looks random but is not. Change the rule and you can wreck it in
+    three different ways — freeze it, trap it between two numbers, or make every draw the same.
+    Untick the seed and you break something else instead: the ability to ever get that run back.</p>
+  </div>
+
+  <div class="card">
+    <h2>Your recipe, and your seed</h2>
+    <div class="wrap">
+      <div>
+        <div class="recipe" id="sd-recipe">f(s) = (5 × s + 3) mod 16</div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">Seed <span class="ctrl-hint">(the very first hidden number)</span></span>
+            <span class="ctrl-val" id="sd-seed-v">1</span>
+          </div>
+          <input type="range" id="sd-seed" min="0" max="15" step="1" value="1"
+                 aria-label="the seed, which is the first hidden state">
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">Multiply by <span class="ctrl-hint">(the scrambler)</span></span>
+            <span class="ctrl-val" id="sd-mul-v">5</span>
+          </div>
+          <input type="range" id="sd-mul" min="0" max="8" step="1" value="5"
+                 aria-label="the multiplier in the recipe">
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">Then add</span>
+            <span class="ctrl-val" id="sd-inc-v">3</span>
+          </div>
+          <input type="range" id="sd-inc" min="0" max="8" step="1" value="3"
+                 aria-label="the amount added in the recipe">
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="sd-noseed">
+          <label for="sd-noseed">No seed — start wherever the clock lands
+            <span class="ctrl-hint">(this is what a script with no <code>seed(0)</code> line does)</span>
+          </label>
+        </div>
+
+        <button class="runagain" id="sd-again" type="button">▶ run the script a second time</button>
+
+        <div class="tag">Or jump straight to a setting worth seeing:</div>
+        <div class="presets">
+          <button class="pbtn" data-seed="1" data-mul="5" data-inc="3">the lesson's recipe</button>
+          <button class="pbtn" data-seed="1" data-mul="4" data-inc="3">frozen after 2 draws</button>
+          <button class="pbtn" data-seed="1" data-mul="1" data-inc="8">two numbers, forever</button>
+          <button class="pbtn" data-seed="1" data-mul="0" data-inc="3">every draw the same</button>
+        </div>
+
+        <div class="readouts">
+          <div class="ro"><div class="ro-k">repeats every</div><div class="ro-v" id="ro-cycle">16 draws</div></div>
+          <div class="ro"><div class="ro-k">numbers it can reach</div><div class="ro-v" id="ro-distinct">16 of 16</div></div>
+        </div>
+
+        <div class="verdict ok" id="sd-verdict">Reproducible ✓</div>
+      </div>
+
+      <div>
+        <svg id="sd-fig" viewBox="0 0 620 250" role="img"
+             aria-label="Two rows of eight draws, one for each time the script is run, with a tick between them when both runs produced the same number. Underneath, a strip of the sixteen possible numbers, filled in when the recipe can ever reach that number."></svg>
+        <div class="note" id="sd-caption">
+          Two runs of the same script, one under the other. A tick means both runs gave the same
+          number at that step.
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Where this toy stops being the truth:</b> NumPy's real generator is called PCG64 and its
+      hidden state is astronomically larger than the 16 values here, so it never repeats in any
+      run you will ever do. The <em>idea</em> is exactly this one though — a hidden number, a fixed
+      rule, and a stream that replays whenever you start it in the same place. These digits come
+      from the recipe above, not from NumPy, so do not go looking for them in your own output.
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  'use strict';
+
+  var MOD = 16;        // small on purpose: the whole state space fits on screen
+  var DRAWS = 8;
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var el = {};
+  ['sd-seed','sd-mul','sd-inc','sd-noseed','sd-again','sd-seed-v','sd-mul-v','sd-inc-v',
+   'sd-recipe','ro-cycle','ro-distinct','sd-verdict','sd-fig','sd-caption'
+  ].forEach(function(id){ el[id] = document.getElementById(id); });
+
+  // ---- the maths, kept apart from the drawing so it can be tested on its own ----
+
+  function nextState(s, mul, inc){ return (mul * s + inc) % MOD; }
+
+  function streamFrom(seed, mul, inc, count){
+    var s = seed % MOD, out = [s], i;
+    for (i = 1; i < count; i++){ s = nextState(s, mul, inc); out.push(s); }
+    return out;
+  }
+
+  // Walk until a state comes back. tail = steps before the loop starts,
+  // cycle = how many draws until it repeats, visited = every state it can reach.
+  function cycleInfo(seed, mul, inc){
+    var seen = {}, order = [], s = seed % MOD, i = 0;
+    while (!seen.hasOwnProperty(s)){
+      seen[s] = i; order.push(s);
+      s = nextState(s, mul, inc);
+      i++;
+    }
+    return { tail: seen[s], cycle: i - seen[s], distinct: order.length, visited: order };
+  }
+
+  // ---- which seeds the two runs start from ----
+
+  var unseededA = 4, unseededB = 11;      // replaced on every re-roll
+
+  function pick(){ return Math.floor(Math.random() * MOD); }
+
+  function rerollUnseeded(){
+    unseededA = pick();
+    do { unseededB = pick(); } while (unseededB === unseededA);
+  }
+
+  function seeds(){
+    var noSeed = el['sd-noseed'].checked;
+    if (!noSeed){ var s = +el['sd-seed'].value; return { a: s, b: s }; }
+    return { a: unseededA, b: unseededB };
+  }
+
+  // ---- drawing ----
+
+  function mk(name, attrs){
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
+
+  function tile(x, y, w, h, label, mode){
+    var g = mk('g', {});
+    var fill = '#FDF9F3', stroke = '#E5DFD6', sw = '1', tc = '#2C2A28';
+    if (mode === 'match'){ fill = '#E4F2F7'; stroke = '#2A7B9B'; sw = '2'; tc = '#1F6280'; }
+    if (mode === 'differ'){ fill = '#FDECEA'; stroke = '#BE3E26'; sw = '2'; tc = '#A33322'; }
+    if (mode === 'stuck'){ fill = '#FBF3DA'; stroke = '#C99A12'; sw = '2'; tc = '#8A6A08'; }
+    if (mode === 'off'){ fill = '#F7F4EF'; tc = '#BDB7B0'; }
+    g.appendChild(mk('rect', {x:x, y:y, width:w, height:h, rx:6, fill:fill, stroke:stroke, 'stroke-width':sw}));
+    var t = mk('text', {x:x + w / 2, y:y + h / 2 + 5, 'text-anchor':'middle',
+                        'font-family':'JetBrains Mono, monospace', 'font-size':'14',
+                        'font-weight':'600', fill:tc});
+    t.textContent = label;
+    g.appendChild(t);
+    return g;
+  }
+
+  function label(x, y, text, colour, size){
+    var t = mk('text', {x:x, y:y, 'font-family':'JetBrains Mono, monospace',
+                        'font-size':String(size || 10), fill:colour || '#6B645E'});
+    t.textContent = text;
+    return t;
+  }
+
+  function draw(){
+    var mul = +el['sd-mul'].value, inc = +el['sd-inc'].value;
+    var noSeed = el['sd-noseed'].checked;
+    var sd = seeds();
+    var info = cycleInfo(sd.a, mul, inc);
+    var runA = streamFrom(sd.a, mul, inc, DRAWS);
+    var runB = streamFrom(sd.b, mul, inc, DRAWS);
+    var identical = runA.join(',') === runB.join(',');
+
+    el['sd-seed-v'].textContent = noSeed ? 'not set' : sd.a;
+    el['sd-mul-v'].textContent = mul;
+    el['sd-inc-v'].textContent = inc;
+    el['sd-seed'].disabled = noSeed;
+    el['sd-recipe'].textContent = 'f(s) = (' + mul + ' × s + ' + inc + ') mod ' + MOD;
+    el['sd-again'].textContent = noSeed ? '▶ run the script a second time'
+                                       : '▶ run the script a second time (same seed)';
+
+    el['ro-cycle'].textContent = info.cycle === 1 ? 'never moves again' : info.cycle + ' draws';
+    el['ro-cycle'].className = 'ro-v' + (info.cycle === MOD ? ' ok' : (info.cycle <= 2 ? ' bad' : ' warnc'));
+    el['ro-distinct'].textContent = info.distinct + ' of ' + MOD;
+    el['ro-distinct'].className = 'ro-v' + (info.distinct === MOD ? ' ok' : ' warnc');
+
+    // ---- the picture ----
+    var fig = el['sd-fig'];
+    clear(fig);
+    var TW = 62, TH = 40, GAP = 8, X0 = 8, y = 20;
+
+    fig.appendChild(label(X0, 12, noSeed ? 'run 1 — seed picked by the clock'
+                                         : 'run 1 — seed ' + sd.a, '#1F6280'));
+    var i;
+    for (i = 0; i < DRAWS; i++){
+      var stuckA = i > 0 && runA[i] === runA[i - 1];
+      fig.appendChild(tile(X0 + i * (TW + GAP), y, TW, TH, String(runA[i]),
+                           stuckA ? 'stuck' : 'match'));
+    }
+    y += TH + 24;
+
+    fig.appendChild(label(X0, y - 8, noSeed ? 'run 2 — the clock has moved on'
+                                            : 'run 2 — seed ' + sd.b + ' again',
+                          identical ? '#1F6280' : '#A33322'));
+    for (i = 0; i < DRAWS; i++){
+      fig.appendChild(tile(X0 + i * (TW + GAP), y, TW, TH, String(runB[i]),
+                           runB[i] === runA[i] ? 'match' : 'differ'));
+    }
+    y += TH + 6;
+
+    for (i = 0; i < DRAWS; i++){
+      fig.appendChild(label(X0 + i * (TW + GAP) + TW / 2 - 3, y + 12,
+                            runB[i] === runA[i] ? '✓' : '✗',
+                            runB[i] === runA[i] ? '#2D8B55' : '#BE3E26', 12));
+    }
+    y += 34;
+
+    fig.appendChild(label(X0, y, 'the ' + MOD + ' numbers this recipe could ever reach:'));
+    y += 8;
+    var SW = 34, SH = 26, SG = 4;
+    for (i = 0; i < MOD; i++){
+      var reached = info.visited.indexOf(i) >= 0;
+      fig.appendChild(tile(X0 + i * (SW + SG), y, SW, SH, String(i), reached ? 'match' : 'off'));
+    }
+    y += SH + 14;
+    fig.setAttribute('viewBox', '0 0 620 ' + y);
+
+    // ---- the verdict ----
+    var v = el['sd-verdict'];
+    if (noSeed){
+      v.className = 'verdict bad';
+      v.innerHTML = 'Not reproducible — run 1 and run 2 disagree from draw ' +
+        (function(){ for (var j = 0; j < DRAWS; j++) if (runA[j] !== runB[j]) return j + 1; return DRAWS; })() +
+        ' onwards.' +
+        '<span class="plain">Nothing is wrong with the recipe. There is just no seed, so every ' +
+        'run starts somewhere new. Press the button again and you get a third set of numbers. ' +
+        'This is why a bug you saw once may never come back, and why nobody else can rerun your ' +
+        'result and get your answer. Tick the seed back on.</span>';
+      return;
+    }
+    if (info.cycle === 1){
+      v.className = 'verdict bad';
+      v.innerHTML = 'Frozen — after ' + info.tail + ' draw' + (info.tail === 1 ? '' : 's') +
+        ' every number is ' + runA[DRAWS - 1] + '.' +
+        '<span class="plain">Still perfectly reproducible: both runs match. But a recipe that ' +
+        'stops moving is not random at all. Only ' + info.distinct + ' of the ' + MOD +
+        ' numbers ever appear. A bad recipe is worse than no recipe, because it still looks like ' +
+        'it is working.</span>';
+      return;
+    }
+    if (info.cycle < MOD){
+      v.className = 'verdict warn';
+      v.innerHTML = 'Reproducible, but it repeats every ' + info.cycle + ' draws.' +
+        '<span class="plain">Only ' + info.distinct + ' of the ' + MOD + ' numbers ever come up, ' +
+        'and then the stream loops. Imagine this shuffling your training data: the model would ' +
+        'see the same handful of orderings over and over and you would never see an error ' +
+        'message about it.</span>';
+      return;
+    }
+    v.className = 'verdict ok';
+    v.innerHTML = 'Reproducible ✓ — both runs match, number for number.' +
+      '<span class="plain">And the recipe is a good one here: all ' + MOD + ' numbers appear ' +
+      'before the stream repeats. Same seed in, same stream out — that is the whole trick that ' +
+      'turns a lucky run into a result somebody else can check.</span>';
+  }
+
+  ['sd-seed','sd-mul','sd-inc'].forEach(function(id){
+    el[id].addEventListener('input', draw);
+  });
+  el['sd-noseed'].addEventListener('change', function(){
+    if (el['sd-noseed'].checked) rerollUnseeded();
+    draw();
+  });
+  el['sd-again'].addEventListener('click', function(){
+    if (el['sd-noseed'].checked) rerollUnseeded();
+    draw();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pbtn'), function(btn){
+    btn.addEventListener('click', function(){
+      el['sd-noseed'].checked = false;
+      el['sd-seed'].value = btn.getAttribute('data-seed');
+      el['sd-mul'].value = btn.getAttribute('data-mul');
+      el['sd-inc'].value = btn.getAttribute('data-inc');
+      draw();
+    });
+  });
+
+  draw();
+
+  // Expose the pure maths so a test harness can check it without a browser.
+  window.__seedRecipe = { nextState: nextState, streamFrom: streamFrom, cycleInfo: cycleInfo,
+                          MOD: MOD, DRAWS: DRAWS };
+})();
+</script>
+
+<script>
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('input', function(){ setTimeout(report, 40); }, true);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  setTimeout(report, 120); setTimeout(report, 600);
+})();
+</script>
+</body>
+</html>
