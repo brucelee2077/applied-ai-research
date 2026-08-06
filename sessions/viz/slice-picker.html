@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grab a Piece — Indexing and Slicing, Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12; --k:#7C6DAA;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;padding-bottom:1.4rem;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.05),transparent 55%)}
+main{max-width:820px;margin:0 auto;padding:1.2rem 1.1rem 0}
+.intro h1{font-family:var(--display);font-size:1.28rem;font-weight:800;line-height:1.2;margin-bottom:.35rem}
+.intro p{font-size:.95rem;color:var(--text2);max-width:64ch}
+.eyebrow{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--sh-sm);padding:1.1rem 1.2rem;margin-top:1.1rem}
+.card h2{font-family:var(--display);font-size:.98rem;font-weight:700;margin-bottom:.25rem}
+.card .sub{font-size:.83rem;color:var(--muted);margin-bottom:.85rem}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.1rem}
+@media(max-width:720px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.ctrl{display:grid;gap:.3rem;margin-bottom:.85rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:.8rem}
+.ctrl-label{font-size:.87rem;font-weight:600}
+.ctrl-hint{font-size:.76rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.83rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--k);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--k);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+.check{display:flex;align-items:flex-start;gap:.5rem;margin-bottom:.6rem;font-size:.85rem}
+.check input{margin-top:.28rem;accent-color:var(--k);cursor:pointer;flex:none}
+.check label{cursor:pointer}
+.seg{display:flex;gap:0;margin-bottom:.85rem;border:1px solid var(--border);border-radius:var(--r-full);overflow:hidden;width:fit-content}
+.seg button{font-family:var(--body);font-size:.82rem;font-weight:600;padding:.36rem .85rem;border:0;
+  background:var(--surface2);color:var(--text2);cursor:pointer}
+.seg button.on{background:var(--k);color:#fff}
+.expr{font-family:var(--mono);font-size:1rem;font-weight:700;padding:.55rem .7rem;border-radius:var(--r-md);
+  background:var(--surface2);border:1px solid var(--border);margin-bottom:.7rem;word-break:break-word}
+.expr.bad{border-color:#F0C4BC;background:#FDECEA;color:#A33322}
+.presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.pbtn{font-family:var(--mono);font-size:.74rem;font-weight:600;padding:.34rem .6rem;border-radius:var(--r-full);
+  border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer}
+.pbtn:hover{border-color:var(--k);color:var(--k)}
+.readouts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.6rem;margin-top:.7rem}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.6rem .7rem;min-width:0}
+.ro-k{font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+.ro-v{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--text);word-break:break-word}
+.ro-v.ok{color:var(--ok)} .ro-v.warnc{color:var(--warn)} .ro-v.bad{color:var(--bad)}
+.verdict{margin-top:.7rem;font-size:.9rem;font-weight:600;padding:.55rem .75rem;border-radius:var(--r-md);
+  background:var(--accent-l);border:1px solid #BFDDE8;color:var(--accent-d)}
+.verdict.ok{background:#EFF7F1;border-color:#BEDFC9;color:#1F6B40}
+.verdict.warn{background:#FBF3DA;border-color:#EBDCA6;color:#8A6A08}
+.verdict.bad{background:#FDECEA;border-color:#F0C4BC;color:#A33322}
+.verdict .plain{display:block;font-weight:400;font-size:.83rem;margin-top:.3rem}
+.note{margin-top:.8rem;font-size:.82rem;color:var(--muted);border-left:3px solid var(--border);padding-left:.7rem}
+svg{width:100%;height:auto;display:block}
+.tag{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.5rem}
+</style>
+</head>
+<body>
+<main>
+  <div class="intro">
+    <span class="eyebrow">Module 1 · Day 2 · play with it</span>
+    <h1>Grab a piece — and find the four ways it comes back empty</h1>
+    <p>These are the lesson's own two arrays. Move the dials and watch exactly which numbers
+    come back. Three of the settings below hand you <b>nothing at all</b> without any error, and
+    one of them quietly <b>changes the array you grabbed from</b>. Those four are the whole point.</p>
+  </div>
+
+  <div class="card">
+    <h2>One row of four numbers</h2>
+    <div class="sub">x = [10 20 30 40] — positions are 0, 1, 2, 3</div>
+    <div class="wrap">
+      <div>
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">start <span class="ctrl-hint">(where to begin)</span></span>
+            <span class="ctrl-val" id="sp-start-v">1</span>
+          </div>
+          <input type="range" id="sp-start" min="0" max="4" step="1" value="1"
+                 aria-label="slice start position">
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">stop <span class="ctrl-hint">(this one is left out)</span></span>
+            <span class="ctrl-val" id="sp-stop-v">3</span>
+          </div>
+          <input type="range" id="sp-stop" min="0" max="4" step="1" value="3"
+                 aria-label="slice stop position, which is not included">
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label">step <span class="ctrl-hint">(how far to jump)</span></span>
+            <span class="ctrl-val" id="sp-step-v">1</span>
+          </div>
+          <input type="range" id="sp-step" min="1" max="3" step="1" value="1"
+                 aria-label="slice step size">
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="sp-neg">
+          <label for="sp-neg">Count backwards
+            <span class="ctrl-hint">(makes the step negative)</span>
+          </label>
+        </div>
+
+        <div class="expr" id="sp-expr">x[1:3:1]</div>
+
+        <div class="tag">Or jump straight to a setting worth seeing:</div>
+        <div class="presets">
+          <button class="pbtn" data-start="1" data-stop="3" data-step="1" data-neg="0">x[1:3]</button>
+          <button class="pbtn" data-start="0" data-stop="4" data-step="2" data-neg="0">x[::2]</button>
+          <button class="pbtn" data-start="0" data-stop="3" data-step="1" data-neg="0">misses the last one</button>
+          <button class="pbtn" data-start="3" data-stop="1" data-step="1" data-neg="0">empty, no error</button>
+          <button class="pbtn" data-start="1" data-stop="3" data-step="1" data-neg="1">backwards, also empty</button>
+        </div>
+
+        <div class="readouts">
+          <div class="ro"><div class="ro-k">you get back</div><div class="ro-v" id="ro-vals">[20 30]</div></div>
+          <div class="ro"><div class="ro-k">shape</div><div class="ro-v" id="ro-shape">(2,)</div></div>
+        </div>
+
+        <div class="verdict ok" id="sp-verdict">2 numbers, exactly as the length rule predicts ✓</div>
+      </div>
+
+      <div>
+        <svg id="sp-fig" viewBox="0 0 620 150" role="img"
+             aria-label="The four numbers 10, 20, 30 and 40 in a row, each labelled with its position from 0 to 3. Cells the slice picks up are filled in teal and numbered in the order the slice visits them. Cells the slice skips stay pale."></svg>
+        <div class="note" id="sp-caption">
+          Teal cells are the ones you get back, numbered in the order the slice visits them.
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <b>The length rule:</b> for a forward step, the count is
+      <code>stop − start</code> divided by the step, rounded up — never counting
+      <code>stop</code> itself. That is why <code>x[1:3]</code> gives 2 numbers, not 3.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>A grid with rows and columns</h2>
+    <div class="sub">g = [[1 2 3], [4 5 6]] — shape (2, 3): 2 rows, then 3 columns</div>
+    <div class="wrap">
+      <div>
+        <div class="seg" id="sp-axis" role="group" aria-label="grab a row or a column">
+          <button type="button" data-axis="row" class="on">grab a row</button>
+          <button type="button" data-axis="col">grab a column</button>
+        </div>
+
+        <div class="ctrl">
+          <div class="ctrl-top">
+            <span class="ctrl-label" id="sp-idx-label">Which row</span>
+            <span class="ctrl-val" id="sp-idx-v">0</span>
+          </div>
+          <input type="range" id="sp-idx" min="0" max="3" step="1" value="0"
+                 aria-label="which row or column to grab">
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="sp-keep">
+          <label for="sp-keep">Ask with a slice, not an index
+            <span class="ctrl-hint">(<code>g[0:1, :]</code> instead of <code>g[0, :]</code>)</span>
+          </label>
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="sp-write">
+          <label for="sp-write">Write 999 into the piece you grabbed</label>
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="sp-copy">
+          <label for="sp-copy">Add <code>.copy()</code> first
+            <span class="ctrl-hint">(costs memory, buys safety)</span>
+          </label>
+        </div>
+
+        <div class="expr" id="sp-gexpr">g[0, :]</div>
+
+        <div class="readouts">
+          <div class="ro"><div class="ro-k">shape</div><div class="ro-v" id="ro-gshape">(3,)</div></div>
+          <div class="ro"><div class="ro-k">view or copy</div><div class="ro-v" id="ro-vc">VIEW</div></div>
+        </div>
+
+        <div class="verdict ok" id="sp-gverdict">g[0, :] gives [1 2 3], shape (3,) ✓</div>
+      </div>
+
+      <div>
+        <svg id="sp-gfig" viewBox="0 0 620 210" role="img"
+             aria-label="The grid g drawn as 2 rows and 3 columns, with row numbers down the left and column numbers across the top. The cells you grabbed are filled in teal. Below the grid, the piece you grabbed is drawn on its own. When a write changes the source, the changed cells in the grid turn red."></svg>
+        <div class="note" id="sp-gcaption">
+          Teal cells are the piece you grabbed. The grid above them is the source array <code>g</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  'use strict';
+
+  var X = [10, 20, 30, 40];
+  var G = [[1, 2, 3], [4, 5, 6]];
+  var ROWS = 2, COLS = 3;
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var el = {};
+  ['sp-start','sp-stop','sp-step','sp-neg','sp-start-v','sp-stop-v','sp-step-v','sp-expr',
+   'ro-vals','ro-shape','sp-verdict','sp-fig','sp-caption',
+   'sp-axis','sp-idx','sp-idx-v','sp-idx-label','sp-keep','sp-write','sp-copy','sp-gexpr',
+   'ro-gshape','ro-vc','sp-gverdict','sp-gfig','sp-gcaption'
+  ].forEach(function(id){ el[id] = document.getElementById(id); });
+
+  var axis = 'row';
+
+  // ---- the maths, kept apart from the drawing so it can be tested on its own ----
+
+  // Python's own slice rule, for the range of values these dials can produce.
+  function sliceIndices(n, start, stop, step){
+    var out = [], i;
+    if (step > 0){
+      for (i = Math.max(0, Math.min(start, n)); i < Math.min(stop, n); i += step) out.push(i);
+    } else {
+      for (i = Math.min(n - 1, start); i > Math.max(-1, stop); i += step) out.push(i);
+    }
+    return out;
+  }
+
+  function sliceExpr(start, stop, step){ return 'x[' + start + ':' + stop + ':' + step + ']'; }
+
+  // NumPy prints an out-of-range index like this. Match it exactly.
+  function indexErrorText(ax, idx){
+    var axisNum = ax === 'row' ? 0 : 1, size = ax === 'row' ? ROWS : COLS;
+    return 'IndexError: index ' + idx + ' is out of bounds for axis ' + axisNum +
+           ' with size ' + size;
+  }
+
+  // Which cells of g does this grab touch? [] when it touches nothing.
+  function grabCells(ax, idx, keep){
+    var cells = [], r, c;
+    if (ax === 'row'){
+      if (keep){ if (idx >= ROWS) return []; }
+      for (c = 0; c < COLS; c++) cells.push([idx, c]);
+    } else {
+      if (keep){ if (idx >= COLS) return []; }
+      for (r = 0; r < ROWS; r++) cells.push([r, idx]);
+    }
+    return cells;
+  }
+
+  function grab(ax, idx, keep){
+    var size = ax === 'row' ? ROWS : COLS;
+    var expr = ax === 'row'
+      ? (keep ? 'g[' + idx + ':' + (idx + 1) + ', :]' : 'g[' + idx + ', :]')
+      : (keep ? 'g[:, ' + idx + ':' + (idx + 1) + ']' : 'g[:, ' + idx + ']');
+
+    // An out-of-range INDEX raises. An out-of-range SLICE does not — it returns an
+    // empty array. That difference is the sharpest edge on this whole page.
+    if (idx >= size && !keep){
+      return { expr: expr, error: indexErrorText(ax, idx) };
+    }
+    if (idx >= size && keep){
+      // Trimmed to nothing, but the OTHER axis survives: a row slice that runs off
+      // the end is 0 rows of 3, while a column slice is 2 rows of nothing.
+      if (ax === 'row') return { expr: expr, error: null, values: [], shape: [0, COLS], ndim: 2, empty: true };
+      return { expr: expr, error: null,
+               values: G.map(function(){ return []; }), shape: [ROWS, 0], ndim: 2, empty: true };
+    }
+    var values, shape, ndim;
+    if (ax === 'row'){
+      values = keep ? [G[idx].slice()] : G[idx].slice();
+      shape = keep ? [1, COLS] : [COLS];
+    } else {
+      values = keep ? G.map(function(r){ return [r[idx]]; }) : G.map(function(r){ return r[idx]; });
+      shape = keep ? [ROWS, 1] : [ROWS];
+    }
+    ndim = shape.length;
+    return { expr: expr, error: null, values: values, shape: shape, ndim: ndim, empty: false };
+  }
+
+  // What does the source array look like after writing 999 through the piece?
+  // Without .copy() the piece is a VIEW, so the source changes too.
+  function sourceAfterWrite(ax, idx, keep, useCopy){
+    var out = G.map(function(r){ return r.slice(); });
+    if (useCopy) return out;                       // .copy() keeps the source safe
+    var cells = grabCells(ax, idx, keep), i;
+    if (idx >= (ax === 'row' ? ROWS : COLS) && !keep) return out;   // it raised, nothing written
+    for (i = 0; i < cells.length; i++) out[cells[i][0]][cells[i][1]] = 999;
+    return out;
+  }
+
+  function fmtRow(a){ return '[' + a.join(' ') + ']'; }
+  function fmtValues(v){
+    if (!v.length) return '[]';
+    if (Array.isArray(v[0])) return '[' + v.map(fmtRow).join(' ') + ']';
+    return fmtRow(v);
+  }
+  function fmtShape(s){ return '(' + s.join(', ') + (s.length === 1 ? ',' : '') + ')'; }
+
+  // ---- drawing helpers ----
+
+  function mk(name, attrs){
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
+
+  function cell(x, y, w, h, label, mode, badge){
+    var g = mk('g', {});
+    var fill = '#FDF9F3', stroke = '#E5DFD6', sw = '1', tc = '#2C2A28';
+    if (mode === 'picked'){ fill = '#E4F2F7'; stroke = '#2A7B9B'; sw = '2.5'; tc = '#1F6280'; }
+    if (mode === 'changed'){ fill = '#FDECEA'; stroke = '#BE3E26'; sw = '2.5'; tc = '#A33322'; }
+    if (mode === 'faded'){ fill = '#F7F4EF'; tc = '#A9A29B'; }
+    g.appendChild(mk('rect', {x:x, y:y, width:w, height:h, rx:6, fill:fill, stroke:stroke, 'stroke-width':sw}));
+    var t = mk('text', {x:x + w / 2, y:y + h / 2 + 5, 'text-anchor':'middle',
+                        'font-family':'JetBrains Mono, monospace', 'font-size':'14',
+                        'font-weight':'600', fill:tc});
+    t.textContent = label;
+    g.appendChild(t);
+    if (badge){
+      g.appendChild(mk('circle', {cx:x + w - 9, cy:y + 9, r:8, fill:'#2A7B9B'}));
+      var b = mk('text', {x:x + w - 9, y:y + 13, 'text-anchor':'middle',
+                          'font-family':'JetBrains Mono, monospace', 'font-size':'9',
+                          'font-weight':'700', fill:'#fff'});
+      b.textContent = badge;
+      g.appendChild(b);
+    }
+    return g;
+  }
+
+  function caption(x, y, text, colour){
+    var t = mk('text', {x:x, y:y, 'font-family':'JetBrains Mono, monospace',
+                        'font-size':'10', fill:colour || '#6B645E'});
+    t.textContent = text;
+    return t;
+  }
+
+  // ---- panel A ----
+
+  function drawA(){
+    var start = +el['sp-start'].value, stop = +el['sp-stop'].value;
+    var mag = +el['sp-step'].value, neg = el['sp-neg'].checked;
+    var step = neg ? -mag : mag;
+    var picked = sliceIndices(X.length, start, stop, step);
+
+    el['sp-start-v'].textContent = start;
+    el['sp-stop-v'].textContent = stop;
+    el['sp-step-v'].textContent = step;
+    el['sp-expr'].textContent = sliceExpr(start, stop, step);
+    el['sp-expr'].className = 'expr' + (picked.length ? '' : ' bad');
+
+    var values = picked.map(function(i){ return X[i]; });
+    el['ro-vals'].textContent = fmtValues(values);
+    el['ro-vals'].className = 'ro-v' + (picked.length ? '' : ' bad');
+    el['ro-shape'].textContent = fmtShape([picked.length]);
+
+    var fig = el['sp-fig'];
+    clear(fig);
+    var CW = 96, CH = 46, GAP = 12, X0 = 40, Y0 = 34;
+    fig.appendChild(caption(X0, 18, 'position'));
+    for (var i = 0; i < X.length; i++){
+      var x = X0 + i * (CW + GAP);
+      var order = picked.indexOf(i);
+      fig.appendChild(caption(x + CW / 2 - 3, Y0 - 8, String(i)));
+      fig.appendChild(cell(x, Y0, CW, CH, String(X[i]),
+                           order >= 0 ? 'picked' : 'faded',
+                           order >= 0 ? String(order + 1) : null));
+    }
+    var y2 = Y0 + CH + 26;
+    fig.appendChild(caption(X0, y2, picked.length
+      ? 'you get back ' + fmtValues(values) + '   shape ' + fmtShape([picked.length])
+      : 'you get back []   shape (0,)   — nothing at all',
+      picked.length ? '#1F6280' : '#A33322'));
+    fig.setAttribute('viewBox', '0 0 620 ' + (y2 + 16));
+
+    var v = el['sp-verdict'];
+    if (!picked.length){
+      v.className = 'verdict bad';
+      if (step < 0 && start < stop){
+        v.innerHTML = 'Empty — you asked to walk backwards from ' + start + ' towards ' + stop +
+          ', but ' + stop + ' is already ahead of ' + start + '.' +
+          '<span class="plain">A negative step walks right to left, so it needs a start that is ' +
+          'bigger than the stop. This is the trap people hit when they try to reverse a slice: ' +
+          'no error, no numbers.</span>';
+      } else if (step > 0 && start >= stop){
+        v.innerHTML = 'Empty — start ' + start + ' is not before stop ' + stop + '.' +
+          '<span class="plain">NumPy does not complain. It hands back an array with 0 numbers in ' +
+          'it. Code downstream then gets an empty batch and usually fails somewhere far away, ' +
+          'which is what makes this one expensive to debug.</span>';
+      } else {
+        v.innerHTML = 'Empty — this slice picks up nothing.' +
+          '<span class="plain">No error is raised. An empty array is a legal array.</span>';
+      }
+      return;
+    }
+    if (step > 0 && stop < X.length){
+      v.className = 'verdict warn';
+      v.innerHTML = picked.length + ' numbers — and ' + X[Math.min(stop, X.length - 1)] +
+        ' at position ' + stop + ' was left out.' +
+        '<span class="plain">The stop is never included. That is the half-open rule: ' +
+        'x[' + start + ':' + stop + '] means "from ' + start + ', up to but not including ' +
+        stop + '". Slide stop to ' + X.length + ' to reach the end of the row.</span>';
+      return;
+    }
+    v.className = 'verdict ok';
+    v.innerHTML = picked.length + ' numbers, exactly as the length rule predicts ✓' +
+      '<span class="plain">' + fmtValues(values) + ', shape ' + fmtShape([picked.length]) +
+      '. Every number from ' + start + ' onwards, jumping ' + Math.abs(step) + ' at a time.</span>';
+  }
+
+  // ---- panel B ----
+
+  function drawB(){
+    var idx = +el['sp-idx'].value, keep = el['sp-keep'].checked;
+    var write = el['sp-write'].checked, useCopy = el['sp-copy'].checked;
+    var res = grab(axis, idx, keep);
+    var size = axis === 'row' ? ROWS : COLS;
+
+    el['sp-idx-v'].textContent = idx;
+    el['sp-idx-label'].textContent = axis === 'row' ? 'Which row' : 'Which column';
+    el['sp-gexpr'].textContent = res.expr + (useCopy ? '.copy()' : '');
+    el['sp-gexpr'].className = 'expr' + (res.error ? ' bad' : '');
+
+    var source = write ? sourceAfterWrite(axis, idx, keep, useCopy)
+                       : G.map(function(r){ return r.slice(); });
+    var changed = write && !useCopy && !res.error;
+
+    var fig = el['sp-gfig'];
+    clear(fig);
+    var CW = 62, CH = 44, GAP = 8, X0 = 46, Y0 = 34;
+    fig.appendChild(caption(4, 18, 'source array g'));
+    fig.appendChild(caption(X0, Y0 - 8, 'col 0        col 1        col 2'));
+    var cells = res.error ? [] : grabCells(axis, idx, keep);
+    function isPicked(r, c){
+      for (var i = 0; i < cells.length; i++) if (cells[i][0] === r && cells[i][1] === c) return true;
+      return false;
+    }
+    for (var r = 0; r < ROWS; r++){
+      var y = Y0 + r * (CH + GAP);
+      fig.appendChild(caption(6, y + CH / 2 + 4, 'row ' + r));
+      for (var c = 0; c < COLS; c++){
+        var mode = 'faded';
+        if (isPicked(r, c)) mode = changed ? 'changed' : 'picked';
+        fig.appendChild(cell(X0 + c * (CW + GAP), y, CW, CH, String(source[r][c]), mode, null));
+      }
+    }
+
+    var y2 = Y0 + ROWS * (CH + GAP) + 22;
+    if (res.error){
+      fig.appendChild(caption(4, y2, res.error, '#A33322'));
+      y2 += 20;
+    } else {
+      fig.appendChild(caption(4, y2, 'the piece you grabbed:  ' + res.expr +
+        (useCopy ? '.copy()' : '') + '  ->  shape ' + fmtShape(res.shape), '#1F6280'));
+      y2 += 14;
+      var flat = res.empty ? [] : (Array.isArray(res.values[0])
+        ? res.values.reduce(function(a, b){ return a.concat(b); }, [])
+        : res.values);
+      if (!flat.length){
+        fig.appendChild(caption(4, y2 + 18, '[]   — 0 numbers, and no error was raised', '#A33322'));
+        y2 += 26;
+      } else {
+        for (var i = 0; i < flat.length; i++){
+          var shown = (write ? 999 : flat[i]);
+          fig.appendChild(cell(4 + i * (CW + GAP), y2 + 4, CW, CH, String(shown),
+                               write ? 'changed' : 'picked', null));
+        }
+        y2 += CH + 12;
+      }
+    }
+    fig.setAttribute('viewBox', '0 0 620 ' + (y2 + 12));
+
+    el['ro-gshape'].textContent = res.error ? '—' : fmtShape(res.shape);
+    el['ro-gshape'].className = 'ro-v' + (res.error ? ' bad' : '');
+    el['ro-vc'].textContent = res.error ? '—' : (useCopy ? 'COPY' : 'VIEW');
+    el['ro-vc'].className = 'ro-v' + (res.error ? ' bad' : (useCopy ? ' ok' : ' warnc'));
+
+    var v = el['sp-gverdict'];
+    if (res.error){
+      v.className = 'verdict bad';
+      v.innerHTML = res.error +
+        '<span class="plain">There are only ' + size + ' ' + (axis === 'row' ? 'rows' : 'columns') +
+        ', numbered 0 to ' + (size - 1) + '. A single index that points past the end stops your ' +
+        'program right here — which is the kind thing to do. Now tick "ask with a slice" and watch ' +
+        'the same out-of-range request go quiet.</span>';
+      return;
+    }
+    if (res.empty){
+      v.className = 'verdict warn';
+      v.innerHTML = 'Legal, and empty — shape ' + fmtShape(res.shape) + ', 0 numbers.' +
+        '<span class="plain">This is the asymmetry worth remembering: ' +
+        (axis === 'row' ? 'g[' + idx + ', :]' : 'g[:, ' + idx + ']') +
+        ' raises an IndexError, but ' + res.expr + ' does not. A slice that runs off the end is ' +
+        'trimmed to nothing instead of complaining. Untick the slice box to see the loud version.</span>';
+      return;
+    }
+    if (write && !useCopy){
+      v.className = 'verdict bad';
+      v.innerHTML = 'The source changed. g is now ' + fmtValues(source) + '.' +
+        '<span class="plain">You never wrote to g. You wrote to ' + res.expr + ' — and a plain ' +
+        'slice is a <b>view</b>, a window onto the same memory, not a fresh array. Writing through ' +
+        'the window writes through to g. Tick <code>.copy()</code> and the same write leaves g ' +
+        'alone.</span>';
+      return;
+    }
+    if (write && useCopy){
+      v.className = 'verdict ok';
+      v.innerHTML = 'g is untouched ✓ — still ' + fmtValues(source) + '.' +
+        '<span class="plain"><code>.copy()</code> made a separate array with its own memory, so ' +
+        '999 landed only in the copy. That safety costs one extra array in memory. Views are free ' +
+        'but shared; copies cost memory and are safe.</span>';
+      return;
+    }
+    v.className = 'verdict ok';
+    v.innerHTML = res.expr + ' gives ' + fmtValues(res.values) + ', shape ' +
+      fmtShape(res.shape) + ' ✓' +
+      '<span class="plain">ndim is ' + res.ndim + '. ' + (keep
+        ? 'Asking with a slice keeps the axis, so you get a grid with one ' +
+          (axis === 'row' ? 'row' : 'column') + ' rather than a flat row of numbers.'
+        : 'Asking with a single index drops that axis, so a ' + (axis === 'row' ? 'row' : 'column') +
+          ' of a 2-D grid comes back as a 1-D row. Tick the slice box to keep the axis and watch ' +
+          'the shape gain a 1.') + '</span>';
+  }
+
+  function draw(){ drawA(); drawB(); }
+
+  ['sp-start','sp-stop','sp-step','sp-neg','sp-idx','sp-keep','sp-write','sp-copy']
+    .forEach(function(id){
+      el[id].addEventListener('input', draw);
+      el[id].addEventListener('change', draw);
+    });
+
+  Array.prototype.forEach.call(el['sp-axis'].querySelectorAll('button'), function(btn){
+    btn.addEventListener('click', function(){
+      axis = btn.getAttribute('data-axis');
+      Array.prototype.forEach.call(el['sp-axis'].querySelectorAll('button'), function(b){
+        b.className = (b === btn) ? 'on' : '';
+      });
+      draw();
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pbtn'), function(btn){
+    btn.addEventListener('click', function(){
+      el['sp-start'].value = btn.getAttribute('data-start');
+      el['sp-stop'].value = btn.getAttribute('data-stop');
+      el['sp-step'].value = btn.getAttribute('data-step');
+      el['sp-neg'].checked = btn.getAttribute('data-neg') === '1';
+      draw();
+    });
+  });
+
+  draw();
+
+  // Expose the pure maths so a test harness can check it without a browser.
+  window.__slicePicker = { sliceIndices: sliceIndices, grab: grab,
+                           sourceAfterWrite: sourceAfterWrite,
+                           indexErrorText: indexErrorText, fmtShape: fmtShape };
+})();
+</script>
+
+<script>
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('input', function(){ setTimeout(report, 40); }, true);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  setTimeout(report, 120); setTimeout(report, 600);
+})();
+</script>
+</body>
+</html>
