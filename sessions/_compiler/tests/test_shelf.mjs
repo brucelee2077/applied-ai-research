@@ -17,7 +17,7 @@ assert.equal(isUnlocked('{"done":{"c1":true},"sr":{"x":{"next":1}}}'), true, 'sr
 
 console.log('test_shelf: unlock rule OK')
 
-assert.equal(TOYS.length, 22, 'exactly 22 shelf-eligible viz pages')
+assert.equal(TOYS.length, 25, 'exactly 25 shelf-eligible viz pages')
 
 // every row is well-formed
 for (const t of TOYS) {
@@ -43,6 +43,11 @@ const owner = n => (TOYS.find(t => t[4] === 'viz/' + n + '.html') || [])[2]
 assert.equal(owner('neuron-boundary'), 'wf2-d01-neuron', 'curated: day-01 holds it inline')
 assert.equal(owner('xor-limit'),       'wf2-d01-neuron', 'curated: day-01 holds xor-c inline')
 assert.equal(owner('matmul'),          'wf1-d04-matmul', 'simple case: earliest embedder')
+// the quest-id is SHORTER than the directory name (day-02-indexing-slicing). Two earlier
+// drafts in this repo shipped a plausible-looking wrong id, so pin the real one.
+assert.equal(owner('slice-picker'),    'wf1-d02-indexing', 'not wf1-d02-indexing-slicing')
+assert.equal(owner('shape-reshaper'),  'wf1-d01-arrays')
+assert.equal(owner('seed-recipe'),     'wf1-d06-seeds')
 
 // shelfSummary takes a reader fn so it never touches localStorage
 const REAL_TODAY = ['wf1-d01-arrays','wf1-d02-indexing','wf1-d03-broadcasting','wf1-d04-matmul',
@@ -51,12 +56,13 @@ const read = qid => REAL_TODAY.includes(qid) ? '{"done":{"c1":true}}' : null
 
 const sum = shelfSummary(read)
 assert.equal(sum.total, TOYS.length)
-assert.equal(sum.unlocked.length, 5, 'learner has exactly 5 toys today')
+assert.equal(sum.unlocked.length, 8, 'learner has exactly 8 toys today')
 assert.deepEqual(sum.unlocked.map(t => t[0]).sort(),
-  ['Activation curves','Broadcasting','Matmul shapes','Neuron weights','XOR limit'])
-assert.equal(sum.locked.length, TOYS.length - 5)
-// order is preserved from TOYS (curriculum order): Broadcasting is m01, so it comes first
-assert.equal(sum.unlocked[0][0], 'Broadcasting', 'unlocked list keeps TOYS order')
+  ['Activation curves','Broadcasting','Matmul shapes','Neuron weights','Seed recipe',
+   'Shape reader','Slice picker','XOR limit'])
+assert.equal(sum.locked.length, TOYS.length - 8)
+// order is preserved from TOYS (curriculum order): Shape reader is m01 Day 1, so it is first
+assert.equal(sum.unlocked[0][0], 'Shape reader', 'unlocked list keeps TOYS order')
 assert.equal(sum.unlocked[sum.unlocked.length - 1][0], 'Activation curves', 'and ends at m02 Day 2')
 
 // empty store -> nothing unlocked, still no throw
