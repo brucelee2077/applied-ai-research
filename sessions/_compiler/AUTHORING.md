@@ -11,6 +11,36 @@ this file ever disagree, the compiler wins — fix this file.
 
 ---
 
+## 0. Who you are writing for (read this before the grammar)
+
+Every rule in this file serves **four priorities** (user directive 2026-08-05):
+**simple language · inspire curiosity · more visualization · teach for a 12-year-old
+with analogies.** The reader is a curious 12-year-old for whom **English is a second
+language**, with school arithmetic and no algebra, calculus, probability, or coding.
+
+Two things authors reliably get wrong, so they are stated here rather than only in the
+skills:
+
+1. **The WORDS, not just the structure.** Authors hit the structural rules (visual per
+   concept, analogy with its breaks-down beat, chunked build-ups) and then leave bare
+   specialist vocabulary in the prose. A word learned after about age 10 is avoided or
+   glossed in plain words at first use — `[[LayerNorm||a step that re-centres each
+   row of numbers so the scale stays sane]]`, never bare. No idioms ("under the hood",
+   "rule of thumb") and no dismissive asides ("obviously", "as you can see"): they
+   exclude a second-language reader. The always-on `judge_plain_language_absolute`
+   floor grades exactly this and returns the reader's `hardest_words`.
+2. **LENGTH IS NOT A DEFECT** (directive 2026-08-06). Never shorten, and never cut
+   coverage, to satisfy any rule here. Density is fixed by CHUNKING (`%%% steps`,
+   `%%% insight`, `####` beats) and readability by simplifying WORDS AND SENTENCES.
+   Verified: 997 words in one-idea beats passes the wall check; 157 words in one
+   unbroken run fails it.
+
+Full authoring guidance lives in `frontier-lesson-builder` (Plain Language Discipline,
+Beginner Intuition Register, Build-Up Register); what enforces each axis, and which
+enforcers fail open, is in `frontier-refactor-qa`.
+
+---
+
 ## 1. What V9 is
 
 V9 is an additive lesson mode. You set `mode: concept` in the front-matter and write

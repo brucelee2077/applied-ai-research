@@ -31,6 +31,32 @@ Every concept unit carries its OWN inline visual: a static labeled figure at min
 
 Mechanical backstop: the reader_flow_gate concept branch (every @@@ concept must contain a visual marker) + concept_shell_gate (every concept section has a visual). These gates only confirm a visual marker is PRESENT, not that it renders and correctly depicts the object. Opus 5 vision is strong: render the produced %%% svg / %%% viz output and visually inspect it (crop and re-check iteratively) rather than reasoning about the markup alone — verifying the rendered figure beats trusting the marker.
 
+## Label every figure — the judge is blind to unlabelled drawings
+
+The `analogy` axis (`coverage_judge.judge_concept_structure`) is what certifies that a
+concept DREW its everyday analogy rather than only naming it. That judge reads
+`_readable_text(html)`, which **strips every tag** — so an SVG's shapes are invisible to
+it and only `<text>` labels survive. Verified: a valve drawn purely as `<rect>`/`<path>`
+with no labels reduces to nothing at all, while a label-rich equation figure reads as
+"drawn".
+
+Consequences for how you build visuals:
+
+- **Put real `<text>` labels on the analogy object's parts** — "water in", "valve shut",
+  "nothing gets through". A beginner should read the labels and think "oh, it's like a
+  ___", and the judge only sees what you label.
+- The judge's verdict is therefore **not** evidence the picture is good. A drawing can be
+  beautiful and score WEAK, or be an equation plot and score GOOD. Use it as a signal
+  about labelling, and judge the drawing yourself.
+- There is **no deterministic gate for analogy quality at all** — the only offline visual
+  checks are "a visual exists" (`concept_shell_gate`) and "it would not render blank"
+  (`visual_integrity_gate`). Nothing offline knows whether the picture shows a valve or a
+  curve.
+
+Plain language applies to figure text too (the reader is a 12-year-old for whom English
+is a second language): label with everyday words, no idioms, and keep the label short
+enough to read at a glance. See `frontier-lesson-builder`'s Plain Language Discipline.
+
 ## Behavioral visual rule
 
 Behavioral concepts require plotted or live-recomputed evidence.

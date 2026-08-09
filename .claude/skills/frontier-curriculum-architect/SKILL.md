@@ -104,6 +104,29 @@ python3 -c "import glob;print(sum('Placeholder' in open(f,errors='replace').read
 
 VERIFY which days are actually stubs before choosing a backfill wave — one module was re-written by five agents because its days were already real. And never write a test that asserts a stub COUNT: such a test fails the moment the work succeeds.
 
+## The Four Beginner Axes Rule (user directive 2026-08-05)
+
+Everything this skill drafts is judged, downstream, on four things: **simple language ·
+inspire curiosity · more visualization · teach for a 12-year-old with analogies.** Two of
+them constrain what YOU produce, before any lesson is written:
+
+- **A `covers` topic must be teachable to a 12-year-old in plain words.** If you cannot
+  state a topic's felt intuition in one sentence without notation, it is scoped wrong —
+  split it, or defer it to the day that can carry it. A spec that only a specialist can
+  read forces the author into textbook register no matter what the builder skill says.
+- **Every topic needs a drawable everyday analogy.** For each entry, know the concrete
+  object the author will picture (valve, dimmer, see-saw, pizza, forecaster). If nothing
+  physical comes to mind, the topic is still abstract — that is a spec problem, not an
+  authoring problem, and it surfaces later as the `analogy` axis grading WEAK.
+
+⚠️ **Never set `notebook_yardstick: null` to make a day easier to ship.** It turns off the
+notebook-relative tone and interest CEILING. It does not turn off the floors — those are
+always on — but a real notebook that exists and is unused is wasted signal, and
+`beginner_language_gate` now FAILs a null yardstick when a sibling day declares one.
+
+**LENGTH IS NOT A DEFECT** (directive 2026-08-06). Never trim `covers` to keep a day
+short, and never resolve a momentum or density complaint by cutting coverage.
+
 ## Coverage Spec Rule (the skill drafts coverage; the notebook is a test)
 
 `coverage.<day>.covers` is **skill-drafted from domain knowledge**, before and independent of any notebook. A notebook may not exist (JAX, scaling laws); the skill must still produce complete coverage. Never derive `covers` by reading a notebook — that inverts the system and lets a notebook self-certify.

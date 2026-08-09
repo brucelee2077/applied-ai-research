@@ -92,6 +92,71 @@ Mark P1 if:
 - bilingual warmth is missing,
 - shipped seed has a propagation-risk pattern.
 
+## Beginner Language Gate (deterministic — the four beginner axes)
+
+```bash
+python3 sessions/_compiler/gates/beginner_language_gate.py <source.md>   # exit 0 pass / 5 fail
+```
+
+The user's four priorities are **simple language · curiosity · visualization ·
+12-year-old analogies** (directive 2026-08-05). Each is enforced on TWO levels: a
+JUDGE for the quality call, a deterministic gate for the countable facts. For simple
+language the judge is **`judge_plain_language_absolute`** (notebook-FREE, always on,
+8 levers incl. vocabulary_age / sentence_simplicity / hero_analogy_scaffold /
+warmth_and_pace, and it returns the reader's `hardest_words`) — that is the real bar,
+because a word blacklist cannot see reading level. Before it existed, `plain_language`
+lived only in `judge_tone`, which returns `N/A` when `notebook_yardstick` is null (9 of
+20 m02–m04 days, most future modules) with no UNENFORCED note — a silent pass.
+
+⚠️ **Both absolute floors now derive `overall` from the LEVER GRADES in code**
+(`_floor_from_levers`), because the model does not apply its own threshold: 6 of 20
+days returned FLOOR_MET while carrying ≥2 WEAK levers. A disagreement is preserved as
+`overall_stated_by_model` — report the computed verdict, not the model's word.
+
+⚠️ **LENGTH IS NOT A DEFECT** (directive 2026-08-06). Never raise a finding that asks
+for cuts. The chunking check is length-neutral by construction (997 chunked words pass;
+157 unbroken words fail). Fix density by chunking, readability by simplifying sentences.
+
+This gate is the deterministic floor beneath that judge. It reports FAIL on:
+
+- **plain language** — banned dismissive phrases + idioms (repo CLAUDE.md §5). Run-on
+  sentences WARN only (a colon-introduced list legitimately reads as one long
+  sentence to a splitter).
+- **real play** — zero interactive widgets. A `%%% viz` embed OR an in-body
+  `<input type="range">` both count; a `%%% demo` does not (it only reveals).
+- **demo honesty** — a `%%% demo label=` promising a "run" on a reveal-only widget.
+- **digestibility** — a main-line prose wall over 600 chars, measured by delegating
+  to `_density_scan.longest_wall` so the number matches the established metric.
+- **yardstick escape hatch** — `notebook_yardstick: null` while a companion notebook
+  EXISTS. That silently disables the tone + interest-ceiling judges; it is how m04
+  day-06 shipped with beginner-friendliness ungraded beside an unused 263 KB notebook.
+
+**Do not read a P0 from the LLM judges as equivalent to this.** Rows 2–4 of the
+builder's non-negotiable table are judge-enforced, so a bridge outage returns
+`N/A`/`BRIDGE_UNAVAILABLE` and the loop PASSES — analogy, buildup_visualized, body
+and interest all fail OPEN. This gate cannot fail open (no bridge, no notebook), and
+the compile-time visual gates mostly cannot — the one exception is
+`visual_integrity_gate`, which `compile_lesson.py` wraps in a bare `try/except` with
+`vok` pre-set True, so a crash inside it logs "skipped" and the compile passes. When
+you report on the four axes, say which were judge-graded that round and which were
+merely not-blocked.
+
+**This gate does NOT block a compile.** It is absent from `compile_lesson.py`'s dispatch;
+`lesson_build.js` only instructs the author agent to run it. It currently FAILS 40 of the
+46 shipped V9 days, so promoting it to a hard compile gate before a corpus fix pass would
+make 40 days uncompilable. Report it as run-and-read, not as a gate that stopped anything.
+
+Scope limits to state rather than assume: digestibility measures BUILD-UP prose only
+(`_density_scan.buildup_of` starts after a concept's first visual), so the hero and every
+concept intro are UNMEASURED — planted 1259- and 1364-char walls there both passed. And the
+yardstick lookup is best-effort (it asks whether a SIBLING day declares a notebook), so a
+module with no notebooks anywhere reports a warn, not a proof.
+
+`sessions/_density_scan.py` now refuses an `argv[1]` that is not `.json` (it used to
+overwrite the lesson you pointed it at — that destroyed a `source.md` twice in one session)
+and globs every module rather than a hardcoded m02+m03. Across all 46 concept days it
+reports **38 with main-line walls over 600** (worst 1766).
+
 ## Manifest Update Gate
 
 Every P0/P1/P2 finding must map to module manifest backlog.

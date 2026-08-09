@@ -35,9 +35,125 @@ No decorative analogy. Use a narrative spine.
 
 Match the length of written deliverables (especially Markdown files) to what the task needs: cover the substance, but do not pad documents with filler sections, redundant summaries, or boilerplate.
 
+## Plain Language Discipline (the WORDS — write to this, don't just get graded on it)
+
+The registers above govern STRUCTURE: order, visuals, analogies, chunking. Authors
+already hit those (measured: a blind authoring probe produced 4 visuals, an interactive
+widget, an analogy with its breaks-down beat, and prose runs under 400 chars). What was
+never specified is the **words**, and that is the axis that was failing.
+
+Your reader is a curious 12-year-old for whom **English is a second language**. Write to
+these eight levers — they are exactly what `judge_plain_language_absolute` grades every
+round, with or without a notebook, and it hands back the reader's `hardest_words` as
+concrete rewrite targets:
+
+```text
+vocabulary_age        everyday words. A word learned after ~age 10 is avoided or
+                      glossed in plain words AT first use.
+                      ✗ utilize · monotonic · orthogonal · canonical · asymmetry
+                      ✓ use · always goes one way · at right angles (90 degrees)
+                      A name you must teach (LayerNorm, Xavier init, MNIST) gets an
+                      inline [[term||plain gloss]] the first time — never bare.
+sentence_simplicity   short sentences, ONE idea each, active voice. Break run-ons.
+                      About each SENTENCE — never about the lesson's length.
+term_before_use       explained the FIRST time it appears. Not used in concept 2 and
+                      glossed in concept 9.
+concrete_over_abstract the physical, experienced thing lands before the abstraction.
+math_restraint        see the Math Restraint rule.
+hero_analogy_scaffold everyday analogy first, and say where it BREAKS DOWN.
+warmth_and_pace       brilliant-friend voice; normalize confusion; let ideas breathe.
+no_idioms             an idiom excludes a second-language reader. Banned outright:
+                      "under the hood" · "out of the box" · "rule of thumb" ·
+                      "in a nutshell" · "obviously" · "as you can see" · "trivially" ·
+                      "recall that" · "this is just" · "of course," · "needless to say"
+```
+
+**LENGTH IS NOT A DEFECT** (user directive 2026-08-06). Never shorten, and never cut
+coverage, to satisfy any of this. Fix density by CHUNKING (Build-Up Register) and
+readability by simplifying WORDS AND SENTENCES. A long lesson broken into small one-idea
+beats is exactly right — verified: 997 chunked words pass the wall check, 157 unbroken
+words fail it.
+
+## The Four Beginner Non-Negotiables (user directive 2026-08-05)
+
+Four things matter most for a first-time learner. Everything else in this skill
+serves them. **Each axis is enforced by a JUDGE for the quality call and a
+deterministic gate for the countable facts** — that split is deliberate. An LLM
+judge is the only thing that can see vocabulary age, analogy quality or curiosity;
+a regex is the only thing that cannot fail open when the bridge is down. Neither
+alone was enough: judge-only returned all-green on 20/20 days that had real
+defects, and a word blacklist caught 2 of them.
+
+| # | The ask | Semantic enforcer (the bar) | Deterministic floor (cannot fail open) |
+|---|---------|-----------------------------|-----------------------------------------|
+| 1 | **Simple language** | `judge_plain_language_absolute` — notebook-FREE, 8 levers incl. vocabulary_age, sentence_simplicity, hero_analogy_scaffold, warmth_and_pace; returns the reader's `hardest_words` | `beginner_language_gate` — banned phrases/idioms, chunking geometry |
+| 2 | **Inspire curiosity** | `judge_interest_absolute` (7 levers) + `judge_body_engagement` | `concept_structure_gate` failure-cluster warn (advisory only) |
+| 3 | **More visualization** | `judge_concept_structure.buildup_visualized` | `reader_flow_gate` + `concept_shell_gate` + `visual_integrity_gate` — real blocking, exit 2/3/4 |
+| 4 | **12-year-old analogies** | `judge_concept_structure.analogy` — GOOD only when the analogy is DRAWN | none (see the blind spot below) |
+
+**Both absolute floors compute `overall` from the LEVER GRADES in code, not from the
+model's own word.** The model does not apply its own stated threshold: 6 of 20 m02–m04
+days returned FLOOR_MET from the interest floor while carrying ≥2 WEAK levers, and the
+plain-language floor did the same on its first run. `_floor_from_levers` does that
+arithmetic and keeps the disagreement visible as `overall_stated_by_model`. The
+judgment stays with the judge; the threshold cannot drift.
+
+**LENGTH IS NOT A DEFECT** (user directive 2026-08-06). No enforcer here measures total
+length, and none should. The chunking check is length-NEUTRAL by construction: verified
+997 words in one-idea beats PASSES while 157 words in an unbroken run FAILS. So fix
+density by CHUNKING and fix readability by simplifying WORDS AND SENTENCES — never by
+cutting coverage.
+
+**Row 1's gate does not block a compile.** `beginner_language_gate` is not in
+`compile_lesson.py`'s dispatch (only a `lesson_build.js` prompt line), and it currently
+FAILS 40 of 46 shipped V9 days — promoting it to a hard gate needs a corpus fix pass
+first. Run it on every new day and treat its FAILs as blocking.
+
+**Rows 2–4's judges fail OPEN.** `BRIDGE_UNAVAILABLE` → `N/A` → the loop PASSES, so
+every lens prints an explicit "UNENFORCED this round" note instead of a silent pass.
+Row 3 also has one fail-open path: `compile_lesson.py` wraps `visual_integrity_gate` in
+a bare `try/except` with `vok` pre-set True.
+
+⚠️ **Row 4's judge cannot see drawings.** `judge_concept_structure` is fed
+`_readable_text(html)`, which strips every tag — so a shape-only SVG (a valve drawn with
+`<rect>`/`<path>`, no labels) is 100% invisible, while a label-rich equation figure reads
+as "drawn". The axis effectively grades SVG *text labels*. Label your analogy figures.
+
+⚠️ **Digestibility measures BUILD-UP prose only.** `_density_scan.buildup_of` starts
+after a concept's first visual, so the hero and every concept INTRO are unmeasured
+(planted 1259- and 1364-char walls there both passed). The intro is where the felt
+intuition lands — keep it chunked on your own judgement.
+
+⚠️ **Do NOT write `notebook_yardstick: null` to make a lesson easier to ship.**
+It turns OFF the tone judge (`plain_language`, `analogy_quality` incl. the HERO's
+analogy scaffold) and the interest ceiling. `beginner_language_gate` hard-fails a
+null yardstick when a companion notebook actually exists — that is exactly how
+m04 day-06 shipped with beginner-friendliness ungraded while a 263 KB notebook
+sat unused on disk.
+
+Run these before you call a day done:
+
+```bash
+python3 sessions/_compiler/gates/beginner_language_gate.py <source.md>   # rows 1 + real play
+python3 sessions/_compiler/gates/concept_structure_gate.py <source.md>   # per-concept triad
+python3 sessions/_compiler/compile_lesson.py <source.md>                 # row 3 (structural)
+python3 sessions/_compiler/gates/coverage_judge.py <lesson.html> --source <source.md>  # rows 2+4
+```
+
+The `coverage_judge` CLI always exits 0 — read its verdict lines, do not trust its
+exit code.
+
 ## Beginner Intuition Register (per concept — the notebook's tone)
 
-Match the register of a strong beginner notebook: warm, plain-language, analogy-first, heavy on *why*. A staff-depth lesson is NOT an excuse to go straight into mechanism — the intuition layer must carry every concept, not just the hero. This is the difference between "correct but cold" and a lesson a beginner actually wants to read. The eval gate for this is the **beginner-friendliness judge** (`coverage_judge.py` tone axis), which grades the lesson against the notebook on warmth / analogy_quality (incl. the opening hook) / intuition_depth / math_restraint / plain_language / progressive_disclosure / curiosity / pace — drive it to MATCHES_NOTEBOOK.
+Match the register of a strong beginner notebook: warm, plain-language, analogy-first, heavy on *why*. A staff-depth lesson is NOT an excuse to go straight into mechanism — the intuition layer must carry every concept, not just the hero. This is the difference between "correct but cold" and a lesson a beginner actually wants to read.
+
+**Enforcement, stated honestly.** Reading level and warmth are graded by the
+**beginner-friendliness judge** (`coverage_judge.judge_tone`: warmth /
+analogy_quality / intuition_depth / math_restraint / plain_language /
+progressive_disclosure / curiosity / pace) — drive it to MATCHES_NOTEBOOK **when a
+notebook exists**. That judge returns `N/A` without one, so on a null-yardstick day
+your only plain-language enforcer is `beginner_language_gate` (row 1 above), and
+warmth/pace go ungraded. On those days the register below is on YOU, not a gate.
 
 Every concept unit opens with **felt intuition before any formula, range, or notation**, in this order:
 
@@ -116,6 +232,14 @@ Hit these body beats in every concept's build-up:
 to digest" (the user's actual words) is a density complaint. So measure it:
 `sessions/_density_scan.py` reports `walls_over_600` (unbroken MAIN-LINE prose paragraphs)
 and `asides_over_600` (unbroken runs inside `!!!` callout boxes). Target **zero of each**.
+Its `argv[1]` is the OUTPUT json path, not a source — it now refuses any path not ending in
+`.json` (it used to overwrite the lesson you pointed it at, which destroyed a `source.md`
+twice in one session), and its day list is now a glob over every module rather than a
+hardcoded m02+m03 pair. That widening matters: across all 46 concept days it reports **38
+with main-line walls over 600** (worst 1766), so the long-standing "zero walls" status only
+ever described the 14 days it was pointed at. For a single day prefer
+`beginner_language_gate.py <source.md>`, which takes the source as INPUT and reuses this
+script's tested `longest_wall` so the two agree.
 Note the two have different cures: a main-line wall gets split into paragraphs, a `%%% steps`
 ladder or a `%%% insight`; a long "Optional (skippable)" box is already correctly placed by
 math-restraint rule 4 and only needs breaking up INSIDE the box, with `<br>` and short bolded
@@ -138,7 +262,7 @@ Interest is now gated independent of any notebook (an ALWAYS-ON absolute floor i
 - **Breadth/payoff tease (P1 gate):** tease the family/landscape ahead; end with a payoff + recap.
 - **Reader-separation (P0 — CLAUDE.md §1):** a foundation lesson body is Reader A only. Do NOT write scripted "here's how you'd say it in an interview" monologues, and do NOT drop Reader-B notation (bare matrix identities like `(x·W₁)·W₂=x·(W₁·W₂)`, terms like "non-convex"/"representational ceiling") without a plain gloss. Keep the required staff depth as ONE plain-language empowerment line ("now you can explain *why* deep nets need a bend") — depth stays, interview *scripting* goes to a separate file.
 - **Momentum — no failure-mode wall (P1):** teach every failure + remedy (coverage still requires it), but do NOT stack ≥3 "Puzzle→Cause→Remedy"/limit units back-to-back with no play/payoff between — INTERLEAVE a win or a live widget. `concept_structure_gate` warns on a ≥3 failure cluster. **Length is fine — never cut coverage to fix momentum; interleave and enrich instead.**
-- **Real play, honestly labelled:** ship ≥2 genuinely interactive `%%% viz` widgets, front-loaded (not one, late). A `%%% demo` only reveals a pre-baked output — its button says "reveal", NOT "run it"; do not imply computation the widget doesn't do.
+- **Real play, honestly labelled:** ship ≥2 genuinely interactive `%%% viz` widgets, front-loaded (not one, late). An in-body `<input type="range">` slider counts as real play too — m02 ships it that way, m03 as viz iframes; either form is fine, **zero is not**. A `%%% demo` only reveals a pre-baked output — its button says "reveal", NOT "run it"; do not imply computation the widget doesn't do. Checkable form: `beginner_language_gate.py` hard-fails zero interactive widgets, and hard-fails a `%%% demo label=` that promises a run. (v8lib's DEFAULT label is already honest; the measured problem is authors overriding it — 48 of 103 demo labels in m02–m04 say "run".)
 
 ## Three-layer architecture
 
@@ -344,7 +468,7 @@ Introduce each term the first time it appears, define-before-use, with an inline
 
 Do NOT front-load a `%%% jargon` wall in the first concept — a screen of definitions before any intuition overwhelms a beginner (direct user review 2026-07-20). Collect the full glossary as a reference **cheat-sheet in the closing recap unit** instead.
 
-Checkable form: the reader_flow gate HARD-FAILS a `%%% jargon` block in the first concept unit; the tone judge grades `progressive_disclosure`.
+Checkable form: the reader_flow gate HARD-FAILS a `%%% jargon` block in the first concept unit; the tone judge grades `progressive_disclosure` **only when a notebook exists**. ⚠️ Nothing checks "no term appears before its gloss" — the one place the compiler reads `[[` is behind `if strict:` on the v8 non-concept path, which `run()` returns before reaching for every `mode: concept` lesson. So define-before-use is an AUTHOR discipline, not an enforced rule; the measured cost of assuming otherwise was 14 genuinely undefined first uses across 10 shipped days.
 
 ## Recap Rule
 
