@@ -59,13 +59,32 @@ def parse_blocks(body):
 # inline markdown-lite
 # ---------------------------------------------------------------------------
 def attr_esc(s):
-    return s.replace('&', '&amp;').replace('"', '&quot;')
+    # `<` and `>` MUST be escaped, not just `&` and `"`. Without them a gloss body
+    # containing markdown emphasis got an <em> injected INSIDE the data-tip attribute
+    # by the rules below, which terminated the attribute early. See inline().
+    return (s.replace('&', '&amp;').replace('"', '&quot;')
+             .replace('<', '&lt;').replace('>', '&gt;'))
 
 def inline(t):
-    # [[phrase||tooltip]] -> glossary term span  (before other inline rules)
-    t = re.sub(r'\[\[(.+?)\|\|(.+?)\]\]',
-               lambda m: '<span class="term" data-tip="%s">%s</span>' % (attr_esc(m.group(2)), m.group(1)),
-               t)
+    # [[phrase||tooltip]] -> glossary term span.
+    #
+    # The rendered span is STASHED behind a placeholder (exactly as the `code` guard
+    # below does) instead of being emitted inline. Reason, measured on the shipped
+    # corpus: this substitution used to run FIRST, so the ** / * rules further down
+    # rewrote the text INSIDE the finished data-tip="..." attribute. Two real bugs
+    # came out of that on m04 (4 corrupted tooltips across 3 lessons):
+    #   (a) one gloss holding *emphasis* got a literal <em> injected into its tooltip,
+    #       so the reader hovering "gradient" saw `steepest <em>increase</em>`;
+    #   (b) two glosses on ONE line, each holding a single `*`, cross-paired into an
+    #       <em>…</em> spanning TWO DIFFERENT attributes.
+    # It also desynced coverage_judge._readable_text (a naive tag strip) on the stray
+    # `>`, so every LLM judge graded mangled prose and passed it.
+    _tips = []
+    def _stash_tip(m):
+        _tips.append('<span class="term" data-tip="%s">%s</span>'
+                     % (attr_esc(m.group(2)), m.group(1)))
+        return '\x01%d\x01' % (len(_tips) - 1)
+    t = re.sub(r'\[\[(.+?)\|\|(.+?)\]\]', _stash_tip, t)
     # Protect `code` spans: stash them behind placeholders so later inline rules
     # (** bold, * em) can never reach INTO code — e.g. `(x-y)**2` must not start a
     # <strong> that runs to the next ** elsewhere in the paragraph.
@@ -77,6 +96,7 @@ def inline(t):
     t = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'<em>\1</em>', t)
     t = re.sub(r'\x00(\d+)\x00', lambda m: _code[int(m.group(1))], t)
+    t = re.sub(r'\x01(\d+)\x01', lambda m: _tips[int(m.group(1))], t)
     return t
 
 # ---------------------------------------------------------------------------

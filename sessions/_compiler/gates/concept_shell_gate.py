@@ -38,7 +38,12 @@ def run(html, meta, donor=None):
         chk(sec.count('class="gotit"') == 1, 'concept %s has exactly one gotit' % cid)
 
     chk(html.count('data-sec="quiz"') == 1, 'exactly one quiz section')
-    chk(html.count('class="q"') == 4, 'quiz has 4 questions (got %d)' % html.count('class="q"'))
+    # Count questions in the QUIZ section only. A %%% warmup recall block also emits
+    # class="q" blocks (inside a .warmup wrapper), so a whole-page count would over-count;
+    # scope to the quiz section to keep the "exactly 4 quiz questions" invariant honest.
+    qsec = re.search(r'data-sec="quiz".*?</section>', html, re.DOTALL)
+    nq = qsec.group(0).count('class="q"') if qsec else html.count('class="q"')
+    chk(nq == 4, 'quiz has 4 questions (got %d)' % nq)
     chk(html.count('data-sec="produce"') == 1, 'exactly one produce section')
     if meta.get('require_artifact', True):
         prod = re.search(r'data-sec="produce".*?</section>', html, re.DOTALL)
@@ -53,6 +58,16 @@ def run(html, meta, donor=None):
     chk('class="fin" id="fin"' in html, '.fin banner')
     for marker in ('<!--V9_CONTENT-->', '<!--V9_NAV-->', '__QUEST_ID__', '@@@', '%%%'):
         chk(marker not in html, 'no leaked marker %r' % marker)
+    # A glossary tooltip is PLAIN TEXT. An `<` or `>` inside data-tip means an inline
+    # rule leaked a tag into the attribute (v8lib.inline used to substitute glosses
+    # before the ** / * rules ran, so emphasis inside a gloss injected a literal <em>,
+    # and two glosses on one line could cross-pair an <em>…</em> across two attributes).
+    # Cost when unchecked: the reader hovering "gradient" saw `steepest <em>increase</em>`,
+    # and coverage_judge._readable_text desynced on the stray `>` so every LLM judge
+    # graded mangled prose and passed it. 3 shipped m04 lessons, 4 tooltips.
+    bad_tips = [t for t in re.findall(r'data-tip="([^"]*)"', html) if '<' in t or '>' in t]
+    chk(not bad_tips, 'no tag leaked into a data-tip tooltip%s'
+        % ('' if not bad_tips else ' (%d bad, e.g. %r)' % (len(bad_tips), bad_tips[0][:60])))
     return ok[0], msgs
 
 def main():
