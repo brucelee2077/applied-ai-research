@@ -471,9 +471,137 @@ def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
     data.setdefault('dimensions', [])
     data.setdefault('top_fixes', [])
     data.setdefault('summary', '')
-    # Fail safe: FLOOR_MET only when explicitly stated; anything else flags for review.
-    ov = str(data.get('overall') or '').upper().replace(' ', '_')
-    data['overall'] = 'FLOOR_MET' if 'FLOOR_MET' in ov else 'BELOW_FLOOR'
+    # Threshold in CODE, not the model's word: its own rule is "no MISSING and <2 WEAK",
+    # but 6 of 20 m02-m04 days returned FLOOR_MET while carrying >=2 WEAK levers (always
+    # `momentum` plus one more). See _floor_from_levers.
+    derived, weak, missing, stated = _floor_from_levers(data)
+    data['overall'] = derived
+    data['lever_counts'] = {'weak': weak, 'missing': missing}
+    if stated and stated != derived:
+        data['overall_stated_by_model'] = stated
+    data['status'] = 'OK'
+    return data
+
+
+# ===========================================================================
+# PLAIN-LANGUAGE / BEGINNER-READABILITY FLOOR — notebook-FREE, always on
+# ===========================================================================
+# Simple language is one of the user's four priorities (directive 2026-08-05), and
+# until now it was the ONLY one with no always-on enforcer: `plain_language` lives
+# only in judge_tone, which early-returns N/A when notebook_yardstick is null — 9 of
+# the 20 shipped m02-m04 days, and most future modules (JAX, scaling laws) have no
+# notebook at all. A deterministic gate (beginner_language_gate) covers the countable
+# part — banned phrases, idioms, chunking geometry — but a word blacklist cannot see
+# VOCABULARY AGE, SENTENCE COMPLEXITY, or CONCEPT LOAD, which is the part that
+# actually decides whether a 12-year-old can read the page. That is judgment, so it
+# needs a judge. This mirrors judge_interest_absolute exactly: fixed anchors, no
+# notebook, runs on EVERY lesson.
+#
+# It also closes three holes judge_tone leaves on a null-yardstick day: WARMTH, PACE,
+# and the HERO's analogy scaffold (judge_concept_structure grades @@@ concept units
+# only, never the hero — so the builder's headline non-negotiable was ungraded).
+#
+# Advisory in the CLI; the lesson_build interest/language lens P0-gates on BELOW_FLOOR.
+# Graceful fallback; never raises.
+_LANG_ABS_MAX = _MAX_LESSON_CHARS
+_LANG_ABS_SYS = (
+    "You are a STRICT READABILITY judge for a beginner ML lesson. Your reader is a curious "
+    "12-YEAR-OLD for whom ENGLISH IS A SECOND LANGUAGE, with normal school arithmetic and NO "
+    "algebra, calculus, probability, or programming background. Judge ONLY whether THIS READER "
+    "can read the page and follow it — not whether it is warm, not whether it is correct, not "
+    "whether coverage is complete. Be harsh and concrete: quote the exact phrase that would stop "
+    "them. LENGTH IS NOT A DEFECT — a long lesson broken into small one-idea beats is GOOD; judge "
+    "the difficulty of the WORDS AND SENTENCES, never the total word count. Interactive widgets "
+    "(%%%viz / %%%demo) and drawings DO exist on the real page even though this is a text extract. "
+    "Return STRICT JSON only (no prose, no markdown fences)."
+)
+
+
+def _lang_abs_prompt(lesson_text):
+    return f"""LESSON UNDER REVIEW (plain-text extract of the real page):
+\"\"\"
+{lesson_text[:_LANG_ABS_MAX]}
+\"\"\"
+
+Score each lever GOOD / WEAK / MISSING against its anchor, with a one-line reason that QUOTES the
+exact spot and a concrete FIX:
+- vocabulary_age      GOOD = everyday words a 12-year-old knows; any word learned after ~age 10 is
+                      either avoided or glossed in plain words AT first use. WEAK/MISSING = words
+                      like "utilize", "monotonic", "non-convex", "orthogonal", "canonical" left bare.
+- sentence_simplicity GOOD = short sentences, ONE idea each, active voice. WEAK = frequent multi-
+                      clause run-ons the reader must re-read. Judge the SENTENCES, not the lesson length.
+- term_before_use     GOOD = every technical term is explained the FIRST time it appears (an inline
+                      gloss counts). MISSING = a term is used, then defined much later or never.
+                      Name the worst offender explicitly.
+- concrete_over_abstract GOOD = ideas land on physical, experienced things before abstractions.
+- math_restraint      GOOD = intuition + picture first; any main-flow formula is one line and
+                      narrated in words; heavy math sits in a clearly skippable box.
+- hero_analogy_scaffold GOOD = the OPENING (before any aspiration/relevance line) is a concrete
+                      everyday analogy the reader has physically done, AND the lesson says somewhere
+                      where that analogy BREAKS DOWN. Problem-first or abstract openings are WEAK.
+- warmth_and_pace     GOOD = a brilliant-friend voice that normalizes confusion and lets ideas
+                      breathe; not an exam, not a textbook, not crammed.
+- no_idioms           GOOD = no idioms or dismissive asides ("under the hood", "obviously",
+                      "as you can see", "this is just") that exclude a second-language reader.
+
+Then decide overall against this FLOOR: return FLOOR_MET only if NO lever is MISSING and a
+12-year-old second-language reader could genuinely follow the page (one WEAK lever is tolerable;
+two or more, or any MISSING, is BELOW_FLOOR).
+
+Return STRICT JSON:
+{{
+  "dimensions": [ {{"name":"vocabulary_age","verdict":"GOOD|WEAK|MISSING","reason":"...","fix":"..."}} ],
+  "overall": "FLOOR_MET|BELOW_FLOOR",
+  "hardest_words": ["the words a 12-year-old would stumble on, verbatim"],
+  "top_fixes": ["highest-leverage rewrite 1", "..."],
+  "summary": "<=2 sentences"
+}}"""
+
+
+def _floor_from_levers(data, tolerate_weak=1):
+    """Derive FLOOR_MET / BELOW_FLOOR from the LEVER GRADES, in code.
+
+    The model is asked for an `overall`, but measured across the m02-m04 corpus it does
+    not apply its own stated threshold: 6 of 20 days returned FLOOR_MET from the interest
+    floor while carrying >=2 WEAK levers, and the plain-language floor did the same on its
+    first run (3 WEAK -> FLOOR_MET). A judgment call about each lever is what an LLM is
+    for; ARITHMETIC over those calls is not, so we do it here. This is the deterministic
+    half of a judge-driven check: the semantics stay with the model, the threshold cannot
+    drift.
+
+    Also fails safe: a missing/garbled `overall` becomes BELOW_FLOOR, never a silent pass.
+    """
+    dims = data.get('dimensions') or []
+    weak = sum(1 for d in dims if str(d.get('verdict', '')).upper() == 'WEAK')
+    missing = sum(1 for d in dims if str(d.get('verdict', '')).upper() == 'MISSING')
+    stated = str(data.get('overall') or '').upper().replace(' ', '_')
+    derived = 'FLOOR_MET' if (missing == 0 and weak <= tolerate_weak) else 'BELOW_FLOOR'
+    # If we have no lever grades at all, fall back to the model's own word (fail-safe).
+    if not dims:
+        return 'FLOOR_MET' if 'FLOOR_MET' in stated else 'BELOW_FLOOR', weak, missing, stated
+    return derived, weak, missing, stated
+
+
+def judge_plain_language_absolute(lesson_text, model=MODEL, timeout=90):
+    """Notebook-FREE readability floor. Runs on EVERY lesson. Never raises."""
+    try:
+        content = _chat(_LANG_ABS_SYS, _lang_abs_prompt(lesson_text), model, timeout)
+    except Exception as e:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e), 'dimensions': [],
+                'overall': 'N/A', 'hardest_words': [], 'top_fixes': [], 'summary': ''}
+    data = _extract_json(content) or _salvage_truncated_json(content)
+    if data is None:
+        return {'status': 'PARSE_ERROR', 'raw': content, 'dimensions': [],
+                'overall': 'N/A', 'hardest_words': [], 'top_fixes': [], 'summary': ''}
+    data.setdefault('dimensions', [])
+    data.setdefault('hardest_words', [])
+    data.setdefault('top_fixes', [])
+    data.setdefault('summary', '')
+    derived, weak, missing, stated = _floor_from_levers(data)
+    data['overall'] = derived
+    data['lever_counts'] = {'weak': weak, 'missing': missing}
+    if stated and stated != derived:
+        data['overall_stated_by_model'] = stated   # keep the disagreement visible
     data['status'] = 'OK'
     return data
 
@@ -789,6 +917,7 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
             'tone': judge_tone(lesson_text, notebook_md),
             'interest': judge_interest(lesson_text, notebook_md),
             'interest_absolute': judge_interest_absolute(lesson_text),
+            'language_absolute': judge_plain_language_absolute(lesson_text),
             'body_engagement': judge_body_engagement(lesson_text, concept_titles),
             'structure': judge_concept_structure(lesson_text, concept_titles)}
 
@@ -871,6 +1000,27 @@ def main():
         print('\nsummary:', interest_abs['summary'])
     elif interest_abs.get('error'):
         print('  error:', interest_abs['error'])
+
+    lang_abs = out.get('language_absolute', {'status': 'N/A', 'overall': 'N/A',
+                                             'dimensions': [], 'hardest_words': [],
+                                             'top_fixes': [], 'summary': ''})
+    print('\n== Plain-Language Floor (no notebook — runs on EVERY lesson) ==')
+    print('status:', lang_abs['status'], '| overall:', lang_abs.get('overall'))
+    if lang_abs['status'] == 'OK':
+        print('\n-- readability levers (absolute anchors, 12-year-old ESL reader) --')
+        for d in lang_abs['dimensions']:
+            print('  [%s] %s — %s' % (d.get('verdict', '?'), d.get('name', '?'), d.get('reason', '')))
+            if d.get('fix'):
+                print('        fix: %s' % d['fix'])
+        if lang_abs.get('hardest_words'):
+            print('\n-- hardest words for this reader --')
+            print('  ' + ', '.join(str(w) for w in lang_abs['hardest_words']))
+        print('\n-- top fixes --')
+        for f in lang_abs['top_fixes']:
+            print('  * %s' % f)
+        print('\nsummary:', lang_abs['summary'])
+    elif lang_abs.get('error'):
+        print('  error:', lang_abs['error'])
 
     body = out.get('body_engagement', {'status': 'N/A', 'overall': 'N/A', 'concepts': [], 'summary': ''})
     print('\n== Concept Body Engagement (per concept build-up voice — advisory) ==')

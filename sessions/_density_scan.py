@@ -17,8 +17,16 @@ import os, re, sys, glob, json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DAYS = sorted(glob.glob(os.path.join(ROOT, 'sessions', 'm02-the-neuron', 'day-*'))) + \
-       sorted(glob.glob(os.path.join(ROOT, 'sessions', 'm03-attention', 'day-*')))
+# EVERY module with concept sources — not a hardcoded pair. The old list named only
+# m02 and m03, so m04 was never scanned and quietly accumulated the corpus's only 7
+# main-line walls (worst 1002 chars) while every other gate reported green.
+# Override with: DENSITY_MODULES="m04-first-model-mlp,m05a-..." python3 _density_scan.py out.json
+_only = [m for m in os.environ.get('DENSITY_MODULES', '').split(',') if m.strip()]
+DAYS = sorted(
+    d for d in glob.glob(os.path.join(ROOT, 'sessions', 'm*', 'day-*'))
+    if os.path.exists(os.path.join(d, 'source.md'))
+    and (not _only or os.path.basename(os.path.dirname(d)) in _only)
+)
 
 # a widget block opens with "%%% <type>" at line start and closes with a line that
 # is exactly "%%%" (AUTHORING.md §4).
@@ -155,6 +163,15 @@ def main():
         print(__doc__)
         return
     out_path = sys.argv[1] if len(sys.argv) > 1 else '/tmp/density.json'
+    # GUARD: argv[1] is an OUTPUT path, which is a footgun — `_density_scan.py
+    # <source.md>` reads like an input and would OVERWRITE that lesson with scan
+    # JSON. Two separate agents destroyed a source.md that way in one session
+    # (recovered via git). Refuse to write over anything that is not JSON.
+    if not out_path.endswith('.json'):
+        sys.exit('refusing to write scan output over %r — argv[1] is the OUTPUT json '
+                 'path, not a source file. To scan one source, use:\n'
+                 '  python3 sessions/_compiler/gates/beginner_language_gate.py <source.md>'
+                 % out_path)
     result = {}
     for day_dir in DAYS:
         snap = scan_day(day_dir)
