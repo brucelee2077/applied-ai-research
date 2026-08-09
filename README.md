@@ -132,6 +132,10 @@ applied-ai-research/
 
 Contributions are welcome! Please read the [Contributing Guidelines](./CONTRIBUTING.md) and [Code of Conduct](./CODE_OF_CONDUCT.md) before submitting pull requests.
 
+### Development workflow
+
+Repository changes can be prepared locally with Codex and reviewed through a GitHub pull request before they are merged into `main`.
+
 ---
 
 ## 📝 License
