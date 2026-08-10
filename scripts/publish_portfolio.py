@@ -12,6 +12,10 @@
 #
 # validate_self_contained(root) -> [(file, offending_link), ...]  ([] = clean)
 #
+# Reusable primitives (scripts/publish_pages.py gates the whole site on these):
+#   is_root_absolute(link)                 -> the "/x" half, applies site-wide
+#   scan_links(files, predicate, root)     -> the scanner, predicate-injectable
+#
 # CLI:
 #   python3 scripts/publish_portfolio.py                 # dry-run, validate only
 #   python3 scripts/publish_portfolio.py --to <dir> --no-dry-run   # copy portfolio/
@@ -30,6 +34,24 @@ _LINK_RE = re.compile(
 _ALLOWED_PREFIXES = ('http://', 'https://', '//', '#', 'mailto:', 'data:', 'tel:')
 
 
+def is_root_absolute(link):
+    """True if a link is ROOT-ABSOLUTE ("/x" but NOT "//host" protocol-relative).
+    Root-absolute links are dead under a Pages PROJECT subpath: "/sessions/x.html"
+    resolves to <user>.github.io/sessions/x.html, dropping the /<repo>/ segment.
+
+    This is the half of _escapes_portfolio() that applies to the WHOLE site, not
+    just portfolio/. scripts/publish_pages.py gates on this predicate alone —
+    "../" is perfectly legal outside portfolio/ (the sessions/ prev/next chain is
+    built from ../day-NN/lesson.html), so do NOT gate the site on
+    _escapes_portfolio or validate_self_contained."""
+    l = link.strip()
+    if not l:
+        return False
+    if l.lower().startswith(_ALLOWED_PREFIXES):
+        return False
+    return l.startswith('/')       # root-absolute (// already allowed above)
+
+
 def _escapes_portfolio(link):
     """True if a link leaves the portfolio tree. Offenses:
       (a) root-absolute ("/x" but NOT "//host" protocol-relative) — dead under a
@@ -42,18 +64,38 @@ def _escapes_portfolio(link):
         return False
     if l.lower().startswith(_ALLOWED_PREFIXES):
         return False
-    if l.startswith('/'):          # root-absolute (// already allowed above)
+    if is_root_absolute(l):        # (a)
         return True
-    if '../' in l:                 # parent escape anywhere in the value
+    if '../' in l:                 # (b) parent escape anywhere in the value
         return True
     return False
 
 
-def validate_self_contained(root):
-    """Scan every portfolio/**/index.html AND portfolio/**/assets/*.html; return
-    (file, offending_link) tuples for any src=/href= that escapes the portfolio
-    (root-absolute or ../ parent escape). [] = clean."""
+def scan_links(files, predicate, root, read=None):
+    """Scan `files` (absolute paths) for src=/href= values satisfying `predicate`.
+    Returns [(path_relative_to_root, offending_link), ...] in sorted-file order.
+
+    `read` is injectable for tests: read(path) -> html string. Unreadable files
+    are skipped, matching the original behaviour (a binary blob named .html must
+    not crash a publish gate)."""
+    if read is None:
+        def read(path):
+            return open(path, encoding='utf-8').read()
     violations = []
+    for path in sorted(files):
+        try:
+            html = read(path)
+        except Exception:
+            continue
+        for m in _LINK_RE.finditer(html):
+            link = m.group(1) or m.group(2) or m.group(3) or ''
+            if predicate(link):
+                violations.append((os.path.relpath(path, root), link))
+    return violations
+
+
+def _portfolio_files(root):
+    """Every portfolio/**/index.html plus every portfolio/**/assets/*.html."""
     patterns = [os.path.join(root, 'portfolio', '**', 'index.html'),
                 os.path.join(root, 'portfolio', '**', 'assets', '*.html')]
     seen = set()
@@ -63,16 +105,14 @@ def validate_self_contained(root):
             if p not in seen:
                 seen.add(p)
                 files.append(p)
-    for path in sorted(files):
-        try:
-            html = open(path, encoding='utf-8').read()
-        except Exception:
-            continue
-        for m in _LINK_RE.finditer(html):
-            link = m.group(1) or m.group(2) or m.group(3) or ''
-            if _escapes_portfolio(link):
-                violations.append((os.path.relpath(path, root), link))
-    return violations
+    return files
+
+
+def validate_self_contained(root):
+    """Scan every portfolio/**/index.html AND portfolio/**/assets/*.html; return
+    (file, offending_link) tuples for any src=/href= that escapes the portfolio
+    (root-absolute or ../ parent escape). [] = clean."""
+    return scan_links(_portfolio_files(root), _escapes_portfolio, root)
 
 
 # ---------------------------------------------------------------------------
