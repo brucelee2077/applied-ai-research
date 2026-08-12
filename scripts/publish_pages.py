@@ -468,15 +468,27 @@ def reconcile(git, action):
         git.mutate('merge', '--no-edit', remote_ref)
     except GitError as e:
         blob = (e.stderr or '') + ' '
-        # git's wording varies ("...would be overwritten by merge:", and older
-        # variants); match the stable part rather than the full sentence.
-        if 'would be overwritten' in blob:
+        # Two different failures share the phrase "would be overwritten by merge".
+        # They have different causes and different fixes, so do not conflate them.
+        if 'untracked working tree file' in blob.lower():
             raise Abort(EX_RECONCILE,
-                        'merge blocked by untracked files it would overwrite:',
+                        'merge blocked: it would overwrite untracked files.',
                         e.stderr.strip(),
                         '',
                         'No merge was started, so nothing needs undoing.',
-                        'Commit or move those files aside, then re-run.')
+                        'origin/%s carries a file you also have untracked locally.'
+                        % PAGES_BRANCH,
+                        'Commit yours or move it aside, then re-run.')
+        if 'local changes' in blob.lower():
+            raise Abort(EX_RECONCILE,
+                        'merge blocked: the index or worktree is not clean.',
+                        e.stderr.strip(),
+                        '',
+                        'No merge was started, so nothing needs undoing.',
+                        'git merge requires a clean tree. This script stages only',
+                        'AFTER merging, so if you are seeing this, something else',
+                        'dirtied the tree mid-run — most likely a concurrent',
+                        'session. Re-run once it settles.')
         conflicted = ''
         try:
             conflicted = git.capture('diff', '--name-only', '--diff-filter=U')
@@ -642,19 +654,22 @@ def main(argv=None, git=None, runner=None):
         if warm:
             print('      pass --quiet-window 0 to commit warm files anyway')
 
-        # ---- 3 stage (real even in dry run; gates read the index) --------
-        if to_commit:
-            check_no_index_lock(git)
-            git.index_op('add', '--', *to_commit)
-            staged = list(to_commit)
+        # ---- 3 commit_all -------------------------------------------------
+        # This has to precede the merge: `git merge` refuses to run with a dirty
+        # worktree, so work-in-progress must be committed first.
         if a.commit_all is not None:
-            # Record the paths BEFORE staging them, so the finally-block can undo
-            # this by exact pathspec too. Without this a dry run with --commit-all
-            # would leave tracked modifications staged.
             modified = _z(git.capture('diff', '--name-only', '-z'))
             if modified:
                 git.index_op('add', '-u', '--')     # tracked mods/deletes only
-                staged += modified
+                if a.publish:
+                    check_no_index_lock(git)
+                    print('\n[1b] committing %d modified tracked file(s)' % len(modified))
+                    git.mutate('commit', '-m', a.commit_all)
+                    expected = git.capture('rev-parse', 'HEAD')
+                else:
+                    # dry run: keep the index dirty only long enough to gate it,
+                    # then the finally-block restores it by exact pathspec.
+                    staged += modified
 
         # ---- 4/5 fetch + divergence --------------------------------------
         action = 'ahead'
@@ -684,6 +699,17 @@ def main(argv=None, git=None, runner=None):
             print('\n[4] reconcile — [dry-run] would merge origin/%s into %s'
                   % (PAGES_BRANCH, branch))
 
+        # ---- 7 stage, AFTER the merge -------------------------------------
+        # Ordering is load-bearing, and git enforces it: `git merge` requires a
+        # clean index, so staging first makes the merge fail with "Your local
+        # changes to the following files would be overwritten by merge". Staging
+        # here also means the gates below see the exact tree that gets pushed
+        # (merge result + new assets) rather than a pre-merge approximation.
+        if to_commit:
+            check_no_index_lock(git)
+            git.index_op('add', '--', *to_commit)
+            staged += list(to_commit)
+
         # ---- 7 gates ------------------------------------------------------
         if not a.skip_gates:
             print('\n[5] gates')
@@ -705,14 +731,15 @@ def main(argv=None, git=None, runner=None):
             return EX_OK
 
         # ---- 8 commit -----------------------------------------------------
+        # --commit-all already committed above (it had to precede the merge), so
+        # this only handles the allowlisted untracked assets.
         if a.publish:
-            if to_commit or a.commit_all is not None:
+            if to_commit:
                 check_no_index_lock(git)
                 assert_unmoved(git, expected, 'running the gates')
-                msg = a.commit_all if a.commit_all is not None else (
-                    a.message or build_commit_message(to_commit, a.skip_gates))
+                msg = a.message or build_commit_message(to_commit, a.skip_gates)
                 if git.code('diff', '--cached', '--quiet') != 0:
-                    print('\n[6] committing')
+                    print('\n[6] committing %d site asset(s)' % len(to_commit))
                     git.mutate('commit', '-m', msg)
                     staged = []           # the commit consumed the staged paths
                     expected = git.capture('rev-parse', 'HEAD')

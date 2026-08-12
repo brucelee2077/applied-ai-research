@@ -438,6 +438,93 @@ def test_warm_path_is_held_by_default(tmp_path, capsys):
 
 
 # ---------------------------------------------------------------------------
+# step ORDER — git itself enforces this, and getting it wrong aborted a real
+# publish run: `git merge` refuses to run with a dirty index, so staging the new
+# assets before the merge makes the merge fail.
+# ---------------------------------------------------------------------------
+def _order(g, *prefixes):
+    """Index of the first call matching each prefix, in log order."""
+    keys = [' '.join(a) for a in g.log]
+    out = []
+    for pre in prefixes:
+        out.append(next((i for i, k in enumerate(keys) if k.startswith(pre)), None))
+    return out
+
+
+def test_merge_happens_before_staging():
+    g = FakeGit(untracked=['sessions/viz/toy.html'],
+                codes={'merge-base --is-ancestor refs/remotes/origin/main HEAD': 1,
+                       'merge-base --is-ancestor HEAD refs/remotes/origin/main': 1})
+    pubp.main(['--publish', '--quiet-window', '0'], git=g, runner=ok_runner)
+    i_merge, i_add = _order(g, 'merge --no-edit', 'add --')
+    assert i_merge is not None and i_add is not None
+    assert i_merge < i_add, 'staged before merging; git merge needs a clean index'
+
+
+def test_gates_run_after_the_merge_so_they_check_the_published_tree():
+    order = []
+    g = FakeGit(codes={'merge-base --is-ancestor refs/remotes/origin/main HEAD': 1,
+                       'merge-base --is-ancestor HEAD refs/remotes/origin/main': 1})
+
+    def tracking_runner(gate):
+        order.append(('gate', len(g.log)))
+        return True, ''
+
+    pubp.main(['--publish'], git=g, runner=tracking_runner)
+    i_merge = _order(g, 'merge --no-edit')[0]
+    assert order and i_merge is not None
+    assert order[0][1] > i_merge, 'gates ran before the merge'
+
+
+def test_commit_happens_after_the_gates():
+    g = FakeGit(untracked=['sessions/viz/toy.html'],
+                codes={'diff --cached --quiet': 1})
+    seen = {'gated': False, 'committed_before_gates': False}
+
+    def runner(gate):
+        seen['gated'] = True
+        return True, ''
+
+    orig_mutate = g.mutate
+
+    def mutate(*args):
+        if args[0] == 'commit' and not seen['gated']:
+            seen['committed_before_gates'] = True
+        return orig_mutate(*args)
+
+    g.mutate = mutate
+    pubp.main(['--publish', '--quiet-window', '0'], git=g, runner=runner)
+    assert not seen['committed_before_gates']
+
+
+def test_commit_all_commits_before_the_merge():
+    """git merge needs a clean WORKTREE too, so work-in-progress must land first."""
+    g = FakeGit(codes={'diff --quiet': 1,
+                       'merge-base --is-ancestor refs/remotes/origin/main HEAD': 1,
+                       'merge-base --is-ancestor HEAD refs/remotes/origin/main': 1},
+                captures={'diff --name-only -z': 'sessions/x.html'})
+    pubp.main(['--publish', '--commit-all', 'wip'], git=g, runner=ok_runner)
+    i_commit, i_merge = _order(g, 'commit -m', 'merge --no-edit')
+    assert i_commit is not None and i_merge is not None
+    assert i_commit < i_merge
+
+
+def test_merge_blocked_by_dirty_index_is_reported_distinctly(capsys):
+    """git's 'Your local changes...' and 'untracked working tree files...' share
+    the phrase 'would be overwritten by merge' but need different fixes."""
+    g = FakeGit(codes={'merge-base --is-ancestor refs/remotes/origin/main HEAD': 1,
+                       'merge-base --is-ancestor HEAD refs/remotes/origin/main': 1},
+                fail={'merge --no-edit':
+                      'error: Your local changes to the following files would be '
+                      'overwritten by merge:\n  sessions/viz/toy.html'})
+    assert pubp.main(['--publish'], git=g, runner=ok_runner) == pubp.EX_RECONCILE
+    out = capsys.readouterr().out
+    assert 'index or worktree is not clean' in out
+    assert 'concurrent' in out
+    assert not g.calls_matching('merge --abort')
+
+
+# ---------------------------------------------------------------------------
 # dry run must not mutate anything
 # ---------------------------------------------------------------------------
 def test_dry_run_never_merges_commits_or_pushes(capsys):
