@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The √d_k Dial — drag the head size and watch softmax collapse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface2:#FDF9F3;
+  --text:#2C2A28; --text2:#5A544E; --muted:#6B645E; --border:#E5DFD6; --border2:#EEEBE5;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-l:#E4F2F7;
+  --ok:#2D8B55; --bad:#BE3E26; --warn:#C99A12;
+  --display:'Bricolage Grotesque',Georgia,serif;
+  --body:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --sh-sm:0 1px 2px rgba(44,42,40,.05); --sh-md:0 4px 12px rgba(44,42,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);line-height:1.6;padding-bottom:3rem;
+  background-image:radial-gradient(ellipse at 20% 0%,rgba(42,123,155,.04),transparent 55%)}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:var(--accent)}
+.nav{position:sticky;top:0;z-index:100;background:rgba(250,247,242,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--border2)}
+.nav-in{max-width:880px;margin:0 auto;height:54px;padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-title{font-family:var(--display);font-size:1rem;font-weight:700}
+.nav-back{font-size:.85rem;color:var(--muted)}
+main{max-width:880px;margin:0 auto;padding:2rem 1.25rem 0}
+.intro{margin-bottom:1.5rem}
+.eyebrow{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.intro h1{font-family:var(--display);font-size:1.85rem;font-weight:800;line-height:1.15;margin-bottom:.55rem}
+.intro p{font-size:1.02rem;color:var(--text2);max-width:64ch}
+.intro p+p{margin-top:.55rem}
+.intro b{color:var(--text)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-sm);padding:1.4rem 1.5rem;margin-bottom:1.5rem}
+.card h2{font-family:var(--display);font-size:1.05rem;font-weight:700;margin-bottom:1rem}
+.controls{display:grid;gap:1.15rem}
+.ctrl{display:grid;gap:.35rem}
+.ctrl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.ctrl-label{font-size:.9rem;font-weight:600}
+.ctrl-hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.ctrl-val{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--accent-d);white-space:nowrap}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:var(--r-full);background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:var(--sh-sm);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff;cursor:pointer}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;gap:.5rem}
+.seg-btn{font-family:var(--body);font-size:.82rem;font-weight:600;color:var(--accent-d);background:var(--accent-l);
+  border:1px solid var(--border);border-radius:var(--r-sm);padding:.45rem .9rem;cursor:pointer}
+.seg-btn:hover{background:#d4e9f0}.seg-btn.active{background:var(--accent);color:#fff;border-color:var(--accent-d)}
+.readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem}
+@media (max-width:640px){.readouts{grid-template-columns:repeat(2,1fr)}}
+.ro{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:.8rem .9rem}
+.ro-k{font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.ro-v{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--text)}
+.ro-v.stalled{color:var(--bad)}.ro-v.alive{color:var(--ok)}
+svg#fig{width:100%;height:auto;display:block;background:var(--surface);border-radius:var(--r-md)}
+.caption{font-size:.93rem;color:var(--text2);margin-top:.9rem;min-height:3.2em}
+.caption b{color:var(--accent-d)}
+.takeaway{background:var(--accent-l);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:1.15rem 1.35rem}
+.takeaway h2{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--accent-d);margin-bottom:.7rem}
+.takeaway ul{margin:0 0 0 1.15rem}
+.takeaway li{margin-bottom:.5rem;font-size:.93rem}
+.takeaway li:last-child{margin-bottom:0}
+.takeaway b{color:var(--accent-d)}
+.note{margin-top:1.1rem;font-size:.85rem;color:var(--muted);max-width:64ch}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <span class="nav-title">The &radic;d_k dial</span>
+    <a class="nav-back" href="../index.html">&larr; All lessons</a>
+  </div>
+</nav>
+
+<main>
+  <div class="intro">
+    <span class="eyebrow">Transformer math &middot; scaled dot-product attention</span>
+    <h1>Drag the head size and watch attention collapse onto one word</h1>
+    <p><b>What am I looking at?</b> One word is choosing between three others. The left bars are the
+    <b>scores</b> that go into softmax. The right bars are the <b>shares</b> softmax hands back &mdash; how much
+    attention each choice actually gets.</p>
+    <p><b>What to do:</b> drag <b>d_k</b> (how many slots each Query and Key has) to the right. Nothing about
+    the three choices changes &mdash; only the number of slots. Then flip the <b>&divide; &radic;d_k</b> switch
+    and watch the shares come back to life.</p>
+  </div>
+
+  <div class="card">
+    <h2>Controls</h2>
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">d_k &mdash; slots per Query/Key <span class="ctrl-hint">(each drag step doubles it)</span></span>
+          <span class="ctrl-val" id="val-dk">d_k = 64 &nbsp;&middot;&nbsp; &radic;d_k = 8.00</span>
+        </div>
+        <input type="range" id="dk" min="0" max="8" step="1" value="6" aria-label="d_k, the number of slots in each Query and Key">
+        <div class="ticks"><span>1</span><span>2</span><span>4</span><span>8</span><span>16</span><span>32</span><span>64</span><span>128</span><span>256</span></div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label">how much the best match wins by <span class="ctrl-hint">(in standard steps, before scaling)</span></span>
+          <span class="ctrl-val" id="val-gap">2.00</span>
+        </div>
+        <input type="range" id="gap" min="0.2" max="3" step="0.05" value="2" aria-label="how much the best match wins by, in standard steps">
+      </div>
+      <div class="seg" id="seg" role="group" aria-label="divide by root d_k">
+        <button class="seg-btn active" data-s="0" aria-pressed="true">&divide; &radic;d_k is OFF</button>
+        <button class="seg-btn" data-s="1" aria-pressed="false">&divide; &radic;d_k is ON</button>
+      </div>
+      <div class="readouts">
+        <div class="ro"><div class="ro-k">divide by</div><div class="ro-v" id="ro-root">8.00</div></div>
+        <div class="ro"><div class="ro-k">top score into softmax</div><div class="ro-v" id="ro-top">16.00</div></div>
+        <div class="ro"><div class="ro-k">top share</div><div class="ro-v" id="ro-share">99.97%</div></div>
+        <div class="ro"><div class="ro-k">learning grip</div><div class="ro-v stalled" id="ro-grip">0.0003 &middot; stalled</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Scores in, shares out</h2>
+    <svg id="fig" viewBox="0 0 760 300" role="img" aria-label="Loading the score and share chart."></svg>
+    <p class="caption" id="cap"></p>
+  </div>
+
+  <div class="takeaway">
+    <h2>What to notice</h2>
+    <ul>
+      <li>Drag d_k from <b>1</b> to <b>256</b> with scaling OFF. The three choices never change &mdash; but the
+      scores grow like <b>&radic;d_k</b>, and the top share climbs to <b>100%</b>. The other two get about
+      <b>0%</b>, and so does their share of the learning signal.</li>
+      <li>Watch <b>learning grip</b> as you drag. That is roughly how much the top share can still move when the
+      model nudges its weights. Near 100% confidence there is almost nothing left to grip, so this layer
+      <b>stops learning who to listen to</b> &mdash; while the loss curve looks perfectly calm.</li>
+      <li>Now switch <b>&divide; &radic;d_k ON</b>. The scores snap back to the size they had at d_k = 1, at every
+      head size, and the shares spread out again. Same three choices, healthy blend.</li>
+      <li>Set d_k = <b>1</b>: &radic;1 = 1, so the switch changes nothing. Scaling only earns its keep once d_k
+      grows &mdash; and in real models d_k is 64 or 128.</li>
+    </ul>
+  </div>
+
+  <p class="note">The scores here are drawn in <i>standard steps</i>: at the start of training the slots of a
+  Query and a Key are small random numbers, so a dot product over d_k slots has a typical size of &radic;d_k
+  standard steps. That is the growth &divide; &radic;d_k cancels. A trained model can still choose to make a
+  score large on purpose &mdash; scaling sets the starting size, not a ceiling.</p>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var svg   = document.getElementById("fig");
+  var elDk  = document.getElementById("dk");
+  var elGap = document.getElementById("gap");
+  var seg   = document.getElementById("seg");
+  var vDk   = document.getElementById("val-dk");
+  var vGap  = document.getElementById("val-gap");
+  var roRoot= document.getElementById("ro-root");
+  var roTop = document.getElementById("ro-top");
+  var roShr = document.getElementById("ro-share");
+  var roGrip= document.getElementById("ro-grip");
+  var cap   = document.getElementById("cap");
+  var NS    = "http://www.w3.org/2000/svg";
+
+  var scaled = false;                       // is the ÷ √d_k switch on?
+  var W = 760, H = 300;
+  var ROWS = [
+    {name:"key A · best match", color:"#2D8B55", fill:"#EAF5EE"},
+    {name:"key B · so-so",      color:"#C99A12", fill:"#FCF3DC"},
+    {name:"key C · unrelated",  color:"#8A8378", fill:"#F1EDE6"}
+  ];
+  var LBL_W = 132, ROW_Y0 = 74, ROW_H = 56, BAR_H = 26;
+  var SC_X = LBL_W + 10, SC_W = 200, SC_MAX = 32;   // score panel (fixed domain so growth is visible)
+  var SH_X = 470, SH_W = 200;                       // share panel, 0-100%
+
+  function softmax(v){
+    var m = Math.max.apply(null, v);
+    var e = v.map(function(x){ return Math.exp(x - m); });
+    var s = e.reduce(function(a,b){ return a+b; }, 0);
+    return e.map(function(x){ return x/s; });
+  }
+  function el(tag, attrs, text){
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs){ if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]); }
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
+
+  function state(){
+    var dk  = Math.pow(2, +elDk.value);
+    var gap = +elGap.value;
+    var root = Math.sqrt(dk);
+    var std  = [gap, gap/2, 0];                                  // scores in standard steps
+    var scores = std.map(function(z){ return scaled ? z : z*root; });
+    return {dk:dk, gap:gap, root:root, scores:scores, shares:softmax(scores)};
+  }
+
+  function draw(){
+    var st = state();
+    var top = st.shares[0];
+    var grip = top * (1 - top);                                  // softmax slope at the top choice
+
+    clear(svg);
+    svg.appendChild(el("text", {x:SC_X, y:30, "font-family":"var(--body)", "font-size":"13",
+      "font-weight":"600", fill:"#5A544E"}, "score fed to softmax"));
+    svg.appendChild(el("text", {x:SH_X, y:30, "font-family":"var(--body)", "font-size":"13",
+      "font-weight":"600", fill:"#5A544E"}, "share of attention"));
+    // the "gentle range" band: where softmax can still spread its shares out
+    svg.appendChild(el("rect", {x:SC_X, y:48, width:(4/SC_MAX)*SC_W, height:ROW_H*3 - 6,
+      fill:"#E4F2F7", stroke:"#BEE0EB", "stroke-dasharray":"3,3"}));
+    svg.appendChild(el("text", {x:SC_X + 3, y:44, "font-family":"var(--mono)", "font-size":"9",
+      fill:"#1F6280"}, "gentle range"));
+
+    ROWS.forEach(function(row, i){
+      var y = ROW_Y0 + i*ROW_H;
+      svg.appendChild(el("text", {x:LBL_W, y:y + BAR_H/2, "text-anchor":"end",
+        "dominant-baseline":"central", "font-family":"var(--body)", "font-size":"11.5",
+        fill:"#5A544E"}, row.name));
+
+      // score bar (clamped to the panel; the number is always exact)
+      var sv = st.scores[i];
+      var swid = Math.max(1, Math.min(sv / SC_MAX, 1) * SC_W);
+      svg.appendChild(el("rect", {x:SC_X, y:y, width:SC_W, height:BAR_H, rx:6, fill:"#F4F1EB"}));
+      svg.appendChild(el("rect", {x:SC_X, y:y, width:swid, height:BAR_H, rx:6,
+        fill:row.fill, stroke:row.color, "stroke-width":"1.5"}));
+      svg.appendChild(el("text", {x:SC_X + SC_W + 8, y:y + BAR_H/2, "dominant-baseline":"central",
+        "font-family":"var(--mono)", "font-size":"11.5", fill:"#2C2A28"}, sv.toFixed(2)));
+      if (sv > SC_MAX){
+        svg.appendChild(el("text", {x:SC_X + SC_W - 4, y:y + BAR_H/2, "text-anchor":"end",
+          "dominant-baseline":"central", "font-family":"var(--mono)", "font-size":"10",
+          fill:"#BE3E26"}, "off the chart →"));
+      }
+
+      // share bar
+      var pv = st.shares[i] * 100;
+      svg.appendChild(el("rect", {x:SH_X, y:y, width:SH_W, height:BAR_H, rx:6, fill:"#F4F1EB"}));
+      svg.appendChild(el("rect", {x:SH_X, y:y, width:Math.max(1, pv/100*SH_W), height:BAR_H, rx:6,
+        fill:row.color, opacity:"0.9"}));
+      svg.appendChild(el("text", {x:SH_X + SH_W + 8, y:y + BAR_H/2, "dominant-baseline":"central",
+        "font-family":"var(--mono)", "font-size":"11.5", fill:"#2C2A28"},
+        (pv < 0.01 && pv > 0 ? "<0.01" : pv.toFixed(2)) + "%"));
+    });
+
+    // learning-grip meter along the bottom
+    var gy = ROW_Y0 + 3*ROW_H + 14;
+    svg.appendChild(el("text", {x:LBL_W, y:gy + 9, "text-anchor":"end", "dominant-baseline":"central",
+      "font-family":"var(--body)", "font-size":"11.5", fill:"#5A544E"}, "learning grip"));
+    svg.appendChild(el("rect", {x:SC_X, y:gy, width:SH_X + SH_W - SC_X, height:18, rx:6, fill:"#F4F1EB"}));
+    svg.appendChild(el("rect", {x:SC_X, y:gy, width:Math.max(1, (grip/0.25)*(SH_X + SH_W - SC_X)),
+      height:18, rx:6, fill:grip < 0.02 ? "#BE3E26" : "#2D8B55", opacity:"0.85"}));
+    svg.appendChild(el("text", {x:SH_X + SH_W + 8, y:gy + 9, "dominant-baseline":"central",
+      "font-family":"var(--mono)", "font-size":"11.5",
+      fill:grip < 0.02 ? "#BE3E26" : "#2D8B55"}, grip.toFixed(4)));
+
+    // readouts
+    vDk.innerHTML = "d_k = " + st.dk + " &nbsp;&middot;&nbsp; &radic;d_k = " + st.root.toFixed(2);
+    vGap.textContent = st.gap.toFixed(2);
+    roRoot.textContent = st.root.toFixed(2);
+    roTop.textContent = st.scores[0].toFixed(2);
+    roShr.textContent = (top*100).toFixed(2) + "%";
+    roGrip.textContent = grip.toFixed(4) + (grip < 0.02 ? " · stalled" : " · alive");
+    roGrip.className = "ro-v " + (grip < 0.02 ? "stalled" : "alive");
+
+    svg.setAttribute("aria-label",
+      "Three scores of " + st.scores.map(function(x){return x.toFixed(2);}).join(", ") +
+      " give attention shares of " + st.shares.map(function(p){return (p*100).toFixed(2) + " percent";}).join(", ") +
+      " at d_k " + st.dk + (scaled ? " with " : " without ") + "dividing by root d_k. Learning grip " +
+      grip.toFixed(4) + ".");
+
+    if (st.dk === 1){
+      cap.innerHTML = "At <b>d_k = 1</b>, &radic;1 = 1 &mdash; so the switch does nothing at all. This is the " +
+        "sanity check: scaling is not a general \"make numbers smaller\" trick, it cancels growth that only " +
+        "appears once there are many slots to add up.";
+    } else if (!scaled){
+      cap.innerHTML = "Scaling <b>OFF</b> at d_k = " + st.dk + ": the same three choices now score about <b>&radic;" +
+        st.dk + " = " + st.root.toFixed(2) + "&times;</b> higher, purely because " + st.dk + " slots got added up " +
+        "instead of one. Softmax reads that as near-certainty and hands the top choice <b>" + (top*100).toFixed(2) +
+        "%</b>" + (grip < 0.02 ? " — and the grip has gone, so this layer has quietly stopped learning." : ".");
+    } else {
+      cap.innerHTML = "Scaling <b>ON</b>: every score is divided by &radic;d_k = " + st.root.toFixed(2) +
+        ", which lands them back at the size they had with a single slot. The top choice gets <b>" +
+        (top*100).toFixed(2) + "%</b> &mdash; still the winner, still room to change its mind.";
+    }
+  }
+
+  elDk.addEventListener("input", draw);
+  elGap.addEventListener("input", draw);
+  Array.prototype.forEach.call(seg.querySelectorAll(".seg-btn"), function(b){
+    b.addEventListener("click", function(){
+      scaled = b.getAttribute("data-s") === "1";
+      Array.prototype.forEach.call(seg.querySelectorAll(".seg-btn"), function(bb){
+        var on = bb === b;
+        bb.classList.toggle("active", on);
+        bb.setAttribute("aria-pressed", String(on));
+      });
+      draw();
+    });
+  });
+  draw();
+})();
+</script>
+
+<script>
+/* auto-size: report content height to an embedding parent so the iframe grows to fit (no inner scroll) */
+(function(){
+  if (window.parent === window) return;
+  var last = 0;
+  function measure(){ return Math.ceil(Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)); }
+  function report(){ var h = measure(); if (h && h !== last){ last = h; window.parent.postMessage({ type: 'viz-height', px: h }, '*'); } }
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+  document.addEventListener('click', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  document.addEventListener('input', function(){ setTimeout(report, 60); }, true);
+  document.addEventListener('change', function(){ setTimeout(report, 60); setTimeout(report, 420); }, true);
+  if (window.ResizeObserver){ try { new ResizeObserver(report).observe(document.body); } catch (e) {} }
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(report); }
+  [80, 300, 800, 1600].forEach(function(t){ setTimeout(report, t); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
+<title>Module 5 · Day 2 — The Backward Pass, Wired by Hand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===========================================================================
+   M1 Day 3 — dark "lab notebook" skin, modeled on visual-tutorial/index.html
+   (sidebar nav + progress checklist + numbered content column), dark palette.
+   Self-contained, offline. Progress persists to localStorage.
+   =========================================================================== */
+:root{
+  /* theme-independent: accents, type, radii, shadows */
+  --accent:#8091FF; --accent-d:#6B7BF0; --accent-soft:#1B2340; --on-soft:#EDF1F7;
+  --q:#5B9BFF; --k:#B39BFF; --v:#FF9B5C;
+  --ok:#5BC98A; --ok-ink:#8FE3AE; --ok-soft:#12271C; --ok-line:#1E7E4C;
+  --warn:#E7B04A; --warn-soft:#2A2410; --warn-line:#8A6A18;
+  --err:#F07A6A; --err-ink:#F8A99B; --err-soft:#2C1A17; --err-line:#9A3B2C;
+  --radius:16px; --r-sm:8px; --r-md:12px; --r-full:9999px;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.28);
+  --display:'Bricolage Grotesque',Georgia,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  /* default surface = Dim (softer charcoal; also the fallback if no data-theme set) */
+  --bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;
+}
+/* ---- darkness levels (switchable in the sidebar) ---- */
+html[data-theme="dim"]{--bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;}
+html[data-theme="dark"]{--bg:#10151D; --bg2:#0A0E15; --panel:#18202B; --panel2:#202A36; --panel3:#28323F;
+  --ink:#E9EEF5; --ink2:#B8C2D1; --muted:#8B97A8; --line:#28313F; --line2:#35414F;}
+html[data-theme="midnight"]{--bg:#090C12; --bg2:#05070B; --panel:#10151D; --panel2:#161D28; --panel3:#1E2732;
+  --ink:#E6ECF4; --ink2:#AEB9C8; --muted:#828FA1; --line:#212A37; --line2:#2C3644;}
+/* Light mode — the warm cream palette, same notebook layout */
+html[data-theme="light"]{
+  --bg:#FAF7F2; --bg2:#F1EBE0; --panel:#FFFFFF; --panel2:#FBF7F0; --panel3:#F3EDE3;
+  --ink:#2C2A28; --ink2:#55504A; --muted:#6E675F; --line:#E5DFD6; --line2:#D8D0C4;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-soft:#E4F2F7; --on-soft:#1F6280;
+  --q:#1F6280; --k:#5E5191; --v:#9A5A12;
+  --ok:#2D8B55; --ok-ink:#1A5C38; --ok-soft:#E8F5EE; --ok-line:#2D8B55;
+  --warn:#A67D08; --warn-soft:#FCF3DC; --warn-line:#A67D08;
+  --err:#C93B3B; --err-ink:#8F2020; --err-soft:#FDE8E8; --err-line:#C93B3B;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--ink);background:var(--bg);line-height:1.65;font-size:16.5px;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(ellipse 110% 55% at 82% -8%,rgba(128,145,255,.10),transparent 60%),
+    radial-gradient(ellipse 90% 50% at 6% 108%,rgba(255,155,92,.06),transparent 60%);
+  background-attachment:fixed}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5px;border-radius:5px;color:var(--q);border:1px solid var(--line)}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:var(--r-full)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---------- top progress bar ---------- */
+#progress-track{position:fixed;top:0;left:0;right:0;height:4px;background:transparent;z-index:60}
+#progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--q),var(--accent),var(--v));
+  transition:width .4s var(--ease);box-shadow:0 0 12px rgba(128,145,255,.5)}
+
+/* ---------- mobile nav toggle ---------- */
+#nav-toggle{display:none}
+
+/* ---------- layout ---------- */
+.layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
+
+/* ---------- sidebar ---------- */
+#sidebar{position:sticky;top:0;height:100vh;width:288px;flex:0 0 288px;
+  display:flex;flex-direction:column;
+  padding:22px 0 0;border-right:1px solid var(--line);background:var(--panel)}
+.sidebar-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;padding:0 16px}
+.brand{padding:6px 8px 14px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand-title{font-family:var(--display);font-weight:800;font-size:1.2rem;letter-spacing:-.02em}
+.brand-dot{color:var(--accent)}
+.brand-sub{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.nav-count{margin-top:10px;font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--ink2)}
+.nav-count b{color:var(--accent)}
+.theme-row{padding:10px 8px 0}
+.theme-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.theme-btn{flex:1;font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn.active{background:var(--accent);color:#fff}
+.nav-group-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:4px 8px;margin-top:10px}
+.nav-link{display:flex;align-items:center;gap:.5rem;padding:7px 10px;margin:1px 0;border-radius:9px;color:var(--ink2);
+  font-size:.86rem;cursor:pointer;border-left:3px solid transparent;transition:all .12s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:var(--body)}
+.nav-link:hover{background:var(--panel2);text-decoration:none;color:var(--ink)}
+.nav-link.active{background:var(--accent-soft);color:var(--on-soft);font-weight:700;border-left-color:var(--accent)}
+.nav-link .nl-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);flex:0 0 auto}
+.nav-link.done .nl-dot{background:var(--ok)}
+.checklist-wrap{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;padding-bottom:16px}
+#checklist{list-style:none;margin:0;padding:0}
+#checklist li{display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--ink2);padding:4px 8px;cursor:pointer;border-radius:7px}
+#checklist li:hover{background:var(--panel2)}
+#checklist li .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--line2);flex:0 0 auto;margin-top:2px;
+  display:grid;place-items:center;font-size:.66rem;color:var(--bg);font-weight:800}
+#checklist li.done .box{background:var(--ok);border-color:var(--ok)}
+#checklist li.done .box::after{content:'✓'}
+#checklist li.done span{color:var(--muted);text-decoration:line-through}
+.ghost-btn{background:none;border:1px solid var(--line2);color:var(--muted);font-size:.74rem;padding:6px 11px;border-radius:8px;cursor:pointer;margin-top:10px;transition:.15s}
+.ghost-btn:hover{border-color:var(--err);color:var(--err)}
+.side-nav{flex:0 0 auto;padding:12px 16px 16px;border-top:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;gap:6px}
+.side-nav a{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);color:var(--ink);transition:.15s}
+.side-nav a:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-1px)}
+.side-nav .d{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.side-nav .t{font-size:.82rem;font-weight:600}
+
+/* ---------- main content ---------- */
+#content{flex:1 1 auto;min-width:0;padding:44px clamp(20px,5vw,60px) 80px;max-width:920px}
+.hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:8px}
+.kicker{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);padding:5px 12px;border-radius:999px}
+.hero h1{font-family:var(--display);font-size:clamp(2rem,4.6vw,2.9rem);letter-spacing:-.03em;margin:.35em 0 .1em;line-height:1.06}
+.hero h1 .sub{display:block;font-size:.5em;font-weight:600;color:var(--ink2);margin-top:.35rem;letter-spacing:-.01em}
+.lede{font-size:1.1rem;color:var(--ink2);max-width:64ch;line-height:1.55}
+.goal{margin-top:1.3rem;display:flex;gap:.8rem;background:linear-gradient(120deg,var(--accent-soft),transparent);
+  border:1px solid var(--accent-d);border-radius:var(--r-md);padding:1rem 1.2rem;max-width:80ch}
+.goal .gic{font-size:1.2rem;flex:0 0 auto}.goal b{color:var(--accent)}.goal code{color:var(--ink)}
+
+.module-section{padding:30px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+.module-section:last-of-type{border-bottom:none}
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.sec-num{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-weight:800;display:grid;place-items:center;font-size:.92rem}
+.sec-num.s-what{background:rgba(91,155,255,.16);color:var(--q)}
+.sec-num.s-study{background:rgba(179,155,255,.16);color:var(--k)}
+.sec-num.s-play{background:rgba(255,155,92,.16);color:var(--v)}
+.sec-num.s-code{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-quiz{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-produce{background:rgba(91,201,138,.16);color:var(--ok)}
+.module-section.done .sec-num{background:var(--ok);color:var(--bg)}
+.sec-h{font-family:var(--display);font-size:1.4rem;font-weight:700;letter-spacing:-.02em;line-height:1.2;flex:1;min-width:0}
+.sec-tag{font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sec-body h4{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--ink);margin:1.4rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body p{margin-bottom:.9rem;color:var(--ink2)}.sec-body p:last-child{margin-bottom:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem;color:var(--ink2)}.sec-body li{margin-bottom:.45rem}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500;color:var(--ink);cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+/* ---------- cards / callouts ---------- */
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.relate .card{background:var(--panel2);border:1px solid var(--line2);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm)}
+.relate .card h5{font-family:var(--display);font-size:.98rem;font-weight:700;color:var(--ink);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem}
+.relate .card .big{font-size:1.5rem}
+.relate .card p{font-size:.88rem;color:var(--ink2);margin:0}
+.callout{border-radius:var(--radius);padding:15px 18px;margin:16px 0;border:1px solid var(--line2);background:var(--panel2);
+  box-shadow:var(--shadow-sm);display:flex;gap:.8rem;font-size:.92rem;line-height:1.55}
+.callout .ic{font-size:1.05rem;flex:0 0 auto;line-height:1.4}
+.callout div{color:var(--ink2)}.callout b{color:var(--ink)}
+.callout code{background:rgba(128,128,128,.2)}
+.c-info{background:linear-gradient(180deg,rgba(91,155,255,.10),transparent);border-color:var(--accent-d)}
+.c-warn{background:linear-gradient(180deg,rgba(231,176,74,.10),transparent);border-color:var(--warn-line)}
+.c-ok{background:linear-gradient(180deg,rgba(91,201,138,.10),transparent);border-color:var(--ok-line)}
+.takeaway{background:var(--panel2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:0 10px 10px 0;font-size:.95rem;margin:14px 0;color:var(--ink2)}
+
+/* ---------- got-it button ---------- */
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.92rem;font-weight:700;
+  color:#fff;background:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:.62rem 1.25rem;cursor:pointer;
+  transition:background .18s,transform .1s,box-shadow .18s}
+.gotit:hover{background:var(--accent-d);box-shadow:0 6px 20px rgba(128,145,255,.28)}
+.gotit:active{transform:translateY(1px)}
+.gotit:disabled{opacity:.45;filter:grayscale(.5);cursor:not-allowed;box-shadow:none}
+.gotit:disabled:hover{background:var(--accent);transform:none}
+.module-section.done .gotit{background:var(--ok);border-color:var(--ok)}
+
+/* ---------- playground (fake terminal) ---------- */
+.viz-panel{background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);padding:18px;margin:18px 0;box-shadow:var(--shadow-sm)}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);
+  border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--v);color:var(--ink)}
+.play-btn.active{background:var(--v);color:var(--bg2);border-color:var(--v);font-weight:600}
+.play-btn.seen:not(.active){border-color:var(--ok);color:var(--ok-ink)}
+.play-btn.seen::after{content:' ✓';font-weight:700}
+.play-console{background:#080B11;color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1rem 1.15rem;
+  border-radius:var(--r-md);border:1px solid var(--line);min-height:160px;white-space:pre-wrap;overflow-x:auto}
+.play-console .prompt{color:#5C6675}.play-console .kw{color:#C9A9F5}.play-console .str{color:#8FE3A0}
+.play-console .num{color:#F0B366}.play-console .fn{color:#7BB5F5}.play-console .ok{color:#8FE3A0}
+.play-console .bad{color:#F08B8B}.play-console .dim{color:#8891A0}.play-console .hl{color:#F5DC8A}
+.play-take{margin-top:.75rem;padding:.8rem .95rem;font-size:.85rem;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--r-md);color:var(--ink2);line-height:1.5;min-height:2.4em}
+.play-take b{color:var(--ink)}
+.hint{font-size:.85rem;color:var(--muted);margin-top:.8rem}
+
+/* ---------- build (scroll reveal) ---------- */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.05rem 1.15rem;border:1px solid var(--line2);border-radius:var(--r-md);
+  background:var(--panel2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:block;text-align:center;min-height:56px;overflow-x:auto;padding:.7rem;background:#F7F9FB;border-radius:var(--r-sm)}
+.build-viz svg{display:inline-block;width:100%;max-width:500px;height:auto;vertical-align:middle}
+.build-note{font-size:.9rem;color:var(--ink2);line-height:1.55}.build-note b{color:var(--ink)}.build-note code{background:var(--bg2)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.build-embed{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;background:#F7F9FB;margin:1rem 0}
+.build-embed iframe{width:100%;height:520px;border:0;display:block;background:#F7F9FB}
+.build-embed .cap{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--panel2);border-top:1px solid var(--line)}
+.build-embed .cap a{color:var(--accent)}
+.build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
+.build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- quiz ---------- */
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;color:var(--ink2);
+  border:1.5px solid var(--line2);background:var(--panel2);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent);color:var(--ink)}
+.q-opt .mark{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;display:grid;place-items:center;font-size:.7rem;font-weight:800;color:var(--bg)}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-soft);color:var(--ink)}
+.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}.q-opt.correct .mark::after{content:'✓'}
+.q-opt.wrong{border-color:var(--err);background:var(--err-soft);color:var(--ink)}
+.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}.q-opt.wrong .mark::after{content:'✕'}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.86rem;border-radius:var(--r-sm);line-height:1.5}
+.q-fb.show{max-height:360px;opacity:1;padding:.75rem .95rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.q-fb.bad{background:var(--err-soft);color:var(--err-ink);border:1px solid var(--err-line)}
+.q-fb code{background:rgba(128,128,128,.2)}
+
+/* ---------- produce prompt ---------- */
+.prompt{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.55rem .6rem .55rem 1rem;background:var(--panel2);border-bottom:1px solid var(--line)}
+.prompt-l{font-family:var(--mono);font-size:.74rem;color:var(--ink2)}.prompt-l b{color:var(--accent)}
+.copy{font-family:var(--body);font-size:.74rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .8rem;cursor:pointer;transition:.15s}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:#080B11;color:#C6D2E0;font-family:var(--mono);font-size:.8rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- completion banner ---------- */
+.fin{margin:1.8rem 0 0;padding:2rem;text-align:center;background:linear-gradient(135deg,var(--ok-soft),var(--accent-soft));
+  border:1px solid var(--ok);border-radius:var(--radius);opacity:0;max-height:0;overflow:hidden;transition:opacity .4s,max-height .4s}
+.fin.show{opacity:1;max-height:480px;padding:2.2rem 2rem}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;font-weight:700;color:var(--ok-ink);margin-bottom:.5rem}
+.fin p{color:var(--ink2);font-size:.92rem;margin:0}.fin b{color:var(--ink)}.fin code{background:rgba(0,0,0,.35)}
+
+.site-footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);line-height:1.6}
+
+/* ---------- tooltip ---------- */
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);background:#080B11;color:#EDEAFE;font-family:var(--body);font-size:.82rem;
+  font-weight:400;line-height:1.45;text-align:left;padding:.6rem .78rem;border-radius:var(--r-md);border:1px solid var(--line2);
+  box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:.2rem}
+
+/* ---------- vlab (inline interactive mechanism visual) ---------- */
+.vlab{border:1px solid var(--line2);border-radius:var(--r-md);background:var(--panel2);padding:14px 16px;margin:0 0 16px;box-shadow:var(--shadow-sm)}
+.vlab-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.vlab-title{font-family:var(--display);font-weight:700;font-size:1rem;color:var(--ink)}
+.vlab-readout{font-family:var(--mono);font-size:.8rem;color:var(--ink2)}.vlab-readout b{color:var(--accent)}
+.vlab-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.vlab-panels{grid-template-columns:1fr}}
+.vlab-fig{margin:0}
+.vlab-fig figcaption{font-size:.74rem;color:var(--muted);margin-bottom:4px;text-align:center}
+.vlab-svg{width:100%;height:auto;display:block;background:#F8FAFC;border:1px solid var(--line);border-radius:8px}
+.vlab-axis{stroke:#C2C9D4;stroke-width:1.2}
+.vlab-grid{stroke:#E7EAF0;stroke-width:1}
+.vlab-lbl{fill:#5A6472;font-family:var(--mono);font-size:11px}
+.vlab-lbl.mut{fill:#96A0AF;font-size:10px}
+.vlab-fit{stroke:#111827;stroke-width:2;fill:none}
+.vlab-fit.dash{stroke:#B0453A;stroke-dasharray:5 4}
+.vlab-pt{stroke:#1F2937;stroke-width:1.1}
+.vlab-controls{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:12px}
+.vlab-controls label{display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--ink2)}
+.vlab-controls input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+.vlab-val{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:600}
+.vlab-toggle{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.vlab-btn{font-family:var(--body);font-size:.78rem;font-weight:600;color:var(--ink2);background:var(--panel);border:0;padding:.4rem .7rem;cursor:pointer}
+.vlab-btn.active{background:var(--accent);color:#fff}
+.vlab-note{font-size:.78rem;color:var(--muted);margin:.6rem 0 0;line-height:1.5}
+.vlab-q{font-size:.82rem;font-weight:600;color:var(--ink);background:rgba(128,145,255,.10);border:1px solid var(--accent-d);border-radius:8px;padding:.5rem .7rem;margin:0 0 .7rem;line-height:1.45}
+.vlab-badge{font-family:var(--body);font-size:.74rem;font-weight:700;border-radius:999px;padding:.15rem .6rem;margin-left:.4rem;white-space:nowrap}
+.vlab-badge.ok{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.vlab-badge.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+
+/* ---------- responsive ---------- */
+#scrim{display:none}
+@media(max-width:900px){
+  .layout{display:block}
+  #sidebar{position:fixed;z-index:70;top:0;left:0;transform:translateX(-100%);transition:transform .22s var(--ease);
+    box-shadow:var(--shadow);width:290px;height:100vh}
+  #sidebar.open{transform:translateX(0)}
+  #nav-toggle{display:inline-flex;align-items:center;gap:.4rem;position:fixed;top:12px;right:12px;z-index:65;
+    background:var(--accent);color:#fff;border:none;padding:9px 15px;border-radius:10px;font-weight:700;font-family:var(--body);font-size:.85rem;cursor:pointer;box-shadow:var(--shadow)}
+  #scrim.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:69}
+  #content{padding:60px 18px 70px;max-width:100%}
+  .relate{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+
+<body data-quest-id="wf5-d02-backward">
+
+<div id="progress-track" aria-hidden="true"><div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div></div>
+<button id="nav-toggle" type="button" aria-label="Toggle sections" aria-expanded="false">☰ Sections</button>
+<div id="scrim" aria-hidden="true"></div>
+
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="sidebar" aria-label="lesson navigation">
+    <div class="sidebar-scroll">
+    <div class="brand">
+      <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
+      <div class="brand-sub">Foundations · M5 Day 2</div>
+      <div class="nav-count" id="count"><b>0</b>/7 sections done</div>
+    </div>
+
+    <div class="theme-row" role="group" aria-label="appearance mode">
+      <span class="nav-group-label" style="padding:0">Appearance</span>
+      <div class="theme-btns">
+        <button class="theme-btn" data-theme-set="light" type="button">Light</button>
+        <button class="theme-btn" data-theme-set="dim" type="button">Dim</button>
+        <button class="theme-btn" data-theme-set="dark" type="button">Dark</button>
+        <button class="theme-btn" data-theme-set="midnight" type="button">Midnight</button>
+      </div>
+    </div>
+
+    <nav aria-label="Sections">
+      <div class="nav-group-label">Module 05 · Train</div>
+      <button class="nav-link" data-target="home"><span class="nl-dot"></span>Start here</button>
+      <button class="nav-link" data-target="s1"><span class="nl-dot"></span>1 · What is it</button>
+      <button class="nav-link" data-target="s2"><span class="nl-dot"></span>2 · Intuition</button>
+      <button class="nav-link" data-target="s3"><span class="nl-dot"></span>3 · Playground</button>
+      <button class="nav-link" data-target="s4"><span class="nl-dot"></span>4 · Mechanism &amp; why</button>
+      <button class="nav-link" data-target="s5"><span class="nl-dot"></span>5 · Build it up</button>
+      <button class="nav-link" data-target="s6"><span class="nl-dot"></span>6 · Quiz</button>
+      <button class="nav-link" data-target="s7"><span class="nl-dot"></span>7 · Produce</button>
+    </nav>
+
+    <div class="checklist-wrap">
+      <div class="nav-group-label">Progress checklist</div>
+      <ul id="checklist"><!-- built by JS --></ul>
+      <button id="reset" class="ghost-btn" type="button">↺ Reset progress</button>
+    </div>
+    </div><!-- /.sidebar-scroll -->
+
+    <div class="side-nav">
+      <a class="lnav prev" href="../day-01-mlp-mnist/lesson.html"><span class="d">← Prev</span><span class="t">MLP on MNIST (from scratch)</span></a>
+      <a class="lnav next" href="../day-03-minibatch-loop/lesson.html"><span class="d">Next →</span><span class="t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
+      <a class="lnav-hub" href="../../index.html"><span class="d">▦ Map</span><span class="t">Back to curriculum</span></a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main id="content">
+
+    <section id="home" class="hero">
+      <span class="kicker">Module 5 · Train · Day 2</span>
+      <h1>The Backward Pass<span class="sub">Wired by Hand</span></h1>
+      <p class="lede">Yesterday your MLP made a guess. Today you teach it to fix that guess. You will compute the gradient — the "which way to nudge each weight" signal — layer by layer, using the chain rule. You will wire <code>dL/dW</code> for every layer of the 784→128→10 MLP by hand, and then check your work against a slow-but-honest numerical gradient.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> walk the gradient backward through a 2-layer MLP with the chain rule, write <code>dL/dW1</code> and <code>dL/dW2</code>, and verify them against a numerical gradient.</div></div>
+    </section>
+
+    <!-- ===== 1. WHAT IS IT ===== -->
+    <section class="module-section" id="s1" data-sec="what">
+  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">Computing the fix for every weight</span><span class="sec-tag">What is it</span></div>
+  <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the forward pass <code>h = relu(x@W1+b1)</code>, <code>logits = h@W2+b2</code> (M2), the cross-entropy loss (M3 Day 1), and that a <span class="term" data-tip="A number that tells you which way, and how much, to change one weight to make the loss smaller. It is the slope of the loss with respect to that weight.">gradient</span> tells you which way to nudge a weight (M3 Day 2). Today we compute those gradients ourselves.</div></div>
+
+      <h4>The one question the backward pass answers</h4>
+      <p>For every single weight in the model, ask: <em>"if I nudge you a tiny bit, how much does the loss change?"</em> That answer is the gradient. The <span class="term" data-tip="The algorithm that computes the gradient of the loss for every weight, working from the output back to the input, reusing the chain rule at each layer.">backward pass</span> (also called <span class="term" data-tip="Short for backward propagation of errors. Same thing as the backward pass.">backpropagation</span>) computes all of them in one sweep from the output back to the input.</p>
+
+      <h4>Why "backward"?</h4>
+      <p>The loss lives at the very end of the forward pass. To know how an early weight affects the loss, you have to trace its effect through every later step. So you start at the loss and walk <strong>backward</strong>, step by step, carrying the blame with you. That tool for chaining the steps together is the <span class="term" data-tip="A rule from calculus: if a depends on b, and b depends on c, then the effect of c on a is the product of the two smaller effects. It lets you multiply step-by-step slopes together.">chain rule</span>.</p>
+
+      <h4>The check that keeps you honest</h4>
+      <p>Hand-wired gradients are easy to get subtly wrong. So you compare them to a <span class="term" data-tip="An estimate of a gradient found by nudging a weight up and down a tiny amount and measuring how the loss changes. Slow but almost impossible to get wrong.">numerical gradient</span> — nudge a weight, watch the loss, divide. If the two match, your wiring is correct. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> "反向"听起来像另一套算法，其实是同一条链子倒着走。In plain terms: the backward pass is not a new algorithm — it is the <em>same</em> forward chain walked in reverse, reusing the values you already computed. The confusing part is only the bookkeeping: which transpose, and where the ReLU gate blocks the blame.</div></div>
+      <button class="gotit" type="button">Got the goal — let's go</button>
+    </div>
+</section>
+
+    <!-- ===== 2. INTUITION ===== -->
+    <section class="module-section" id="s2" data-sec="intuition">
+  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Passing the blame down a line of workers</span><span class="sec-tag">Intuition</span></div>
+  <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">🏭</span><h5>An assembly line</h5><p>Worker 1 hands a part to Worker 2, who hands it to Worker 3, who ships it. The final product is wrong. Someone made a mistake — but who, and how much?</p></div>
+        <div class="card"><span class="big">📣</span><h5>Blame flows backward</h5><p>The manager tells Worker 3 "you were off by this much". Worker 3 works out how much of that came from the part Worker 2 gave them, and passes that share of blame back. So does Worker 2 to Worker 1.</p></div>
+      </div>
+      <p><strong>In one line:</strong> each layer takes the blame it received from the layer after it, keeps its own share, and passes the rest further back — that passing-back is the chain rule.</p>
+      <p>Your forward pass is the assembly line: <code>x → layer 1 → h → layer 2 → logits → loss</code>. The backward pass sends the blame the other way: <code>loss → layer 2 → h → layer 1 → x</code>. At each layer, the blame it holds tells it exactly how to fix its own weights.</p>
+      <p><b>直觉 / Intuition:</b> 把误差想成"责任"：从最后一道工序往回传，每层留下自己的一份，再把剩下的递给前一层。 The technical point is that the chain rule multiplies the local slopes back through the network, so each layer learns exactly how much it contributed to the final loss.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: real workers each pass blame once, but the same intermediate value (like <code>h</code>) can feed many later steps. The chain rule handles that by <strong>adding up</strong> all the blame that flows back through it — a worker can be blamed by several people at once.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+</section>
+
+    <!-- ===== 3. PLAYGROUND ===== -->
+    <section class="module-section" id="s3" data-sec="play">
+  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Forward, then walk the blame back, then check it</span><span class="sec-tag">Playground</span></div>
+  <div class="sec-body">
+      <p>First, an interactive picture. <strong>Drag the step slider</strong> to walk the blame backward, one hop at a time, and watch the ReLU gate stop it at a dead unit.</p>
+      <div class="vlab" id="bwlab">
+        <div class="vlab-q">Learning question: how does one loss number turn into a gradient for every weight — and why does ReLU stop the blame at a dead unit?</div>
+        <div class="vlab-head">
+          <span class="vlab-title">Blame flows backward</span>
+          <span class="vlab-readout" id="bw-read">step 0 · forward pass only</span>
+        </div>
+        <div class="vlab-panels">
+          <figure class="vlab-fig"><figcaption>forward ↑ (blue) · gradient ↓ (red), revealed step by step</figcaption>
+            <svg class="vlab-svg" id="bw-flow" viewBox="0 0 260 230" role="img" aria-label="Forward and backward pass through a tiny MLP"></svg>
+          </figure>
+          <figure class="vlab-fig"><figcaption>the ReLU gate: blame passes only where z1 &gt; 0</figcaption>
+            <svg class="vlab-svg" id="bw-gate" viewBox="0 0 260 230" role="img" aria-label="ReLU gate zeroing the gradient of a dead unit"></svg>
+          </figure>
+        </div>
+        <div class="vlab-controls">
+          <label>walk the blame back <input type="range" id="bw-step" min="0" max="4" step="1" value="0" aria-label="backward pass step"><span class="vlab-val" id="bw-step-v">0 / 4</span></label>
+        </div>
+        <p class="vlab-note"><b>Notice:</b> the gradient starts as <code>probs − y_true</code> at the loss and multiplies its way back; at the ReLU, the dead unit (<code>z1 &lt; 0</code>) has its blame gated to exactly 0, so its weights get no update this step. <b>Misconception:</b> backprop is not a separate algorithm — it is the same chain walked in reverse, reusing the saved forward values. <b>Where this simplifies:</b> one sample, 2→2→2, fixed weights; real nets batch this over many layers. <b>Frontier relevance:</b> every LLM learns with exactly this sweep — <code>probs − y</code>, then "transpose the input, multiply the blame", gated at each nonlinearity.</p>
+      </div>
+      <p>Below is a simulated Python terminal. Run the forward pass, wire the gradients backward, then verify against a numerical gradient. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="fwd" type="button">① forward + save the pieces</button>
+          <button class="play-btn" data-demo="back" type="button">② gradients, layer by layer</button>
+          <button class="play-btn" data-demo="check" type="button">③ check vs numerical gradient</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: <code>dL/dW</code> means "how much the loss changes when W changes" — the number you subtract a small slice of to improve the weight (M3 Day 3).</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+</section>
+
+    <!-- ===== 4. MECHANISM & WHY ===== -->
+    <section class="module-section" id="s4" data-sec="why">
+  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">The chain rule, wired for our two layers</span><span class="sec-tag">Mechanism &amp; why</span></div>
+  <div class="sec-body">
+      <h4>Step 1 — in plain words</h4>
+      <p>The forward pass is a chain: <code>logits = (relu(x@W1+b1)) @ W2 + b2</code>, then softmax and cross-entropy give the loss. To find how <code>W1</code> affects the loss, multiply together the small effects along the chain: how the loss depends on the logits, how the logits depend on <code>h</code>, how <code>h</code> depends on <code>W1</code>. That multiplying-along-the-chain is the chain rule.</p>
+
+      <h4>Step 2 — the formulas, symbol by symbol</h4>
+      <p>A lovely fact makes the start simple: for softmax + cross-entropy, the blame at the output is just <strong>predicted probabilities minus the true one-hot label</strong>. Everything else falls out of it.</p>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        dlogits = probs − y_true       <span class="dim"># shape (10,) — the starting blame</span><br>
+        dW2 = h.T @ dlogits            <span class="dim"># (128,1)@(1,10) → (128,10)</span><br>
+        db2 = dlogits                  <span class="dim"># (10,)</span><br>
+        dh  = dlogits @ W2.T           <span class="dim"># (1,10)@(10,128) → (128,) — blame handed to layer 1</span><br>
+        dz1 = dh * (z1 &gt; 0)            <span class="dim"># ReLU gate: blame passes only where z1 was positive</span><br>
+        dW1 = x.T @ dz1                <span class="dim"># (784,1)@(1,128) → (784,128)</span><br>
+        db1 = dz1                      <span class="dim"># (128,)</span>
+      </div></div>
+      <p>Symbols: <code>probs</code> = softmax output (10 numbers), <code>y_true</code> = one-hot true label, <code>h</code> = the hidden activations, <code>z1 = x@W1+b1</code> = the pre-ReLU values, <code>W2.T</code> = the transpose of <code>W2</code>. Every <code>d…</code> is "loss's sensitivity to that thing". Notice the pattern: each layer's <code>dW</code> is <strong>its input, transposed, times the blame flowing into it</strong>.</p>
+
+      <h4>Step 3 — a worked example (tiny numbers)</h4>
+      <p>Say the true digit is class 0, so <code>y_true = [1, 0, 0, …]</code>, and softmax gave <code>probs = [0.7, 0.2, 0.1, …]</code>. Then <code>dlogits = probs − y_true = [-0.3, 0.2, 0.1, …]</code>. The <code>-0.3</code> on the true class says "push this logit up"; the positives say "push those down". Feed that into <code>dW2 = h.T @ dlogits</code> and you get one gradient number per weight in <code>W2</code>. The ReLU gate <code>(z1 &gt; 0)</code> then zeroes out blame for any hidden unit that was switched off.</p>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — the backward sweep</b>
+<br><b>1 · In words:</b> start with predicted − true at the output, then repeat "transpose the input, multiply the blame", gating at ReLU — see Steps 1–3 above.
+<br><b>2 · The formula:</b> <code>dlogits = probs − y_true</code>; <code>dW2 = hᵀ·dlogits</code>; <code>dh = dlogits·W2ᵀ</code>; <code>dz1 = dh·(z1&gt;0)</code>; <code>dW1 = xᵀ·dz1</code>.
+<br><b>3 · Tiny numbers:</b> true class 0, <code>probs=[0.7,0.2,0.1,…]</code> → <code>dlogits=[-0.3,0.2,0.1,…]</code>; a hidden unit with <code>z1&lt;0</code> gets <code>dz1=0</code> (its blame is blocked).
+<br><b>4 · Sanity check:</b> each <code>dW</code> has the same shape as its <code>W</code>, and a numerical gradient <code>(loss(W+ε)−loss(W−ε))/(2ε)</code> must match to several decimals. If it does not, a transpose or the ReLU gate is wrong.</div></div>
+
+      <h4>Why this is the whole game</h4>
+      <p>Every deep network — including a giant LLM — learns with exactly this backward sweep: start with <code>probs − y_true</code>, then repeat "transpose the input, multiply the blame" through each layer, gating at each nonlinearity. Tomorrow you will run it in a loop over mini-batches.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The check:</b> a numerical gradient nudges one weight by a tiny <code>ε</code>, measures <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code>, and should match your hand-wired <code>dW</code> to several decimal places. If it doesn't, a transpose or a gate is wrong.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>A hand-wired backward pass is where wrong gradients hide — the arithmetic still runs, so nothing tells you the math is off.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): a wrong gradient that still runs.</b> This is a bug that doesn't announce itself. If you write <code>dW2 = dlogits @ h.T</code> instead of <code>h.T @ dlogits</code>, or forget the ReLU gate <code>(z1 &gt; 0)</code>, or flip a sign, the shapes can still line up and the code runs with no error. But the gradient points in the wrong direction, so training crawls, wanders, or the loss slowly rises. There is nothing to see in the output. A senior engineer never trusts a hand-wired backward pass without a <b>code-review</b> gradient check: nudge one weight by a tiny <code>ε</code> and confirm <code>(loss(W+ε) − loss(W−ε)) / (2ε)</code> matches your <code>dW</code> to several decimals before running any real training.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: hand-wiring gradients vs. automatic differentiation.</b> Deriving each <code>dW</code> by hand teaches you exactly how learning works and lets you optimize a specific layer, but it is slow to write and easy to get subtly wrong. A framework's autograd (M5 later) computes gradients for you and is almost never wrong, at the cost of hiding the mechanism. In a <b>design review</b> the call is clear for anything real: use autograd and keep the hand-derivation for understanding and for the rare custom kernel where you must.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Backprop computes <code>dL/dW</code> for every weight in one reverse sweep. For softmax + cross-entropy the output gradient is just <code>probs − y_true</code>; from there each layer's weight gradient is its input transposed times the incoming blame — <code>dW2 = hᵀ·dlogits</code> — and the blame handed further back is <code>dh = dlogits·W2ᵀ</code>, gated through ReLU by <code>(z1&gt;0)</code>. The nuance is that a wrong transpose or a missing gate still runs — shapes line up, no error — so I always gradient-check against a numerical <code>(loss(W+ε)−loss(W−ε))/(2ε)</code> before trusting a hand-wired backward pass."</div></div>
+      <button class="gotit" type="button">Got the full backward pass</button>
+    </div>
+</section>
+
+    <!-- ===== 5. BUILD IT UP ===== -->
+    <section class="module-section" id="s5" data-sec="build">
+  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Walk the blame from loss back to the first weight — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
+  <div class="sec-body">
+      <p>Here is the backward pass built one step at a time, from the loss all the way back to <code>dW1</code>. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+</section>
+
+    <!-- ===== 6. QUIZ ===== -->
+    <section class="module-section" id="s6" data-sec="quiz">
+  <div class="sec-head"><span class="sec-num s-quiz">6</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tag">Quiz</span></div>
+  <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+</section>
+
+    <!-- ===== 7. PRODUCE ===== -->
+    <section class="module-section" id="s7" data-sec="produce">
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Wire the backward pass yourself and prove it with a numerical check — that's what makes the day count. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py</code>. Build the 784→128→10 forward pass, then hand-write <code>dW2, db2, dW1, db1</code> from <code>dlogits = probs − y_true</code>. Add a numerical-gradient checker that nudges each weight by <code>ε = 1e-5</code> and compares. Print the largest difference between your gradient and the numerical one — it should be tiny (below about <code>1e-6</code>). Run with <code>python3 sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">ask Claude to build it</span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Help me build my Module 5 Day 2 artifact.
+
+Create sessions/m04-first-model-mlp/day-02-backward-pass/experiment.py that, with a comment on each step, wires the backward pass of a 2-layer MLP by hand in NumPy:
+1. A 784 -> 128 (ReLU) -> 10 forward pass on one small random input, saving z1, h, logits.
+2. Softmax + cross-entropy loss against a one-hot label.
+3. Manual gradients using the chain rule: dlogits = probs - y_true, then dW2 = h.T @ dlogits, db2, dh = dlogits @ W2.T, dz1 = dh * (z1 > 0), dW1 = x.T @ dz1, db1.
+4. A numerical gradient checker: nudge each weight by eps=1e-5 and compare (f(W+eps)-f(W-eps))/(2*eps) to the analytic gradient.
+Print the maximum absolute difference for W1 and W2 and confirm it is below 1e-6.
+Then run it and paste the max difference at the bottom as a comment.</pre>
+      </div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Analytic <code>dW2</code> and <code>dW1</code> have the same shapes as <code>W2</code> and <code>W1</code>.</li>
+        <li>The ReLU gate zeroes <code>dz1</code> wherever <code>z1 ≤ 0</code>.</li>
+        <li>The max absolute difference vs the numerical gradient is below about <code>1e-6</code>.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-02-backward-pass/log.md</code>: (1) the largest gap between your hand-wired gradient and the numerical one, and whether any layer surprised you; (2) what the ReLU gate did to the dead unit's gradient; (3) one thing you're still unsure about.</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+</section>
+
+    <div class="fin" id="fin" role="status" aria-hidden="true">
+      <span class="em" aria-hidden="true">🎉</span>
+      <h3>Module 5 · Day 2 complete! 🏆</h3>
+      <p>Nice work — you've completed <b>The Backward Pass</b>.<br>Next up: <b>Mini-Batch Loop &amp; Overfit-One-Batch</b>.</p>
+    </div>
+
+    <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+  </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.module-section'));
+var bar = document.getElementById('bar') || document.getElementById('progress-bar');
+var count = document.getElementById('count'), fin = document.getElementById('fin');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link'));
+
+/* ---- build the sidebar checklist from sections ---- */
+var checklist = document.getElementById('checklist'), checkItems = {};
+secs.forEach(function(sec){
+  var key = sec.getAttribute('data-sec');
+  var title = sec.querySelector('.sec-h') ? sec.querySelector('.sec-h').textContent : key;
+  var num = sec.querySelector('.sec-num') ? sec.querySelector('.sec-num').textContent : '';
+  var li = document.createElement('li');
+  li.innerHTML = '<span class="box" aria-hidden="true"></span><span>'+num+' · '+shorten(title)+'</span>';
+  li.addEventListener('click', function(){ sec.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'}); });
+  checklist.appendChild(li);
+  checkItems[key] = li;
+});
+function shorten(t){ return t.length>34 ? t.slice(0,32).trim()+'…' : t; }
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:RM?'auto':'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  if(bar){ bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete'); }
+  if(count) count.innerHTML = '<b>'+done+'</b>/'+total+' sections done';
+  secs.forEach(function(s){
+    var k = s.getAttribute('data-sec'), on = s.classList.contains('done');
+    if(checkItems[k]) checkItems[k].classList.toggle('done', on);
+    var nl = navLinks.filter(function(l){return l.getAttribute('data-target')===s.id;})[0];
+    if(nl) nl.classList.toggle('done', on);
+  });
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+var resetBtn = document.getElementById('reset');
+if(resetBtn) resetBtn.addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* ---- darkness switcher ---- */
+var themeBtns = Array.prototype.slice.call(document.querySelectorAll('.theme-btn'));
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem('frontier-theme', t); }catch(e){}
+  themeBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme-set')===t); });
+}
+themeBtns.forEach(function(b){ b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme-set')); }); });
+setTheme(document.documentElement.getAttribute('data-theme') || 'dim');
+
+/* ---- sidebar nav: click to scroll, scrollspy to highlight active ---- */
+navLinks.forEach(function(l){
+  l.addEventListener('click', function(){
+    var t = document.getElementById(l.getAttribute('data-target'));
+    if(t) t.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'});
+    setTimeout(function(){ if(window.__revealBuild) window.__revealBuild(); }, RM?60:650);
+    closeSidebar();
+  });
+});
+var spyTargets = [document.getElementById('home')].concat(secs).filter(Boolean);
+if('IntersectionObserver' in window){
+  var spy = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        var id = e.target.id;
+        navLinks.forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-target')===id); });
+      }
+    });
+  }, {threshold:0.01, rootMargin:'-45% 0px -50% 0px'});
+  spyTargets.forEach(function(t){ spy.observe(t); });
+}
+
+/* ---- mobile sidebar toggle ---- */
+var sidebar = document.getElementById('sidebar'), toggle = document.getElementById('nav-toggle'), scrim = document.getElementById('scrim');
+function openSidebar(){ sidebar.classList.add('open'); scrim.classList.add('show'); toggle.setAttribute('aria-expanded','true'); }
+function closeSidebar(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); }
+if(toggle) toggle.addEventListener('click', function(){ sidebar.classList.contains('open')?closeSidebar():openSidebar(); });
+if(scrim) scrim.addEventListener('click', closeSidebar);
+
+/* ===== PLAYGROUND ===== */
+var DEMOS = {
+  fwd:{html:'<span class="prompt">&gt;&gt;&gt;</span> z1 = x @ W1 + b1          <span class="dim"># pre-activation, save it for later</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> h  = relu(z1)              <span class="dim"># hidden activations (128,)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> logits = h @ W2 + b2\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> probs  = softmax(logits)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> loss   = cross_entropy(probs, y_true)\n'+
+    '<span class="hl">loss = 1.204</span>   <span class="dim"># saved: z1, h, logits, probs</span>',
+    take:'<b>①  Forward pass, but keep the pieces.</b> The backward pass needs <code>z1</code>, <code>h</code>, and <code>probs</code> again. Saving them now is why you compute forward before backward.'},
+  back:{html:'<span class="prompt">&gt;&gt;&gt;</span> dlogits = probs - y_true   <span class="dim"># the starting blame (10,)</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dW2 = h.T @ dlogits        <span class="dim"># (128,10)  layer-2 weight grad</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dh  = dlogits @ W2.T       <span class="dim"># (128,)   blame handed to layer 1</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dz1 = dh * (z1 &gt; 0)        <span class="dim"># ReLU gate: block where z1&lt;=0</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> dW1 = x.T @ dz1            <span class="dim"># (784,128) layer-1 weight grad</span>\n'+
+    '<span class="ok">dW1.shape (784, 128)   dW2.shape (128, 10)  ✓</span>',
+    take:'<b>②  Blame flows backward.</b> Each layer: transpose the input, multiply the incoming blame. The ReLU gate <code>(z1&gt;0)</code> blocks blame for units that were off. Shapes match the weights — a good first sanity check.'},
+  check:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">def</span> <span class="fn">num_grad</span>(W, i, j, eps=<span class="num">1e-5</span>):\n'+
+    '<span class="dim">...</span>     <span class="kw">return</span> (loss_at(W,i,j,+eps) - loss_at(W,i,j,-eps)) / (<span class="num">2</span>*eps)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> analytic = dW2[<span class="num">3</span>,<span class="num">5</span>];  numeric = num_grad(W2,<span class="num">3</span>,<span class="num">5</span>)\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> analytic, numeric, abs(analytic-numeric)\n'+
+    '<span class="hl">(0.041832, 0.041833, 7.4e-07)</span>\n'+
+    '<span class="ok"># match to 6 decimals → the wiring is correct ✓</span>',
+    take:'<b>③  Trust, but verify.</b> The numerical gradient nudges one weight and watches the loss. It agrees with your hand-wired <code>dW2</code> to 6 decimals, so the chain rule was applied correctly.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active'); b.classList.add('seen');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* ===== BUILD — scroll-reveal ===== */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='The forward chain from input to loss'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='20' y='45' width='55' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='47' y='62' fill='#1F6280'>x</text><text x='90' y='62' fill='#6B645E'>→</text><rect x='105' y='45' width='75' height='26' rx='4' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><text x='142' y='62' fill='#1a5c38'>h</text><text x='195' y='62' fill='#6B645E'>→</text><rect x='210' y='45' width='90' height='26' rx='4' fill='#FCF3DC' stroke='#C99A12' stroke-width='1.5'/><text x='255' y='62' fill='#9A7208'>logits</text><text x='315' y='62' fill='#6B645E'>→</text><rect x='330' y='45' width='90' height='26' rx='4' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='1.5'/><text x='375' y='62' fill='#1F6280'>probs</text><text x='435' y='62' fill='#6B645E'>→</text><rect x='448' y='45' width='58' height='26' rx='4' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='477' y='62' fill='#C93B3B'>loss</text></g></svg>",
+  note:"<b>Start with the forward chain.</b> Each arrow is one operation. The loss sits at the far right. To improve any weight, you need to know how it affects that far-right loss. Save <code>z1</code>, <code>h</code>, and <code>probs</code> — the backward pass reuses them."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='The starting blame equals probs minus true label'><g font-family='monospace' font-size='12' text-anchor='middle'><rect x='30' y='38' width='90' height='30' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='75' y='58' fill='#1F6280'>probs</text><text x='135' y='58' fill='#6B645E'>−</text><rect x='155' y='38' width='100' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='205' y='58' fill='#5E5191'>y_true (1-hot)</text><text x='275' y='58' fill='#6B645E'>=</text><rect x='295' y='38' width='110' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='350' y='58' fill='#C93B3B'>dlogits (blame)</text></g></svg>",
+  note:"<b>The blame at the output is tiny to compute.</b> For softmax + cross-entropy, <code>dlogits = probs − y_true</code>. If the true digit is class 0, subtracting the one-hot pushes that logit up and the rest down. This is the seed of the whole backward pass."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Layer 2 weight gradient is h transpose times dlogits'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='70' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='65' y='58' fill='#1a5c38'>h.T</text><text x='115' y='58' fill='#6B645E'>@</text><rect x='130' y='38' width='90' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='175' y='58' fill='#C93B3B'>dlogits</text><text x='235' y='58' fill='#6B645E'>=</text><rect x='255' y='38' width='150' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='330' y='58' fill='#9A7208'>dW2  (128, 10)</text></g></svg>",
+  note:"<b>Layer 2's gradient.</b> <code>dW2 = h.T @ dlogits</code>. The pattern to remember: a layer's weight gradient is <strong>its input, transposed, times the blame flowing into it</strong>. The shape <code>(128,10)</code> matches <code>W2</code> exactly."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='Blame handed back to the hidden layer via W2 transpose'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='90' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='75' y='58' fill='#C93B3B'>dlogits</text><text x='135' y='58' fill='#6B645E'>@</text><rect x='150' y='38' width='70' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='185' y='58' fill='#9A7208'>W2.T</text><text x='235' y='58' fill='#6B645E'>=</text><rect x='255' y='38' width='120' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='315' y='58' fill='#1a5c38'>dh  (128,)</text></g></svg>",
+  note:"<b>Hand the blame back a layer.</b> <code>dh = dlogits @ W2.T</code> spreads the output blame back onto the 128 hidden units, weighted by the same <code>W2</code> that carried them forward. This <code>dh</code> is layer 1's share of the mistake."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='ReLU gate zeroes blame where z1 was not positive'><g font-family='monospace' font-size='11.5' text-anchor='middle'><rect x='30' y='38' width='75' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='67' y='58' fill='#1a5c38'>dh</text><text x='120' y='58' fill='#6B645E'>×</text><rect x='135' y='38' width='110' height='30' rx='5' fill='#EDE9F8' stroke='#7C6DAA' stroke-width='2'/><text x='190' y='58' fill='#5E5191'>(z1 &gt; 0)</text><text x='260' y='58' fill='#6B645E'>=</text><rect x='280' y='38' width='120' height='30' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='340' y='58' fill='#C93B3B'>dz1 (128,)</text></g></svg>",
+  note:"<b>The ReLU gate.</b> ReLU passed only positive values forward, so it passes blame back only where <code>z1 &gt; 0</code>. <code>dz1 = dh * (z1 &gt; 0)</code> zeroes out the units that were switched off — they had no effect, so they get no blame."},
+ {viz:"<svg viewBox='0 0 520 110' role='img' aria-label='Layer 1 weight gradient and the numerical check'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='20' y='30' width='60' height='28' rx='5' fill='#E4F2F7' stroke='#2A7B9B' stroke-width='2'/><text x='50' y='49' fill='#1F6280'>x.T</text><text x='92' y='49' fill='#6B645E'>@</text><rect x='105' y='30' width='60' height='28' rx='5' fill='#FDE8E8' stroke='#C93B3B' stroke-width='2'/><text x='135' y='49' fill='#C93B3B'>dz1</text><text x='178' y='49' fill='#6B645E'>=</text><rect x='195' y='30' width='150' height='28' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='270' y='49' fill='#9A7208'>dW1 (784,128)</text><rect x='120' y='72' width='300' height='26' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='270' y='89' fill='#1a5c38'>numerical check: match to 1e-6 ✓</text></g></svg>",
+  note:"<b>Back to the first weight, then verify.</b> <code>dW1 = x.T @ dz1</code> — same pattern, input-transposed times incoming blame. Finally, a numerical gradient nudges each weight and confirms your hand-wired gradients to about 6 decimals. Match = correct. This exact sweep trains every deep network, LLMs included."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+function revealVisible(){
+  var vh = window.innerHeight || document.documentElement.clientHeight;
+  bsteps.forEach(function(s){
+    if(s.classList.contains('revealed')) return;
+    // reveal any step whose top has entered (or scrolled above) the viewport — never leave it blank
+    if(s.getBoundingClientRect().top < vh*0.95) seeStep(s);
+  });
+}
+window.__revealBuild = revealVisible;   // sidebar jumps re-check so a jumped-to build is never blank
+if(!bsteps.length){ bUnlock(); }
+else if(RM || !('IntersectionObserver' in window)){ bsteps.forEach(seeStep); }
+else {
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.15, rootMargin:'0px 0px -6% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+  // robustness: reveal steps already on screen (e.g. after a sidebar jump) and on any scroll/resize
+  window.addEventListener('scroll', revealVisible, {passive:true});
+  window.addEventListener('resize', revealVisible);
+  revealVisible();
+  setTimeout(revealVisible, 700);
+}
+
+/* ===== QUIZ ===== */
+var QS=[
+ {q:'1. Why is the backward pass called "backward"?',
+  opts:['it runs the code in reverse order','it starts at the loss and traces each weight\'s effect back through the network','it uses negative numbers','it undoes the forward pass'],
+  ans:1, fb:'Right. The loss is at the end, so you walk back from it, carrying the blame to each earlier weight.'},
+ {q:'2. For softmax + cross-entropy, the blame at the output (dlogits) equals:',
+  opts:['probs × y_true','probs − y_true','y_true − 1','log(probs)'],
+  ans:1, fb:'Right. dlogits = probs − y_true — subtracting the one-hot label from the predicted probabilities.'},
+ {q:'3. A layer\'s weight gradient follows which pattern?',
+  opts:['weight × blame','the input transposed, times the blame flowing in','blame ÷ input','just the blame'],
+  ans:1, fb:'Right. dW = input.T @ incoming_blame — e.g. dW2 = h.T @ dlogits, dW1 = x.T @ dz1.'},
+ {q:'4. Your hand-wired backward pass runs with no error and the shapes all match, but the training loss barely moves (or slowly drifts up). Where do you look first?',
+  opts:['increase the number of hidden units','run a numerical gradient check — a swapped transpose (h.T @ dlogits vs dlogits @ h.T), a missing ReLU gate (z1 > 0), or a flipped sign can still run yet point the gradient the wrong way','collect more training data','make the batch size larger'],
+  ans:1, fb:'Right. A wrong gradient that still runs is the classic silent backprop bug. Nudge one weight by a tiny ε and check (loss(W+ε) − loss(W−ε)) / (2ε) against your dW; a mismatch pinpoints the bad transpose, gate, or sign. Nothing in the raw output would reveal it — more units, data, or batch size cannot fix a gradient that points the wrong way.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* ===== COPY ===== */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el; tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body); tip.classList.add('show'); position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+
+<!-- ── viz iframe: auto-size to content + manual reload safety net ──
+     Root cause of the earlier "blank box" was Safari treating each local file://
+     path as its own origin, so an iframe embedded from a *different* file gets its
+     paint suppressed as a privacy measure — confirmed by: it worked standalone,
+     it worked in Chrome, and it worked over http://localhost. Not a code bug, and
+     it does not affect the deployed (https) site. Auto-resize restored; the reload
+     button stays as a harmless safety net regardless of browser. -->
+<script>
+(function(){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || d.type !== 'viz-height' || typeof d.px !== 'number') return;
+    var frames = document.querySelectorAll('.build-embed iframe');
+    for (var i = 0; i < frames.length; i++){
+      if (frames[i].contentWindow === e.source){
+        frames[i].style.height = Math.min(Math.max(d.px, 320), 3200) + 'px';
+        break;
+      }
+    }
+  });
+  var btn = document.getElementById('bcastReload');
+  if(btn) btn.addEventListener('click', function(){
+    var f = document.getElementById('bcastFrame');
+    if(f) f.src = f.src;
+  });
+})();
+</script>
+
+<!-- ── vlab: backward-pass "blame flows backward" (P0 mechanism visual) ── -->
+<script>
+(function(){
+  "use strict";
+  var lab=document.getElementById('bwlab'); if(!lab) return;
+  var flow=document.getElementById('bw-flow'), gate=document.getElementById('bw-gate');
+  var read=document.getElementById('bw-read'), stepS=document.getElementById('bw-step'), stepV=document.getElementById('bw-step-v');
+  // fixed tiny MLP, one sample — all forward + backward values computed here (real chain-rule math)
+  var x=[1,2];
+  var W1=[[0.5,-1.0],[1.0,-0.5]], b1=[0,0];
+  var W2=[[1.0,0.0],[0.5,1.0]];
+  var y=[1,0];
+  var z1=[x[0]*W1[0][0]+x[1]*W1[1][0]+b1[0], x[0]*W1[0][1]+x[1]*W1[1][1]+b1[1]]; // [2.5,-2.0]
+  var h=[Math.max(0,z1[0]), Math.max(0,z1[1])];                                  // [2.5,0]
+  var logits=[h[0]*W2[0][0]+h[1]*W2[1][0], h[0]*W2[0][1]+h[1]*W2[1][1]];         // [2.5,0]
+  var mmax=Math.max(logits[0],logits[1]), e0=Math.exp(logits[0]-mmax), e1=Math.exp(logits[1]-mmax), Z=e0+e1;
+  var probs=[e0/Z, e1/Z];
+  var loss=-Math.log(probs[0]);                                                  // true class 0
+  var dlogits=[probs[0]-y[0], probs[1]-y[1]];
+  var dh=[dlogits[0]*W2[0][0]+dlogits[1]*W2[0][1], dlogits[0]*W2[1][0]+dlogits[1]*W2[1][1]]; // dlogits @ W2ᵀ
+  var dz1=[dh[0]*(z1[0]>0?1:0), dh[1]*(z1[1]>0?1:0)];
+  function f2(v){ return v.toFixed(2); }
+  function vecs(v){ return '['+v.map(f2).join(', ')+']'; }
+  var msgs=['step 0 · forward pass only — values saved for the sweep',
+            'step 1 · dlogits = probs − y_true',
+            'step 2 · dh = dlogits · W2ᵀ (blame handed to hidden)',
+            'step 3 · ReLU gate: dz1 zeroes the dead unit',
+            'step 4 · dW1 = xᵀ · dz1 (blame reaches first weights)'];
+
+  function drawFlow(step){
+    var rows=[
+      {fv:'loss = '+loss.toFixed(2),        g:'',                                       gs:9},
+      {fv:'logits = '+vecs(logits),         g:'dlogits = probs−y = '+vecs(dlogits),      gs:1},
+      {fv:'h = relu(z1) = '+vecs(h),        g:'dh = dlogits·W2ᵀ = '+vecs(dh),            gs:2},
+      {fv:'z1 = x·W1 = '+vecs(z1),          g:'dz1 = dh·(z1>0) = '+vecs(dz1)+'  ← gated', gs:3},
+      {fv:'x (input) = '+vecs(x),           g:'dW1 = xᵀ·dz1  (weights updated)',          gs:4}
+    ];
+    var top=12, rh=43, bx=8, bw=244, bh=34;
+    var s='<g font-family="monospace" font-size="8.5">';
+    for(var i=0;i<5;i++){
+      var r=rows[i], yy=top+i*rh, on=(step===r.gs);
+      s+='<rect x="'+bx+'" y="'+yy+'" width="'+bw+'" height="'+bh+'" rx="5" fill="#EEF2F7" stroke="'+(on?'#C0392B':'#8A93A0')+'" stroke-width="'+(on?1.8:1)+'"/>';
+      s+='<text x="'+(bx+7)+'" y="'+(yy+14)+'" fill="#2C2A28">'+r.fv+'</text>';
+      if(r.g && step>=r.gs) s+='<text x="'+(bx+7)+'" y="'+(yy+27)+'" fill="#C0392B">'+r.g+'</text>';
+      if(i<4){
+        var midy=yy+bh+(rh-bh)/2+3;
+        s+='<text x="'+(bx+bw-12)+'" y="'+midy+'" fill="#2A7B9B" font-size="11">↑</text>';
+        if(step>=rows[i+1].gs && rows[i+1].gs<9) s+='<text x="'+(bx+10)+'" y="'+midy+'" fill="#C0392B" font-size="11">↓</text>';
+      }
+    }
+    s+='</g>';
+    flow.innerHTML=s;
+  }
+
+  function drawGate(step){
+    var cols=[75,185], base=118, sc=26;
+    var s='<g font-family="monospace" font-size="9" text-anchor="middle">';
+    s+='<text x="130" y="16" fill="#5A6472">ReLU gate (per hidden unit)</text>';
+    s+='<line x1="20" y1="'+base+'" x2="240" y2="'+base+'" class="vlab-axis"/>';
+    for(var u=0;u<2;u++){
+      var cx=cols[u], zv=z1[u], open=zv>0;
+      var bh=Math.min(70,Math.abs(zv)*sc), by=open?base-bh:base, colr=open?'#2D8B55':'#AEB6C2';
+      s+='<rect x="'+(cx-24)+'" y="'+by+'" width="48" height="'+bh+'" rx="3" fill="'+colr+'"/>';
+      s+='<text x="'+cx+'" y="'+(open?by-4:by+bh+12)+'" fill="#5A6472">z1='+zv.toFixed(1)+'</text>';
+      s+='<text x="'+cx+'" y="'+(base+22)+'" fill="'+(open?'#1a5c38':'#8A93A0')+'">'+(open?'OPEN ✓':'CLOSED ✕')+'</text>';
+      if(step>=3){
+        s+='<text x="'+cx+'" y="'+(base+40)+'" fill="#5A6472" font-size="8">dh in = '+dh[u].toFixed(2)+'</text>';
+        s+='<text x="'+cx+'" y="'+(base+54)+'" fill="'+(open?'#C0392B':'#8A93A0')+'" font-size="8">dz1 out = '+dz1[u].toFixed(2)+(open?'':' (blocked)')+'</text>';
+      }
+      s+='<text x="'+cx+'" y="'+(base+74)+'" fill="#96A0AF" font-size="8">unit '+u+'</text>';
+    }
+    s+='</g>';
+    gate.innerHTML=s;
+  }
+
+  function draw(){ var st=+stepS.value; drawFlow(st); drawGate(st); read.textContent=msgs[st]; stepV.textContent=st+' / 4'; }
+  stepS.addEventListener('input', draw);
+  draw();
+})();
+</script>
+</body>
+</html>

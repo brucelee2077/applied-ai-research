@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
+<title>Module 5 · Day 4 — Full Training: Reading the Loss Curve &amp; Dropout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===========================================================================
+   M1 Day 3 — dark "lab notebook" skin, modeled on visual-tutorial/index.html
+   (sidebar nav + progress checklist + numbered content column), dark palette.
+   Self-contained, offline. Progress persists to localStorage.
+   =========================================================================== */
+:root{
+  /* theme-independent: accents, type, radii, shadows */
+  --accent:#8091FF; --accent-d:#6B7BF0; --accent-soft:#1B2340; --on-soft:#EDF1F7;
+  --q:#5B9BFF; --k:#B39BFF; --v:#FF9B5C;
+  --ok:#5BC98A; --ok-ink:#8FE3AE; --ok-soft:#12271C; --ok-line:#1E7E4C;
+  --warn:#E7B04A; --warn-soft:#2A2410; --warn-line:#8A6A18;
+  --err:#F07A6A; --err-ink:#F8A99B; --err-soft:#2C1A17; --err-line:#9A3B2C;
+  --radius:16px; --r-sm:8px; --r-md:12px; --r-full:9999px;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.28);
+  --display:'Bricolage Grotesque',Georgia,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  /* default surface = Dim (softer charcoal; also the fallback if no data-theme set) */
+  --bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;
+}
+/* ---- darkness levels (switchable in the sidebar) ---- */
+html[data-theme="dim"]{--bg:#161C26; --bg2:#0F141C; --panel:#1F2836; --panel2:#273140; --panel3:#2F3A4A;
+  --ink:#EDF1F7; --ink2:#BFC9D8; --muted:#93A0B2; --line:#313C4C; --line2:#3E4A5B;}
+html[data-theme="dark"]{--bg:#10151D; --bg2:#0A0E15; --panel:#18202B; --panel2:#202A36; --panel3:#28323F;
+  --ink:#E9EEF5; --ink2:#B8C2D1; --muted:#8B97A8; --line:#28313F; --line2:#35414F;}
+html[data-theme="midnight"]{--bg:#090C12; --bg2:#05070B; --panel:#10151D; --panel2:#161D28; --panel3:#1E2732;
+  --ink:#E6ECF4; --ink2:#AEB9C8; --muted:#828FA1; --line:#212A37; --line2:#2C3644;}
+/* Light mode — the warm cream palette, same notebook layout */
+html[data-theme="light"]{
+  --bg:#FAF7F2; --bg2:#F1EBE0; --panel:#FFFFFF; --panel2:#FBF7F0; --panel3:#F3EDE3;
+  --ink:#2C2A28; --ink2:#55504A; --muted:#6E675F; --line:#E5DFD6; --line2:#D8D0C4;
+  --accent:#2A7B9B; --accent-d:#1F6280; --accent-soft:#E4F2F7; --on-soft:#1F6280;
+  --q:#1F6280; --k:#5E5191; --v:#9A5A12;
+  --ok:#2D8B55; --ok-ink:#1A5C38; --ok-soft:#E8F5EE; --ok-line:#2D8B55;
+  --warn:#A67D08; --warn-soft:#FCF3DC; --warn-line:#A67D08;
+  --err:#C93B3B; --err-ink:#8F2020; --err-soft:#FDE8E8; --err-line:#C93B3B;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);color:var(--ink);background:var(--bg);line-height:1.65;font-size:16.5px;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(ellipse 110% 55% at 82% -8%,rgba(128,145,255,.10),transparent 60%),
+    radial-gradient(ellipse 90% 50% at 6% 108%,rgba(255,155,92,.06),transparent 60%);
+  background-attachment:fixed}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5px;border-radius:5px;color:var(--q);border:1px solid var(--line)}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:var(--r-full)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---------- top progress bar ---------- */
+#progress-track{position:fixed;top:0;left:0;right:0;height:4px;background:transparent;z-index:60}
+#progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--q),var(--accent),var(--v));
+  transition:width .4s var(--ease);box-shadow:0 0 12px rgba(128,145,255,.5)}
+
+/* ---------- mobile nav toggle ---------- */
+#nav-toggle{display:none}
+
+/* ---------- layout ---------- */
+.layout{display:flex;align-items:flex-start;max-width:1320px;margin:0 auto}
+
+/* ---------- sidebar ---------- */
+#sidebar{position:sticky;top:0;height:100vh;width:288px;flex:0 0 288px;
+  display:flex;flex-direction:column;
+  padding:22px 0 0;border-right:1px solid var(--line);background:var(--panel)}
+.sidebar-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;padding:0 16px}
+.brand{padding:6px 8px 14px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand-title{font-family:var(--display);font-weight:800;font-size:1.2rem;letter-spacing:-.02em}
+.brand-dot{color:var(--accent)}
+.brand-sub{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.nav-count{margin-top:10px;font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--ink2)}
+.nav-count b{color:var(--accent)}
+.theme-row{padding:10px 8px 0}
+.theme-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.theme-btn{flex:1;font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn.active{background:var(--accent);color:#fff}
+.nav-group-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:4px 8px;margin-top:10px}
+.nav-link{display:flex;align-items:center;gap:.5rem;padding:7px 10px;margin:1px 0;border-radius:9px;color:var(--ink2);
+  font-size:.86rem;cursor:pointer;border-left:3px solid transparent;transition:all .12s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:var(--body)}
+.nav-link:hover{background:var(--panel2);text-decoration:none;color:var(--ink)}
+.nav-link.active{background:var(--accent-soft);color:var(--on-soft);font-weight:700;border-left-color:var(--accent)}
+.nav-link .nl-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);flex:0 0 auto}
+.nav-link.done .nl-dot{background:var(--ok)}
+.checklist-wrap{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;padding-bottom:16px}
+#checklist{list-style:none;margin:0;padding:0}
+#checklist li{display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--ink2);padding:4px 8px;cursor:pointer;border-radius:7px}
+#checklist li:hover{background:var(--panel2)}
+#checklist li .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--line2);flex:0 0 auto;margin-top:2px;
+  display:grid;place-items:center;font-size:.66rem;color:var(--bg);font-weight:800}
+#checklist li.done .box{background:var(--ok);border-color:var(--ok)}
+#checklist li.done .box::after{content:'✓'}
+#checklist li.done span{color:var(--muted);text-decoration:line-through}
+.ghost-btn{background:none;border:1px solid var(--line2);color:var(--muted);font-size:.74rem;padding:6px 11px;border-radius:8px;cursor:pointer;margin-top:10px;transition:.15s}
+.ghost-btn:hover{border-color:var(--err);color:var(--err)}
+.side-nav{flex:0 0 auto;padding:12px 16px 16px;border-top:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;gap:6px}
+.side-nav a{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);color:var(--ink);transition:.15s}
+.side-nav a:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-1px)}
+.side-nav .d{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.side-nav .t{font-size:.82rem;font-weight:600}
+
+/* ---------- main content ---------- */
+#content{flex:1 1 auto;min-width:0;padding:44px clamp(20px,5vw,60px) 80px;max-width:920px}
+.hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:8px}
+.kicker{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);padding:5px 12px;border-radius:999px}
+.hero h1{font-family:var(--display);font-size:clamp(2rem,4.6vw,2.9rem);letter-spacing:-.03em;margin:.35em 0 .1em;line-height:1.06}
+.hero h1 .sub{display:block;font-size:.5em;font-weight:600;color:var(--ink2);margin-top:.35rem;letter-spacing:-.01em}
+.lede{font-size:1.1rem;color:var(--ink2);max-width:64ch;line-height:1.55}
+.goal{margin-top:1.3rem;display:flex;gap:.8rem;background:linear-gradient(120deg,var(--accent-soft),transparent);
+  border:1px solid var(--accent-d);border-radius:var(--r-md);padding:1rem 1.2rem;max-width:80ch}
+.goal .gic{font-size:1.2rem;flex:0 0 auto}.goal b{color:var(--accent)}.goal code{color:var(--ink)}
+
+.module-section{padding:30px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+.module-section:last-of-type{border-bottom:none}
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.sec-num{flex:0 0 auto;width:32px;height:32px;border-radius:9px;background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-weight:800;display:grid;place-items:center;font-size:.92rem}
+.sec-num.s-what{background:rgba(91,155,255,.16);color:var(--q)}
+.sec-num.s-study{background:rgba(179,155,255,.16);color:var(--k)}
+.sec-num.s-play{background:rgba(255,155,92,.16);color:var(--v)}
+.sec-num.s-code{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-quiz{background:rgba(231,176,74,.16);color:var(--warn)}
+.sec-num.s-produce{background:rgba(91,201,138,.16);color:var(--ok)}
+.module-section.done .sec-num{background:var(--ok);color:var(--bg)}
+.sec-h{font-family:var(--display);font-size:1.4rem;font-weight:700;letter-spacing:-.02em;line-height:1.2;flex:1;min-width:0}
+.sec-tag{font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sec-body h4{font-family:var(--display);font-size:1.02rem;font-weight:700;color:var(--ink);margin:1.4rem 0 .5rem}
+.sec-body h4:first-child{margin-top:0}
+.sec-body p{margin-bottom:.9rem;color:var(--ink2)}.sec-body p:last-child{margin-bottom:0}
+.sec-body ul,.sec-body ol{margin:0 0 .9rem 1.4rem;color:var(--ink2)}.sec-body li{margin-bottom:.45rem}
+.term{border-bottom:1.5px dashed var(--accent);font-weight:500;color:var(--ink);cursor:help}
+.term[data-tip]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+/* ---------- cards / callouts ---------- */
+.relate{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.relate .card{background:var(--panel2);border:1px solid var(--line2);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm)}
+.relate .card h5{font-family:var(--display);font-size:.98rem;font-weight:700;color:var(--ink);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem}
+.relate .card .big{font-size:1.5rem}
+.relate .card p{font-size:.88rem;color:var(--ink2);margin:0}
+.callout{border-radius:var(--radius);padding:15px 18px;margin:16px 0;border:1px solid var(--line2);background:var(--panel2);
+  box-shadow:var(--shadow-sm);display:flex;gap:.8rem;font-size:.92rem;line-height:1.55}
+.callout .ic{font-size:1.05rem;flex:0 0 auto;line-height:1.4}
+.callout div{color:var(--ink2)}.callout b{color:var(--ink)}
+.callout code{background:rgba(128,128,128,.2)}
+.c-info{background:linear-gradient(180deg,rgba(91,155,255,.10),transparent);border-color:var(--accent-d)}
+.c-warn{background:linear-gradient(180deg,rgba(231,176,74,.10),transparent);border-color:var(--warn-line)}
+.c-ok{background:linear-gradient(180deg,rgba(91,201,138,.10),transparent);border-color:var(--ok-line)}
+.takeaway{background:var(--panel2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:0 10px 10px 0;font-size:.95rem;margin:14px 0;color:var(--ink2)}
+
+/* ---------- got-it button ---------- */
+.gotit{margin-top:1.3rem;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--body);font-size:.92rem;font-weight:700;
+  color:#fff;background:var(--accent);border:1.5px solid var(--accent);border-radius:10px;padding:.62rem 1.25rem;cursor:pointer;
+  transition:background .18s,transform .1s,box-shadow .18s}
+.gotit:hover{background:var(--accent-d);box-shadow:0 6px 20px rgba(128,145,255,.28)}
+.gotit:active{transform:translateY(1px)}
+.gotit:disabled{opacity:.45;filter:grayscale(.5);cursor:not-allowed;box-shadow:none}
+.gotit:disabled:hover{background:var(--accent);transform:none}
+.module-section.done .gotit{background:var(--ok);border-color:var(--ok)}
+
+/* ---------- playground (fake terminal) ---------- */
+.viz-panel{background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius);padding:18px;margin:18px 0;box-shadow:var(--shadow-sm)}
+.play-btns{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem}
+.play-btn{font-family:var(--mono);font-size:.8rem;font-weight:500;border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);
+  border-radius:var(--r-sm);padding:.5rem .8rem;cursor:pointer;transition:all .15s}
+.play-btn:hover{border-color:var(--v);color:var(--ink)}
+.play-btn.active{background:var(--v);color:var(--bg2);border-color:var(--v);font-weight:600}
+.play-btn.seen:not(.active){border-color:var(--ok);color:var(--ok-ink)}
+.play-btn.seen::after{content:' ✓';font-weight:700}
+.play-console{background:#080B11;color:#CDD6F4;font-family:var(--mono);font-size:.84rem;line-height:1.7;padding:1rem 1.15rem;
+  border-radius:var(--r-md);border:1px solid var(--line);min-height:160px;white-space:pre-wrap;overflow-x:auto}
+.play-console .prompt{color:#5C6675}.play-console .kw{color:#C9A9F5}.play-console .str{color:#8FE3A0}
+.play-console .num{color:#F0B366}.play-console .fn{color:#7BB5F5}.play-console .ok{color:#8FE3A0}
+.play-console .bad{color:#F08B8B}.play-console .dim{color:#8891A0}.play-console .hl{color:#F5DC8A}
+.play-take{margin-top:.75rem;padding:.8rem .95rem;font-size:.85rem;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--r-md);color:var(--ink2);line-height:1.5;min-height:2.4em}
+.play-take b{color:var(--ink)}
+.hint{font-size:.85rem;color:var(--muted);margin-top:.8rem}
+
+/* ---------- build (scroll reveal) ---------- */
+.build{display:flex;flex-direction:column;gap:1rem;margin:1rem 0}
+.build-hint{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:.2rem 0 .5rem}
+.build-step{display:grid;grid-template-columns:1fr;gap:.7rem;padding:1.05rem 1.15rem;border:1px solid var(--line2);border-radius:var(--r-md);
+  background:var(--panel2);opacity:1;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.build.armed .build-step:not(.revealed){opacity:0;transform:translateY(18px)}
+.build-viz{display:block;text-align:center;min-height:56px;overflow-x:auto;padding:.7rem;background:#F7F9FB;border-radius:var(--r-sm)}
+.build-viz svg{display:inline-block;width:100%;max-width:500px;height:auto;vertical-align:middle}
+.build-note{font-size:.9rem;color:var(--ink2);line-height:1.55}.build-note b{color:var(--ink)}.build-note code{background:var(--bg2)}
+.build-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:.72rem;font-weight:700;margin-right:.5rem;vertical-align:middle}
+.build-embed{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;background:#F7F9FB;margin:1rem 0}
+.build-embed iframe{width:100%;height:520px;border:0;display:block;background:#F7F9FB}
+.build-embed .cap{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.72rem;color:var(--muted);padding:.5rem .8rem;background:var(--panel2);border-top:1px solid var(--line)}
+.build-embed .cap a{color:var(--accent)}
+.build-embed .cap .reload{margin-left:auto;font-family:var(--body);font-size:.7rem;font-weight:600;color:var(--ink2);background:var(--panel3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:.3rem .6rem;cursor:pointer}
+.build-embed .cap .reload:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---------- quiz ---------- */
+.q{margin-bottom:1.6rem}.q:last-child{margin-bottom:0}
+.q-ask{font-family:var(--body);font-size:.96rem;font-weight:600;color:var(--ink);margin-bottom:.7rem;line-height:1.4}
+.q-opts{display:flex;flex-direction:column;gap:.5rem}
+.q-opt{display:flex;align-items:center;gap:.7rem;text-align:left;font-family:var(--body);font-size:.9rem;color:var(--ink2);
+  border:1.5px solid var(--line2);background:var(--panel2);border-radius:var(--r-sm);padding:.65rem .9rem;cursor:pointer;transition:all .15s}
+.q-opt:hover:not(.locked){border-color:var(--accent);color:var(--ink)}
+.q-opt .mark{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;display:grid;place-items:center;font-size:.7rem;font-weight:800;color:var(--bg)}
+.q-opt.correct{border-color:var(--ok);background:var(--ok-soft);color:var(--ink)}
+.q-opt.correct .mark{background:var(--ok);border-color:var(--ok)}.q-opt.correct .mark::after{content:'✓'}
+.q-opt.wrong{border-color:var(--err);background:var(--err-soft);color:var(--ink)}
+.q-opt.wrong .mark{background:var(--err);border-color:var(--err)}.q-opt.wrong .mark::after{content:'✕'}
+.q-opt.locked{cursor:default}
+.q-fb{max-height:0;overflow:hidden;opacity:0;transition:max-height .3s,opacity .3s;font-size:.86rem;border-radius:var(--r-sm);line-height:1.5}
+.q-fb.show{max-height:360px;opacity:1;padding:.75rem .95rem;margin-top:.5rem}
+.q-fb.good{background:var(--ok-soft);color:var(--ok-ink);border:1px solid var(--ok-line)}
+.q-fb.bad{background:var(--err-soft);color:var(--err-ink);border:1px solid var(--err-line)}
+.q-fb code{background:rgba(128,128,128,.2)}
+
+/* ---------- produce prompt ---------- */
+.prompt{border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;margin:1rem 0}
+.prompt-h{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.55rem .6rem .55rem 1rem;background:var(--panel2);border-bottom:1px solid var(--line)}
+.prompt-l{font-family:var(--mono);font-size:.74rem;color:var(--ink2)}.prompt-l b{color:var(--accent)}
+.copy{font-family:var(--body);font-size:.74rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:var(--r-sm);padding:.45rem .8rem;cursor:pointer;transition:.15s}
+.copy:hover{background:var(--accent-d)}.copy.done{background:var(--ok)}
+.prompt-t{margin:0;padding:1rem;background:#080B11;color:#C6D2E0;font-family:var(--mono);font-size:.8rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- completion banner ---------- */
+.fin{margin:1.8rem 0 0;padding:2rem;text-align:center;background:linear-gradient(135deg,var(--ok-soft),var(--accent-soft));
+  border:1px solid var(--ok);border-radius:var(--radius);opacity:0;max-height:0;overflow:hidden;transition:opacity .4s,max-height .4s}
+.fin.show{opacity:1;max-height:480px;padding:2.2rem 2rem}
+.fin .em{font-size:2.6rem;display:block;margin-bottom:.5rem}
+.fin h3{font-family:var(--display);font-size:1.5rem;font-weight:700;color:var(--ok-ink);margin-bottom:.5rem}
+.fin p{color:var(--ink2);font-size:.92rem;margin:0}.fin b{color:var(--ink)}.fin code{background:rgba(0,0,0,.35)}
+
+.site-footer{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);line-height:1.6}
+
+/* ---------- tooltip ---------- */
+#term-tip{position:fixed;z-index:1000;max-width:min(300px,92vw);background:#080B11;color:#EDEAFE;font-family:var(--body);font-size:.82rem;
+  font-weight:400;line-height:1.45;text-align:left;padding:.6rem .78rem;border-radius:var(--r-md);border:1px solid var(--line2);
+  box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .15s var(--ease),transform .15s var(--ease)}
+#term-tip.show{opacity:1;transform:translateY(0)}
+#term-tip .ttl{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:.2rem}
+
+/* ---------- responsive ---------- */
+#scrim{display:none}
+@media(max-width:900px){
+  .layout{display:block}
+  #sidebar{position:fixed;z-index:70;top:0;left:0;transform:translateX(-100%);transition:transform .22s var(--ease);
+    box-shadow:var(--shadow);width:290px;height:100vh}
+  #sidebar.open{transform:translateX(0)}
+  #nav-toggle{display:inline-flex;align-items:center;gap:.4rem;position:fixed;top:12px;right:12px;z-index:65;
+    background:var(--accent);color:#fff;border:none;padding:9px 15px;border-radius:10px;font-weight:700;font-family:var(--body);font-size:.85rem;cursor:pointer;box-shadow:var(--shadow)}
+  #scrim.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:69}
+  #content{padding:60px 18px 70px;max-width:100%}
+  .relate{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+
+<body data-quest-id="wf5-d04-training">
+
+<div id="progress-track" aria-hidden="true"><div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="lesson progress"></div></div>
+<button id="nav-toggle" type="button" aria-label="Toggle sections" aria-expanded="false">☰ Sections</button>
+<div id="scrim" aria-hidden="true"></div>
+
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="sidebar" aria-label="lesson navigation">
+    <div class="sidebar-scroll">
+    <div class="brand">
+      <div class="brand-title">Frontier<span class="brand-dot">.</span>Lab</div>
+      <div class="brand-sub">Foundations · M5 Day 4</div>
+      <div class="nav-count" id="count"><b>0</b>/7 sections done</div>
+    </div>
+
+    <div class="theme-row" role="group" aria-label="appearance mode">
+      <span class="nav-group-label" style="padding:0">Appearance</span>
+      <div class="theme-btns">
+        <button class="theme-btn" data-theme-set="light" type="button">Light</button>
+        <button class="theme-btn" data-theme-set="dim" type="button">Dim</button>
+        <button class="theme-btn" data-theme-set="dark" type="button">Dark</button>
+        <button class="theme-btn" data-theme-set="midnight" type="button">Midnight</button>
+      </div>
+    </div>
+
+    <nav aria-label="Sections">
+      <div class="nav-group-label">Module 05 · Train</div>
+      <button class="nav-link" data-target="home"><span class="nl-dot"></span>Start here</button>
+      <button class="nav-link" data-target="s1"><span class="nl-dot"></span>1 · What is it</button>
+      <button class="nav-link" data-target="s2"><span class="nl-dot"></span>2 · Intuition</button>
+      <button class="nav-link" data-target="s3"><span class="nl-dot"></span>3 · Playground</button>
+      <button class="nav-link" data-target="s4"><span class="nl-dot"></span>4 · Mechanism &amp; why</button>
+      <button class="nav-link" data-target="s5"><span class="nl-dot"></span>5 · Build it up</button>
+      <button class="nav-link" data-target="s6"><span class="nl-dot"></span>6 · Quiz</button>
+      <button class="nav-link" data-target="s7"><span class="nl-dot"></span>7 · Produce</button>
+    </nav>
+
+    <div class="checklist-wrap">
+      <div class="nav-group-label">Progress checklist</div>
+      <ul id="checklist"><!-- built by JS --></ul>
+      <button id="reset" class="ghost-btn" type="button">↺ Reset progress</button>
+    </div>
+    </div><!-- /.sidebar-scroll -->
+
+    <div class="side-nav">
+      <a class="lnav prev" href="../day-03-minibatch-loop/lesson.html"><span class="d">← Prev</span><span class="t">Mini-Batch Loop &amp; Overfit-One-Batch</span></a>
+      <a class="lnav next" href="../day-05-pytorch-version/lesson.html"><span class="d">Next →</span><span class="t">The Same Model in PyTorch</span></a>
+      <a class="lnav-hub" href="../../index.html"><span class="d">▦ Map</span><span class="t">Back to curriculum</span></a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main id="content">
+
+    <section id="home" class="hero">
+      <span class="kicker">Module 5 · Train · Day 4</span>
+      <h1>Full Training<span class="sub">Reading the Loss Curve &amp; Dropout</span></h1>
+      <p class="lede">Your loop works and it passed the sanity check. Now you run it for real on MNIST — and you learn to read the story the loss curve is telling you. Falling means learning. Flat means stuck. And when the validation loss starts rising while training loss keeps dropping, the model is memorizing. Dropout is one simple fix.</p>
+      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div><b>By the end, you'll be able to:</b> read a loss curve (learning vs stuck vs overfitting), and explain how dropout randomly switches off neurons so the network cannot over-rely on any single one.</div></div>
+    </section>
+
+    <!-- ===== 1. WHAT IS IT ===== -->
+    <section class="module-section" id="s1" data-sec="what">
+  <div class="sec-head"><span class="sec-num s-what">1</span><span class="sec-h">Watching training, and keeping it honest</span><span class="sec-tag">What is it</span></div>
+  <div class="sec-body">
+      <div class="callout c-info"><span class="ic">🧭</span><div><b>What this assumes:</b> the mini-batch loop from Day 3, the loss from M3 Day 1, and the idea of a held-out set (Day 1). Today we run the loop for real and read what it produces.</div></div>
+
+      <h4>The loss curve — training's speedometer</h4>
+      <p>Every epoch, you record the average loss. Plot loss against epoch and you get the <span class="term" data-tip="A plot of the loss value over training steps or epochs. Its shape tells you whether the model is learning, stuck, or overfitting.">loss curve</span>. It is the single most useful picture in training: its shape tells you what to do next.</p>
+
+      <h4>Two curves, not one</h4>
+      <p>You plot two lines: the <span class="term" data-tip="The loss measured on the data the model trains on. It almost always keeps falling.">training loss</span> and the <span class="term" data-tip="The loss measured on a separate held-out set the model never trains on. It shows whether the model is truly learning or just memorizing.">validation loss</span> (on a held-out set). Training loss usually keeps falling. When validation loss turns and starts <strong>rising</strong> while training keeps dropping, the model is <span class="term" data-tip="When a model fits the training data too closely and does worse on new data. Seen as the validation loss rising while training loss keeps falling.">overfitting</span> — memorizing instead of generalizing.</p>
+
+      <h4>Dropout — a simple cure</h4>
+      <p><span class="term" data-tip="A regularization trick: during training, randomly set a fraction of neuron outputs to zero each step, so the network cannot depend on any single neuron.">Dropout</span> fights overfitting. During training, at each step you randomly switch off a fraction of neurons (set them to zero). The network is forced to spread its knowledge around instead of leaning on any one neuron. Keep going 👇</p>
+      <div class="callout c-warn"><span class="ic">😕</span><div><b>为什么这里容易卡住 · Why this trips people up:</b> 很多人盯着 training loss 一路下降，就以为在进步。In plain terms: a falling <em>training</em> loss feels like success, but it's the wrong curve to trust alone — the model may be memorizing. The signal that matters is the <em>gap</em> between training and validation loss; when validation turns upward, you're overfitting.</div></div>
+      <button class="gotit" type="button">Got the goal — let's go</button>
+    </div>
+</section>
+
+    <!-- ===== 2. INTUITION ===== -->
+    <section class="module-section" id="s2" data-sec="intuition">
+  <div class="sec-head"><span class="sec-num s-study">2</span><span class="sec-h">Practising with a random teammate missing</span><span class="sec-tag">Intuition</span></div>
+  <div class="sec-body">
+      <div class="relate">
+        <div class="card"><span class="big">📉</span><h5>The loss curve is a story</h5><p>Loss falling = the team is getting better. Loss flat = practice is not helping. Practice score great but real-game score getting worse = the team only works in one exact setup.</p></div>
+        <div class="card"><span class="big">🏀</span><h5>Dropout = a random benched player</h5><p>Each practice drill, bench one or two players at random. Now no single star can be the whole plan. Everyone learns to contribute, so the team stays strong even when someone is off.</p></div>
+      </div>
+      <p><strong>In one line:</strong> read the two loss curves to spot memorizing, and use dropout — randomly benching neurons during training — so no single neuron becomes a point of failure.</p>
+      <p><b>直觉 / Intuition:</b> 每次训练随机让几个神经元"请假"，逼着团队里没有谁是不可替代的。 The technical point is that dropping a different random subset of neurons each step stops the network from over-relying on any one of them, so it generalizes better.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div>Where the analogy breaks: a benched player rests and comes back unchanged, but dropout switches off <em>different</em> neurons every single step, and at test time <strong>all</strong> neurons play together. So the model trains as many overlapping "teams" and then uses the whole roster to make predictions.</div></div>
+      <button class="gotit" type="button">Got the picture</button>
+    </div>
+</section>
+
+    <!-- ===== 3. PLAYGROUND ===== -->
+    <section class="module-section" id="s3" data-sec="play">
+  <div class="sec-head"><span class="sec-num s-play">3</span><span class="sec-h">Train, read the curve, then add dropout</span><span class="sec-tag">Playground</span></div>
+  <div class="sec-body">
+      <p>Below is a simulated Python terminal. Train the MLP, spot the overfitting turn, then switch on dropout. <strong>Click all three</strong> to finish this section.</p>
+      <div class="play">
+        <div class="play-btns">
+          <button class="play-btn" data-demo="run" type="button">① train &amp; print both losses</button>
+          <button class="play-btn" data-demo="overfit" type="button">② spot the overfitting turn</button>
+          <button class="play-btn" data-demo="dropout" type="button">③ add dropout → gap shrinks</button>
+        </div>
+        <div class="play-console" id="console"><span class="dim"># click a button above to start</span></div>
+        <div class="play-take" id="take"><span class="dim">Each click shows a one-line "what this means" here.</span></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted)">Tip: <span class="term" data-tip="A method that discourages a model from fitting the training data too closely, so it does better on new data. Dropout is one kind.">regularization</span> is the family name for tricks like dropout that fight overfitting.</p>
+      <button class="gotit" type="button" disabled>try all three first</button>
+    </div>
+</section>
+
+    <!-- ===== 4. MECHANISM & WHY ===== -->
+    <section class="module-section" id="s4" data-sec="why">
+  <div class="sec-head"><span class="sec-num s-study">4</span><span class="sec-h">Three curve shapes, and how dropout works</span><span class="sec-tag">Mechanism &amp; why</span></div>
+  <div class="sec-body">
+      <h4>Reading the loss curve — three shapes</h4>
+      <ul>
+        <li><strong>Falling steadily:</strong> good — the model is learning. Let it keep going.</li>
+        <li><strong>Flat from the start (or stuck high):</strong> stuck — usually the learning rate is too small or too large, or a wiring bug. This is why you overfit one batch first (Day 3).</li>
+        <li><strong>Training falls, validation turns upward:</strong> overfitting — the model is memorizing the training set. Stop early, add data, or add regularization like dropout.</li>
+      </ul>
+
+      <h4>Dropout — Step 1, in plain words</h4>
+      <p>During each training step, roll a dice for every neuron. With probability <code>p</code>, set that neuron's output to zero for this step. Because a different random set is off each step, no neuron can become the single thing the answer depends on.</p>
+
+      <h4>Step 2 — the formula</h4>
+      <div class="callout c-info"><span class="ic">🧮</span><div style="font-family:var(--mono);font-size:.82rem;line-height:1.9">
+        mask = (random(h.shape) &gt; p)     <span class="dim"># True where the neuron stays on</span><br>
+        h = h * mask / (1 - p)           <span class="dim"># zero out the rest, scale up the survivors</span>
+      </div></div>
+      <p>Symbols: <code>h</code> = the hidden activations, <code>p</code> = dropout rate (say 0.2 means drop 20%), <code>mask</code> = a random on/off pattern. Dividing by <code>(1 - p)</code> keeps the average size of <code>h</code> the same, so the next layer sees roughly the same total signal. At test time you turn dropout off — all neurons are used.</p>
+
+      <h4>Step 3 — a worked feel</h4>
+      <p>With <code>p = 0.2</code> and 128 hidden neurons, about 26 are zeroed each step, and the surviving ~102 are scaled up by <code>1/0.8 = 1.25</code>. Next step, a different 26 are off. Over many steps the model learns to be robust to any subset being missing.</p>
+
+      <div class="callout c-info"><span class="ic">🪜</span><div><b>Math Ladder — inverted dropout</b>
+<br><b>1 · In words:</b> randomly zero a fraction of neurons each step, and scale up the survivors so the average signal reaching the next layer is unchanged — see Steps 1–2 above.
+<br><b>2 · The formula:</b> <code>mask = (rand(h.shape) &gt; p)</code>; <code>h = h · mask / (1−p)</code> — <code>h</code> = hidden activations, <code>p</code> = drop rate, <code>mask</code> = random keep pattern, <code>1/(1−p)</code> = the rescale that preserves the mean.
+<br><b>3 · Tiny numbers:</b> <code>p=0.2</code>, 128 units → ~26 zeroed; survivors scaled by <code>1/0.8 = 1.25</code> (Step 3).
+<br><b>4 · Sanity check:</b> the expected output equals the no-dropout output (that is what <code>/(1−p)</code> guarantees), and dropout must be <em>off</em> at test time. If test accuracy jitters run-to-run, dropout is still on.</div></div>
+
+      <h4>Why labs care</h4>
+      <p>The loss curve is the primary dashboard for every training run, from this MLP to a giant LLM — engineers stare at it for days. And overfitting never goes away; it just changes shape. Dropout, weight decay, and early stopping are the everyday tools that keep big models honest.</p>
+      <div class="callout c-info"><span class="ic">🔗</span><div><b>The habit:</b> always watch validation loss, not just training loss. The moment the two diverge is the moment your model stops learning the task and starts memorizing the answers.</div></div>
+
+      <h4>The staff lens — one silent failure, one trade-off</h4>
+      <p>Dropout has one on/off switch you must flip at the right time, and one knob that trades stability for capacity.</p>
+      <div class="callout c-warn"><span class="ic">⚠️</span><div><b>Failure mode (silent): dropout left on at test time.</b> This is a bug that doesn't announce itself. Dropout should run <em>only</em> during training; at test time every neuron must be used. If you forget to switch it off, the model keeps randomly zeroing neurons while you evaluate — so its answers become random and its test accuracy is quietly lower and jittery from run to run, with no error. The matching trap is the scaling: if you drop neurons but forget to divide the survivors by <code>(1 - p)</code>, the average signal into the next layer shrinks, so train and test behave differently even when the switch is right. A senior engineer in <b>code review</b> checks that evaluation flips dropout off (in a framework, <code>model.eval()</code>) and that the <code>(1 - p)</code> scaling is present.</div></div>
+      <div class="callout c-info"><span class="ic">⚖️</span><div><b>Trade-off: dropout rate — less overfitting vs. slower learning.</b> A higher <code>p</code> (say 0.5) forces more robustness and fights overfitting harder, but it throws away more signal each step, so training is noisier and slower to converge. A lower <code>p</code> (say 0.1) trains fast but regularizes weakly. In a <b>design review</b> you tune <code>p</code> to the size of the train-vs-validation gap: reach for more dropout only when that gap is actually growing, not by default.</div></div>
+      <div class="callout c-ok"><span class="ic">🎤</span><div><b>Say this in an interview:</b> "Dropout fights overfitting by randomly zeroing a fraction <code>p</code> of activations each training step and scaling the survivors by <code>1/(1−p)</code> so the expected signal is unchanged; at test time it's off and all neurons fire. Reading the loss curve is how you know you need it — when validation loss turns up while training loss keeps falling, you're memorizing. The nuance is two silent bugs: leaving dropout on at eval (jittery, lower accuracy) and dropping without the <code>1/(1−p)</code> rescale, so train and test see different signal levels."</div></div>
+      <button class="gotit" type="button">Got curves and dropout</button>
+    </div>
+</section>
+
+    <!-- ===== 5. BUILD IT UP ===== -->
+    <section class="module-section" id="s5" data-sec="build">
+  <div class="sec-head"><span class="sec-num s-code">5</span><span class="sec-h">Feel the descent, then read the curve — scroll, don't click</span><span class="sec-tag">Build it up</span></div>
+  <div class="sec-body">
+      <p>First, play with gradient descent itself — drag the controls and watch a ball roll downhill toward the lowest loss. That downhill roll is what every training step is doing.</p>
+      <div class="build-embed"><iframe src="../../viz/gradient-descent.html" title="interactive" loading="lazy"></iframe><div class="cap">interactive — drag the controls. <a href="../../viz/gradient-descent.html" target="_blank" rel="noopener">open full screen</a></div></div>
+      <p>Now here is the loss-curve story and dropout, built one step at a time. <strong>Scroll down slowly</strong> — each piece fades in with a short note.</p>
+      <div class="build-hint">↓ scroll to reveal each piece ↓</div>
+      <div class="build" id="build"></div>
+      <button class="gotit" type="button" disabled>scroll through the build first</button>
+    </div>
+</section>
+
+    <!-- ===== 6. QUIZ ===== -->
+    <section class="module-section" id="s6" data-sec="quiz">
+  <div class="sec-head"><span class="sec-num s-quiz">6</span><span class="sec-h">Click an answer — instant feedback on each</span><span class="sec-tag">Quiz</span></div>
+  <div class="sec-body">
+      <p>4 questions, instant feedback. <strong>Answer all four</strong> to complete today.</p>
+      <div id="quiz"></div>
+      <button class="gotit" type="button" disabled>answer all four first</button>
+    </div>
+</section>
+
+    <!-- ===== 7. PRODUCE ===== -->
+    <section class="module-section" id="s7" data-sec="produce">
+  <div class="sec-head"><span class="sec-num s-produce">7</span><span class="sec-h">Leave today's evidence (strongly recommended)</span><span class="sec-tag">Produce</span></div>
+  <div class="sec-body">
+      <p>Understanding ≠ being able to write it. Train on MNIST, plot the two loss curves, and see dropout shrink the gap — that's what makes the day count. Pick one:</p>
+      <h4>Option A · write it yourself</h4>
+      <p>Create <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py</code>. Train the 784→128→10 MLP on MNIST with your Day-3 loop. Record training loss and validation loss each epoch and plot both curves (save the figure). Then add dropout with <code>p = 0.2</code> on the hidden layer, retrain, and compare the train-vs-validation gap before and after. Run with <code>python3 sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py</code>.</p>
+      <h4>Option B · let Claude build it, then read it</h4>
+      <p>Copy the prompt below back into Claude Code. It has Claude Code create the file, write the code, and run it for you.</p>
+      <div class="prompt">
+        <div class="prompt-h"><span class="prompt-l">ask Claude to build it</span><button class="copy" type="button" data-copy="#pp">📋 copy</button></div>
+        <pre class="prompt-t" id="pp">Help me build my Module 5 Day 4 artifact.
+
+Create sessions/m04-first-model-mlp/day-04-training-loss-dropout/experiment.py that, with a comment on each step, trains the 2-layer MLP on MNIST and studies the loss curve (NumPy, reuse the Day 2-3 code):
+1. Trains for several epochs, recording BOTH training loss and validation loss (on a held-out split) each epoch.
+2. Plots the two loss curves on one figure and saves it; prints where the validation loss stops improving (the overfitting turn).
+3. Adds dropout with p=0.2 on the hidden activations during training only (mask + scale by 1/(1-p)); turns it off at eval time.
+4. Retrains and prints the train-vs-validation gap with and without dropout, showing the gap shrinks with dropout.
+Then run it and paste the two gaps at the bottom as a comment.</pre>
+      </div>
+      <h4>Acceptance criteria</h4>
+      <ul>
+        <li>Both curves — training and validation loss — are recorded each epoch and plotted on one figure.</li>
+        <li>The overfitting turn (where validation loss stops improving) is identified.</li>
+        <li>With dropout on (training only, scaled by <code>1/(1−p)</code>), the train-vs-validation gap shrinks.</li>
+      </ul>
+      <div class="callout c-info"><span class="ic">📓</span><div><b>5-minute research log · 5 分钟研究笔记:</b> 关页面前，用自己的话写三行 — before you close the tab, write three lines in <code>sessions/m04-first-model-mlp/day-04-training-loss-dropout/log.md</code>: (1) at which epoch validation loss stopped improving; (2) how much dropout shrank the train-vs-validation gap; (3) one thing you're still unsure about.</div></div>
+      <button class="gotit" type="button">Done</button>
+    </div>
+</section>
+
+    <div class="fin" id="fin" role="status" aria-hidden="true">
+      <span class="em" aria-hidden="true">🎉</span>
+      <h3>Module 5 · Day 4 complete! 🏆</h3>
+      <p>Nice work — you've completed <b>Full Training</b>.<br>Next up: <b>The Same Model in PyTorch</b>.</p>
+    </div>
+
+    <footer class="site-footer">Frontier Lab · Foundations — a fully self-contained single file. Progress is saved locally in your browser (localStorage), works offline, just double-click to open.</footer>
+
+  </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+var QID = document.body.getAttribute('data-quest-id') || 'quest';
+var KEY = 'frontier-lesson:'+QID;
+var state = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{done:{}} }catch(e){ return {done:{}} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)) }catch(e){} }
+
+var secs = Array.prototype.slice.call(document.querySelectorAll('.module-section'));
+var bar = document.getElementById('bar') || document.getElementById('progress-bar');
+var count = document.getElementById('count'), fin = document.getElementById('fin');
+var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link'));
+
+/* ---- build the sidebar checklist from sections ---- */
+var checklist = document.getElementById('checklist'), checkItems = {};
+secs.forEach(function(sec){
+  var key = sec.getAttribute('data-sec');
+  var title = sec.querySelector('.sec-h') ? sec.querySelector('.sec-h').textContent : key;
+  var num = sec.querySelector('.sec-num') ? sec.querySelector('.sec-num').textContent : '';
+  var li = document.createElement('li');
+  li.innerHTML = '<span class="box" aria-hidden="true"></span><span>'+num+' · '+shorten(title)+'</span>';
+  li.addEventListener('click', function(){ sec.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'}); });
+  checklist.appendChild(li);
+  checkItems[key] = li;
+});
+function shorten(t){ return t.length>34 ? t.slice(0,32).trim()+'…' : t; }
+
+function markDone(sec, scrollNext){
+  sec.classList.add('done'); state.done[sec.getAttribute('data-sec')]=true; save(); refresh();
+  if(scrollNext){
+    var i = secs.indexOf(sec);
+    if(i>-1 && i+1<secs.length) setTimeout(function(){ secs[i+1].scrollIntoView({behavior:RM?'auto':'smooth',block:'start'}); },180);
+    else setTimeout(function(){ fin.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'}); },180);
+  }
+}
+secs.forEach(function(sec){
+  if(state.done[sec.getAttribute('data-sec')]) sec.classList.add('done');
+  var btn = sec.querySelector('.gotit');
+  if(btn) btn.addEventListener('click', function(){ markDone(sec, true); });
+});
+function refresh(){
+  var total = secs.length, done = secs.filter(function(s){return s.classList.contains('done')}).length;
+  var pct = Math.round(done/total*100);
+  if(bar){ bar.style.width = pct+'%'; bar.setAttribute('aria-valuenow', String(pct)); bar.setAttribute('aria-valuetext', pct+'% complete'); }
+  if(count) count.innerHTML = '<b>'+done+'</b>/'+total+' sections done';
+  secs.forEach(function(s){
+    var k = s.getAttribute('data-sec'), on = s.classList.contains('done');
+    if(checkItems[k]) checkItems[k].classList.toggle('done', on);
+    var nl = navLinks.filter(function(l){return l.getAttribute('data-target')===s.id;})[0];
+    if(nl) nl.classList.toggle('done', on);
+  });
+  var all = done===total; fin.classList.toggle('show', all); fin.setAttribute('aria-hidden', all?'false':'true');
+}
+var resetBtn = document.getElementById('reset');
+if(resetBtn) resetBtn.addEventListener('click', function(){
+  if(!confirm('Reset today\'s progress?')) return;
+  state={done:{}}; save(); secs.forEach(function(s){s.classList.remove('done')}); refresh();
+});
+
+/* ---- darkness switcher ---- */
+var themeBtns = Array.prototype.slice.call(document.querySelectorAll('.theme-btn'));
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem('frontier-theme', t); }catch(e){}
+  themeBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme-set')===t); });
+}
+themeBtns.forEach(function(b){ b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme-set')); }); });
+setTheme(document.documentElement.getAttribute('data-theme') || 'dim');
+
+/* ---- sidebar nav: click to scroll, scrollspy to highlight active ---- */
+navLinks.forEach(function(l){
+  l.addEventListener('click', function(){
+    var t = document.getElementById(l.getAttribute('data-target'));
+    if(t) t.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'});
+    setTimeout(function(){ if(window.__revealBuild) window.__revealBuild(); }, RM?60:650);
+    closeSidebar();
+  });
+});
+var spyTargets = [document.getElementById('home')].concat(secs).filter(Boolean);
+if('IntersectionObserver' in window){
+  var spy = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        var id = e.target.id;
+        navLinks.forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-target')===id); });
+      }
+    });
+  }, {threshold:0.01, rootMargin:'-45% 0px -50% 0px'});
+  spyTargets.forEach(function(t){ spy.observe(t); });
+}
+
+/* ---- mobile sidebar toggle ---- */
+var sidebar = document.getElementById('sidebar'), toggle = document.getElementById('nav-toggle'), scrim = document.getElementById('scrim');
+function openSidebar(){ sidebar.classList.add('open'); scrim.classList.add('show'); toggle.setAttribute('aria-expanded','true'); }
+function closeSidebar(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); toggle.setAttribute('aria-expanded','false'); }
+if(toggle) toggle.addEventListener('click', function(){ sidebar.classList.contains('open')?closeSidebar():openSidebar(); });
+if(scrim) scrim.addEventListener('click', closeSidebar);
+
+/* ===== PLAYGROUND ===== */
+var DEMOS = {
+  run:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="kw">for</span> epoch <span class="kw">in</span> range(<span class="num">8</span>):\n'+
+    '<span class="dim">...</span>     train_epoch()\n'+
+    '<span class="dim">...</span>     print(epoch, f<span class="str">"train {train_loss:.3f}"</span>, f<span class="str">"val {val_loss:.3f}"</span>)\n'+
+    '<span class="ok">0  train 0.55  val 0.52</span>\n<span class="ok">1  train 0.34  val 0.33</span>\n<span class="ok">2  train 0.24  val 0.26</span>\n<span class="hl">3  train 0.18  val 0.24</span>',
+    take:'<b>①  Record two losses each epoch.</b> Training loss (on data it learns from) and validation loss (on held-out data). Early on, both fall together — the model is genuinely learning.'},
+  overfit:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># keep going...</span>\n'+
+    '<span class="ok">3  train 0.18  val 0.24</span>\n<span class="hl">4  train 0.13  val 0.25  ← val stops falling</span>\n'+
+    '<span class="bad">5  train 0.09  val 0.28  ← val RISING</span>\n<span class="bad">6  train 0.06  val 0.32</span>\n<span class="bad">7  train 0.04  val 0.37</span>',
+    take:'<b>②  The overfitting turn.</b> Training loss keeps dropping but validation loss turns and rises. The model is now memorizing the training set instead of learning to read new digits. Around epoch 4 was the sweet spot.'},
+  dropout:{html:'<span class="prompt">&gt;&gt;&gt;</span> <span class="dim"># add dropout p=0.2 on the hidden layer</span>\n'+
+    '<span class="prompt">&gt;&gt;&gt;</span> mask = (rand(h.shape) &gt; <span class="num">0.2</span>); h = h*mask/<span class="num">0.8</span>\n'+
+    '<span class="ok">4  train 0.19  val 0.21</span>\n<span class="ok">5  train 0.16  val 0.19</span>\n<span class="ok">6  train 0.14  val 0.18</span>\n<span class="ok">7  train 0.13  val 0.17  ← gap much smaller ✓</span>',
+    take:'<b>③  Dropout closes the gap.</b> Randomly zeroing 20% of neurons each step stops the model over-relying on any one. Training loss falls a little slower, but validation loss stays low — better on unseen digits.'}
+};
+var playSec=document.getElementById('s3'), consoleEl=document.getElementById('console'), takeEl=document.getElementById('take');
+var playBtns=Array.prototype.slice.call(playSec.querySelectorAll('.play-btn')), playSeen={};
+playBtns.forEach(function(b){ b.addEventListener('click', function(){
+  var k=b.getAttribute('data-demo');
+  playBtns.forEach(function(o){o.classList.remove('active')}); b.classList.add('active'); b.classList.add('seen');
+  consoleEl.innerHTML=DEMOS[k].html; takeEl.innerHTML=DEMOS[k].take; playSeen[k]=true;
+  if(Object.keys(playSeen).length>=3){ var g=playSec.querySelector('.gotit'); g.disabled=false; g.textContent='Saw all three — got it ✓'; }
+}); });
+
+/* ===== BUILD — scroll-reveal ===== */
+var BUILD=[
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Loss recorded each epoch forms a falling curve'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 40 C 150 62, 260 80, 420 90' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><circle cx='70' cy='40' r='3' fill='#2A7B9B'/><circle cx='160' cy='63' r='3' fill='#2A7B9B'/><circle cx='260' cy='80' r='3' fill='#2A7B9B'/><circle cx='420' cy='90' r='3' fill='#2A7B9B'/><text x='245' y='112' font-size='11' fill='#6B645E' text-anchor='middle'>epoch →</text><text x='30' y='60' font-size='11' fill='#6B645E' text-anchor='middle' transform='rotate(-90 30 60)'>loss</text></g></svg>",
+  note:"<b>The loss curve.</b> Record the average loss each epoch and plot it. A curve that falls steadily means the model is learning. This one picture is the main dashboard for any training run."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Three loss curve shapes: learning, stuck, overfitting'><g font-family='monospace' font-size='9.5'><path d='M20 40 C 60 65, 110 82, 150 88' fill='none' stroke='#2D8B55' stroke-width='2'/><text x='85' y='108' fill='#1a5c38' text-anchor='middle'>learning ✓</text><line x1='190' y1='45' x2='320' y2='45' stroke='#C99A12' stroke-width='2'/><text x='255' y='108' fill='#9A7208' text-anchor='middle'>stuck</text><path d='M360 40 C 400 62, 430 70, 445 72' fill='none' stroke='#2A7B9B' stroke-width='2'/><path d='M360 45 C 400 60, 440 55, 500 40' fill='none' stroke='#C93B3B' stroke-width='2'/><text x='430' y='108' fill='#C93B3B' text-anchor='middle'>overfitting</text></g></svg>",
+  note:"<b>Three shapes to know.</b> Falling = learning. Flat = stuck (bad learning rate or a bug — overfit one batch to check, Day 3). Training down but validation up = overfitting: the model is memorizing, not generalizing."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Train loss keeps falling while validation loss turns up'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 45 C 160 70, 260 82, 420 90' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><path d='M70 48 C 160 66, 230 62, 420 40' fill='none' stroke='#C93B3B' stroke-width='2.5'/><line x1='235' y1='30' x2='235' y2='95' stroke='#C93B3B' stroke-width='1' stroke-dasharray='4 3'/><text x='235' y='22' font-size='9.5' fill='#C93B3B' text-anchor='middle'>the turn</text><text x='448' y='92' font-size='10' fill='#1F6280'>train</text><text x='448' y='42' font-size='10' fill='#C93B3B'>val</text></g></svg>",
+  note:"<b>Spot the turn.</b> Training loss (blue) keeps dropping, but validation loss (red) bottoms out and rises. That crossing point is where the model stopped learning the task and began memorizing. Best to stop, or regularize, around there."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='Dropout randomly switches off some neurons each step'><g font-family='monospace' font-size='10' text-anchor='middle'><text x='90' y='22' fill='#6B645E'>step A</text><circle cx='50' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='90' cy='55' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='130' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='50' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='90' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='130' cy='90' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><text x='390' y='22' fill='#6B645E'>step B</text><circle cx='350' cy='55' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='390' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='430' cy='55' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='350' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/><circle cx='390' cy='90' r='11' fill='#EEEBE5' stroke='#B0A99E' stroke-width='1.5' stroke-dasharray='3 2'/><circle cx='430' cy='90' r='11' fill='#E8F5EE' stroke='#2D8B55' stroke-width='1.5'/></g></svg>",
+  note:"<b>Dropout: a different team each step.</b> Dashed grey circles are neurons switched off this step. A different random set is dropped each time, so no single neuron can become the whole answer. The formula: <code>h = h * mask / (1 - p)</code>."},
+ {viz:"<svg viewBox='0 0 520 100' role='img' aria-label='At test time all neurons are used with dropout off'><g font-family='monospace' font-size='11' text-anchor='middle'><rect x='30' y='38' width='160' height='30' rx='5' fill='#FCF3DC' stroke='#C99A12' stroke-width='2'/><text x='110' y='58' fill='#9A7208'>train: dropout ON</text><text x='205' y='58' fill='#6B645E'>vs</text><rect x='240' y='38' width='170' height='30' rx='5' fill='#E8F5EE' stroke='#2D8B55' stroke-width='2'/><text x='325' y='58' fill='#1a5c38'>test: dropout OFF</text></g></svg>",
+  note:"<b>On for training, off for testing.</b> Dropout only runs while learning. At test time every neuron is used, so predictions are stable. The <code>/(1-p)</code> scaling during training keeps the signal size matched so the switch is seamless."},
+ {viz:"<svg viewBox='0 0 520 120' role='img' aria-label='With dropout the validation curve stays low, gap shrinks'><g font-family='monospace'><line x1='60' y1='95' x2='430' y2='95' stroke='#E5DFD6' stroke-width='1.5'/><line x1='60' y1='25' x2='60' y2='95' stroke='#E5DFD6' stroke-width='1'/><path d='M70 48 C 160 66, 260 76, 420 82' fill='none' stroke='#2A7B9B' stroke-width='2.5'/><path d='M70 50 C 160 66, 260 74, 420 78' fill='none' stroke='#2D8B55' stroke-width='2.5'/><text x='448' y='84' font-size='10' fill='#1F6280'>train</text><text x='448' y='74' font-size='10' fill='#1a5c38'>val</text><text x='245' y='112' font-size='11' fill='#6B645E' text-anchor='middle'>epoch →</text></g></svg>",
+  note:"<b>The payoff.</b> With dropout, training and validation curves stay close and both stay low. The model does better on unseen digits. This same dashboard-and-regularize habit scales all the way up to giant LLMs — only the numbers get bigger."}
+];
+var buildWrap=document.getElementById('build'), buildSec=document.getElementById('s5');
+BUILD.forEach(function(item,i){
+  var step=document.createElement('div'); step.className='build-step';
+  step.innerHTML='<div class="build-viz">'+item.viz+'</div><div class="build-note"><span class="build-num">'+(i+1)+'</span>'+item.note+'</div>';
+  buildWrap.appendChild(step);
+});
+var bsteps=Array.prototype.slice.call(buildWrap.querySelectorAll('.build-step')), bseen=0;
+function bUnlock(){ var g=buildSec.querySelector('.gotit'); if(g){ g.disabled=false; g.textContent='Saw the whole build — got it ✓'; } }
+function seeStep(s){ if(s.classList.contains('revealed'))return; s.classList.add('revealed'); bseen++; if(bseen>=bsteps.length) bUnlock(); }
+function revealVisible(){
+  var vh = window.innerHeight || document.documentElement.clientHeight;
+  bsteps.forEach(function(s){
+    if(s.classList.contains('revealed')) return;
+    // reveal any step whose top has entered (or scrolled above) the viewport — never leave it blank
+    if(s.getBoundingClientRect().top < vh*0.95) seeStep(s);
+  });
+}
+window.__revealBuild = revealVisible;   // sidebar jumps re-check so a jumped-to build is never blank
+if(!bsteps.length){ bUnlock(); }
+else if(RM || !('IntersectionObserver' in window)){ bsteps.forEach(seeStep); }
+else {
+  buildWrap.classList.add('armed');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ seeStep(e.target); bio.unobserve(e.target); } }); }, {threshold:0.15, rootMargin:'0px 0px -6% 0px'});
+  bsteps.forEach(function(s){ bio.observe(s); });
+  // robustness: reveal steps already on screen (e.g. after a sidebar jump) and on any scroll/resize
+  window.addEventListener('scroll', revealVisible, {passive:true});
+  window.addEventListener('resize', revealVisible);
+  revealVisible();
+  setTimeout(revealVisible, 700);
+}
+
+/* ===== QUIZ ===== */
+var QS=[
+ {q:'1. A loss curve that falls steadily means:',
+  opts:['the model is stuck','the model is learning','the model is overfitting','the code has a bug'],
+  ans:1, fb:'Right. A steadily falling loss is the healthy sign — the model is improving epoch by epoch.'},
+ {q:'2. Training loss keeps dropping but validation loss starts rising. This is:',
+  opts:['learning normally','a good sign to keep training','overfitting — the model is memorizing','a stuck model'],
+  ans:2, fb:'Right. When the two curves diverge, the model is memorizing the training set instead of generalizing.'},
+ {q:'3. What does dropout do during training?',
+  opts:['adds more neurons','randomly switches off a fraction of neurons each step','removes the loss function','makes the batch bigger'],
+  ans:1, fb:'Right. It zeros a random subset of neurons each step, so the network cannot over-rely on any single one.'},
+ {q:'4. Training looks healthy, but your test accuracy is lower than expected and changes by a percent or two every time you re-run evaluation on the same fixed test set. Where do you look first?',
+  opts:['collect a bigger test set','check that dropout is switched off at test time (e.g. model.eval()) — if it stays on, neurons are still randomly zeroed during evaluation, so answers vary run to run and accuracy drops','increase the dropout rate p','train for more epochs'],
+  ans:1, fb:'Right. Evaluation on a fixed test set should be deterministic. Randomness between runs is the fingerprint of dropout (or another train-only randomness) still active at test time. Switch it off for evaluation so every neuron is used, and make sure the /(1-p) scaling kept the training-time signal matched. Nothing errors, which is why this one bites so many beginners.'}
+];
+var quizWrap=document.getElementById('quiz'), quizSec=document.getElementById('s6'), answered={};
+QS.forEach(function(item,qi){
+  var block=document.createElement('div'); block.className='q';
+  var ask=document.createElement('div'); ask.className='q-ask'; ask.innerHTML=item.q; block.appendChild(ask);
+  var opts=document.createElement('div'); opts.className='q-opts';
+  var fb=document.createElement('div'); fb.className='q-fb';
+  item.opts.forEach(function(text,oi){
+    var o=document.createElement('button'); o.type='button'; o.className='q-opt';
+    o.innerHTML='<span class="mark"></span><span>'+text+'</span>';
+    o.addEventListener('click', function(){
+      if(answered[qi]) return; answered[qi]=true;
+      Array.prototype.slice.call(opts.children).forEach(function(c){c.classList.add('locked')});
+      if(oi===item.ans){ o.classList.add('correct'); fb.className='q-fb good show'; fb.innerHTML='✓ '+item.fb; }
+      else { o.classList.add('wrong'); opts.children[item.ans].classList.add('correct'); fb.className='q-fb bad show'; fb.innerHTML='The correct answer is the green one. '+item.fb; }
+      if(Object.keys(answered).length>=QS.length){ var g=quizSec.querySelector('.gotit'); g.disabled=false; g.textContent='All four answered — check ✓'; }
+    });
+    opts.appendChild(o);
+  });
+  block.appendChild(opts); block.appendChild(fb); quizWrap.appendChild(block);
+});
+
+/* ===== COPY ===== */
+Array.prototype.slice.call(document.querySelectorAll('.copy')).forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var t=document.querySelector(btn.getAttribute('data-copy')), txt=t?t.textContent.trim():'';
+    var done=function(ok){ var o=btn.textContent; btn.textContent=ok?'✓ copied':'select & copy manually'; btn.classList.toggle('done',ok); setTimeout(function(){btn.textContent=o;btn.classList.remove('done')},1600); };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(function(){done(true)},function(){legacy(txt,done)});
+    else legacy(txt,done);
+  });
+});
+function legacy(txt,cb){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); document.body.removeChild(ta); cb(ok); }catch(e){ cb(false); } }
+
+refresh();
+})();
+</script>
+
+<!-- ── glossary tooltips ── -->
+<script>
+(function(){
+  "use strict";
+  var terms = document.querySelectorAll('.term[data-tip]');
+  if(!terms.length) return;
+  var tip = document.createElement('div');
+  tip.id = 'term-tip'; tip.setAttribute('role','tooltip');
+  document.body.appendChild(tip);
+  var active = null;
+  function position(el){
+    var r = el.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    var t = tip.getBoundingClientRect(), pad = 8;
+    var left = r.left + r.width/2 - t.width/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - t.width - pad));
+    var top = r.top - t.height - pad;
+    if(top < pad) top = r.bottom + pad;
+    tip.style.left = Math.round(left)+'px';
+    tip.style.top  = Math.round(top)+'px';
+  }
+  function show(el){
+    active = el; tip.textContent = '';
+    var ttl = document.createElement('span'); ttl.className = 'ttl';
+    ttl.textContent = (el.textContent||'').replace(/[.:,;]+$/,'').trim();
+    var body = document.createElement('span'); body.textContent = el.getAttribute('data-tip');
+    tip.appendChild(ttl); tip.appendChild(body); tip.classList.add('show'); position(el);
+  }
+  function hide(){ active = null; tip.classList.remove('show'); }
+  Array.prototype.forEach.call(terms, function(el){
+    if(!el.hasAttribute('tabindex')) el.setAttribute('tabindex','0');
+    el.addEventListener('mouseenter', function(){ show(el); });
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', function(){ show(el); });
+    el.addEventListener('blur', hide);
+  });
+  window.addEventListener('scroll', function(){ if(active) position(active); }, {passive:true});
+  window.addEventListener('resize', function(){ if(active) position(active); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+})();
+</script>
+
+<!-- ── viz iframe: auto-size to content + manual reload safety net ──
+     Root cause of the earlier "blank box" was Safari treating each local file://
+     path as its own origin, so an iframe embedded from a *different* file gets its
+     paint suppressed as a privacy measure — confirmed by: it worked standalone,
+     it worked in Chrome, and it worked over http://localhost. Not a code bug, and
+     it does not affect the deployed (https) site. Auto-resize restored; the reload
+     button stays as a harmless safety net regardless of browser. -->
+<script>
+(function(){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || d.type !== 'viz-height' || typeof d.px !== 'number') return;
+    var frames = document.querySelectorAll('.build-embed iframe');
+    for (var i = 0; i < frames.length; i++){
+      if (frames[i].contentWindow === e.source){
+        frames[i].style.height = Math.min(Math.max(d.px, 320), 3200) + 'px';
+        break;
+      }
+    }
+  });
+  var btn = document.getElementById('bcastReload');
+  if(btn) btn.addEventListener('click', function(){
+    var f = document.getElementById('bcastFrame');
+    if(f) f.src = f.src;
+  });
+})();
+</script>
+</body>
+</html>
