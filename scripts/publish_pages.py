@@ -265,7 +265,6 @@ def gate_specs(root, skip_names=(), checks=None):
     py = sys.executable or 'python3'
     checks = checks or {}
     specs = [
-        Gate('shelf-audit', [py, 'sessions/_shelf_audit.py'], None),
         Gate('nav-audit-published',
              [py, 'sessions/nav_audit.py', '--published-only'], None),
         Gate('absolute-links', None, checks.get('absolute-links')),
@@ -276,7 +275,6 @@ def gate_specs(root, skip_names=(), checks=None):
              [py, '-m', 'pytest', 'sessions/_compiler/tests', '-q',
               '-p', 'no:cacheprovider'], None),
         Gate('node-reveal', ['node', 'sessions/_compiler/tests/test_reveal.mjs'], None),
-        Gate('node-shelf', ['node', 'sessions/_compiler/tests/test_shelf.mjs'], None),
         Gate('node-sr', ['node', 'sessions/_compiler/tests/test_sr.mjs'], None),
         Gate('self-tests',
              [py, '-m', 'pytest', 'scripts', '-q', '-p', 'no:cacheprovider'], None),

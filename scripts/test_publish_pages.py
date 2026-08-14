@@ -244,7 +244,6 @@ def test_gate_specs_include_published_only_flag():
 
 def test_gate_specs_are_ordered_cheap_first():
     names = [g.name for g in pubp.gate_specs('/repo')]
-    assert names.index('shelf-audit') < names.index('compiler-tests')
     assert names.index('nav-audit-published') < names.index('compiler-tests')
 
 
@@ -255,14 +254,15 @@ def test_gate_specs_can_be_filtered_by_name():
 
 def test_run_gates_fail_fast_stops_early():
     gates = pubp.gate_specs('/repo')
+    first = gates[0].name          # by name, so retiring a gate cannot void this test
     calls = []
 
     def runner(g):
         calls.append(g.name)
-        return (g.name != 'shelf-audit'), 'boom'
+        return (g.name != first), 'boom'
 
     res = pubp.run_gates(gates, runner, fail_fast=True)
-    assert len(res) == 1 and calls == ['shelf-audit']
+    assert len(res) == 1 and calls == [first]
 
 
 def test_run_gates_default_runs_all_and_reports_all():
@@ -374,7 +374,9 @@ def ok_runner(gate):
 
 
 def bad_runner(gate):
-    return (gate.name != 'shelf-audit'), 'exit 1'
+    # Fails the FIRST gate, looked up by name — a hard-coded name here would turn
+    # into a silent all-pass runner the moment that gate is renamed or retired.
+    return (gate.name != pubp.gate_specs('/repo')[0].name), 'exit 1'
 
 
 # ---------------------------------------------------------------------------

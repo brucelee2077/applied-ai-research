@@ -134,38 +134,6 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .cap-row .track{flex:1;height:7px;background:var(--panel3);border-radius:var(--r-full);overflow:hidden;min-width:0}
 .cap-row .fill{display:block;height:100%;border-radius:var(--r-full);transition:width .6s var(--ease)}
 .cap-row .cc{font-family:var(--mono);font-size:.67rem;color:var(--muted);min-width:32px;text-align:right}
-/* ── Toy Shelf ── */
-.shelf-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);
-            padding:.9rem 1.05rem;margin-bottom:.9rem;box-shadow:var(--shadow-sm)}
-.shelf-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;
-            align-items:baseline;margin-bottom:.7rem}
-.shelf-big{font-family:var(--display);font-weight:800;font-size:1.05rem;color:var(--ink)}
-.shelf-big span{color:var(--accent)}
-.shelf-sub{font-size:.78rem;color:var(--muted);text-align:right;min-width:0}
-.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:.5rem}
-.toy{background:var(--panel2);border:1px solid var(--line2);border-radius:var(--r-sm);
-     padding:.55rem .6rem;text-align:left;font:inherit;color:inherit;cursor:pointer;
-     transition:border-color .2s var(--ease),transform .2s var(--ease)}
-.toy:hover{border-color:var(--accent);transform:translateY(-2px)}
-.toy[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
-.toy-n{font-size:.79rem;font-weight:600;line-height:1.3;color:var(--ink)}
-.toy-m{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.2rem}
-.toy-v{font-size:.68rem;color:var(--ok-ink);margin-top:.25rem}
-.toy.locked{opacity:.45;cursor:not-allowed;border-style:dashed}
-.toy.locked:hover{transform:none;border-color:var(--line2)}
-.toy.locked .toy-v{color:var(--muted)}
-.toy-play{margin-top:.75rem;background:var(--panel3);border:1px solid var(--line2);
-          border-radius:var(--r-sm);padding:.75rem .85rem}
-.tp-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.7rem;
-         align-items:start;margin-bottom:.6rem}
-.tp-title{font-family:var(--display);font-weight:800;font-size:.98rem}
-.tp-meta{font-family:var(--mono);font-size:.66rem;color:var(--muted);margin-top:.15rem}
-.tp-meta a{color:var(--accent)}
-.tp-close{background:transparent;border:1px solid var(--line2);color:var(--ink2);
-          border-radius:var(--r-sm);width:26px;height:26px;cursor:pointer;line-height:1}
-.tp-close:hover{border-color:var(--accent);color:var(--accent)}
-.tp-frame iframe{width:100%;height:320px;border:0;display:block;
-                 border-radius:var(--r-sm);background:var(--bg2)}
 /* ── next-goal tracker (distance to next gate + finishing the phase) ── */
 .goal-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
 .goal-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:.9rem 1.05rem;box-shadow:var(--shadow-sm);display:block;text-decoration:none;transition:border-color .15s,transform .1s}
@@ -304,23 +272,6 @@ footer a{color:var(--accent)}
     </header>
 
     <section class="dash" id="dash" aria-label="Your progress">
-      <div class="shelf-wrap">
-        <div class="shelf-head">
-          <div class="shelf-big"><span id="shelfCount">0</span> toys on your shelf</div>
-          <div class="shelf-sub" id="shelfSub"></div>
-        </div>
-        <div class="shelf" id="shelf"></div>
-        <div class="toy-play" id="toyPlay" hidden>
-          <div class="tp-head">
-            <div>
-              <div class="tp-title" id="tpTitle"></div>
-              <div class="tp-meta" id="tpMeta"></div>
-            </div>
-            <button class="tp-close" id="tpClose" type="button" aria-label="Close toy">✕</button>
-          </div>
-          <div class="tp-frame" id="tpFrame"></div>
-        </div>
-      </div>
       <div class="dash-tiles">
         <div class="tile ring-tile">
           <div class="ring">
@@ -723,106 +674,6 @@ var MODULES = [
    ['L8','Interview Preparation','m29-ship-outreach/day-08-interview-preparation/lesson.html','w24-d04-interviewprep']]}
 ];
 
-/* ── Toy Shelf logic — INLINED from _compiler/shells/js/shelf.js ──
-   Do not hand-edit. Edit the module, then re-inline (strip 'export ').
-   sessions/_shelf_audit.py fails if these drift.                        */
-/* SHELF-LOGIC:BEGIN */
-// shelf.js — Toy Shelf logic. Pure: no DOM, no localStorage, no rendering.
-// Inlined into sessions/index.html between the SHELF-LOGIC markers; keep the two
-// copies identical (sessions/_shelf_audit.py enforces it).
-
-// A toy unlocks as soon as its owning lesson has ANY completed section.
-// This is deliberately looser than the hub's pillStatus(), which requires
-// done.produce || done.verdict — a learner meets a toy mid-lesson, so demanding
-// completion would lock a toy they have already played with.
-function isUnlocked(raw){
-  if (!raw) return false;
-  try {
-    var s = JSON.parse(raw);
-    return !!(s && s.done && Object.keys(s.done).length > 0);
-  } catch (e) { return false; }   // corrupt state must never break the hub
-}
-
-// ── The shelf table ───────────────────────────────────────────────────────────
-// [ name, module label, owning quest-id, what you can do with it, page ]
-//
-// Owner = the earliest lesson where the learner meets this widget OR AN INLINE
-// EQUIVALENT of it. Hand-set, never derived: grep gets neuron-boundary and
-// xor-limit wrong (both are held inline by m02 Day 1) and would show them locked.
-//
-// Excluded: attention-heatmap, attention-multihead, attention-pipeline,
-// softmax-scaling, leaky-slope — no tracked page embeds them, so no owner exists.
-var TOYS = [
-  ['Shape reader',        'm01 · Day 1', 'wf1-d01-arrays',       're-shape 24 numbers',              'viz/shape-reshaper.html'],
-  ['Slice picker',        'm01 · Day 2', 'wf1-d02-indexing',     'grab a piece and break it',        'viz/slice-picker.html'],
-  ['Broadcasting',        'm01 · Day 3', 'wf1-d03-broadcasting', 'stretch two shapes to fit',        'viz/broadcasting.html'],
-  ['Matmul shapes',       'm01 · Day 4', 'wf1-d04-matmul',       'multiply matrices',                'viz/matmul.html'],
-  ['Seed recipe',         'm01 · Day 6', 'wf1-d06-seeds',        'freeze a random stream',           'viz/seed-recipe.html'],
-  ['Neuron weights',      'm02 · Day 1', 'wf2-d01-neuron',       'tilt a decision boundary',         'viz/neuron-boundary.html'],
-  ['XOR limit',           'm02 · Day 1', 'wf2-d01-neuron',       'break a single neuron',            'viz/xor-limit.html'],
-  ['Activation curves',   'm02 · Day 2', 'wf2-d02-activations',  'compare ReLU vs sigmoid',          'viz/activation-derivatives.html'],
-  ['Gradient descent',    'm02 · Day 6', 'wf3-d03-training-loop','roll downhill at your own pace',   'viz/gradient-descent.html'],
-  ['Embedding similarity','m03 · Day 1', 'wf4-d01-embeddings',   'compare meanings by angle',        'viz/embedding-similarity.html'],
-  ['Score explorer',      'm03 · Day 2', 'wf4-d02-qkv',          'drag a question and see who wins', 'viz/qkv-score-explorer.html'],
-  ['Dot-product scorer',  'm03 · Day 3', 'wf4-d03-attention-scores','flip a score to a mismatch',    'viz/dot-product-score.html'],
-  ['Softmax shares',      'm03 · Day 3', 'wf4-d03-attention-scores','drag scores and move the shares','viz/softmax-shares.html'],
-  ['Head splitter',       'm03 · Day 4', 'wf4-d04-multihead',    'split one width into many heads',  'viz/multihead-split.html'],
-  ['Seat collider',       'm03 · Day 5', 'wf4-d05-position',     'crash two seats into one stamp',   'viz/positional-collide.html'],
-  ['Transformer FLOPs',   'm08 · Day 1', 'w03-d01-arith',        'count the cost of a forward pass', 'viz/transformer-flops.html'],
-  ['KV cache',            'm08 · Day 3', 'w03-d03-kv',           'watch memory grow per token',      'viz/kv-cache.html'],
-  ['Rooflines',           'm09a · Day 1','w02-d01-roofline',     'find the wall your kernel hits',   'viz/roofline.html'],
-  ['Parallelism',         'm09c · Day 1','w04-d01-fsdp',         'split a model across devices',     'viz/parallelism.html'],
-  ['Scaling laws',        'm10a · Day 3','w05-d03-isoflops',     'trade parameters against data',    'viz/scaling-laws.html'],
-  ['MoE routing',         'm14a · Day 1','w07-d01-moefund',      'send tokens to experts',           'viz/moe-routing.html'],
-  ['Flash attention',     'm15a · Day 4','w13-d04-flashattn',    'tile attention to fit in SRAM',    'viz/flash-attention.html'],
-  ['Quantization',        'm16a · Day 5','w06-d05-llmint8',      'squeeze weights and watch error',  'viz/quantization.html'],
-  ['Speculative decoding','m17b · Day 4','w16-d04-specdecode',   'let a small model guess ahead',    'viz/speculative-decoding.html'],
-  ['Diffusion noising',   'm22b · Day 1','m22b-d01-forward',     'add noise until it is gone',       'viz/diffusion-noising.html']
-];
-
-// Partition the shelf. `read(qid)` returns the raw localStorage string or null —
-// injected so this stays testable and never touches the browser itself.
-function shelfSummary(read){
-  var unlocked = [], locked = [];
-  for (var i = 0; i < TOYS.length; i++){
-    var raw = null;
-    // localStorage.getItem throws SecurityError when site data is blocked —
-    // a locked shelf is fine, a hub that stops rendering is not.
-    try { raw = read(TOYS[i][2]); } catch (e) { raw = null; }
-    (isUnlocked(raw) ? unlocked : locked).push(TOYS[i]);
-  }
-  return { total: TOYS.length, unlocked: unlocked, locked: locked };
-}
-
-// ── viz iframe height protocol ────────────────────────────────────────────────
-// Must stay equal to the type in _compiler/shells/v9-base.donor (line ~606).
-// Compiled lessons get that parity free from visual_integrity_gate.py, which reads
-// the type from the donor; index.html is NOT compiled, so _shelf_audit.py checks it.
-var VIZ_MSG_TYPE = 'viz-height';
-
-// Same clamp the lesson receiver uses. Returns null for anything not a real number.
-function clampHeight(px){
-  if (typeof px !== 'number' || !isFinite(px)) return null;
-  return Math.min(Math.max(px, 320), 3200);
-}
-
-// Which toy should be open after a click? null means "closed".
-// Kept pure so the single-panel rule is testable without a DOM.
-function nextOpen(currentlyOpen, clicked){
-  return currentlyOpen === clicked ? null : clicked;
-}
-
-// Should this height message be applied, and to what height?
-// Returns null to ignore. Senders keep firing for ~1600ms after load
-// (viz/xor-limit.html:262 fires at 80/300/800/1600ms, plus 60/420ms per click),
-// so a message routinely outlives the panel that requested it.
-function acceptHeight(msg, hasLiveFrame, sourceMatches){
-  if (!msg || msg.type !== VIZ_MSG_TYPE) return null;
-  if (!hasLiveFrame || !sourceMatches) return null;
-  return clampHeight(msg.px);
-}
-/* SHELF-LOGIC:END */
-
 // ── progress helpers (read the same localStorage the lessons write) ──
 function pillStatus(lesson){
   if(!lesson[2]) return 'none';
@@ -932,97 +783,12 @@ function renderPhaseJump(){
   });
 }
 
-// ── Toy Shelf render ──────────────────────────────────────────────────────────
-var _openToy = null;      // page path of the open toy, or null
-var _openFrame = null;    // the live iframe element, or null
-
-function readQuest(qid){
-  try { return localStorage.getItem('frontier-lesson:' + qid); }
-  catch (e) { return null; }        // private mode / disabled storage
-}
-
-function closeToy(){
-  var host = document.getElementById('tpFrame');
-  if (host) host.innerHTML = '';    // destroys the iframe
-  _openFrame = null;
-  _openToy = null;
-  var panel = document.getElementById('toyPlay');
-  if (panel) panel.hidden = true;
-  var btns = document.querySelectorAll('.toy[aria-pressed="true"]');
-  for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', 'false');
-}
-
-function openToy(toy, btn){
-  if (nextOpen(_openToy, toy[4]) === null) { closeToy(); return; }   // clicking the open toy collapses it
-  closeToy();
-  _openToy = toy[4];
-  btn.setAttribute('aria-pressed', 'true');
-  document.getElementById('tpTitle').textContent = toy[0];
-  document.getElementById('tpMeta').innerHTML =
-    toy[1] + ' · ' + toy[3] + ' · <a href="' + toy[4] +
-    '" target="_blank" rel="noopener">open full screen</a>';
-  // Lazily create the iframe so N toys cost zero iframes at rest.
-  var host = document.getElementById('tpFrame');
-  var f = document.createElement('iframe');
-  f.setAttribute('title', toy[0]);
-  f.setAttribute('loading', 'lazy');
-  f.src = toy[4];
-  host.appendChild(f);
-  _openFrame = f;
-  document.getElementById('toyPlay').hidden = false;
-}
-
-function renderShelf(gate){
-  var host = document.getElementById('shelf');
-  if (!host) return;
-  var sum = shelfSummary(readQuest);
-  document.getElementById('shelfCount').textContent = sum.unlocked.length;
-
-  // Subtitle: reuse the hub's own forward-looking gate line.
-  var sub = document.getElementById('shelfSub');
-  if (gate) {
-    sub.textContent = gate.remaining + ' lesson' + (gate.remaining === 1 ? '' : 's') +
-                      ' to clear the M' + gate.m.n + ' gate';
-  } else {
-    sub.textContent = 'all gates cleared 🎉';
-  }
-
-  host.innerHTML = '';
-  function card(toy, unlocked){
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'toy' + (unlocked ? '' : ' locked');
-    b.setAttribute('aria-pressed', 'false');
-    if (!unlocked) b.disabled = true;
-    b.innerHTML = '<div class="toy-n"></div><div class="toy-m"></div><div class="toy-v"></div>';
-    b.querySelector('.toy-n').textContent = toy[0];
-    b.querySelector('.toy-m').textContent = toy[1];
-    b.querySelector('.toy-v').textContent = unlocked ? toy[3] : '🔒 locked';
-    if (unlocked) b.addEventListener('click', function(){ openToy(toy, b); });
-    return b;
-  }
-  // unlocked first, then locked — locked ones read as anticipation, not a scold
-  for (var i = 0; i < sum.unlocked.length; i++) host.appendChild(card(sum.unlocked[i], true));
-  for (var j = 0; j < sum.locked.length; j++)   host.appendChild(card(sum.locked[j], false));
-}
-
-// Every guard decision lives in acceptHeight() so it is unit-tested; this layer
-// only supplies the two DOM facts it cannot know.
-window.addEventListener('message', function(e){
-  var live = !!(_openFrame && _openFrame.contentWindow);
-  var same = live && e.source === _openFrame.contentWindow;
-  var h = acceptHeight(e.data, live, same);
-  if (h === null) return;
-  _openFrame.style.height = h + 'px';
-});
-
 function render(){
   renderCapFilters();
 
   var totLessons=0, builtLessons=0, doneLessons=0, inProgress=0, modsStarted=0;
   var capAgg={}; Object.keys(CAPS).forEach(function(c){ capAgg[c]={done:0,built:0}; });
   var phaseOrder=[], phaseMap={}, qidStatus={}, gatesTotal=0, gatesDone=0;
-  var gate = null;   // hoisted out of the goal-card IIFE so renderShelf() can read it
   MODULES.forEach(function(m){
     var phase = m.phase || '—';
     if(!phaseMap[phase]){ phaseOrder.push(phase); phaseMap[phase]={built:0,done:0,mods:0,modsDone:0}; }
@@ -1095,7 +861,7 @@ function render(){
     var row = document.getElementById('goalRow'); if(!row) return;
     var html='';
     // next review gate: first module holding a buildable, not-yet-complete ✓ gate
-    // NOTE: `gate` is declared in render()'s scope (hoisted) — do not re-declare it here.
+    var gate = null;
     for(var i=0;i<MODULES.length && !gate;i++){
       var m=MODULES[i]; if(!m.lessons) continue;
       var hasGate=false, gateDone=false, remaining=0, total=0, href=null;
@@ -1137,7 +903,6 @@ function render(){
     }
     row.innerHTML = html;
   })();
-  renderShelf(gate);
 
   // ── milestones & badges (derived purely from live completion state) ──
   (function(){
@@ -1229,10 +994,6 @@ function render(){
   renderPhaseJump();
   applyFilter();
 }
-(function(){
-  var x = document.getElementById('tpClose');
-  if (x) x.addEventListener('click', closeToy);
-})();
 render();
 
 // ── appearance switcher (same localStorage key as every lesson) ──
