@@ -196,8 +196,18 @@ def run(source_text, whitelist=None, manifest_covers=None):
     # ---- 2. SVG labels ------------------------------------------------------
     en_lab = re.findall(r'<text class="lang-en"[^>]*>(.*?)</text>', body, re.S)
     zh_lab = re.findall(r'<text class="lang-zh"[^>]*>(.*?)</text>', body, re.S)
+    # A label needs a twin only if it says something a Chinese reader could not read.
+    # Two exemptions, both measured against real drawings:
+    #   * no Latin word of 3+ letters — "N = 7 000 000 000", "5 x 3", a tick
+    #   * every word in it is a WHITELISTED TERM — a label that is just "ReLU" or
+    #     "softmax" must STAY English by the term policy, so demanding
+    #     <text class="lang-zh">ReLU</text> would add a duplicate node that teaches
+    #     nothing and then require it forever.
+    def _needs_twin(t):
+        words = _NEEDS_WORDS.findall(t)
+        return bool(words) and not all(w.lower() in terms for w in words)
     plain = [t for t in re.findall(r'<text(?![^>]*class="lang-)[^>]*>(.*?)</text>', body, re.S)
-             if _NEEDS_WORDS.search(t)]
+             if _needs_twin(t)]
     if len(en_lab) != len(zh_lab):
         fail('SVG labels are unbalanced: %d <text class="lang-en"> vs %d "lang-zh". Every '
              'paired label needs both halves or one language loses a caption.'
@@ -252,6 +262,15 @@ def run(source_text, whitelist=None, manifest_covers=None):
         t = re.sub(r'<[^>]+>', ' ', t)                      # tags/attrs
         t = re.sub(r'\[\[([^\|\]]+)\|\|[^\]]*\]\]', r'\1', t)   # keep the term, drop the gloss
         t = re.sub(r'(?m)^\s*(code|out|src|expr):.*$', ' ', t)
+        # AUTHORING MARKERS are not prose, and flagging them buries the one thing
+        # this check exists to find — a paragraph nobody translated. Masked:
+        #   `%%% steps` / `!!! c-warn`  widget and callout fence lines
+        #   `step:` / `why:` / `take:`  the ASCII field openers _kv recognises
+        #   `concept: xor-limit`        a spaced-repetition id
+        t = re.sub(r'(?m)^\s*%%%.*$', ' ', t)
+        t = re.sub(r'(?m)^\s*!!!.*$', ' ', t)
+        t = re.sub(r'(?m)^\s*[A-Za-z_]\w*:', ' ', t)
+        t = re.sub(r'\bconcept:\s*\S+', ' ', t)
         for w in re.findall(r'[A-Za-z][A-Za-z\-\'/]{2,}', t):
             if w.lower() not in terms:
                 leaks[w] = leaks.get(w, 0) + 1

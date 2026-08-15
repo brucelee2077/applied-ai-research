@@ -43,8 +43,15 @@ def run(html, meta, donor=None):
     # class="q" blocks (inside a .warmup wrapper), so a whole-page count would over-count;
     # scope to the quiz section to keep the "exactly 4 quiz questions" invariant honest.
     qsec = re.search(r'data-sec="quiz".*?</section>', html, re.DOTALL)
-    nq = qsec.group(0).count('class="q"') if qsec else html.count('class="q"')
-    chk(nq == 4, 'quiz has 4 questions (got %d)' % nq)
+    sec = qsec.group(0) if qsec else html
+    nq = sec.count('class="q"')
+    # A BILINGUAL quiz carries every question twice — once per language — so the
+    # invariant is 4 questions PER LANGUAGE, not 4 nodes. Counting nodes reported
+    # "got 8" on the first translated day and blocked a correct page.
+    langs = 2 if ('class="lang-en"' in sec and 'class="lang-zh"' in sec) else 1
+    chk(nq == 4 * langs,
+        'quiz has 4 questions per language (got %d node(s) across %d language(s))'
+        % (nq, langs))
     chk(html.count('data-sec="produce"') == 1, 'exactly one produce section')
     if meta.get('require_artifact', True):
         prod = re.search(r'data-sec="produce".*?</section>', html, re.DOTALL)

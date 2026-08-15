@@ -615,11 +615,27 @@ def render_hero(meta, block):
     txt = '\n'.join(block['lines'])
     # Optional %%% warmup ... %%% recall block (retention): extract BEFORE the lede/goal
     # split so it isn't swallowed into the goal text; render it after the goal.
+    # The hero body does NOT go through render_md — it is split on @lede/@goal
+    # markers — so a ~~~zh fence here is never parsed as a fence. Its Chinese
+    # warm-up twin has to be lifted out explicitly, or it lands inside @zh_goal and
+    # ships as literal '~~~zh %%% warmup q: …' text. Take the ZH fence FIRST: its
+    # body contains a %%% warmup block that the English regex would otherwise match.
     warm_html = ''
+    zh_warm_html = ''
+    mz = re.search(r'(?ms)^~~~zh\s*\n\s*%%%\s+warmup\s*\n(.*?)^%%%\s*\n~~~\s*$', txt)
+    if mz:
+        zh_warm_html = render_warmup(mz.group(1).split('\n'))
+        txt = txt[:mz.start()] + txt[mz.end():]
     mw = re.search(r'(?ms)^%%%\s+warmup\s*\n(.*?)^%%%\s*$', txt)
     if mw:
         warm_html = render_warmup(mw.group(1).split('\n'))
         txt = txt[:mw.start()] + txt[mw.end():]
+    if warm_html and zh_warm_html:
+        warm_html = ('<div class="lang-en">%s</div><div class="lang-zh">%s</div>'
+                     % (warm_html, zh_warm_html))
+    elif zh_warm_html and not warm_html:
+        raise ValueError('the hero has a Chinese %%% warmup twin but no English one — '
+                         'an English reader would lose the warm-up entirely')
     f = _hero_fields(txt)
     lede = bilingual(_flat(f.get('lede')), _flat(f.get('zh_lede')))
     goal = bilingual(_flat(f.get('goal')), _flat(f.get('zh_goal')))

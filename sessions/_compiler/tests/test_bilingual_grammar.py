@@ -7,6 +7,7 @@ import v8lib
 import concept_shell_gate
 
 SHELLS = os.path.join(HERE, '..', 'shells')
+REPO = os.path.join(HERE, '..', '..', '..')
 FIXTURE = os.path.join(HERE, 'fixtures', 'mini_concept.md')
 
 
@@ -312,3 +313,73 @@ def test_a_viz_embed_is_shared_too():
                           'After.\n~~~zh\n之后。\n~~~')
     assert out.count('class="build-embed"') == 1
     assert not re.search(r'class="lang-(en|zh)">\s*<div class="build-embed">', out)
+
+
+# =============================================================================
+# the hero's warm-up, and the bilingual quiz count
+# =============================================================================
+# Both found by translating a real day, not by inspection.
+
+def test_a_chinese_warmup_twin_is_paired_not_leaked():
+    # render_hero does NOT go through render_md — it splits the body on @lede/@goal
+    # markers — so a ~~~zh fence there is never parsed as a fence. The Chinese
+    # warm-up landed inside @zh_goal and shipped as literal '~~~zh %%% warmup q: …'.
+    blk = {'args': {}, 'lines': [
+        '@lede Have you ever seen this?', '@goal Do the thing.', '',
+        '%%% warmup', 'q: EN? | a:1 | a | b | c | d | fb: x', '%%%', '',
+        '~~~zh', '%%% warmup', 'q: 中文？ | a:1 | 甲 | 乙 | 丙 | 丁 | fb: x', '%%%', '~~~']}
+    html = v8lib.render_hero({'title': 'T', 'subtitle': 'S', 'module_label': 'M'}, blk)
+    assert '~~~' not in html and '%%%' not in html, html[-300:]
+    assert html.count('class="warmup"') == 2
+    assert '<div class="lang-en"><div class="warmup"' in html
+    assert '中文？' in html and 'EN?' in html
+
+
+def test_a_chinese_warmup_with_no_english_one_raises():
+    # An English reader would lose the warm-up entirely.
+    blk = {'args': {}, 'lines': [
+        '@lede L', '@goal G', '',
+        '~~~zh', '%%% warmup', 'q: 中文？ | a:1 | 甲 | 乙 | 丙 | 丁 | fb: x', '%%%', '~~~']}
+    with pytest.raises(ValueError, match='no English one'):
+        v8lib.render_hero({}, blk)
+
+
+def test_the_shell_gate_counts_quiz_questions_per_language():
+    # Counting NODES reported "got 8" on the first translated day and blocked a
+    # correct page: a bilingual quiz carries every question twice.
+    html, meta = _compile(_bilingual_fixture())
+    ok, msgs = concept_shell_gate.run(html, meta)
+    assert ok, '\n'.join(msgs)
+    line = [m for m in msgs if 'quiz has 4 questions' in m][0]
+    assert line.startswith('pass'), line
+    assert 'per language' in line
+
+
+def test_the_real_pilot_day_passes_every_deterministic_gate():
+    # The end-to-end proof: the first fully translated day, through the real gates.
+    import subprocess
+    day = os.path.join(REPO, 'sessions', 'm02-the-neuron', 'day-02-activations')
+    src, lesson = os.path.join(day, 'source.md'), os.path.join(day, 'lesson.html')
+    if not os.path.exists(lesson):
+        pytest.skip('pilot day not compiled')
+    text = open(src, encoding='utf-8').read()
+    assert '~~~zh' in text, 'the pilot day lost its Chinese'
+    import lang_parity_gate
+    ok, msgs = lang_parity_gate.run(text)
+    assert ok, '\n'.join(msgs)
+    meta, _ = v8lib.split_frontmatter(text)
+    donor = open(os.path.join(SHELLS, meta['donor']), encoding='utf-8').read()
+    ok2, msgs2 = concept_shell_gate.run(open(lesson, encoding='utf-8').read(), meta, donor=donor)
+    assert ok2, '\n'.join(msgs2)
+
+
+def test_the_pilot_page_has_balanced_language_nodes():
+    day = os.path.join(REPO, 'sessions', 'm02-the-neuron', 'day-02-activations', 'lesson.html')
+    if not os.path.exists(day):
+        pytest.skip('pilot day not compiled')
+    h = open(day, encoding='utf-8').read()
+    main = re.search(r'<main id="content">(.*?)</main>', h, re.S).group(1)
+    assert main.count('class="lang-en"') == main.count('class="lang-zh"')
+    assert main.count('<text class="lang-en"') == main.count('<text class="lang-zh"')
+    assert not any(m in main for m in ('~~~', '%%%', '@@@'))
+
