@@ -60,7 +60,7 @@ Let's start with a puzzle you can hold in your hands. A neuron does a weighted s
 
 Now the puzzle: **what do you get if you stack two straight rulers?**
 ~~~zh
-先从一个你能拿在手里的小谜题开始。一个 neuron（神经元）做的事情是：把每个输入乘上它的
+先从一个你能拿在手里的小谜题开始。一个 neuron 做的事情是：把每个输入乘上它的
 weight（权重）加起来，再加一个 bias（偏置）。说白了，这就是一条**直线规则**。你可以想象一把
 完全笔直的**尺子**。
 

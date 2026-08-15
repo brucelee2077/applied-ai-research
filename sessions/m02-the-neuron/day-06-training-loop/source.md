@@ -3,9 +3,9 @@ quest_id: wf3-d03-training-loop
 mode: concept
 donor: v9-base.donor
 page_title: "Module 2 · Day 6 — The Training Loop"
-zh_page_title: "Module 2 · 第 6 天 —— 训练循环"
+zh_page_title: "第 2 模块 · 第 6 天 —— 训练循环"
 module_label: "Module 2 · Train · Day 6"
-zh_module_label: "Module 2 · 训练 · 第 6 天"
+zh_module_label: "第 2 模块 · 训练 · 第 6 天"
 title: "The Training Loop"
 zh_title: "训练循环"
 subtitle: "Where the Network Actually Learns"
@@ -16,12 +16,12 @@ spine: "free-throw"
 zh_spine: "罚球"
 nav_prev_href: "../day-05-gradients-backprop/lesson.html"
 nav_prev_label: "Gradients & Backpropagation"
-zh_nav_prev_label: "梯度与 backpropagation（反向传播）"
+zh_nav_prev_label: "梯度与反向传播"
 nav_next_href: "../day-07-optimizers/lesson.html"
 nav_next_label: "Optimizers (SGD, Momentum, Adam)"
-zh_nav_next_label: "Optimizer（优化器）：SGD、Momentum、Adam"
+zh_nav_next_label: "优化器"
 fin_title: "Module 2 · Day 6 complete! 🏆"
-zh_fin_title: "Module 2 · 第 6 天完成！🏆"
+zh_fin_title: "第 2 模块 · 第 6 天 完成！🏆"
 fin_body: "Nice work — you've assembled the <b>training loop</b>: forward pass → loss → backward pass → update, repeated over batches and epochs until the loss falls. That loop is where a network actually learns.<br>Next up: <b>Optimizers</b> — smarter ways to take each downhill step."
 zh_fin_body: "干得好 —— 你把 <b>training loop（训练循环）</b>拼起来了：forward pass（前向传播）→ loss（损失）→ backward pass（反向传播）→ update（更新），一圈一圈重复，直到 loss 降下来。网络就是在这个循环里真正学会东西的。<br>下一站：<b>Optimizer（优化器）</b> —— 更聪明的下坡走法。"
 notebook_yardstick: 00-neural-networks/fundamentals/08_training_loop.ipynb
@@ -60,7 +60,7 @@ q: From yesterday: what does backpropagation do in one backward sweep? | a:2 | R
 q: From day 4: what is the loss, in one line? | a:0 | One number saying how wrong the guess is; lower is better | The number of layers in the network | The speed of training | A random starting weight | concept: loss-signal | fb: The loss is a single number scoring how wrong the guess is — lower is better, 0 is perfect. Today we watch it fall, loop after loop.
 %%%
 @zh_lede 想一想你是怎么学会投**罚球**的。你走到线上，出手 —— 当，砸在篮框左边。于是你把准星往右挪一点点，再投一次。近了一些。当，再调，再投。没有人第一次就能空心命中。你是靠*把一个小小的修正重复无数次*，才让球落进网里的。这个节奏 —— *试一次、量一下偏了多少、挪一点、再来* —— 就是 neural network（神经网络）学习的全部秘密。它有个名字：**training loop（训练循环）**。你听说过的每个模型底下都是它在转：今天你要训练的那个小 neuron，手机的刷脸解锁，给你推下一个视频的东西，一直到 ChatGPT。零件你已经一个一个造好了 —— 那个猜测，给偏差打分的 loss，还有告诉你该往哪边挪的 gradient。今天它们咔一声合成一个不停重复的圈。按下开始，看着一个数字一投一投地往下掉，直到网络能把球投进去。
-@zh_goal 你会把零件扣进一个循环：**forward（出手）** → **loss（量偏差）** → **backward（我往哪边偏了？）** → **update（挪准星）**，然后再来一圈。你会认识 **learning rate（学习率）** —— 每次挪多大胆，还会用 **epoch（轮次）** 和 **iteration（迭代）** 来数练了多少。你会像工程师一样读一条往下掉的 **loss curve（损失曲线）**。然后我们去戳一戳练习出岔子的几种阴招，每个都是一个小谜题，配一行就能改好的答案。每次都先讲人话；重一点的数学都放在可以跳过的框里。
+@zh_goal 你会把零件扣进一个循环：**forward（出手）** → **loss（量偏了多少）** → **backward（我往哪边偏了？）** → **update（挪准星）**，然后再来一圈。你会认识 **learning rate（学习率）** —— 每次挪多大胆，还会用 **epoch（轮次）** 和 **iteration（迭代）** 来数练了多少。你会像工程师一样读一条往下掉的 **loss curve（损失曲线）**。然后我们去戳一戳练习出岔子的几种阴招，每个都是一个小谜题，配一行就能改好的答案。每次都先讲人话；重一点的数学都放在可以跳过的框里。
 ~~~zh
 %%% warmup
 q: 接昨天：gradient 指向哪边，我们又该往哪边走才能学到东西？ | a:1 | 它指下坡，我们就往同一边走 | 它指上坡（loss 更大的方向），我们要往**反**方向走，也就是下坡 | 它指旁边，我们不动 | 它直接指着答案，我们一步跳过去 | concept: gradient-downhill | fb: gradient 指的是**上坡**，也就是 loss 更大的方向，所以我们往反方向走 —— 下坡，走向更小的 loss。那个减号就是今天的 update。
@@ -69,7 +69,7 @@ q: 接第 4 天：一句话说清 loss 是什么？ | a:0 | 一个数字，说�
 %%%
 ~~~
 
-@@@ concept id=c1 zh_tag="练习的循环" tag="The practice loop" zh_title="training loop（训练循环）—— 四步，一圈一圈重复" title="The training loop — four steps, on repeat" zh_gotit="看懂这个循环了" gotit="Got the loop"
+@@@ concept id=c1 zh_tag="练习的循环" tag="The practice loop" zh_title="training loop —— 四步，一圈一圈重复" title="The training loop — four steps, on repeat" zh_gotit="看懂这个循环了" gotit="Got the loop"
 Let's stay on the basketball court, because you already know this loop by heart. Picture one **free-throw** practice cycle. **(1)** You shoot. **(2)** You *look* at where it landed — a foot left of the rim. **(3)** You work out *which way* you were off: "I leaned left." **(4)** You *nudge* your aim a little to the right. Then you do the whole thing again. Four little steps, over and over — and every single one is something you already built this module.
 ~~~zh
 我们还留在篮球场上，因为这个循环你早就会了。想一想一次**罚球**练习。**(1)** 你出手。**(2)** 你*看*球落在哪 —— 篮框左边一尺。**(3)** 你想清楚自己*往哪边*偏了：「我往左倾了。」**(4)** 你把准星往右*挪一点*。然后整套再来一遍。四个小步骤，一遍一遍 —— 而每一步都是你这个 module 里已经造好的东西。
@@ -145,7 +145,7 @@ Steps 1–3 you already own. Step 4 is today's new magic — the single moment t
 第 1 到 3 步你已经会了。第 4 步是今天的新魔法 —— 网络*发生改变*的那唯一一个瞬间。我们放大看看。
 ~~~
 
-@@@ concept id=c2 zh_tag="把准星挪一点" tag="Nudge the aim" zh_title="update（更新）—— 唯一真正改动 weight 的一步" title="The update — the one step that changes the weights" zh_gotit="看懂 update 了" gotit="Got the update"
+@@@ concept id=c2 zh_tag="把准星挪一点" tag="Nudge the aim" zh_title="update —— 唯一真正改动 weight 的一步" title="The update — the one step that changes the weights" zh_gotit="看懂 update 了" gotit="Got the update"
 This is the heart of the loop, so let's slow right down. Your last **free-throw** clanked off the *left* of the rim. Your body already knows the fix: aim a little to the *right*. Not all the way across the gym — you'd overcorrect and miss right — just a *small nudge*, the **opposite way** from the miss. The network does exactly this with each weight, and it never has to guess: yesterday's gradient already told it "pushing this weight up makes the miss *worse*."
 ~~~zh
 这是整个循环的心脏，所以我们慢下来。你上一次**罚球**砸在篮框*左*边。你的身体已经知道该怎么改：准星往*右*挪一点。不是挪到球场那头 —— 那样会改过头，偏到右边去 —— 只是*挪一小点*，朝着偏差的**反方向**。网络对每个 weight 做的就是这件事，而且它从来不用猜：昨天的 gradient 已经告诉它「把这个 weight 往上推会让偏差*更糟*」。
@@ -216,7 +216,7 @@ step: 问 gradient 哪边是*更糟*的
 why: gradient 指向**上坡**，也就是 loss 更大的方向。它是偏差的方向。
 step: 转过身 —— **减掉**它
 why: 那个小小的**减号**就是全部的门道。走「更糟」的**反方向**，就是走向更好，也就是下坡。
-step: 只取那个方向的一*小部分* —— 乘上 **learning rate（学习率）**
+step: 只取那个方向的一*小部分* —— 乘上 **learning rate**
 why: 一整步跳出去会飞过篮框。learning rate 决定给定一个斜率时你**跨多大一步**；我们先去跟这个循环 1958 年的祖先打个招呼，第 4 个 concept 再正式认识它。
 step: 这就得到**新的 weight**，而且网络里每个 weight 在同一圈里都这么处理一次
 why: 这就是 **update**。对 `w` 做一次，对 `b` 做一次，对那一百万个全做一次 —— 一圈，每个挪一下。
@@ -263,7 +263,7 @@ It is also the great-grandchild of a much cruder idea from 1958. Meeting the anc
 它也是 1958 年一个粗糙得多的想法的曾孙。见过祖先之后，今天这个版本会显得相当奢侈。
 ~~~
 
-@@@ concept id=c3 zh_tag="老办法" tag="The old way" zh_title="perceptron（感知机）—— 这个循环粗糙的祖先" title="The perceptron — the crude ancestor of the loop" zh_gotit="看懂这个祖先了" gotit="Got the ancestor"
+@@@ concept id=c3 zh_tag="老办法" tag="The old way" zh_title="perceptron —— 这个循环粗糙的祖先" title="The perceptron — the crude ancestor of the loop" zh_gotit="看懂这个祖先了" gotit="Got the ancestor"
 Imagine an old-school **free-throw** coach with exactly one rule. While you're sinking shots he says *nothing* — no praise, no tips. The instant you *miss*, he blows a whistle and shoves your elbow — the same shove no matter **how badly** you missed. Airball off the backboard? One shove. Rattled out by a fingernail? The same shove. That coach is a real machine: the [[perceptron||Frank Rosenblatt's 1958 learning machine: it corrected the weights only when it got an example wrong, and its correction carried no measure of how wrong]], built by Frank **Rosenblatt** in 1958 — the first thing anyone ever called a learning machine, and the crude ancestor of everything you did in the last concept.
 ~~~zh
 想象一个老派的**罚球**教练，他只有一条规则。你投进的时候他*什么都不说* —— 不夸你，也不给建议。你一*没投中*，他就吹哨，然后推你的胳膊肘 —— 不管你偏得**多厉害**，都是同一下推。球砸在篮板上飞了？推一下。被框沿刮了一指甲盖弹出来？同样推一下。这个教练是一台真实存在的机器：[[perceptron（感知机）||Frank Rosenblatt 在 1958 年造的学习机器：只有在做错的时候才修 weight，而且它的修正里不带「错了多少」这个信息]]，由 Frank **Rosenblatt** 在 1958 年造出来，是人类第一次称之为学习机器的东西，也是你在上一个 concept 里做的一切的粗糙祖先。
@@ -335,7 +335,7 @@ Now back to your loop, and its single most important dial.
 现在回到你的循环，以及它最重要的那一个旋钮。
 ~~~
 
-@@@ concept id=c4 zh_tag="一次挪多少" tag="How big a nudge" zh_title="learning rate（学习率）—— 以及它咬人的两种方式" title="The learning rate — and two ways it bites" zh_gotit="看懂 learning rate 了" gotit="Got the learning rate"
+@@@ concept id=c4 zh_tag="一次挪多少" tag="How big a nudge" zh_title="learning rate —— 以及它咬人的两种方式" title="The learning rate — and two ways it bites" zh_gotit="看懂 learning rate 了" gotit="Got the learning rate"
 Picture walking down a hill into a valley, in the dark. You can't see the bottom, but you can *feel* the tilt of the ground under your boots. Before you set off you choose one rule — how **boldly** you turn that tilt into a step — and you are not allowed to change your mind halfway down. Choose timid and every step is a shuffle. Choose bold and steep ground launches you a long way. Here's the lovely part: with *one* setting, your steps are naturally long high on the steep slope and short down where the ground flattens. The steps shrink by themselves. What stays the same all walk long is the boldness.
 ~~~zh
 想象你在黑夜里走下一座山，往山谷里走。你看不见谷底，但你*感觉*得到靴子底下地面的倾斜。出发之前你选定一条规则 —— 你要多**大胆**地把这个倾斜变成一步 —— 而且走到一半不许改主意。选得胆小，每一步都是挪一挪。选得大胆，陡的地面会把你甩出很远。妙的地方在这里：只用*一个*设置，你在高处陡坡上的步子自然就长，走到地面变平的地方步子自然就短。步子会自己变小。整段路里没变的是那份胆量。
@@ -365,7 +365,7 @@ why: **Cause:** the learning rate was **too high**, so each step **overshoot**s 
 
 So the whole story turns on *how far* past the bottom you land. Here are the two cases side by side, with the distance-to-the-bottom written on each hop.
 ~~~zh
-那个胆量设置就是 [[learning rate（学习率）||每一次挪动的乘数：步长 = learning rate × gradient。也叫 step size（步长）。太大胆会把你甩过谷底；太胆小就只能爬]] —— 写成 `lr` —— 它乘在每一次挪动上，所以它决定了在任何给定的斜率上你**跨多大一步**。（你也会听到它被叫做 **step size**。）它是整个领域里被调得最多的一个数字：训练那个给你的视频排序的模型的团队，还有做刷脸解锁的团队，今天都在调这同一个旋钮。
+那个胆量设置就是 [[learning rate||每一次挪动的乘数：步长 = learning rate × gradient。也叫 step size（步长）。太大胆会把你甩过谷底；太胆小就只能爬]] —— 写成 `lr` —— 它乘在每一次挪动上，所以它决定了在任何给定的斜率上你**跨多大一步**。（你也会听到它被叫做 **step size**。）它是整个领域里被调得最多的一个数字：训练那个给你的视频排序的模型的团队，还有做刷脸解锁的团队，今天都在调这同一个旋钮。
 
 **这个比喻对的地方：**一个设置就决定了你是在爬、能到达，还是永远飞过谷底。
 
@@ -474,7 +474,7 @@ t3: 越过谷底没问题；落得比出发时更远就有问题。当这一步�
 旋钮搞定 —— 这样**六个陷阱里已经有两个**进了你的工具包。接下来：我们怎么*数*这些练习，又怎么知道什么时候该停？
 ~~~
 
-@@@ concept id=c5 zh_tag="数一数练了多少" tag="Counting practice" zh_title="epoch（轮次）、iteration（迭代），还有 loss curve（损失曲线）" title="Epochs, iterations, and the loss curve" zh_gotit="看懂 epoch 和曲线了" gotit="Got epochs & the curve"
+@@@ concept id=c5 zh_tag="数一数练了多少" tag="Counting practice" zh_title="epoch、iteration，还有 loss curve（损失曲线）" title="Epochs, iterations, and the loss curve" zh_gotit="看懂 epoch 和曲线了" gotit="Got epochs & the curve"
 Picture studying with a **deck of flashcards** before a test. Flipping *one* card and fixing what you got wrong is one small round of practice. Flipping through the *whole deck*, front to back, is one full pass. And you'd go through the deck many times before test day. Training counts practice in exactly those two units — it just gives them fancier names. Once you have the names you unlock the single most useful picture in all of machine learning: a plot of your own progress.
 ~~~zh
 想象考试前用**一叠单词卡**复习。翻*一张*卡，把答错的地方改过来，这是一小轮练习。把*整叠*从头翻到尾，是一次完整的过。而考试前你会把这叠卡过很多遍。训练数练习量用的正好是这两个单位 —— 只是名字花哨一点。有了名字，你就解锁了整个机器学习里最有用的一张图：你自己进度的曲线。
@@ -527,10 +527,10 @@ So far: iterations, epochs, and a number to plot. Here's what a *healthy* run lo
 三个短格子。第三个是回报。
 
 %%% steps
-step: 一张卡，一次修正 —— 一个 **iteration（迭代）**
-why: 一个 [[iteration（迭代）||forward → loss → backward → update 的一圈，也就是一次 weight 更新]]（也叫 **one step**）就是四步循环走一圈。所以一个 iteration 正好是**一次 update** —— 不多不少。
-step: 整叠过一遍 —— 一个 **epoch（轮次）**
-why: 一个 [[epoch（轮次）||把你全部训练数据完整过一遍 —— 很多个 iteration 连起来]] 就是把你所有训练数据**完整过一遍**。所以 100 个例子、每个 update 一次 = 一个 epoch 里 100 个 iteration。epoch 就是打成一捆的 iteration。
+step: 一张卡，一次修正 —— 一个 **iteration**
+why: 一个 [[iteration||forward → loss → backward → update 的一圈，也就是一次 weight 更新]]（也叫 **one step**）就是四步循环走一圈。所以一个 iteration 正好是**一次 update** —— 不多不少。
+step: 整叠过一遍 —— 一个 **epoch**
+why: 一个 [[epoch||把你全部训练数据完整过一遍 —— 很多个 iteration 连起来]] 就是把你所有训练数据**完整过一遍**。所以 100 个例子、每个 update 一次 = 一个 epoch 里 100 个 iteration。epoch 就是打成一捆的 iteration。
 step: 每一圈之后把 loss 记下来，然后**把 loss 画出来**
 why: 那张图就是你的进度报告。因为 loss 是每圈一个数字，你真的可以**看着它往下掉** —— 网络的全部教育写在一条线上。
 %%%
@@ -864,7 +864,7 @@ why: 背答案会让训练 loss 变小！这意味着你一直开心地盯着的
 step: 警报 —— 留一片数据出来，也给它打分
 why: 在 [[validation set（验证集）||从训练里留出来的一片数据，只用来检查网络对它从没练过的数据表现如何]] 上网络从没练过，所以背答案在那里帮不上忙。因此背答案一开始，**validation loss 就会上升**，而训练 loss 还在下降。两条曲线分叉 —— 这个分叉就是你的警铃。
 step: 修法 —— **early stopping（早停）**
-why: [[early stopping（早停）||当 validation loss 不再变好、开始上升时就停下训练 —— 正好在背答案接管之前]] 意思是你在分叉处停手：**validation 不再变好就停**，然后保留在**留出**数据上分数最好的那个版本，而不是背得最好的那个。
+why: [[early stopping||当 validation loss 不再变好、开始上升时就停下训练 —— 正好在背答案接管之前]] 意思是你在分叉处停手：**validation 不再变好就停**，然后保留在**留出**数据上分数最好的那个版本，而不是背得最好的那个。
 %%%
 
 %%% insight
@@ -1010,8 +1010,8 @@ Here's the one picture to keep — the four steps, the dial, the curve, and wher
 - **第 2 步 · loss** —— 量偏差：用一个数字说这次猜得有多错。
 - **第 3 步 · backward** —— 往哪边偏了：backpropagation 把 gradient 发给每一个 weight。
 - **第 4 步 · update** —— 挪准星：`w ← w − lr × gradient`；那个**减号**让你往下坡走。
-- 在 **iteration（迭代）**（一次 update，在一个 batch 上 —— 今天的 batch 是一个例子）和 **epoch（轮次）**（完整过一遍）上**重复**，看着 **loss curve** 下降并变平（**converge，收敛**）。
-- **learning rate（学习率）**是乘在每次挪动上的乘数；**perceptron（感知机）**（1958）是那个只在做错时才修正的粗糙祖先。
+- 在 **iteration**（一次 update，在一个 batch 上 —— 今天的 batch 是一个例子）和 **epoch**（完整过一遍）上**重复**，看着 **loss curve** 下降并变平（**converge，收敛**）。
+- **learning rate**是乘在每次挪动上的乘数；**perceptron**（1958）是那个只在做错时才修正的粗糙祖先。
 
 这是要留住的那一张图 —— 四个步骤、那个旋钮、那条曲线，以及每个陷阱打在哪里。
 ~~~
@@ -1122,7 +1122,7 @@ q: Training loss keeps falling but validation loss starts rising. What is happen
 四个快问题，每题都会立刻给你反馈 —— 四题都答完就算今天完成。（如果有一题卡住你，那是一个往回滚的提示，不是不及格。）
 
 %%% quiz
-q: training loop 的四个步骤，按顺序是什么？ | a:2 | loss → forward → update → backward | update → backward → loss → forward | forward pass → loss → backward pass → update | backward → update → forward → loss | fb: 一圈是 forward（出手）→ loss（量偏差）→ backward（往哪边偏了？）→ update（挪准星），然后重复。就是那个罚球练习：试、量、改、再来。
+q: training loop 的四个步骤，按顺序是什么？ | a:2 | loss → forward → update → backward | update → backward → loss → forward | forward pass → loss → backward pass → update | backward → update → forward → loss | fb: 一圈是 forward（出手）→ loss（量偏了多少）→ backward（往哪边偏了？）→ update（挪准星），然后重复。就是那个罚球练习：试、量、改、再来。
 q: 在 update 规则 w ← w − lr × gradient 里，那个减号做什么，lr 又控制什么？ | a:1 | 减号让训练更快；lr 决定有几层 | gradient 指上坡，所以减号让 weight 往下坡走（走向更小的 loss）；lr 是乘在这一步上的乘数 —— 每次挪动有多大胆 | 减号删掉不好的 weight；lr 是 epoch 的个数 | 减号只是写法，没有作用；lr 就是 loss 的值 | fb: gradient 指的是**上坡**（loss 更大的方向），所以减掉它就让 weight 往下坡走，走向更小的 loss。learning rate 乘在这一步上：太大胆会冲过头直到 loss 发散，太胆小训练就只能爬。
 q: 你的 loss 每一圈都爬得更高，最后炸成 NaN。哪里出错了，怎么修？ | a:2 | learning rate 太低；解法：再降低一些 | epoch 太少；解法：把数据打乱 | learning rate 太高 —— 每一步冲过头的距离超过剩余距离的两倍，所以 weight 每圈都落得更远，loss 就往上爬；解法：降低 learning rate（或者用一个随时间缩小它的 schedule） | gradient 没清零；解法：训练更多 epoch | fb: loss 一圈一圈变大，意味着每一步把 weight 带过谷底的距离**超过**它原来离谷底的距离，所以 weight 在谷底两侧弹，而且每次落得更远。（稍微越过谷底是无害的 —— 球会来回折，但还是会停下。）这就是那个经典的 learning rate 太高：把它降下来，或者用一个 schedule（decay），让早期的步子大胆求快、后期的步子温柔好停。
 q: 训练 loss 一直在降，但 validation loss 开始上升。这是在发生什么，处方是什么？ | a:1 | learning rate 太低；处方：提高它 | 网络在 overfitting —— 在背训练数据而不是学规律；处方：early stopping（validation loss 不再变好就停） | gradient 堆起来了；处方：每一圈清零 | 这个 neuron 表示不了目标；处方：把数据打乱 | fb: 两条曲线分叉的时候 —— 训练 loss 往下，validation loss 往上 —— 网络已经不在学规律，开始背训练例子了。这就是 overfitting。early stopping 正好在分叉处停手，留下推广得最好的那个版本。

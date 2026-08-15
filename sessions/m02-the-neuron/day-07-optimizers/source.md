@@ -59,7 +59,7 @@ q: From yesterday: what does the learning rate control, and what if it is too bi
 
 ~~~zh
 %%% warmup
-q: 接着昨天：训练循环的四步按顺序是什么？ | a:2 | loss → forward → update → backward | update → backward → loss → forward | forward → loss → backward → update | backward → forward → update → loss | concept: training-loop | fb: 一圈是 forward（出手）→ loss（量偏了多少）→ backward（往哪边偏）→ update（调准星），然后重复。
+q: 接着昨天：训练循环的四步按顺序是什么？ | a:2 | loss → forward → update → backward | update → backward → loss → forward | forward → loss → backward → update | backward → forward → update → loss | concept: training-loop | fb: 一圈是 forward（出手）→ loss（量偏了多少）→ backward（往哪边偏了？）→ update（挪准星），然后重复。
 q: 接着昨天：在「w ← w − lr × gradient」里，那个减号在做什么？ | a:1 | 它删掉坏的 weight | gradient 指向上坡，所以减号把 weight 往下坡推、走向更小的 loss | 它只是个记号，没有作用 | 它在数 epoch | concept: update-rule | fb: gradient 指向 loss 更大的上坡方向，所以减掉它就是让 weight 往下坡走。
 q: 接着昨天：learning rate 控制什么，太大了会怎样？ | a:0 | 每一圈的步长 —— 太大就会迈过头，loss 可能炸掉 | 层数 —— 太大就加神经元 | 哪边是下坡 —— 太大就把符号翻过来 | loss 的值本身 —— 太大就是零 loss | concept: learning-rate | fb: learning rate 就是步长；太大的话每一次轻推都迈过谷底，于是 loss 来回震荡然后发散。
 %%%
@@ -68,7 +68,7 @@ q: 接着昨天：learning rate 控制什么，太大了会怎样？ | a:0 | 每
 @@@ concept id=c1 zh_tag="朴素的一步" tag="The plain step" zh_title="梯度下降 —— 球最原始的下坡一步" title="Gradient descent — the ball's raw downhill step" zh_gotit="懂了朴素的一步" gotit="Got the plain step"
 Let us start with the plainest way to roll the marble — the one already sitting inside yesterday's loop. Crouch down next to the ball and look at the ground right under it. Which way does it tip? *That* is the way the ball wants to go: downhill, toward less "how wrong am I." The plainest optimizer does that and nothing else. Feel the tilt under the ball, slide the ball a little way downhill, repeat. How far it slides each time comes from one number — the [[learning rate||the step size: how far the ball moves each step. Written "lr". A bigger lr takes bigger slides, a smaller lr takes smaller slides]] — which simply scales the slope before it moves the weight. This roll-with-the-tilt move is called **gradient descent**.
 ~~~zh
-我们先从让弹珠滚起来最朴素的办法开始 —— 也就是昨天那个循环里已经装着的那个。蹲到球旁边，看看它正下方的地面。它朝哪边倾？*那*就是球想去的方向：下坡，走向更小的「我错得多厉害」。最朴素的优化器就做这件事，别的都不做。感受球下面的倾斜，把球往下坡挪一小段，重复。它每次挪多远，来自一个数字 —— [[learning rate||步长：球每一步走多远。写作 "lr"。lr 越大每次挪得越远，越小挪得越近]] —— 它只是在移动 weight 之前把斜率缩放一下。这个「顺着倾斜滚」的动作叫做 **gradient descent（梯度下降）**。
+我们先从让弹珠滚起来最朴素的办法开始 —— 也就是昨天那个循环里已经装着的那个。蹲到球旁边，看看它正下方的地面。它朝哪边倾？*那*就是球想去的方向：下坡，走向更小的「我错得多厉害」。最朴素的优化器就做这件事，别的都不做。感受球下面的倾斜，把球往下坡挪一小段，重复。它每次挪多远，来自一个数字 —— [[learning rate||步长：球每一步走多远。写作 "lr"。lr 越大每次挪得越远，越小挪得越近]] —— 它只是在移动 weight 之前把斜率缩放一下。这个「顺着倾斜滚」的动作叫做 **gradient descent**。
 ~~~
 
 %%% svg
@@ -111,13 +111,13 @@ Now *you* drive the marble. Below is a real valley with a **learning rate** slid
 **它在哪里不成立：** 真弹珠有重量，会自己继续滚。朴素的 gradient descent *完全没有记忆* —— 每一步只感受它站的地方的倾斜，上一步转身就忘。（给它记忆正好就是下一个升级。）
 
 #### 整个动作，一级一级来
-这条规则用大白话讲就是一句短话：**新 weight = 老 weight − learning rate × 斜率。** 我们慢慢走，一级只挪一小步，别让任何东西溜过去。
+这条规则用大白话讲就是一句短话：**新 weight = 老 weight − learning rate × 斜率。** 我们慢慢走，一级只挪一小步，别让任何东西从你眼前溜过去。
 
 %%% steps
 step: 感受倾斜
 why: 球下面的斜率（也就是 *gradient*）告诉你地面朝哪边升高
 step: 转过身
-why: 我们想去更低的地方，所以往相反方向走 —— 那个减号就是干这个的
+why: 我们想去更低的地方，所以往相反方向走 —— 那个减号就是带你往下坡的
 step: 走一段，长短由 lr 定
 why: 斜率给出方向和陡度，learning rate 决定你顺着它走多远
 step: 新 weight = 老 weight − learning rate × 斜率
@@ -195,7 +195,7 @@ Before we make the ball smarter, that honest question: the tilt of *what*? Pictu
 ~~~
 
 %%% svg
-<svg viewBox="0 0 520 196" role="img" aria-label="Three ways a class decides which way to walk. Left: ask the whole class, all student icons highlighted, labelled batch, accurate but slow. Middle: ask one random student, one icon highlighted, labelled stochastic, fast but noisy. Right: ask a small handful, a few icons highlighted, labelled mini-batch, the practical middle."><g font-family="monospace" font-size="9.5"><text class="lang-en" x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">How many classmates do you ask before each step?</text><text class="lang-zh" x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">每走一步之前你问几个同学？</text><rect x="14" y="30" width="158" height="150" rx="6" fill="#FDECEC" stroke="#C93B3B"/><text class="lang-en" x="93" y="50" text-anchor="middle" fill="#C93B3B">ask the WHOLE class</text><text class="lang-zh" x="93" y="50" text-anchor="middle" fill="#C93B3B">问全班</text><g fill="#C93B3B"><circle cx="46" cy="78" r="7"/><circle cx="72" cy="78" r="7"/><circle cx="98" cy="78" r="7"/><circle cx="124" cy="78" r="7"/><circle cx="59" cy="102" r="7"/><circle cx="85" cy="102" r="7"/><circle cx="111" cy="102" r="7"/><circle cx="46" cy="126" r="7"/><circle cx="72" cy="126" r="7"/><circle cx="98" cy="126" r="7"/><circle cx="124" cy="126" r="7"/></g><text class="lang-en" x="93" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">batch: accurate, but slow</text><text class="lang-zh" x="93" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">batch：准，但慢</text><rect x="182" y="30" width="156" height="150" rx="6" fill="#FDF3D6" stroke="#C99A12"/><text class="lang-en" x="260" y="50" text-anchor="middle" fill="#9A7208">ask ONE student</text><text class="lang-zh" x="260" y="50" text-anchor="middle" fill="#9A7208">问一个学生</text><g fill="#D8CFBE"><circle cx="216" cy="78" r="7"/><circle cx="242" cy="78" r="7"/><circle cx="294" cy="78" r="7"/><circle cx="229" cy="102" r="7"/><circle cx="281" cy="102" r="7"/><circle cx="216" cy="126" r="7"/><circle cx="294" cy="126" r="7"/></g><circle cx="268" cy="78" r="9" fill="#C99A12"/><text class="lang-en" x="260" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">stochastic: fast, but noisy</text><text class="lang-zh" x="260" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">stochastic：快，但吵</text><rect x="348" y="30" width="158" height="150" rx="6" fill="#EAF5EE" stroke="#2D8B55"/><text class="lang-en" x="427" y="50" text-anchor="middle" fill="#1a5c38">ask a HANDFUL</text><text class="lang-zh" x="427" y="50" text-anchor="middle" fill="#1a5c38">问一小把</text><g fill="#C7DDCB"><circle cx="382" cy="78" r="7"/><circle cx="460" cy="78" r="7"/><circle cx="395" cy="102" r="7"/><circle cx="382" cy="126" r="7"/><circle cx="460" cy="126" r="7"/></g><g fill="#2D8B55"><circle cx="408" cy="78" r="7"/><circle cx="434" cy="78" r="7"/><circle cx="447" cy="102" r="7"/></g><text class="lang-en" x="427" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">mini-batch: the sweet spot</text><text class="lang-zh" x="427" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">mini-batch：那个甜点</text></g></svg>
+<svg viewBox="0 0 520 196" role="img" aria-label="Three ways a class decides which way to walk. Left: ask the whole class, all student icons highlighted, labelled batch, accurate but slow. Middle: ask one random student, one icon highlighted, labelled stochastic, fast but noisy. Right: ask a small handful, a few icons highlighted, labelled mini-batch, the practical middle."><g font-family="monospace" font-size="9.5"><text class="lang-en" x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">How many classmates do you ask before each step?</text><text class="lang-zh" x="260" y="16" text-anchor="middle" fill="#2C2A28" font-size="12">每走一步之前你问几个同学？</text><rect x="14" y="30" width="158" height="150" rx="6" fill="#FDECEC" stroke="#C93B3B"/><text class="lang-en" x="93" y="50" text-anchor="middle" fill="#C93B3B">ask the WHOLE class</text><text class="lang-zh" x="93" y="50" text-anchor="middle" fill="#C93B3B">问全班</text><g fill="#C93B3B"><circle cx="46" cy="78" r="7"/><circle cx="72" cy="78" r="7"/><circle cx="98" cy="78" r="7"/><circle cx="124" cy="78" r="7"/><circle cx="59" cy="102" r="7"/><circle cx="85" cy="102" r="7"/><circle cx="111" cy="102" r="7"/><circle cx="46" cy="126" r="7"/><circle cx="72" cy="126" r="7"/><circle cx="98" cy="126" r="7"/><circle cx="124" cy="126" r="7"/></g><text class="lang-en" x="93" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">batch: accurate, but slow</text><text class="lang-zh" x="93" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">batch：准，但慢</text><rect x="182" y="30" width="156" height="150" rx="6" fill="#FDF3D6" stroke="#C99A12"/><text class="lang-en" x="260" y="50" text-anchor="middle" fill="#9A7208">ask ONE student</text><text class="lang-zh" x="260" y="50" text-anchor="middle" fill="#9A7208">问一个学生</text><g fill="#D8CFBE"><circle cx="216" cy="78" r="7"/><circle cx="242" cy="78" r="7"/><circle cx="294" cy="78" r="7"/><circle cx="229" cy="102" r="7"/><circle cx="281" cy="102" r="7"/><circle cx="216" cy="126" r="7"/><circle cx="294" cy="126" r="7"/></g><circle cx="268" cy="78" r="9" fill="#C99A12"/><text class="lang-en" x="260" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">stochastic: fast, but noisy</text><text class="lang-zh" x="260" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">stochastic：快，但吵</text><rect x="348" y="30" width="158" height="150" rx="6" fill="#EAF5EE" stroke="#2D8B55"/><text class="lang-en" x="427" y="50" text-anchor="middle" fill="#1a5c38">ask a HANDFUL</text><text class="lang-zh" x="427" y="50" text-anchor="middle" fill="#1a5c38">问一小把</text><g fill="#C7DDCB"><circle cx="382" cy="78" r="7"/><circle cx="460" cy="78" r="7"/><circle cx="395" cy="102" r="7"/><circle cx="382" cy="126" r="7"/><circle cx="460" cy="126" r="7"/></g><g fill="#2D8B55"><circle cx="408" cy="78" r="7"/><circle cx="434" cy="78" r="7"/><circle cx="447" cy="102" r="7"/></g><text class="lang-en" x="427" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">mini-batch: the sweet spot</text><text class="lang-zh" x="427" y="158" text-anchor="middle" fill="#6B645E" font-size="8.5">mini-batch：那个最佳点</text></g></svg>
 %%%
 
 **What the class-vote picture gets right:** more voices means a truer direction but a slower decision, and one voice is quick but jumpy — that trade is real. **Where it breaks down:** in a real class everyone can shout at once; a network's "asking" means doing maths on each example, so asking more genuinely costs more time and memory. That cost is exactly why the middle option won.
@@ -243,7 +243,7 @@ So the modern default is *mini-batch* SGD: sample a small batch, take the plain 
 **班级投票这个比喻对在哪里：** 声音越多方向越真但决定越慢，一个声音快但跳 —— 这个取舍是真的。**它在哪里不成立：** 真班里所有人可以同时喊；而网络的「问」意味着对每个样本做数学，所以问得越多真的越费时间和内存。正是这个成本让中间那个选项赢了。
 
 #### 三种口味，用网络的话说
-每种口味只是在决定「走一步之前在多少个样本上测倾斜」。同一个班，三种投票规模：
+每种口味只是在决定：走一步之前，你在多少个样本上测倾斜。同一个班，三种投票规模：
 
 %%% steps
 step: Batch gradient descent —— 问全班
@@ -275,7 +275,7 @@ code: n = 1_000_000  # 数据集大小；成本 ≈ 每步摸过的样本数
 out: batch      :         1 步  每过一遍数据
      mini-batch :    15,625 步 每过一遍数据
      sgd        : 1,000,000 步 每过一遍数据
-take: <b>同样的数据预算，步数差得离谱。</b>Full-batch 每过一遍只买到一步；mini-batch（一次 64 个）买到约 15,625 步；纯 SGD 买到一百万步。这就是我们抽样的原因 —— 很多粗糙的步子几乎总比一个完美的步子学得快。Mini-batch 是那个甜点：步数多，而那一小把的平均让每一步还算稳。
+take: <b>同样的数据预算，步数差得离谱。</b>Full-batch 每过一遍只买到一步；mini-batch（一次 64 个）买到约 15,625 步；纯 SGD 买到一百万步。这就是我们抽样的原因 —— 很多粗糙的步子几乎总比一个完美的步子学得快。Mini-batch 是那个最佳点：步数多，而那一小把的平均让每一步还算稳。
 %%%
 
 如果那个差距的大小让你吓了一跳，很好 —— 它让大多数人都吓一跳，而它就是那个唯一的事实，解释了为什么现在没人再在每一步上用整个数据集。
@@ -756,7 +756,7 @@ One picture to keep: same hill, smarter ways down it.
 你刚刚把一个朴素的下坡一步，变成了一小家子聪明的步子 —— 而它们每一个仍然只是一颗**滚动的球**在「我错得多厉害」这座山上往下滚，只是滚得更聪明。整条线索，五个拍子：
 
 - **朴素的一步。** 感受球下面的倾斜，往下坡挪一点：*新 weight = 老 weight − learning rate × 斜率。* learning rate 就是步长。
-- **三种口味。** *Batch* 问全部数据（准、慢），*SGD* 问一个样本（快、吵），*mini-batch* 问一小把（日常的甜点）。我们抽样，因为很多粗糙的步子胜过一个完美的步子。
+- **三种口味。** *Batch* 问全部数据（准、慢），*SGD* 问一个样本（快、吵），*mini-batch* 问一小把（日常的最佳点）。我们抽样，因为很多粗糙的步子胜过一个完美的步子。
 - **Momentum。** 保留一个持续的速度，于是稳定的下坡会*攒速度*，左右的弹跳会*抵消* —— 它压住 Z 字形，也治好走得太慢的爬行。
 - **RMSProp 和 Adam。** 给每个 weight 自己的步幅，从它自己最近的斜率量出来。**Adam = Momentum + RMSProp**，你听过的大多数模型背后的默认选择。
 - **那些失败，和那道墙。** 速率太大 → 迈过头并炸掉（解药：更小的速率，或者一个让它衰减的 *schedule*）。太小 → 爬行（解药：更大的速率、momentum，或者一个自适应优化器）。以及那个天花板：优化器*只跟着它被给的 gradient 走* —— 它没法修一个糟糕的 loss、没法分开 XOR、也没法承诺全局最低点。

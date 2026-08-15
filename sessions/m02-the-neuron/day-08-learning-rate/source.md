@@ -55,7 +55,7 @@ q: What is Adam, the optimizer people reach for first? | a:3 | plain SGD with a 
 ~~~zh
 %%% warmup
 q: 昨天你见了 Momentum。它给朴素的下坡一步加了什么？ | a:1 | 一个更大的训练数据集 | 一个持续的速度 —— 最近斜率的记忆 | 第二个要最小化的 loss | 卡住时随机重启 | concept: momentum | fb: Momentum 保留一个持续的速度，于是稳定下坡攒速度，左右弹跳互相抵消。
-q: batch、stochastic（SGD）、mini-batch 里，日常默认是哪个？ | a:2 | full-batch —— 每步之前用全部数据 | 整个训练只走一大步 | mini-batch —— 每步一小把样本 | 完全不走步，只看一眼 | concept: mini-batch | fb: Mini-batch 是那个甜点：步数多，而那一小把的平均让每一步还算稳。
+q: batch、stochastic（SGD）、mini-batch 里，日常默认是哪个？ | a:2 | full-batch —— 每步之前用全部数据 | 整个训练只走一大步 | mini-batch —— 每步一小把样本 | 完全不走步，只看一眼 | concept: mini-batch | fb: Mini-batch 是那个最佳点：步数多，而那一小把的平均让每一步还算稳。
 q: Adam 是什么，为什么人们第一个伸手拿它？ | a:3 | plain SGD 配一个大得多的学习率 | 一种改 loss 函数的办法 | 一个只能 full-batch 的方法 | Momentum + RMSProp 合在一起 —— 速度加上每 weight 的步子 | concept: adam | fb: Adam 把 Momentum 的持续速度和 RMSProp 的每 weight 步幅合起来，所以每个 weight 两样都有。
 %%%
 ~~~
@@ -131,7 +131,7 @@ expr: new_weight = old_weight − learning_rate × gradient
 note: gradient = 方向（哪边是下坡、有多陡）。learning_rate = 你跨多远。那个减号让你往下坡走。这和训练你那个单个神经元的 weight 与 bias 是完全同一个步子。
 %%%
 
-我们用很小的真实数字看一遍，让这句话变具体。假设一个 weight 是 `old_weight = 2.0`，gradient（斜率）是 `4.0`。*只*改学习率，看这一跳把 weight 挪多远：
+我们用很小的真实数字看一遍，让这句话变具体。假设一个 weight 是 `old_weight = 2.0`，gradient（梯度）是 `4.0`。*只*改学习率，看这一跳把 weight 挪多远：
 
 %%% demo id=lrhopzh label="先猜，再展开"
 predict: 老 weight 2.0，gradient 4.0，learning rate 0.1 —— 这一跳把 weight 挪多远：0.04、0.4，还是 4.0？先猜再看。
@@ -340,7 +340,7 @@ why: 规则里没有任何东西会拦住它，所以数字一路翻倍上去，
 Now you can *feel* both failures and the sweet spot between them in one place. This is a real valley (loss `= weight²`) with a **learning rate slider**. Drag it *small* and watch the ball inch down in tiny crawling steps. Drag it *big* and watch each step overshoot the bottom and climb the far wall. Somewhere in between it slides down and settles. **Predict** what happens at each end *before* you drag — then check yourself:
 ~~~zh
 #### 整张图 —— 一个旋钮，三种结果
-现在你可以在一个地方*感受*两个失败和它们中间那个甜点。这是一个真实的山谷（loss `= weight²`），带一个 **learning rate 滑块**。往*小*拖，看球一小步一小步地爬下去。往*大*拖，看每一步都迈过谷底、爬上对面的墙。在中间某处它会滑下去并安顿。在你拖之前**先预测**两端会发生什么 —— 然后检查你自己：
+现在你可以在一个地方*感受*两个失败和它们中间那个最佳点。这是一个真实的山谷（loss `= weight²`），带一个 **learning rate 滑块**。往*小*拖，看球一小步一小步地爬下去。往*大*拖，看每一步都迈过谷底、爬上对面的墙。在中间某处它会滑下去并安顿。在你拖之前**先预测**两端会发生什么 —— 然后检查你自己：
 ~~~
 
 %%% svg
