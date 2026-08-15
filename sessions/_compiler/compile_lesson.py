@@ -118,6 +118,20 @@ def main():
             for m in cmsgs: log('  ', m)
         except Exception as e:
             log('   coverage gate skipped:', e)
+        # -- Language Parity Gate (HARD once the day declares Chinese) --
+        # Inert on an English-only day, so it cannot block the 41 days that have no
+        # Chinese yet; the moment a source contains a ~~~zh fence or a zh_ key it
+        # must be COMPLETE, because half-Chinese is the failure mode that ships a
+        # page which looks finished and teaches less.
+        try:
+            import lang_parity_gate
+            pok, pmsgs = lang_parity_gate.run(open(args.source, encoding='utf-8').read())
+            log('\n-- Language Parity Gate --')
+            for m in pmsgs: log('  ', m)
+            if not pok:
+                sok = False; log('   language parity FAILED')
+        except Exception as e:
+            log('   language parity gate skipped:', e)
         # -- Visual Integrity Gate (HARD) : block a visual that would render blank --
         # Catches viz embeds whose file/JS-dep is missing, whose height-sender
         # protocol drifted, or inline SVGs that draw nothing — the "compiles green

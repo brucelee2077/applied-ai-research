@@ -41,6 +41,11 @@
 # CLI:       python3 gates/beginner_language_gate.py <source.md>   (exit 0/5)
 # =============================================================================
 import sys, os, re, glob
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from v8lib import CJK_RE as _CJK_RE
+except Exception:                                    # pragma: no cover
+    _CJK_RE = re.compile(r'[一-鿿]')
 
 # --- axis 1 lexicons (repo CLAUDE.md s5) ------------------------------------
 # Dismissive: tells the reader their confusion is illegitimate.
@@ -55,8 +60,39 @@ _IDIOMS = [
     'a piece of cake', 'in a nutshell', 'the elephant in the room',
     'bread and butter', 'low-hanging fruit',
 ]
+# --- axis 1, Chinese ---------------------------------------------------------
+# Chinese was measured to fail open on two of the four axes: the English lists hit
+# nothing, `.lower()` is a no-op on Han, and `[^.!?\n]+` + `.split()` scored a
+# 51-character Chinese sentence as ONE word in ONE sentence, so the run-on check
+# was provably dead. These are the Chinese equivalents of the same two rules.
+_ZH_BANNED = [
+    '显然', '很显然', '不难看出', '不难发现', '众所周知', '不言而喻', '如你所见',
+    '一目了然', '稍加思考', '留给读者', '读者自证', '自不必说', '无需多言', '这只是',
+]
+# 成语 and set literary phrases. For a 12-year-old these are the Chinese analogue of
+# an English idiom: four characters that assume a shared cultural reference the
+# reader may not have, and that cannot be worked out from the parts.
+_ZH_IDIOMS = [
+    '一举两得', '举一反三', '水到渠成', '事半功倍', '牵一发而动全身', '一石二鸟',
+    '提纲挈领', '化繁为简', '不胜枚举', '大同小异', '一蹴而就', '立竿见影',
+    '顺理成章', '相辅相成', '一劳永逸', '万变不离其宗',
+]
+# Chinese verbs that oversell a %%% demo, which only un-hides a pre-baked answer.
+# Verified: the English `\b(run|execute|compute)\b` cannot match 运行一下 — no word
+# boundaries exist in Chinese — so demo honesty passed on any Chinese label.
+_ZH_RUNNY = ['运行', '执行', '跑一下', '跑一遍', '计算出', '算出来', '真的算']
+
 _MAX_SENTENCE_WORDS = 45   # generous: flags genuine run-ons, not normal prose
+# Chinese sentences are measured in CHARACTERS, split on 。！？；— not on . ! ?
+# A further rule is needed that English does not need: Chinese writers legitimately
+# chain clauses with 逗号, so a "sentence" can be one idea or six. Measured on a real
+# 58-character sample, splitting on 。！？； alone still yielded ONE segment. So a
+# comma-chain is counted too.
+_MAX_ZH_SENTENCE_CHARS = 60
+_MAX_ZH_COMMAS = 4
 _MAX_MAIN_WALL = 600       # matches _density_scan.py's walls_over_600 threshold
+                           # (both are ENGLISH-CHARACTER EQUIVALENTS — see
+                           #  v8lib.text_weight, which _density_scan now applies)
 
 _INTERACTIVE_SRC = re.compile(r'(?m)^%%%\s+viz\b')
 _INTERACTIVE_INLINE = re.compile(r'<input[^>]+type="(range|checkbox)"', re.I)
@@ -231,9 +267,15 @@ def run(source_text, notebook_exists=False, source_path=None):
     # SVG labels); walls + run-ons are measured on main-line prose only. Two views,
     # because they answer two different questions.
     hits = []
-    low = _reader_visible_words(body).lower()
+    visible = _reader_visible_words(body)
+    low = visible.lower()
     for phrase in _BANNED + _IDIOMS:
         for m in re.finditer(re.escape(phrase), low):
+            hits.append((phrase, m.start()))
+    # Chinese: match on the UNLOWERED text — .lower() does nothing to Han, and
+    # lowering is meaningless for these literals.
+    for phrase in _ZH_BANNED + _ZH_IDIOMS:
+        for m in re.finditer(re.escape(phrase), visible):
             hits.append((phrase, m.start()))
     if hits:
         shown = ', '.join(sorted({h[0] for h in hits}))
@@ -251,6 +293,24 @@ def run(source_text, notebook_exists=False, source_path=None):
         words = [w for w in seg.split() if any(c.isalnum() for c in w)]
         if len(words) > _MAX_SENTENCE_WORDS:
             long_sents.append((len(words), ' '.join(words[:12])))
+    # Chinese sentences: split on 。！？； and measure CHARACTERS, plus a comma-chain
+    # rule. Both are needed — see the constants above for the measurements.
+    zh_long = []
+    for m in re.finditer(r'[^。！？；\n]+', main_prose):
+        seg = m.group(0).strip()
+        han = len(_CJK_RE.findall(seg))
+        if han < 8:                       # not a Chinese sentence; the English rule owns it
+            continue
+        commas = seg.count('，') + seg.count('、')
+        if han > _MAX_ZH_SENTENCE_CHARS:
+            zh_long.append(('%d 汉字' % han, seg[:16]))
+        elif commas > _MAX_ZH_COMMAS:
+            zh_long.append(('%d 个逗号' % commas, seg[:16]))
+    if zh_long:
+        msgs.append('warn plain language (Chinese): %d main-line sentence(s) over %d 汉字 '
+                    'or with more than %d commas (worst %s: "%s…") — one idea per sentence'
+                    % (len(zh_long), _MAX_ZH_SENTENCE_CHARS, _MAX_ZH_COMMAS,
+                       zh_long[0][0], zh_long[0][1]))
     if long_sents:
         worst = max(long_sents)
         # ADVISORY, not blocking: a colon-introduced list legitimately reads as one
@@ -279,7 +339,8 @@ def run(source_text, notebook_exists=False, source_path=None):
     dishonest = []
     for m in _DEMO_HDR.finditer(body):
         lm = _LABEL.search(m.group(1))
-        if lm and _RUNNY.search(lm.group(1)):
+        if lm and (_RUNNY.search(lm.group(1))
+                   or any(v in lm.group(1) for v in _ZH_RUNNY)):
             dishonest.append(lm.group(1))
     if dishonest:
         fail('demo honesty: %d %%%% demo label(s) promise execution on a widget that '

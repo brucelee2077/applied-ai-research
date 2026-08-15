@@ -82,6 +82,23 @@ def _strip_markup(text):
     return CALLOUT_BLOCK_RE.sub('\n\n', out)
 
 
+# --- CJK-aware length -------------------------------------------------------
+# The 600-character thresholds below were calibrated on English prose measured with
+# len(). A Han character carries about 2.3 English characters' worth of text
+# (measured — see v8lib.text_weight), so counting raw characters makes every wall
+# limit ~2.3x more permissive on a Chinese lesson: a 600-Han-character wall reads
+# like a 1380-character English one and passes. Measuring in English-character
+# EQUIVALENTS keeps ONE calibrated number and handles the mixed EN/ZH text every
+# Chinese lesson has, because technical terms stay in English by design.
+try:
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '_compiler'))
+    from v8lib import text_weight as _w
+except Exception:                                   # pragma: no cover
+    def _w(t):                                      # fall back to raw length, never crash a scan
+        return len(t or '')
+
+
 def _worst_run(prose):
     """Longest paragraph with no chunk boundary and no blank line."""
     worst = 0
@@ -90,12 +107,12 @@ def _worst_run(prose):
         if not stripped or BREAK_RE.match(stripped):
             continue
         # a paragraph that is one long block of prose IS the wall
-        worst = max(worst, len(stripped))
+        worst = max(worst, _w(stripped))
     return worst
 
 
 def longest_wall(text):
-    """Longest run of MAIN-LINE prose (chars) with no chunk boundary.
+    """Longest run of MAIN-LINE prose, in ENGLISH-CHARACTER EQUIVALENTS.
 
     Widget bodies (raw SVG, demo key:value lines, steps rungs) are stripped
     first — a 4k-char inline <svg> is not a wall of text for the reader, it is
@@ -105,7 +122,7 @@ def longest_wall(text):
 
 
 def aside_wall(text):
-    """Longest unbroken run INSIDE callout boxes ("Optional (skippable)" asides).
+    """Longest unbroken run INSIDE callout boxes, in English-character equivalents.
 
     A boxed aside off the critical path is a milder problem than a main-line
     wall, and it has a cheaper fix (break it internally with <br> and bold
@@ -117,7 +134,7 @@ def aside_wall(text):
         body = re.sub(r'(?m)^!!!.*$', '', block)              # drop both fences
         body = RAW_HTML_RE.sub('\n\n', WIDGET_BLOCK_RE.sub('\n\n', body))
         for run in re.split(r'<br\s*/?>|\n\s*\n', body):      # <br> is a real line break
-            worst = max(worst, len(run.strip()))
+            worst = max(worst, _w(run.strip()))
     return worst
 
 

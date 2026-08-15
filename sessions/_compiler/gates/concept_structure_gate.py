@@ -14,9 +14,15 @@
 # Reusable:  from concept_structure_gate import run ; ok, msgs = run(source_text)
 # CLI:       python3 gates/concept_structure_gate.py <source.md>   (exit 0/3)
 # =============================================================================
-import sys, re
+import sys, os, re
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import v8lib
 
-_MIN_PROSE = 40  # chars of real prose required on each side of the visual (tunable)
+# English-character EQUIVALENTS of real prose required on each side of the visual.
+# Measured with v8lib.text_weight, not len(): 40 Han characters is roughly 92
+# English characters' worth of text, so a raw len() check is ~2.3x stricter on a
+# Chinese lesson than the number it was calibrated as.
+_MIN_PROSE = 40
 _VIS_OPEN = re.compile(r'^%%%\s+(svg|viz)\b', re.MULTILINE)
 _SVG_CLOSED = re.compile(r'<svg[\s>].*?</svg>', re.DOTALL)
 _WIDGET = re.compile(r'%%%.*?%%%', re.DOTALL)  # strip any widget when measuring prose
@@ -71,7 +77,7 @@ def run(source_text):
             continue
 
         intro = _WIDGET.sub('', text[:first.start()]).strip()
-        chk(len(intro) >= _MIN_PROSE, 'concept %s has intro prose before its visual' % cid)
+        chk(v8lib.text_weight(intro) >= _MIN_PROSE, 'concept %s has intro prose before its visual' % cid)
 
         # find where the first visual ends, then measure build-up after it
         if first is vis:
@@ -84,7 +90,7 @@ def run(source_text):
         # content widget (%%% steps / demo / mathladder / a 2nd svg-viz) — a narrated
         # %%% steps worked-example IS substantial build-up even with no surrounding prose.
         has_bw = bool(_BUILDUP_CONTENT.search(after))
-        chk(len(buildup) >= _MIN_PROSE or has_bw, 'concept %s has build-up after its visual' % cid)
+        chk(v8lib.text_weight(buildup) >= _MIN_PROSE or has_bw, 'concept %s has build-up after its visual' % cid)
 
         # -- ADVISORY (warn-only; NEVER flips ok[0] / exit code): visualize the build-up --
         # If this concept's build-up is HEAVY (a Math Ladder, or math demoted into an

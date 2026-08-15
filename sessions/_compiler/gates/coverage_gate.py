@@ -77,8 +77,16 @@ _CHROME = {
 # helpers — all pure
 # ---------------------------------------------------------------------------
 def _norm(s):
-    """Lowercase, collapse whitespace/punctuation to single spaces."""
-    return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9]+', ' ', str(s).lower())).strip()
+    """Lowercase, collapse whitespace/punctuation to single spaces.
+
+    The keep-set includes Han. With `[^a-z0-9]+` it did not, so every Chinese
+    character was DELETED from the covered-text: measured, _norm('注意力 attention 头')
+    returned just 'attention'. On a Chinese lesson the covered-text collapsed to the
+    English terms alone and tier-1 coverage reported every spec concept as an
+    A/EXEC-GAP. Widening a keep-set is purely additive — it can only ever ADD
+    matches, so no English verdict can change.
+    """
+    return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9㐀-䶿一-鿿]+', ' ', str(s).lower())).strip()
 
 
 def _strip_tags(html):

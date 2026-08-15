@@ -48,6 +48,30 @@ def _region_texts(blocks):
     return mode, t
 
 
+# --- Chinese equivalents of the two English cue lists ------------------------
+# The English lists keep working on a bilingual day, because the English text is
+# still there. These check the CHINESE side of the same two rules. Note '？' — the
+# fullwidth question mark, which the English list's '?' cannot match.
+_ZH_CURIOSITY = ['你', '想一想', '想想', '有没有', '猜', '试试', '注意看', '会发生什么',
+                 '？', '如果', '为什么', '好奇', '试着']
+_ZH_DISCOVERY = ['预测', '猜一猜', '观察', '注意', '看一看', '你应该看到', '在你', '先想']
+
+
+def _zh_text(blocks):
+    """All Chinese prose in these blocks, joined — the ~~~zh fence bodies."""
+    out = []
+    for b in blocks:
+        lines = b.get('lines') or []
+        i = 0
+        while i < len(lines):
+            if lines[i].strip().startswith('~~~zh'):
+                i += 1
+                while i < len(lines) and lines[i].strip() != '~~~':
+                    out.append(lines[i]); i += 1
+            i += 1
+    return '\n'.join(out)
+
+
 def _run_concept(meta, blocks, msgs, ok, fail, pas):
     spine_word = (meta.get('spine') or 'bend').split(':')[0].split()[0].lower()
     hero = next((b for b in blocks if b['type']=='hero'), None)
@@ -101,6 +125,30 @@ def _run_concept(meta, blocks, msgs, ok, fail, pas):
     ptxt = '\n'.join(prod['lines']).lower() if prod else ''
     cues = ['predict','guess','observe','notice','watch','what you should see','before you']
     pas('produce is discovery-framed') if any(c in ptxt for c in cues) else fail('produce not discovery-framed')
+
+    # --- the Chinese side, only once the day actually has Chinese ------------
+    if _zh_text(blocks).strip():
+        hero_zh = _zh_text([b for b in blocks if b['type']=='hero'])
+        if hero_zh.strip():
+            (pas('Chinese hero has a human/curiosity anchor')
+             if any(c in hero_zh for c in _ZH_CURIOSITY)
+             else fail('the Chinese hero has no human/curiosity anchor — a translated hook '
+                       'must still ASK the reader something (你 / 想一想 / 为什么 / ？)'))
+        prod_zh = _zh_text([b for b in blocks if b['type']=='produce'])
+        if prod_zh.strip():
+            (pas('Chinese produce is discovery-framed')
+             if any(c in prod_zh for c in _ZH_DISCOVERY)
+             else fail('the Chinese produce section is not discovery-framed — say what to '
+                       '预测 / 观察 before running, as the English does'))
+        zh_spine = str(meta.get('zh_spine') or '').strip()
+        if zh_spine:
+            n_zh = sum(1 for b in blocks if zh_spine in _zh_text([b]))
+            (pas("zh_spine ('%s') in %d Chinese block(s)" % (zh_spine, n_zh)) if n_zh >= 3
+             else fail("zh_spine ('%s') appears in only %d Chinese block(s), need >=3 — the "
+                       "narrative thread has to survive translation" % (zh_spine, n_zh)))
+        else:
+            msgs.append('warn no zh_spine declared — the Chinese narrative thread is '
+                        'UNCHECKED this run (an English spine word cannot match Chinese text)')
     return ok[0], msgs
 
 

@@ -22,6 +22,36 @@ HUMAN_TOKENS    = ["your brain", "brain", "you "]
 # ---------------------------------------------------------------------------
 # bilingual pairing
 # ---------------------------------------------------------------------------
+# Han, Han-extension, CJK punctuation and full-width forms. Kana is deliberately
+# absent: no lesson uses it, and matching it would only add false positives.
+CJK_RE = re.compile(r'[㐀-䶿一-鿿豈-﫿　-〿＀-￯]')
+CJK_WEIGHT = 2.3
+
+
+def text_weight(s):
+    """Length of `s` in ENGLISH-CHARACTER EQUIVALENTS.
+
+    Every length threshold in the gates was calibrated on English prose measured
+    with len(): the 600-character prose wall, the 40-character minimum around a
+    visual. Applied to Chinese with raw len(), each of those silently changes
+    meaning — a wall limit becomes ~2.3x more permissive, a minimum ~2.3x stricter.
+
+    Measured on the first authored EN/ZH twin (m02/day-02 c1, two paragraph pairs
+    of identical content): 240 English chars vs 128 Chinese, and 363 vs 157. Solving
+    `ascii + w*cjk = len(EN)` gives w = 2.03 and 2.58, mean 2.31 — so one Han
+    character carries about 2.3 English characters' worth of text. That is two data
+    points, not a corpus study; it is written down here so it can be re-measured
+    and tightened as more days are translated.
+
+    Weighting rather than forking every threshold keeps ONE calibrated number per
+    rule and handles mixed text, which every Chinese lesson has: technical terms
+    stay in English by design.
+    """
+    s = s or ''
+    cjk = len(CJK_RE.findall(s))
+    return int(round((len(s) - cjk) + CJK_WEIGHT * cjk))
+
+
 def bilingual(en, zh, tag='span'):
     """A paired language node, or the English alone when there is no twin.
 
