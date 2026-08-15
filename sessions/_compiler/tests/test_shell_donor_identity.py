@@ -71,16 +71,26 @@ def test_donor_scripts_are_an_ordered_subsequence_of_the_lesson(src, lesson, don
                          '(donor has %d, lesson has %d)' % (missing, len(ds), len(hs)))
 
 
-def test_all_47_compiled_lessons_share_one_css_md5():
-    # The property that makes a donor edit verifiable in one pass: if this ever
-    # splits into two classes, some pages did not get the change.
-    md5s = {}
-    for _src, lesson, _donor, _meta in COMPILED:
+def test_lessons_sharing_a_donor_share_one_css_md5():
+    # The property that makes a donor edit verifiable in one pass: within one donor
+    # family, if this splits into two classes then some pages did not get the change.
+    #
+    # Per FAMILY, not globally. It was global while every compiled lesson came from
+    # v9-base.donor; m01's six days now carry frozen PER-LESSON donors extracted from
+    # their own shipped HTML, so the corpus legitimately spans more than one CSS
+    # variant. Asserting one class globally would fail on a correct repo.
+    fams = {}
+    for _src, lesson, donor, _meta in COMPILED:
         c, _ = sig._shell_regions(open(lesson, encoding='utf-8').read())
-        md5s.setdefault(hashlib.md5(c.encode()).hexdigest()[:8], []).append(
+        fam = 'm01-per-lesson' if os.path.basename(donor).startswith('m01-day-') \
+              else os.path.basename(donor)
+        fams.setdefault(fam, {}).setdefault(hashlib.md5(c.encode()).hexdigest()[:8], []).append(
             os.path.relpath(lesson, os.path.join(REPO, 'sessions')))
-    assert len(md5s) == 1, 'compiled lessons split into %d CSS classes: %s' % (
-        len(md5s), {k: v[:3] for k, v in md5s.items()})
+    # v9-base is the family a donor edit has to reach in one pass
+    v9 = fams.get('v9-base.donor', {})
+    assert len(v9) == 1, 'v9-base lessons split into %d CSS classes: %s' % (
+        len(v9), {k: v[:3] for k, v in v9.items()})
+    assert len(v9[list(v9)[0]]) >= 47, 'expected >=47 lessons on v9-base.donor'
 
 
 # =============================================================================

@@ -122,12 +122,21 @@ def test_an_honest_chinese_demo_label_passes():
 def test_english_verdicts_are_unchanged_on_every_shipped_day():
     # The batch is additive by construction; this pins it across the corpus so a
     # future Chinese rule cannot quietly start failing English days.
-    fails = 0
+    #
+    # Scoped to the V9-AUTHORED cohort. m01's six days were later put on the pipeline
+    # by verbatim extraction from their shipped HTML — they are legacy pages that were
+    # never written to the v9 beginner bar, so all six fail this gate for pre-existing
+    # English reasons and would only add noise to the pin.
+    fails = v9 = 0
     for p in sorted(glob.glob(os.path.join(REPO, 'sessions', 'm*', 'day-*', 'source.md'))):
+        if 'm01-shape-of-data' in p:
+            continue
+        v9 += 1
         ok, _ = blg.run(open(p, encoding='utf-8').read(), source_path=p)
         fails += (not ok)
-    # 41 of 47 fail today for pre-existing English reasons; the number is pinned so
-    # a regression shows up as a change rather than as noise.
+    assert v9 >= 47, 'expected >=47 v9-authored days, saw %d' % v9
+    # 41 of 47 fail today for pre-existing English reasons; pinned so a regression
+    # shows up as a change rather than as noise.
     assert fails == 41, ('English failure count moved to %d — a Chinese rule is firing '
                          'on English days' % fails)
 

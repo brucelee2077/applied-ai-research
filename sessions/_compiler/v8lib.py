@@ -756,7 +756,16 @@ REGION_PATTERNS = {
     's4':          r'<section class="module-section" id="s4".*?</section>',
     's7':          r'<section class="module-section" id="s7".*?</section>',
     'fin':         r'<div class="fin" id="fin".*?</div>',
-    'nav_prev':    r'<a class="lnav prev" href="[^"]*">.*?</a>',
+    # The FIRST lesson of a chain has no previous day, so its prev-nav is a DISABLED
+    # SPAN rather than a link: <span class="lnav prev disabled"><span class="d">Start
+    # </span><span class="t">…</span></span>. Only one page in the corpus is shaped
+    # that way today (m01/day-01), and extract_source refused it outright — "regions
+    # not found (donor not v8-shaped?)" — so the module's first day could not be put
+    # on the pipeline at all. The span alternative terminates on `</span></span>`,
+    # not on `</span>`: a lone non-greedy `</span>` stops at the inner .d span and
+    # captures half the element.
+    'nav_prev':    r'(?:<a class="lnav prev" href="[^"]*">.*?</a>'
+                   r'|<span class="lnav prev disabled">.*?</span></span>)',
     'nav_next':    r'<a class="lnav next" href="[^"]*">.*?</a>',
     'DEMOS':       r'var DEMOS = \{.*?\n\};',
     'BUILD':       r'var BUILD=\[.*?\n\];',
