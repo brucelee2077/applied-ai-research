@@ -16,9 +16,16 @@
 # Usage:
 #   python3 sessions/_compiler/compile_lesson.py <source.md>
 #       [--donor <html>] [--out <html>] [--check-only] [--quiet]
-#   exit 0 = compiled + gates pass ; 2 = reader-flow gate failed (nothing written)
-#          ; 3 = shell-invariant gate failed ; 4 = visual integrity failed
-#          ; 1 = usage / parse error
+#   exit 0 = compiled + gates pass ; 2 = reader-flow gate failed
+#          ; 3 = shell-invariant / concept-shell gate failed
+#          ; 4 = visual integrity failed ; 1 = usage / parse error
+#
+#   NOTHING IS WRITTEN ON ANY NON-ZERO EXIT. The write used to sit ABOVE the
+#   exit-3/4 checks, so a failed gate still left a lesson.html on disk that had
+#   already been judged broken — recovering meant knowing to `git checkout` it,
+#   and a sweep over all 47 lessons could leave a batch of them in that state.
+#   The write is now the last thing that happens, and it goes through a sibling
+#   temp file + os.replace so a kill mid-write cannot truncate a shipped page.
 # =============================================================================
 import sys, os, argparse
 
@@ -28,6 +35,27 @@ sys.path.insert(0, os.path.join(HERE, 'gates'))
 import v8lib                       # noqa: E402
 import reader_flow_gate            # noqa: E402
 import shell_invariant_gate        # noqa: E402
+
+
+def atomic_write(path, text):
+    """Write `text` to `path` via a sibling temp file, then rename into place.
+
+    os.replace is atomic within a filesystem, so a reader either sees the whole
+    old file or the whole new one — never a half-written page. The temp file is
+    removed if the write itself fails, so a crash cannot leave `.tmp` litter
+    behind for the publish gate's fail-closed untracked-path check to trip on.
+    """
+    tmp = path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def main():
@@ -108,17 +136,20 @@ def main():
         log('\n-- Shell Invariant Gate (output vs donor) --')
         for m in smsgs: log('  ', m)
 
+    # -- every gate is decided BEFORE the output file is touched --
+    if not sok:
+        log('\n%s FAILED — nothing written.'
+            % ('Concept Shell Gate' if concept_mode else 'Shell Invariant Gate')); sys.exit(3)
+    if not vok:
+        log('\nVisual Integrity Gate FAILED — a visual would render blank at '
+            'runtime. Nothing written.'); sys.exit(4)
+
     if not args.check_only:
-        with open(out_path, 'w', encoding='utf-8') as f:
-            f.write(html)
+        atomic_write(out_path, html)
         log('\nwrote', os.path.relpath(out_path), '(%d chars)' % len(html))
     else:
         log('\n--check-only: not written')
 
-    if not sok:
-        log('\n%s FAILED.' % ('Concept Shell Gate' if concept_mode else 'Shell Invariant Gate')); sys.exit(3)
-    if not vok:
-        log('\nVisual Integrity Gate FAILED — a visual would render blank at runtime.'); sys.exit(4)
     log('\nOK — compiled and all gates pass.')
 
 
