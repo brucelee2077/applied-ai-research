@@ -14,6 +14,7 @@
 # =============================================================================
 import sys, os, re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for shell_invariant_gate
 import v8lib
 
 def run(html, meta, donor=None):
@@ -74,15 +75,55 @@ def run(html, meta, donor=None):
     bad_tips = [t for t in re.findall(r'data-tip="([^"]*)"', html) if '<' in t or '>' in t]
     chk(not bad_tips, 'no tag leaked into a data-tip tooltip%s'
         % ('' if not bad_tips else ' (%d bad, e.g. %r)' % (len(bad_tips), bad_tips[0][:60])))
+
+    # -- shell byte-identity (only when the caller hands us the donor) ----------
+    # compile_lesson.py has ALWAYS passed donor=donor here, but this function
+    # ignored the argument, so mode:concept lessons had NO byte-identity check at
+    # all: an edit to the donor's CSS or JS engine could reach some pages and miss
+    # others with nothing to catch it. That is precisely the risk when a shell
+    # change has to land in the donor and all 47 compiled lessons at once.
+    #
+    # The invariant is NOT shell_invariant_gate's "same number of scripts". Nine of
+    # the 47 legitimately carry extra inline-lab scripts, and those sit INTERLEAVED
+    # between the donor's own (measured on m02/day-04-loss: donor#0, author, author,
+    # author, donor#1, donor#2, donor#3). So the honest invariant is:
+    #   * the CSS block is byte-identical to the donor, and
+    #   * the donor's scripts appear, data-masked, as an ordered SUBSEQUENCE of the
+    #     lesson's scripts — extra author scripts anywhere are fine.
+    # Verified true for all 47 shipped lessons before being switched on.
+    if donor is not None:
+        import shell_invariant_gate as _sig     # same dir; reuse, don't reimplement
+        dc, ds = _sig._shell_regions(donor)
+        hc, hs = _sig._shell_regions(html)
+        chk(dc == hc, 'CSS block byte-identical to donor')
+        donor_masked = [_sig._mask_data(s) for s in ds]
+        lesson_masked = [_sig._mask_data(s) for s in hs]
+        remaining = iter(lesson_masked)
+        missing = [i for i, s in enumerate(donor_masked)
+                   if not any(s == cand for cand in remaining)]
+        chk(not missing,
+            'all %d donor scripts present in order (data masked)%s'
+            % (len(ds), '' if not missing else ' — MISSING donor script index %s' % missing))
     return ok[0], msgs
 
 def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument('lesson'); ap.add_argument('--source', required=True)
+    ap.add_argument('--donor', help='donor path; defaults to the source\'s front-matter donor: key')
+    ap.add_argument('--no-donor', action='store_true', help='skip the shell byte-identity check')
     a = ap.parse_args()
     meta, _ = v8lib.split_frontmatter(open(a.source, encoding='utf-8').read())
-    ok, msgs = run(open(a.lesson, encoding='utf-8').read(), meta)
+    # Resolve the donor by default. The CLI used to call run() without it, so the
+    # byte-identity check was unreachable from the command line even after being
+    # wired — the same silent-no-op shape as the ignored kwarg it replaces.
+    donor = None
+    if not a.no_donor:
+        dp = a.donor or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                     'shells', meta.get('donor', ''))
+        if meta.get('donor') or a.donor:
+            donor = open(dp, encoding='utf-8').read()
+    ok, msgs = run(open(a.lesson, encoding='utf-8').read(), meta, donor=donor)
     for m in msgs: print('  ', m)
     print('\n' + ('PASS' if ok else 'FAIL')); sys.exit(0 if ok else 3)
 
