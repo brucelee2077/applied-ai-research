@@ -475,7 +475,11 @@ def render_md(text, _in_zh=False):
             if not en_blocks:
                 raise ValueError('a ~~~zh fence has no English blocks above it to pair with. '
                                  'Chinese-only content would be invisible to an English '
-                                 'reader; write the English first, then its twin.')
+                                 'reader; write the English first, then its twin. (A '
+                                 '%%%% svg / %%%% viz block does not count: a drawing is '
+                                 'shared between the languages, so it is never part of a '
+                                 'paired span — give each of its labels a paired '
+                                 '<text class="lang-en"> / <text class="lang-zh"> instead.)')
             zh_html = render_md('\n'.join(buf), _in_zh=True)
             if not zh_html.strip():
                 raise ValueError('empty ~~~zh fence — delete it or write the twin')
@@ -509,6 +513,18 @@ def render_md(text, _in_zh=False):
                 buf.append(lines[i]); i += 1
             i += 1
             out.append(render_widget(typ, wargs, buf))
+            if typ in ('svg', 'viz'):
+                # A DRAWING IS SHARED between the two languages — one picture whose
+                # labels are paired <text class="lang-en"> / <text class="lang-zh">.
+                # So it belongs to no span: it is emitted unwrapped, and it closes
+                # whatever span preceded it. Without this, a drawing sitting between
+                # two prose spans (the normal shape of a concept: intro, picture,
+                # build-up) would land inside the SECOND span's .lang-en wrapper and
+                # disappear entirely in Chinese mode — the concept would silently
+                # lose its visual with every gate still green. Prose before the
+                # drawing that the author did not pair simply stays unwrapped, which
+                # shows under both languages; lang_parity_gate reports it.
+                span_start = len(out)
             continue
         if s.startswith('#### '):
             out.append('<h4>' + inline(s[5:].strip()) + '</h4>'); i += 1; continue

@@ -265,3 +265,50 @@ def test_a_source_with_no_chinese_emits_no_language_wrappers_in_the_content():
     bi, _ = _compile(_bilingual_fixture())
     bi_content = re.search(r'<main id="content">(.*?)</main>', bi, re.S).group(1)
     assert 'lang-zh' in bi_content, 'and it must actually fire when Chinese IS authored'
+
+
+# =============================================================================
+# a drawing is SHARED, so it belongs to no span
+# =============================================================================
+# The normal shape of a concept is: intro prose, picture, build-up prose. The
+# picture is one drawing whose labels are paired <text class="lang-en"> /
+# <text class="lang-zh">, so it must never be enclosed in a .lang-en wrapper —
+# there it would vanish entirely in Chinese mode and the concept would silently
+# lose its visual with every gate still green. A drawing therefore closes whatever
+# span preceded it and starts a new one.
+
+SVG = '%%% svg\n<svg viewBox="0 0 10 10"><text x="1" y="1">L</text></svg>\n%%%'
+
+
+def test_a_drawing_between_two_spans_stays_unwrapped():
+    out = v8lib.render_md(
+        'Intro.\n~~~zh\n引子。\n~~~\n\n' + SVG + '\n\nBuild-up.\n~~~zh\n推导。\n~~~')
+    # the drawing sits between the two wrapper pairs, in neither of them
+    assert not re.search(r'class="lang-(en|zh)">\s*<div class="build-viz">', out), out[:400]
+    assert out.count('<svg') == 1
+    assert out.count('class="lang-en"') == 2 and out.count('class="lang-zh"') == 2
+    # order preserved: intro, drawing, build-up
+    assert out.index('引子') < out.index('<svg') < out.index('推导')
+
+
+def test_a_fence_right_after_a_drawing_has_nothing_to_pair():
+    with pytest.raises(ValueError, match='no English blocks'):
+        v8lib.render_md('Intro.\n~~~zh\n引子。\n~~~\n\n' + SVG + '\n\n~~~zh\n孤立中文。\n~~~')
+
+
+def test_unpaired_prose_before_a_drawing_is_not_an_error():
+    # It shows under BOTH languages, which is the fallback. lang_parity_gate is
+    # what reports it as incomplete, not the compiler.
+    out = v8lib.render_md('Intro with no twin.\n\n' + SVG + '\n\nAfter.\n~~~zh\n之后。\n~~~')
+    assert 'Intro with no twin' in out
+    assert out.count('class="lang-en"') == 1          # only the paired span
+    head = out[:out.index('<svg')]
+    assert 'lang-' not in head, 'unpaired intro prose must stay unwrapped'
+
+
+def test_a_viz_embed_is_shared_too():
+    out = v8lib.render_md('Intro.\n~~~zh\n引子。\n~~~\n\n'
+                          '%%% viz src="../../viz/x.html" title="t"\n%%%\n\n'
+                          'After.\n~~~zh\n之后。\n~~~')
+    assert out.count('class="build-embed"') == 1
+    assert not re.search(r'class="lang-(en|zh)">\s*<div class="build-embed">', out)
