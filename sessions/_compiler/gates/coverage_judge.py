@@ -412,7 +412,11 @@ def _chat(system, user, model=MODEL, timeout=90, max_tokens=2000):
     return (resp.choices[0].message.content or '').strip()
 
 
-_INTEREST_ABS_SYS = (
+def _interest_abs_sys(lang='en'):
+    return ("READER: " + _A(lang, 'reader') + ". Judge " + _A(lang, 'judged_text') + ". ") + _INTEREST_ABS_SYS_BASE
+
+
+_INTEREST_ABS_SYS_BASE = (
     "You judge whether a BEGINNER ML lesson (a curious 12-year-old for whom English may be a second language) "
     "cultivates INTEREST — makes a first-time learner WANT MORE: lean in, poke at it, come back tomorrow. There "
     "is NO reference notebook; grade each lever on its OWN merits against the fixed anchors, HARSHLY, defaulting "
@@ -425,7 +429,7 @@ _INTEREST_ABS_SYS = (
 _INTEREST_ABS_MAX = _MAX_LESSON_CHARS
 
 
-def _interest_abs_prompt(lesson_text):
+def _interest_abs_prompt(lesson_text, lang='en'):
     return f"""LESSON UNDER REVIEW (plain-text extract; %%%viz / %%%demo / @@@produce blocks are INTERACTIVE —
 runnable or clickable in the real page, so a caption like "drag z / slide the line" means genuine hands-on play):
 \"\"\"
@@ -457,10 +461,10 @@ Return STRICT JSON:
 }}"""
 
 
-def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
+def judge_interest_absolute(lesson_text, model=MODEL, timeout=90, lang='en'):
     """Notebook-FREE absolute interest floor. Runs on EVERY lesson. Never raises."""
     try:
-        content = _chat(_INTEREST_ABS_SYS, _interest_abs_prompt(lesson_text), model, timeout)
+        content = _chat(_interest_abs_sys(lang), _interest_abs_prompt(lesson_text, lang), model, timeout)
     except Exception as e:
         return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e),
                 'dimensions': [], 'overall': 'N/A', 'top_fixes': [], 'summary': ''}
@@ -503,11 +507,63 @@ def judge_interest_absolute(lesson_text, model=MODEL, timeout=90):
 #
 # Advisory in the CLI; the lesson_build interest/language lens P0-gates on BELOW_FLOOR.
 # Graceful fallback; never raises.
+
+# ---------------------------------------------------------------------------
+# language-specific judging anchors
+# ---------------------------------------------------------------------------
+# The judges are semantic, so they do not CRASH on Chinese — they grade the wrong
+# thing. Every anchor below was written for English: the reader clause says English
+# is a second language, the hard-word examples are English words, the idiom examples
+# are English idioms, and the analogy exemplars are Anglo-Western objects. Pointed
+# at a Chinese page, "no idioms" would look for "under the hood" and pass a page
+# full of 成语, which for a 12-year-old are the harder barrier.
+#
+# So each judge takes lang='en'|'zh' and interpolates its anchors from here. One
+# table, so a new judge cannot forget a language.
+LANG_ANCHORS = {
+    'en': {
+        'reader': ("a curious 12-YEAR-OLD for whom ENGLISH IS A SECOND LANGUAGE, with normal "
+                   "school arithmetic and NO algebra, calculus, probability, or programming "
+                   "background"),
+        'judged_text': 'the ENGLISH text on the page (ignore any Chinese)',
+        'hard_words': '"utilize", "monotonic", "non-convex", "orthogonal", "canonical"',
+        'sentence_unit': 'sentences, ONE idea each, active voice',
+        'idioms': ('idioms or dismissive asides ("under the hood", "obviously", "as you can '
+                   'see", "this is just")'),
+        'analogy_examples': ('the valve, dimmer, see-saw, ruler, pizza, forecaster/surprise, '
+                             'assembly line, scorecard'),
+        'gloss_form': 'an inline plain-words gloss at first use',
+    },
+    'zh': {
+        'reader': ("一个好奇的 12 岁中文母语读者，有普通小学算术基础，没有代数、微积分、概率或"
+                   "编程背景（a curious 12-year-old NATIVE CHINESE reader)"),
+        'judged_text': 'the CHINESE text on the page (ignore the English twin except when checking a gloss)',
+        'hard_words': ('书面语/学术词如「显著」「收敛」「泛化」「单调」「正交」，或未加解释的四字'
+                       '术语；小学生读不懂的词就是难词'),
+        'sentence_unit': ('句子按汉字数衡量，一句一个意思；中文特别容易出现逗号长链——一句话套六个'
+                          '分句，读者要回读才懂，这算 WEAK'),
+        'idioms': ('成语与书面套话（「一举两得」「水到渠成」「事半功倍」「显然」「众所周知」'
+                   '「不言而喻」「如你所见」）—— 对 12 岁读者，成语假设了他可能没有的文化背景，'
+                   '而且无法从字面推出意思'),
+        'analogy_examples': ('中国孩子日常真做过的事：食堂打饭排队、地铁换乘、跳皮筋、压岁钱、'
+                            '尺子、水龙头、跷跷板、快递分拣'),
+        'gloss_form': '首次出现时用中文括注，例如 attention（注意力）',
+    },
+}
+
+
+def _A(lang, key):
+    """One anchor. Falls back to English for an unknown LANGUAGE, and returns '' for
+    an unknown KEY — a judge must never die on a typo'd anchor name, because the
+    whole module's contract is that it degrades instead of raising."""
+    return (LANG_ANCHORS.get(lang) or {}).get(key) or LANG_ANCHORS['en'].get(key, '')
+
+
 _LANG_ABS_MAX = _MAX_LESSON_CHARS
-_LANG_ABS_SYS = (
-    "You are a STRICT READABILITY judge for a beginner ML lesson. Your reader is a curious "
-    "12-YEAR-OLD for whom ENGLISH IS A SECOND LANGUAGE, with normal school arithmetic and NO "
-    "algebra, calculus, probability, or programming background. Judge ONLY whether THIS READER "
+def _lang_abs_sys(lang='en'):
+    return (
+    "You are a STRICT READABILITY judge for a beginner ML lesson. Your reader is "
+    + _A(lang, 'reader') + ". Judge ONLY " + _A(lang, 'judged_text') + " and only whether THIS READER "
     "can read the page and follow it — not whether it is warm, not whether it is correct, not "
     "whether coverage is complete. Be harsh and concrete: quote the exact phrase that would stop "
     "them. LENGTH IS NOT A DEFECT — a long lesson broken into small one-idea beats is GOOD; judge "
@@ -517,7 +573,10 @@ _LANG_ABS_SYS = (
 )
 
 
-def _lang_abs_prompt(lesson_text):
+_LANG_ABS_SYS = _lang_abs_sys('en')      # kept for callers that import the constant
+
+
+def _lang_abs_prompt(lesson_text, lang='en'):
     return f"""LESSON UNDER REVIEW (plain-text extract of the real page):
 \"\"\"
 {lesson_text[:_LANG_ABS_MAX]}
@@ -527,11 +586,11 @@ Score each lever GOOD / WEAK / MISSING against its anchor, with a one-line reaso
 exact spot and a concrete FIX:
 - vocabulary_age      GOOD = everyday words a 12-year-old knows; any word learned after ~age 10 is
                       either avoided or glossed in plain words AT first use. WEAK/MISSING = words
-                      like "utilize", "monotonic", "non-convex", "orthogonal", "canonical" left bare.
-- sentence_simplicity GOOD = short sentences, ONE idea each, active voice. WEAK = frequent multi-
+                      like {_A(lang, 'hard_words')} left bare.
+- sentence_simplicity GOOD = short {_A(lang, 'sentence_unit')}. WEAK = frequent multi-
                       clause run-ons the reader must re-read. Judge the SENTENCES, not the lesson length.
-- term_before_use     GOOD = every technical term is explained the FIRST time it appears (an inline
-                      gloss counts). MISSING = a term is used, then defined much later or never.
+- term_before_use     GOOD = every technical term is explained the FIRST time it appears
+                      ({_A(lang, 'gloss_form')} counts). MISSING = a term is used, then defined much later or never.
                       Name the worst offender explicitly.
 - concrete_over_abstract GOOD = ideas land on physical, experienced things before abstractions.
 - math_restraint      GOOD = intuition + picture first; any main-flow formula is one line and
@@ -541,8 +600,7 @@ exact spot and a concrete FIX:
                       where that analogy BREAKS DOWN. Problem-first or abstract openings are WEAK.
 - warmth_and_pace     GOOD = a brilliant-friend voice that normalizes confusion and lets ideas
                       breathe; not an exam, not a textbook, not crammed.
-- no_idioms           GOOD = no idioms or dismissive asides ("under the hood", "obviously",
-                      "as you can see", "this is just") that exclude a second-language reader.
+- no_idioms           GOOD = no {_A(lang, 'idioms')} that exclude this reader.
 
 Then decide overall against this FLOOR: return FLOOR_MET only if NO lever is MISSING and a
 12-year-old second-language reader could genuinely follow the page (one WEAK lever is tolerable;
@@ -582,10 +640,10 @@ def _floor_from_levers(data, tolerate_weak=1):
     return derived, weak, missing, stated
 
 
-def judge_plain_language_absolute(lesson_text, model=MODEL, timeout=90):
+def judge_plain_language_absolute(lesson_text, model=MODEL, timeout=90, lang='en'):
     """Notebook-FREE readability floor. Runs on EVERY lesson. Never raises."""
     try:
-        content = _chat(_LANG_ABS_SYS, _lang_abs_prompt(lesson_text), model, timeout)
+        content = _chat(_lang_abs_sys(lang), _lang_abs_prompt(lesson_text, lang), model, timeout)
     except Exception as e:
         return {'status': 'BRIDGE_UNAVAILABLE', 'error': str(e), 'dimensions': [],
                 'overall': 'N/A', 'hardest_words': [], 'top_fixes': [], 'summary': ''}
@@ -701,7 +759,8 @@ _STRUCT_SYS = (
     "the unit (1) leads with a felt picture / plain-words intuition BEFORE any formula, notation, or undefined "
     "jargon; (2) carries a CONCRETE, everyday, physically-experienced analogy INCLUDING an explicit 'where it "
     "breaks down' AND DRAWS that analogy — the concept's OPENING visual pictures the everyday THING itself (the "
-    "valve, dimmer, see-saw, ruler, pizza, forecaster/surprise, assembly line, scorecard), not the equation or a "
+    "valve, dimmer, see-saw, ruler, pizza, forecaster/surprise, assembly line, scorecard — or, judging "
+    "Chinese, 食堂打饭/地铁换乘/尺子/水龙头/跷跷板), not the equation or a "
     "bare axis/curve plot; a beginner should look and think 'oh, it's like a ___' before meeting any math; "
     "(3) builds up step-by-step rather than dumping the mechanism; and (4) VISUALIZES ITS BUILD-UP "
     "— a HEAVY build-up (a >=2-step derivation, a multi-step numeric worked example, a value/curve/shape that "
@@ -715,7 +774,7 @@ _STRUCT_SYS = (
 )
 
 
-def _struct_prompt(lesson_text, concept_titles):
+def _struct_prompt(lesson_text, concept_titles, lang='en'):
     names = '\n'.join('- %s' % c for c in (concept_titles or [])) or '(none)'
     return f"""CONCEPT UNITS TO JUDGE (by name/title):
 {names}
@@ -763,7 +822,20 @@ penalize it. A bare formula callout that only restates an equation is NOT a buil
 a predict-then-run demo IS."""
 
 
-def judge_concept_structure(lesson_text, concept_titles, model=MODEL, timeout=90):
+def _struct_sys(lang='en'):
+    """The structure judge's system prompt, with the reader clause localized.
+
+    This judge does not use the _chat seam — it builds its own client because it
+    needs max_tokens=8000 and reads finish_reason for its salvage path — so `lang`
+    has to be threaded in here explicitly. The analogy exemplars inside _STRUCT_SYS
+    list BOTH cultures unconditionally: a Chinese analogy may be 食堂打饭 without
+    being marked down for not resembling a see-saw, and English is unaffected.
+    """
+    return ('READER: ' + _A(lang, 'reader') + '. Judge ' + _A(lang, 'judged_text')
+            + '. ' + _STRUCT_SYS)
+
+
+def judge_concept_structure(lesson_text, concept_titles, model=MODEL, timeout=90, lang='en'):
     """LLM per-concept structure judge. Never raises. N/A when no concepts given."""
     if not concept_titles:
         return {'status': 'N/A', 'reason': 'no concepts to judge',
@@ -777,8 +849,8 @@ def judge_concept_structure(lesson_text, concept_titles, model=MODEL, timeout=90
         client = OpenAI(api_key='not-needed', base_url=BRIDGE_URL, timeout=timeout)
         resp = client.chat.completions.create(
             model=model,
-            messages=[{'role': 'system', 'content': _STRUCT_SYS},
-                      {'role': 'user', 'content': _struct_prompt(lesson_text, concept_titles)}],
+            messages=[{'role': 'system', 'content': _struct_sys(lang)},
+                      {'role': 'user', 'content': _struct_prompt(lesson_text, concept_titles, lang)}],
             # Per-concept objects (name + FOUR axes + note + fix) across ~13 concepts
             # overrun the old 2000-token budget once the 4th axis (buildup_visualized)
             # was added — the response truncated mid-object, _extract_json failed, and the
@@ -879,6 +951,96 @@ def _salvage_truncated_json(text):
         return None
 
 
+
+# ---------------------------------------------------------------------------
+# translation fidelity  (bilingual days only)
+# ---------------------------------------------------------------------------
+# lang_parity_gate can prove the Chinese EXISTS — a fence per concept, a twin per
+# label, matching quiz answer indices. It cannot read. Three things only a reader
+# can check, and each one ships a page that looks finished and teaches something
+# different:
+#   * the Chinese says something the English does not (or drops something it does)
+#   * the Chinese swapped the ANALOGY. The agreed rule is one analogy and therefore
+#     ONE drawing shared between the languages; a Chinese twin that reaches for a
+#     different everyday object leaves the figure illustrating the English one, so
+#     the picture and the words disagree in exactly one language.
+#   * a technical term is glossed twice, never, or differently in two places
+#
+# It reads the SOURCE, not the compiled page: in source.md each ~~~zh fence sits
+# directly under the English it mirrors, which is the comparison this judge needs.
+_FIDELITY_MAX = _MAX_LESSON_CHARS
+_FIDELITY_SYS = (
+    "You are a STRICT BILINGUAL FIDELITY judge for a beginner ML lesson written in ONE source "
+    "file that holds both languages: English prose, then its Chinese twin inside a ~~~zh ... ~~~ "
+    "fence. Drawings (%%% svg) are SHARED between the languages — one picture whose labels are "
+    "paired <text class=\"lang-en\"> / <text class=\"lang-zh\">. The agreed policy is: narration, "
+    "analogies, headings, quiz and figure labels are Chinese; code, identifiers, formula symbols "
+    "and technical TERMS stay English, glossed once on first use as attention（注意力）. Judge ONLY "
+    "whether the two languages TEACH THE SAME LESSON. Do not grade the quality of either language "
+    "on its own — other judges do that. Quote the exact mismatched pair. "
+    "Return STRICT JSON only (no prose, no markdown fences)."
+)
+
+
+def _fidelity_prompt(source_text):
+    return f"""BILINGUAL SOURCE UNDER REVIEW (English prose followed by its ~~~zh twin):
+\"\"\"
+{source_text[:_FIDELITY_MAX]}
+\"\"\"
+
+Score each lever GOOD / WEAK / MISSING, quoting the exact English and Chinese that disagree:
+- same_claims        GOOD = every factual claim, number, name and caveat in the English appears in
+                     the Chinese and vice versa. WEAK = a hedge, a caveat or a "where it breaks
+                     down" line dropped in one language. MISSING = a whole beat or claim present in
+                     one language only, or a NUMBER that differs.
+- same_analogy       GOOD = both languages carry the SAME everyday analogy, because they share one
+                     drawing. WEAK = the Chinese keeps the analogy but drops its "where it breaks
+                     down". MISSING = the Chinese reaches for a DIFFERENT everyday object than the
+                     English and the shared figure, so the picture contradicts the words.
+- term_policy        GOOD = each technical term stays in English and is glossed in Chinese exactly
+                     ONCE, at first use, in the form attention（注意力）; the same term is glossed
+                     the same way everywhere. WEAK = glossed more than once, or two different
+                     Chinese renderings of one term. MISSING = a term translated away entirely so
+                     the reader never meets the English word, or never glossed at all.
+- no_untranslated    GOOD = no English sentence left sitting inside the Chinese. Technical terms,
+                     code and identifiers do not count.
+- register           GOOD = the Chinese reads like a brilliant friend talking to a 12-year-old, the
+                     same voice as the English — not a machine translation, not 书面语.
+
+Then decide overall: return FIDELITY_OK only if NO lever is MISSING and at most one is WEAK.
+
+Return STRICT JSON:
+{{
+  "dimensions": [ {{"name":"same_claims","verdict":"GOOD|WEAK|MISSING","reason":"...","fix":"..."}} ],
+  "overall": "FIDELITY_OK|FIDELITY_BROKEN",
+  "mismatches": [ {{"en":"the English, verbatim","zh":"the Chinese, verbatim","what":"what differs"}} ],
+  "summary": "<=2 sentences"
+}}"""
+
+
+def judge_translation_fidelity(source_text, model=MODEL, timeout=90):
+    """Do the two languages teach the same lesson? N/A on an English-only source."""
+    if '~~~zh' not in (source_text or ''):
+        return {'status': 'N/A', 'overall': 'N/A',
+                'note': 'source declares no Chinese — nothing to compare'}
+    raw = _chat(_FIDELITY_SYS, _fidelity_prompt(source_text), model=model, timeout=timeout,
+                max_tokens=4000)
+    if not raw:
+        return {'status': 'BRIDGE_UNAVAILABLE', 'overall': 'N/A'}
+    data = _extract_json(raw) or _salvage_truncated_json(raw)
+    if not data:
+        # Fail SAFE, like the other absolute floors: garbled output must not read as
+        # a pass on a check whose whole job is to catch a page that looks finished.
+        return {'status': 'UNPARSEABLE', 'overall': 'FIDELITY_BROKEN', 'raw': raw[:400]}
+    dims = data.get('dimensions') or []
+    missing = sum(1 for d in dims if str(d.get('verdict', '')).upper() == 'MISSING')
+    weak = sum(1 for d in dims if str(d.get('verdict', '')).upper() == 'WEAK')
+    # computed in code, not trusted from the model — same rule as _floor_from_levers
+    data['overall'] = 'FIDELITY_OK' if (missing == 0 and weak <= 1) else 'FIDELITY_BROKEN'
+    data['status'] = 'OK'
+    return data
+
+
 def run_from_paths(lesson_html_path, source_path, root=ROOT):
     """Convenience: gather spec/curation/notebook via coverage_gate, then run ALL
     FOUR judges — coverage, beginner-friendliness (tone), interest/curiosity, and
@@ -913,13 +1075,23 @@ def run_from_paths(lesson_html_path, source_path, root=ROOT):
     import re as _re
     src_text = open(source_path, encoding='utf-8').read()
     concept_titles = _re.findall(r'@@@\s+concept\b[^\n]*\btitle="([^"]+)"', src_text)
-    return {'coverage': judge(lesson_text, spec, nb_concepts, curation),
-            'tone': judge_tone(lesson_text, notebook_md),
-            'interest': judge_interest(lesson_text, notebook_md),
-            'interest_absolute': judge_interest_absolute(lesson_text),
-            'language_absolute': judge_plain_language_absolute(lesson_text),
-            'body_engagement': judge_body_engagement(lesson_text, concept_titles),
-            'structure': judge_concept_structure(lesson_text, concept_titles)}
+    out = {'coverage': judge(lesson_text, spec, nb_concepts, curation),
+           'tone': judge_tone(lesson_text, notebook_md),
+           'interest': judge_interest(lesson_text, notebook_md),
+           'interest_absolute': judge_interest_absolute(lesson_text),
+           'language_absolute': judge_plain_language_absolute(lesson_text),
+           'body_engagement': judge_body_engagement(lesson_text, concept_titles),
+           'structure': judge_concept_structure(lesson_text, concept_titles)}
+    # A bilingual day is graded TWICE on the beginner floors, once per language, with
+    # the Chinese pass using Chinese anchors — an English "no idioms" anchor would
+    # look for "under the hood" and wave through a page full of 成语. Plus fidelity,
+    # which is the only check that can see the two languages disagreeing.
+    if '~~~zh' in src_text:
+        out['language_absolute_zh'] = judge_plain_language_absolute(lesson_text, lang='zh')
+        out['interest_absolute_zh'] = judge_interest_absolute(lesson_text, lang='zh')
+        out['structure_zh'] = judge_concept_structure(lesson_text, concept_titles, lang='zh')
+        out['fidelity'] = judge_translation_fidelity(src_text)
+    return out
 
 
 # ---------------------------------------------------------------------------
