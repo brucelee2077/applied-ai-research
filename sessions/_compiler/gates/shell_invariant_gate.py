@@ -62,7 +62,12 @@ def run(html, meta, donor=None):
         chk(('href="%s"' % meta['nav_prev_href']) in html, 'prev nav href')
     if meta.get('nav_next_href'):
         chk(('href="%s"' % meta['nav_next_href']) in html, 'next nav href')
-    chk('{{' not in html and '@@@' not in html and '%%%' not in html, 'no unresolved markers')
+    # One check per marker, so the message names the leak instead of just saying no.
+    # `~~~` joins the list because it is a block fence: render_md consumes `~~~html`
+    # and `~~~zh`, but an unterminated one falls through to the paragraph branch and
+    # ships as literal text the reader sees.
+    _leaked = [mk for mk in ('{{', '@@@', '%%%', '~~~') if mk in html]
+    chk(not _leaked, 'no unresolved markers%s' % ('' if not _leaked else ' (leaked: %s)' % ', '.join(map(repr, _leaked))))
     chk('experiment.py' in html, 'artifact (experiment.py) referenced')
 
     if donor is not None:

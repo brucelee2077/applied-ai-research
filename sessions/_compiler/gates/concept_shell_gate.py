@@ -56,7 +56,13 @@ def run(html, meta, donor=None):
     chk('frontier-lesson:' in html, 'localStorage frontier-lesson:')
     chk('frontier-theme' in html, 'localStorage frontier-theme')
     chk('class="fin" id="fin"' in html, '.fin banner')
-    for marker in ('<!--V9_CONTENT-->', '<!--V9_NAV-->', '__QUEST_ID__', '@@@', '%%%'):
+    # `~~~` is in this list because it is a BLOCK FENCE the reader must never see.
+    # render_md consumes `~~~html` and `~~~zh`, but a fence whose terminator the
+    # author forgot (or misspelled) falls through to the paragraph branch and ships
+    # as literal text: `render_md("English.\n\n~~~zh\n中文。\n~~~")` emits
+    # `<p>~~~zh 中文。</p><p>~~~</p>`. Verified zero of the 47 shipped lessons
+    # contain `~~~`, so this can only catch a real leak.
+    for marker in ('<!--V9_CONTENT-->', '<!--V9_NAV-->', '__QUEST_ID__', '@@@', '%%%', '~~~'):
         chk(marker not in html, 'no leaked marker %r' % marker)
     # A glossary tooltip is PLAIN TEXT. An `<` or `>` inside data-tip means an inline
     # rule leaked a tag into the attribute (v8lib.inline used to substitute glosses

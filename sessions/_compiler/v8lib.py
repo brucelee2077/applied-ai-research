@@ -121,7 +121,18 @@ def _kv(lines):
     for ln in lines:
         stripped = ln.strip()
         # new field: leading word directly touching a colon, e.g. "out:" / "take:".
-        m = re.match(r'\s*(\w+):', ln)
+        #
+        # The name must START with an ASCII letter or underscore. `\w+` alone matches
+        # CJK in Python 3, so a Chinese sentence ending in an ASCII colon opened a
+        # PHANTOM field and the text after the colon vanished from the page with no
+        # error — measured: `_kv(['take: x', '这一步很重要:因为它决定了价格'])` returned
+        # `{'take': 'x', '这一步很重要': '因为它决定了价格'}`, so the prose became a
+        # field nothing renders. Field names are an authoring vocabulary (code/out/
+        # take/why/step/…), all ASCII, so narrowing the opener costs nothing: verified
+        # zero lines across all 47 shipped sources parse differently under this regex.
+        # A Chinese line keeps folding into the previous field as a continuation,
+        # which is what it is.
+        m = re.match(r'\s*([A-Za-z_]\w*):', ln)
         if m and not stripped.startswith(('#', '-')):
             last = m.group(1)
             value = ln.split(':', 1)[1].strip()
@@ -543,9 +554,21 @@ def render_fin(meta):
 # compile: donor + source -> lesson.html   (marker-based region replacement)
 # ---------------------------------------------------------------------------
 def sub_once(pattern, repl, text, label, flags=re.DOTALL):
-    new, n = re.subn(pattern, lambda m: repl, text, count=1, flags=flags)
+    """Replace EXACTLY one occurrence of `pattern`, or raise.
+
+    The match count is taken BEFORE substituting. `re.subn(..., count=1)` caps its
+    returned count at 1, so the old `if n != 1` could only ever catch ZERO matches —
+    against two or more it silently rewrote the first and left the rest. That is the
+    dangerous direction: a donor carrying a second `<title>`/`<div class="brand-sub">`
+    /`<a class="lnav prev">` would ship another lesson's identity, and the gate that
+    is supposed to prove the region was substituted would report success. Verified
+    zero donors of the 47 currently match any substituted region more than once, so
+    making this strict changes no output today — it just stops being blind.
+    """
+    n = sum(1 for _ in re.finditer(pattern, text, flags=flags))
     if n != 1:
         raise RuntimeError("region replace matched %d times (expected 1): %s" % (n, label))
+    new, _ = re.subn(pattern, lambda m: repl, text, count=1, flags=flags)
     return new
 
 CONTENT_SECTIONS = ['s1', 's2', 's4', 's7']   # reader-flow prose regions authored in source
