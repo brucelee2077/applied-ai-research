@@ -276,6 +276,7 @@ def gate_specs(root, skip_names=(), checks=None):
               '-p', 'no:cacheprovider'], None),
         Gate('node-reveal', ['node', 'sessions/_compiler/tests/test_reveal.mjs'], None),
         Gate('node-sr', ['node', 'sessions/_compiler/tests/test_sr.mjs'], None),
+        Gate('node-lang', ['node', 'sessions/_compiler/tests/test_lang_switch.mjs'], None),
         Gate('self-tests',
              [py, '-m', 'pytest', 'scripts', '-q', '-p', 'no:cacheprovider'], None),
     ]
