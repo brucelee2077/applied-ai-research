@@ -281,6 +281,252 @@ def test_a_malformed_whitelist_raises():
 
 
 # =============================================================================
+# lang_parity_gate check 1r — region-mode days, where check 1 FAILED OPEN
+# =============================================================================
+# THE MEASURED DEFECT. Check 1 iterates `@@@ concept` blocks. m01's six days are
+# `mode: exemplar`: 14 `@@@ region` blocks of verbatim HTML each, and ZERO concepts.
+# So on all six the loop ran zero times and the gate printed
+#     pass all 0 concept units carry Chinese
+# Six freshly translated days — 686 hand-written lang-en / lang-zh pairs across
+# them — had their prose parity certified by a message that examined nothing. These
+# tests pin the replacement, and the last two pin that the vacuous pass is gone.
+
+REGION_FM = '---\nquest_id: t\nmode: exemplar\ntitle: T\nzh_title: 题\n---\n\n'
+
+
+def _region_src(*regions):
+    """regions = (name, html) pairs -> a minimal `mode: exemplar` source."""
+    return REGION_FM + ''.join('@@@ region name=%s\n%s\n' % (n, h) for n, h in regions)
+
+
+def _region_msgs(src):
+    ok, msgs = parity.run(src, whitelist=WL)
+    return ok, [m for m in msgs if 'region' in m]
+
+
+# --- assertion (a): the lang-en / lang-zh counts must balance -----------------
+
+def test_balanced_region_pairs_pass_and_the_gate_reports_both_counts():
+    ok, msgs = _region_msgs(_region_src(
+        ('brand_sub', '<span class="lang-en">M1 Day 1</span><span class="lang-zh">M1 第 1 天</span>'),
+        ('hero', '<p class="lang-en">A shape is a list.</p><p class="lang-zh">shape 就是一串数。</p>')))
+    assert ok
+    # The numbers are the deliverable, not just the boolean — a reviewer has to be
+    # able to read the two counts out of the pass line.
+    assert any(m.startswith('pass') and '2 class="lang-en" vs 2 class="lang-zh"' in m
+               for m in msgs), msgs
+
+
+def test_an_unpaired_lang_en_node_fails_because_it_VANISHES_for_a_chinese_reader():
+    # Not a cosmetic gap. A node with NEITHER class shows under both languages, so an
+    # untouched page degrades to English safely. A node explicitly marked lang-en with
+    # no twin is display:none in Chinese mode: the sentence is simply not on the page.
+    ok, msgs = _region_msgs(_region_src(
+        ('hero', '<p class="lang-en">Twinned.</p><p class="lang-zh">有孪生。</p>'
+                 '<p class="lang-en">This one has no twin and disappears.</p>')))
+    assert not ok
+    assert any(m.startswith('FAIL') and '2 class="lang-en" vs 1 class="lang-zh"' in m
+               for m in msgs), msgs
+    assert any('hero: 2 en vs 1 zh' in m for m in msgs), msgs
+
+
+def test_an_unpaired_lang_zh_node_fails_because_it_shows_to_an_english_reader():
+    ok, msgs = _region_msgs(_region_src(
+        ('hero', '<p class="lang-en">Twinned.</p><p class="lang-zh">有孪生。</p>'
+                 '<p class="lang-zh">这句英文读者也会看到。</p>')))
+    assert not ok
+    assert any('1 class="lang-en" vs 2 class="lang-zh"' in m for m in msgs), msgs
+
+
+def test_two_regions_whose_skews_CANCEL_still_fail():
+    # The fail-open path in a totals-only check, and the reason 1r localises per
+    # region: region a is short one Chinese twin, region b is short one English twin,
+    # so the day-level totals read a clean 3 vs 3 while TWO nodes are broken.
+    src = _region_src(
+        ('a', '<p class="lang-en">one</p><p class="lang-zh">一</p><p class="lang-en">two</p>'),
+        ('b', '<p class="lang-en">three</p><p class="lang-zh">三</p><p class="lang-zh">四</p>'))
+    ok, msgs = _region_msgs(src)
+    assert not ok
+    assert any('3 class="lang-en" vs 3 class="lang-zh"' in m and m.startswith('FAIL')
+               for m in msgs), msgs
+    assert any('a: 2 en vs 1 zh' in m and 'b: 1 en vs 2 zh' in m for m in msgs), msgs
+
+
+@pytest.mark.parametrize('form,why', [
+    ("class='lang-en'", 'single quotes — invisible to a double-quote-only regex'),
+    ('class=\\"lang-en\\"', 'escaped, which is what a double-quoted JS string in '
+                            'DEMOS/BUILD/QS produces'),
+    ('class="lede lang-en"', 'a second class alongside it'),
+])
+def test_the_count_cannot_be_dodged_by_a_different_spelling_of_the_class(form, why):
+    # All 686 occurrences in m01 are the canonical double-quoted form today, so this
+    # is prevention: a regex that only saw one spelling would let an unpaired node
+    # through as a silent pass, which is the exact failure being closed here.
+    ok, msgs = _region_msgs(_region_src(('hero', '<p %s>x</p>' % form)))
+    assert not ok, why
+    assert any('1 class="lang-en" vs 0 class="lang-zh"' in m for m in msgs), (why, msgs)
+
+
+# --- assertion (b): a ~~~zh fence inside a region ships as literal text -------
+
+def test_a_zh_fence_inside_a_region_fails():
+    # A REAL TRAP nothing caught before. v8lib.compile_html pastes a region into the
+    # page BYTE-FOR-BYTE and never calls render_md, so `~~~zh` is not a fence — the
+    # four literal characters and the Chinese after them render as visible text on the
+    # page. It is also the one mistake an author who knows the concept-mode grammar
+    # will make first.
+    ok, msgs = _region_msgs(_region_src(
+        ('hero', '<p class="lang-en">A shape is a list.</p>\n~~~zh\nshape 就是一串数。\n~~~\n'
+                 '<p class="lang-zh">shape 就是一串数。</p>')))
+    assert not ok
+    assert any(m.startswith('FAIL') and '~~~zh fence' in m and 'hero' in m
+               for m in msgs), msgs
+
+
+def test_paired_nodes_with_no_fence_pass_the_fence_check():
+    ok, msgs = _region_msgs(_region_src(
+        ('hero', '<p class="lang-en">A shape is a list.</p><p class="lang-zh">shape 就是一串数。</p>')))
+    assert ok
+    assert any(m.startswith('pass') and 'no region hides a ~~~zh fence' in m for m in msgs), msgs
+
+
+# --- assertion (c): a prose region with no Chinese at all ---------------------
+
+def test_a_wholly_untranslated_prose_region_is_reported_not_passed():
+    # The failure this catches is the quiet one: a class-less English region renders
+    # fine for both readers, so the page LOOKS finished. Balance and fence checks both
+    # pass on it — there is nothing unpaired and no fence — and only a "this region
+    # has no Chinese in it" check can see it.
+    #
+    # RETROACTIVELY VERIFIED against the real pre-translation state. Run the new check
+    # on m01/day-01-arrays as it stood before this batch and it reports:
+    #     FAIL 8 region(s) ... no class="lang-zh" node at all: hero (461 chars),
+    #     s1 (1725), s2 (1277), s4 (2198), s7 (1990), DEMOS (1380), BUILD (1765),
+    #     QS (1191)
+    # — 12 027 characters of untranslated prose, correctly named region by region. The
+    # old check 1 printed "pass all 0 concept units carry Chinese" on that same file.
+    prose = '<p>' + 'A row is one line of the grid. ' * 8 + '</p>'   # 248 chars of text
+    ok, msgs = _region_msgs(_region_src(
+        ('hero', '<p class="lang-en">Hi.</p><p class="lang-zh">你好。</p>'),
+        ('s4', prose)))
+    assert not ok
+    assert any(m.startswith('FAIL') and 'no class="lang-zh" node at all' in m and 's4' in m
+               for m in msgs), msgs
+
+
+def test_a_short_chrome_region_is_exempt_from_the_prose_requirement():
+    # Threshold calibration, measured over m01's 84 regions: the longest region that
+    # CANNOT be bilingual is `title` — a <title> element, and a browser tab cannot
+    # show two — at 57 characters of text; the shortest that genuinely is prose is
+    # `fin` at 166. The 200-character line sits in that gap.
+    ok, msgs = _region_msgs(_region_src(
+        ('title', '<title>Module 1 · Day 1 — Numbers, Arrays, and the Shape of Data</title>'),
+        ('hero', '<p class="lang-en">Hi.</p><p class="lang-zh">你好。</p>')))
+    assert ok, msgs
+    assert any(m.startswith('pass') and 'over 200 characters of prose carries Chinese' in m
+               for m in msgs), msgs
+
+
+def test_a_long_region_that_is_almost_all_markup_is_not_a_false_positive():
+    # `_visible_text` strips tags and comments before measuring, so a region that is
+    # 900 bytes of SVG attributes and 40 characters of label text is not accused of
+    # being an untranslated wall of prose.
+    svg = ('<svg viewBox="0 0 520 200">'
+           + ''.join('<rect x="%d" y="20" width="30" height="30" fill="#89b4fa" '
+                     'stroke="#1e1e2e" stroke-width="2" rx="4"></rect>' % (20 + 40 * i)
+                     for i in range(10))
+           + '</svg>')
+    assert len(svg) > 700
+    ok, msgs = _region_msgs(_region_src(
+        ('BUILD', svg), ('hero', '<p class="lang-en">Hi.</p><p class="lang-zh">你好。</p>')))
+    assert ok, msgs
+
+
+# --- inertness: the 40-odd English-only days must not start failing -----------
+
+def test_a_region_day_with_no_chinese_at_all_stays_inert():
+    # Same contract as the concept-mode checks. A day with no Chinese has not started;
+    # the CSS fallback shows English and there is nothing to be half-done about.
+    src = _region_src(('s1', '<p>' + 'English prose only. ' * 30 + '</p>'))
+    src = src.replace('zh_title: 题\n', '')
+    ok, msgs = parity.run(src, whitelist=WL)
+    assert ok
+    assert any(m.startswith('n/a') for m in msgs), msgs
+    assert not any('region' in m for m in msgs), 'check 1r must not run: %s' % msgs
+
+
+def test_a_day_that_declares_chinese_only_with_single_quotes_is_not_inert():
+    # `_declares_chinese` used to test the literal string 'class="lang-zh"'. A page
+    # whose only Chinese was single-quoted would have declared nothing, and the ENTIRE
+    # gate — U+FFFD aside — would have gone inert on a half-translated day.
+    src = _region_src(('hero', "<p class='lang-en'>x</p><p class='lang-zh'>甲</p>"))
+    ok, msgs = parity.run(src, whitelist=WL)
+    assert not any(m.startswith('n/a') for m in msgs), msgs
+    assert any('1 class="lang-en" vs 1 class="lang-zh"' in m for m in msgs), msgs
+
+
+# --- the vacuous pass itself, and the corpus pin -----------------------------
+
+def test_a_region_day_never_reports_the_vacuous_all_zero_concepts_pass():
+    # The exact string that certified six days while reading nothing.
+    _ok, msgs = parity.run(_region_src(
+        ('hero', '<p class="lang-en">Hi.</p><p class="lang-zh">你好。</p>')), whitelist=WL)
+    assert not any('all 0 concept units carry Chinese' in m for m in msgs), msgs
+
+
+def test_a_day_with_neither_concepts_nor_regions_says_UNCHECKED():
+    # The third case, so the two branches cannot BOTH be skipped into a silent pass:
+    # Chinese is declared but there is no unit of any kind to hang it on.
+    ok, msgs = parity.run(REGION_FM + 'Loose prose.\n~~~zh\n散落的中文。\n~~~\n', whitelist=WL)
+    assert any('UNCHECKED' in m and 'prose parity' in m for m in msgs), msgs
+
+
+def _region_sources():
+    out = []
+    for p in sorted(glob.glob(os.path.join(REPO, 'sessions', 'm*', 'day-*', 'source.md'))):
+        src = open(p, encoding='utf-8').read()
+        body, _fm = parity._strip_frontmatter(src)
+        if any(k == 'region' for k, _a, _t in parity._blocks(body)):
+            out.append((p, src, body))
+    return out
+
+
+def test_every_shipped_region_mode_day_balances_and_is_actually_measured():
+    # THE CORPUS PIN, and it guards against a loop over an empty set as much as
+    # against an imbalance: assert the cohort was found before asserting anything
+    # about it. m01's six days measured 122 / 114 / 112 / 105 / 109 / 124 pairs across
+    # 14 regions each when this was written — all balanced, all now on evidence rather
+    # than on a vacuous pass.
+    days = _region_sources()
+    assert len(days) >= 6, 'expected >=6 region-mode days, saw %d' % len(days)
+    broken, unmeasured = {}, []
+    for path, src, body in days:
+        rel = os.path.relpath(path, os.path.join(REPO, 'sessions'))
+        en = len(parity._LANG_EN_RE.findall(body))
+        zh = len(parity._LANG_ZH_RE.findall(body))
+        if en != zh:
+            broken[rel] = (en, zh)
+        ok, msgs = parity.run(src)
+        if not any(m.startswith('pass') and 'region language classes balance' in m
+                   for m in msgs):
+            unmeasured.append((rel, [m for m in msgs if 'region' in m or m.startswith('n/a')]))
+    assert not broken, 'unbalanced lang classes (en, zh): %s' % broken
+    assert not unmeasured, 'check 1r did not produce a real verdict: %s' % unmeasured
+
+
+def test_no_shipped_region_hides_a_zh_fence():
+    # Pins the trap corpus-wide: today 0 of 84 m01 regions contain one, and a fence
+    # written into a region tomorrow would ship the characters `~~~zh` to the reader.
+    bad = {}
+    for path, _src, body in _region_sources():
+        for _k, args, text in parity._blocks(body):
+            if _k == 'region' and parity._fences(text):
+                bad.setdefault(os.path.relpath(path, os.path.join(REPO, 'sessions')),
+                               []).append(args.strip())
+    assert not bad, 'literal ~~~zh fences inside verbatim regions: %s' % bad
+
+
+# =============================================================================
 # reader_flow_gate — the Chinese side of the curiosity and discovery rules
 # =============================================================================
 # The English lists keep working on a bilingual day because the English text is

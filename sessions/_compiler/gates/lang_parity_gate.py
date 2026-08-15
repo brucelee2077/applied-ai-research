@@ -17,6 +17,12 @@
 #
 # Six checks, all deterministic and offline:
 #   1. every @@@ concept carries Chinese, and no prose span is left untwinned
+#  1r. the same question for `mode: exemplar` days, which have `@@@ region` blocks of
+#      verbatim HTML and no concepts at all: paired lang-en/lang-zh node counts must
+#      balance, no region may hide a ~~~zh fence (a region is never rendered, so the
+#      fence would ship as literal text), and no prose region may be wholly English.
+#      Added because check 1 iterated concepts and therefore reported
+#      "pass all 0 concept units carry Chinese" on every one of m01's six days.
 #   2. every reader-visible SVG label has a paired <text class="lang-zh">
 #      (symbol/number-only labels are auto-exempt — "N = 7 000 000 000" needs no
 #       translation, and demanding one would be noise)
@@ -43,6 +49,33 @@ _VISIBLE_FM = ['title', 'subtitle', 'module_label', 'fin_title', 'fin_body']
 # A label needing no translation: no Latin word of 3+ letters. Numbers, operators,
 # ticks, single letters and bare identifiers are the same in both languages.
 _NEEDS_WORDS = re.compile(r'[A-Za-z]{3,}')
+
+# Counting the language classes in a REGION (raw HTML written by hand). Deliberately
+# tolerant, because every form below renders identically to the reader and a count
+# that only recognised the canonical one could be dodged by accident:
+#   class="lang-en"      the canonical form (686 of 686 occurrences in m01 today)
+#   class='lang-en'      single quotes — invisible to a double-quote-only regex
+#   class=\"lang-en\"    escaped, which is what you get inside a double-quoted JS
+#                        string in the DEMOS / BUILD / QS regions
+#   class="lede lang-en" a second class alongside it
+def _lang_class_re(lang):
+    return re.compile(r'class\s*=\s*\\?["\'][^"\']*\blang-%s\b' % lang)
+
+
+_LANG_EN_RE = _lang_class_re('en')
+_LANG_ZH_RE = _lang_class_re('zh')
+
+
+def _visible_text(region_html):
+    """Roughly how much reader-facing text a region carries, tags removed.
+
+    Only used against a threshold, so entity decoding and JS-string quoting do not
+    need to be exact — it just has to tell a <title> line (57 chars) apart from a
+    translated section body (2000+).
+    """
+    t = re.sub(r'(?s)<!--.*?-->', ' ', region_html)
+    t = re.sub(r'<[^>]+>', ' ', t)
+    return re.sub(r'\s+', ' ', t).strip()
 
 # sessions/_compiler/gates -> sessions/_compiler -> sessions -> _refactor/zh_terms.yaml.
 # The first version stopped one dirname short and pointed at
@@ -131,8 +164,12 @@ def _fences(text):
 
 def _declares_chinese(src):
     body, fm = _strip_frontmatter(src)
+    # `_LANG_ZH_RE` rather than a literal `'class="lang-zh"' in body`: a day whose only
+    # Chinese used single quotes or lived escaped inside a JS string would otherwise
+    # declare nothing, and the whole gate would go inert on a half-translated page.
+    # Widening is additive here — the corpus contains 0 non-canonical forms today.
     return bool(_fences(body)) or bool(re.search(r'(?m)^zh_\w+\s*:', fm)) \
-        or 'zh_tag=' in body or 'zh_title=' in body or 'class="lang-zh"' in body
+        or 'zh_tag=' in body or 'zh_title=' in body or bool(_LANG_ZH_RE.search(body))
 
 
 def _quiz_rows(text):
@@ -181,37 +218,123 @@ def run(source_text, whitelist=None, manifest_covers=None):
 
     # ---- 1. every concept carries Chinese, and no span is left untwinned ----
     concepts = [(a, t) for k, a, t in _blocks(body) if k == 'concept']
-    bare = []
-    for args, text in concepts:
-        m = re.search(r'id=(\S+)', args)
-        cid = m.group(1) if m else '?'
-        if not _fences(text):
-            bare.append(cid)
-    if bare:
-        fail('%d concept unit(s) have no Chinese at all: %s. A page that is Chinese in '
-             'places and English in others is worse than either — finish the unit or '
-             'remove its Chinese.' % (len(bare), ', '.join(bare)))
-    else:
-        pas('all %d concept units carry Chinese' % len(concepts))
+    regions = [(a, t) for k, a, t in _blocks(body) if k == 'region']
 
-    # a trailing prose span with no fence after it shows in BOTH languages
-    unpaired = []
-    for args, text in concepts:
-        cid = re.search(r'id=(\S+)', args).group(1) if re.search(r'id=(\S+)', args) else '?'
-        fences = _fences(text)
-        if not fences:
-            continue
-        tail = '\n'.join(text.split('\n')[fences[-1][1] + 1:])
-        tail = re.sub(r'(?ms)^%%%.*?^%%%\s*$', '', tail)          # widgets are not prose
-        if v8lib.text_weight(tail.strip()) > 80:
-            unpaired.append((cid, v8lib.text_weight(tail.strip())))
-    if unpaired:
-        fail('%d concept unit(s) end with prose that has no Chinese twin, so it shows in '
-             'BOTH languages: %s (weight in English-char equivalents). Close the span '
-             'with a ~~~zh fence.'
-             % (len(unpaired), ', '.join('%s:%d' % u for u in unpaired)))
-    else:
-        pas('no concept ends with an untwinned prose span')
+    # THIS CHECK USED TO FAIL OPEN ON A WHOLE MODULE. It iterates `@@@ concept`
+    # blocks, so on m01 — six `mode: exemplar` days built from 14 `@@@ region` blocks
+    # and ZERO concepts — the loop never ran and the gate printed "pass all 0 concept
+    # units carry Chinese". Six fully translated days had their prose parity certified
+    # by a message that had examined nothing. Check 1r below is the region-mode half.
+    # Neither half is allowed to print a pass when it had no input to look at.
+    if concepts:
+        bare = []
+        for args, text in concepts:
+            m = re.search(r'id=(\S+)', args)
+            cid = m.group(1) if m else '?'
+            if not _fences(text):
+                bare.append(cid)
+        if bare:
+            fail('%d concept unit(s) have no Chinese at all: %s. A page that is Chinese in '
+                 'places and English in others is worse than either — finish the unit or '
+                 'remove its Chinese.' % (len(bare), ', '.join(bare)))
+        else:
+            pas('all %d concept units carry Chinese' % len(concepts))
+
+        # a trailing prose span with no fence after it shows in BOTH languages
+        unpaired = []
+        for args, text in concepts:
+            cid = re.search(r'id=(\S+)', args).group(1) if re.search(r'id=(\S+)', args) else '?'
+            fences = _fences(text)
+            if not fences:
+                continue
+            tail = '\n'.join(text.split('\n')[fences[-1][1] + 1:])
+            tail = re.sub(r'(?ms)^%%%.*?^%%%\s*$', '', tail)      # widgets are not prose
+            if v8lib.text_weight(tail.strip()) > 80:
+                unpaired.append((cid, v8lib.text_weight(tail.strip())))
+        if unpaired:
+            fail('%d concept unit(s) end with prose that has no Chinese twin, so it shows in '
+                 'BOTH languages: %s (weight in English-char equivalents). Close the span '
+                 'with a ~~~zh fence.'
+                 % (len(unpaired), ', '.join('%s:%d' % u for u in unpaired)))
+        else:
+            pas('no concept ends with an untwinned prose span')
+    elif not regions:
+        # Chinese is declared but there is no unit of ANY kind to hang it on. Never
+        # silently pass: say out loud that the check had nothing to read.
+        note('this day declares Chinese but has neither @@@ concept nor @@@ region '
+             'blocks — prose parity UNCHECKED this run (no unit to measure).')
+
+    # ---- 1r. region-mode days: the same question, asked of raw HTML -----------
+    # A region is pasted into the page BYTE-FOR-BYTE (v8lib.compile_html) and never
+    # goes through render_md, so its bilingual markup is hand-written as paired
+    # `class="lang-en"` / `class="lang-zh"` nodes. Three ways that goes wrong, none of
+    # them visible to checks 1-6:
+    #   a. an UNPAIRED node. A node with NEITHER class shows under both languages, so
+    #      an untouched page degrades to English safely — but a node explicitly marked
+    #      `lang-en` with no `lang-zh` twin is display:none for a Chinese reader. It
+    #      does not fall back. It VANISHES. The mirror case shows Chinese to an
+    #      English reader.
+    #   b. a `~~~zh` FENCE inside a region. Because the region is verbatim, the fence
+    #      is not a fence: the literal characters `~~~zh` and the Chinese after them
+    #      ship to the reader as visible text.
+    #   c. a region of real prose with no Chinese in it at all — an untranslated
+    #      section that reads as finished, because English shows through.
+    if regions:
+        tot_en = tot_zh = 0
+        skew, fenced, untranslated = [], [], []
+        for args, text in regions:
+            m = re.search(r'name=(\S+)', args)
+            name = m.group(1) if m else '?'
+            en = len(_LANG_EN_RE.findall(text))
+            zh = len(_LANG_ZH_RE.findall(text))
+            tot_en += en
+            tot_zh += zh
+            if en != zh:
+                skew.append('%s: %d en vs %d zh' % (name, en, zh))
+            if _fences(text):
+                fenced.append(name)
+            # A region long enough to be reader-facing prose must carry SOME Chinese.
+            # Threshold measured on the real corpus: across m01's 84 regions the
+            # shortest one that is genuinely prose is `fin` at 166 characters of text,
+            # and the longest that CANNOT be bilingual is `title` (a <title> element,
+            # and a browser tab cannot show two) at 57. 200 sits in that gap with room
+            # on both sides.
+            if not zh and len(_visible_text(text)) > 200:
+                untranslated.append('%s (%d chars)' % (name, len(_visible_text(text))))
+
+        # (a) balance. Both numbers are reported whatever the verdict — the point of
+        # the check is the pair of counts, not just the boolean. Localised per region
+        # as well, because equal TOTALS can still hide two skewed regions that cancel
+        # each other out (+1 here, -1 there), which is exactly a fail-open path.
+        if tot_en != tot_zh or skew:
+            fail('region language classes are unbalanced: %d class="lang-en" vs %d '
+                 'class="lang-zh" across %d region(s)%s. An unpaired lang-en node is '
+                 'display:none for a Chinese reader — it VANISHES, it does not fall back '
+                 'to English; an unpaired lang-zh node shows Chinese to an English reader.'
+                 % (tot_en, tot_zh, len(regions),
+                    ('; skewed: ' + ', '.join(skew[:6])) if skew else ''))
+        else:
+            pas('region language classes balance: %d class="lang-en" vs %d '
+                'class="lang-zh" across %d region(s)' % (tot_en, tot_zh, len(regions)))
+
+        # (b) a fence cannot work inside a verbatim region
+        if fenced:
+            fail('%d region(s) contain a ~~~zh fence: %s. A region is pasted into the page '
+                 'byte-for-byte and never rendered, so the fence is not a fence — the '
+                 'literal text "~~~zh" ships to the reader. Use paired '
+                 '<p class="lang-en"> / <p class="lang-zh"> nodes instead.'
+                 % (len(fenced), ', '.join(fenced)))
+        else:
+            pas('no region hides a ~~~zh fence that would ship as literal text')
+
+        # (c) a whole region nobody translated
+        if untranslated:
+            fail('%d region(s) hold reader-visible prose with no class="lang-zh" node at '
+                 'all: %s. English shows through, so the page looks finished and teaches a '
+                 'Chinese reader nothing in that section.'
+                 % (len(untranslated), ', '.join(untranslated)))
+        else:
+            pas('every region over 200 characters of prose carries Chinese')
 
     # ---- 2. SVG labels ------------------------------------------------------
     en_lab = re.findall(r'<text class="lang-en"[^>]*>(.*?)</text>', body, re.S)
