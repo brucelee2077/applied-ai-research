@@ -702,7 +702,13 @@ function secLabel(sec){
   return (h.querySelector('.lang-'+cur) || h.querySelector('.lang-en') || h).textContent;
 }
 function buildChecklist(){
-  if(!checklist) return;
+  /* Returns true when it actually rebuilt, so the caller knows whether to
+     refresh. The language check lives HERE rather than in setLang because
+     setLang's text is shared verbatim with pages that have no checklist at all
+     (index.html, roadmap.html) — referencing _lblLang from there would throw. */
+  if(!checklist) return false;
+  var cur = document.documentElement.getAttribute('data-lang') || 'en';
+  if(_lblLang === cur && checklist.children.length) return false;
   checklist.innerHTML = ''; checkItems = {};
   secs.forEach(function(sec){
     var key = sec.getAttribute('data-sec');
@@ -713,7 +719,8 @@ function buildChecklist(){
     checklist.appendChild(li);
     checkItems[key] = li;
   });
-  _lblLang = document.documentElement.getAttribute('data-lang') || 'en';
+  _lblLang = cur;
+  return true;
 }
 buildChecklist();
 function shorten(t){ return t.length>34 ? t.slice(0,32).trim()+'…' : t; }
@@ -777,8 +784,12 @@ function setLang(l, persist){
   document.documentElement.setAttribute('lang', l==='zh' ? 'zh-Hans' : 'en');
   if(persist!==false){ try{ localStorage.setItem('frontier-lang', l); }catch(e){} }
   langBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-lang-set')===l); });
-  /* checklist labels are language-dependent; rebuild only on a real change */
-  if(_lblLang !== l){ buildChecklist(); refresh(); }
+  /* Checklist labels are language-dependent. Both calls are guarded by typeof so
+     this exact block can also be pasted onto pages that have no checklist and no
+     refresh() at all (the hub and the roadmap) — one shared text, no variants. */
+  if(typeof buildChecklist === 'function' && buildChecklist()){
+    if(typeof refresh === 'function') refresh();
+  }
 }
 langBtns.forEach(function(b){
   if(b.getAttribute('data-lang-set')==='zh' && !hasZh){

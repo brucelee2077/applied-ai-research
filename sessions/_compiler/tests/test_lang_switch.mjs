@@ -239,4 +239,40 @@ t('the checklist keys stay the data-sec values across a switch', () => {
   assert.deepEqual(Object.keys(h.api.items()), ['c1'])
 })
 
+// --- the hub / roadmap shape: no checklist, no refresh() ---------------------
+// index.html and roadmap.html carry the same sidebar shell but have no #checklist
+// and no refresh(). The sweep pastes the language controller onto them verbatim,
+// so setLang must survive both being absent — an unguarded call would throw and
+// kill the whole IIFE, taking the theme switcher down with it.
+t('the language controller works on a page with no checklist and no refresh', () => {
+  const store = {}
+  const localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v) },
+  }
+  const htmlEl = el({ 'data-lang': 'en' })
+  const enBtn = el({ class: 'lang-btn', 'data-lang-set': 'en' })
+  const zhBtn = el({ class: 'lang-btn', 'data-lang-set': 'zh' })
+  const zhBody = el({ class: 'lang-zh' }, '中文内容')
+  const root = el({}, '', [enBtn, zhBtn, zhBody])
+  const document = {
+    documentElement: htmlEl,
+    getElementById: () => null,
+    createElement: () => el(),
+    querySelector: (sel) => root.querySelector(sel),
+    querySelectorAll: (sel) => root.querySelectorAll(sel),
+  }
+  // NOTE: no `secs`, no `shorten`, no `refresh`, and langSrc only — exactly the
+  // scope those two pages provide.
+  const factory = new Function('document', 'localStorage',
+    `${langSrc}\nreturn { setLang: setLang };`)
+  const api = factory(document, localStorage)
+  api.setLang('zh')
+  assert.equal(htmlEl.getAttribute('data-lang'), 'zh')
+  assert.equal(htmlEl.getAttribute('lang'), 'zh-Hans')
+  assert.equal(store['frontier-lang'], 'zh')
+  api.setLang('en')
+  assert.equal(htmlEl.getAttribute('data-lang'), 'en')
+})
+
 console.log(`ok: language switcher (${n} assertions groups, extracted live from v9-base.donor)`)

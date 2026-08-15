@@ -9,7 +9,7 @@ DONOR = os.path.join(HERE, '..', 'shells', 'v9-base.donor')
 # Every piece the reading-language toggle needs. A page carrying some of these and
 # not others is the failure mode of a partial rollout: the row renders but nothing
 # happens on click, or the CSS hides Chinese that no button can reveal.
-PIECES = {
+CORE_PIECES = {
     'prepaint':      "set reading language before paint",
     'prepaint-lang': "setAttribute('lang'",
     'css-row':       ".lang-row{",
@@ -22,9 +22,21 @@ PIECES = {
     'js-setlang':    'function setLang(',
     'js-haszh':      'var hasZh =',
     'js-store':      "localStorage.setItem('frontier-lang'",
+}
+# Only meaningful on a page that HAS a progress checklist. index.html and
+# roadmap.html carry the same sidebar shell but have no #checklist and no
+# refresh(), which is why the controller guards both calls with typeof.
+CHECKLIST_PIECES = {
     'js-checklist':  'function buildChecklist(',
     'js-seclabel':   'function secLabel(',
 }
+
+
+def _expected(html):
+    p = dict(CORE_PIECES)
+    if 'id="checklist"' in html:
+        p.update(CHECKLIST_PIECES)
+    return p
 
 
 def _shell_pages():
@@ -61,14 +73,14 @@ def test_the_globs_matched_something():
 
 def test_the_donor_has_every_piece():
     donor = open(DONOR, encoding='utf-8').read()
-    missing = [k for k, needle in PIECES.items() if needle not in donor]
+    missing = [k for k, needle in _expected(donor).items() if needle not in donor]
     assert not missing, 'v9-base.donor is missing %s' % missing
 
 
 @pytest.mark.parametrize('rel,path', COMPILED, ids=[c[0] for c in COMPILED])
 def test_compiled_lesson_has_every_toggle_piece(rel, path):
     h = open(path, encoding='utf-8').read()
-    missing = [k for k, needle in PIECES.items() if needle not in h]
+    missing = [k for k, needle in _expected(h).items() if needle not in h]
     assert not missing, 'missing %s — recompile from source.md' % missing
 
 
@@ -77,10 +89,53 @@ def test_no_shell_page_has_a_half_applied_toggle(rel, path):
     # Holds before AND after the sweep: a page either has the whole toggle or
     # none of it. Half of it is the state that renders a dead button.
     h = open(path, encoding='utf-8').read()
-    present = [k for k, needle in PIECES.items() if needle in h]
-    assert present == [] or len(present) == len(PIECES), \
+    want = _expected(h)
+    present = [k for k, needle in want.items() if needle in h]
+    assert present == [] or len(present) == len(want), \
         'partial toggle — has %s, missing %s' % (
-            sorted(present), sorted(set(PIECES) - set(present)))
+            sorted(present), sorted(set(want) - set(present)))
+
+
+@pytest.mark.parametrize('rel,path', SHELL_PAGES, ids=[c[0] for c in SHELL_PAGES])
+def test_every_shell_page_carries_the_toggle(rel, path):
+    # The rollout invariant. Asserted per page rather than as a count, so the
+    # failure names the page that was missed instead of just a number.
+    h = open(path, encoding='utf-8').read()
+    assert 'class="lang-row"' in h, 'no language row — run sessions/_lang_shell_sweep.py --apply'
+
+
+# The behavioural test (test_lang_switch.mjs) extracts its code from the DONOR.
+# That only proves anything about the 293 shipped pages if what they carry is the
+# same text. These two assert exactly that, which is what makes _lang_shell_sweep
+# slicing from the donor rather than hardcoding meaningful.
+def _sweep_parts():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        '_lang_shell_sweep', os.path.join(REPO, 'sessions', '_lang_shell_sweep.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.donor_parts()
+
+
+PARTS = _sweep_parts()
+
+
+@pytest.mark.parametrize('rel,path', SHELL_PAGES, ids=[c[0] for c in SHELL_PAGES])
+def test_page_toggle_text_is_byte_identical_to_the_donor(rel, path):
+    h = open(path, encoding='utf-8').read()
+    need = ['prepaint', 'css', 'markup', 'controller']
+    if 'id="checklist"' in h:
+        need.append('checklist')
+    drifted = [k for k in need if PARTS[k] not in h]
+    assert not drifted, ('%s drifted from the donor — the behavioural test in '
+                         'test_lang_switch.mjs no longer describes this page' % drifted)
+
+
+def test_the_donor_parts_are_not_empty():
+    # A slice helper that silently returned '' would make the test above pass on
+    # every page while checking nothing.
+    for k, v in PARTS.items():
+        assert v and len(v) > 20, 'donor part %r is empty or truncated: %r' % (k, v[:40])
 
 
 def test_the_theme_switcher_was_not_disturbed():

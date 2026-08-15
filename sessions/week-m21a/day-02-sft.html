@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>/* set appearance before paint (no flash) */(function(){try{var t=localStorage.getItem('frontier-theme');if(['light','dim','dark','midnight'].indexOf(t)<0)t='dim';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dim');}})();</script>
+<script>/* set reading language before paint (no flash) */(function(){try{var l=localStorage.getItem('frontier-lang');if(['en','zh'].indexOf(l)<0)l='en';document.documentElement.setAttribute('data-lang',l);document.documentElement.setAttribute('lang',l==='zh'?'zh-Hans':'en');}catch(e){document.documentElement.setAttribute('data-lang','en');}})();</script>
 <title>Module 21a · Day 2 — Supervised Fine-Tuning</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,6 +92,24 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
 .theme-btn{flex:1;font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
 .theme-btn:hover{color:var(--ink)}
 .theme-btn.active{background:var(--accent);color:#fff}
+/* ---- reading language (EN / 中文), mirroring .theme-* one-for-one ---- */
+.lang-row{padding:10px 8px 0}
+.lang-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.lang-btn{font-family:var(--body);font-size:.72rem;font-weight:600;color:var(--muted);background:none;border:0;border-radius:7px;padding:5px 4px;cursor:pointer;transition:.15s}
+.lang-btn:hover{color:var(--ink)}
+.lang-btn.active{background:var(--accent);color:#fff}
+.lang-btn[aria-disabled="true"]{opacity:.38;cursor:not-allowed}
+.lang-btn[aria-disabled="true"]:hover{color:var(--muted)}
+/* One language shows at a time. A block carrying NEITHER class shows under both,
+   which is the fallback: a day with no Chinese twin still reads in English
+   instead of going blank. No JavaScript is involved in that decision. */
+html[data-lang="en"] .lang-zh{display:none}
+html[data-lang="zh"] .lang-en{display:none}
+/* CJK needs more leading and no letter-spacing to stay readable at this size.
+   No new webfont is loaded — the system CJK stack is used, because every lesson
+   page must stay self-contained. */
+html[data-lang="zh"] .sec-body,html[data-lang="zh"] .lede,html[data-lang="zh"] .goal{line-height:1.9;letter-spacing:0}
+html[data-lang="zh"] .sec-h,html[data-lang="zh"] h1,html[data-lang="zh"] h4{letter-spacing:0}
 .nav-group-label{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;padding:4px 8px;margin-top:10px}
 .nav-link{display:flex;align-items:center;gap:.5rem;padding:7px 10px;margin:1px 0;border-radius:9px;color:var(--ink2);
   font-size:.86rem;cursor:pointer;border-left:3px solid transparent;transition:all .12s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:var(--body)}
@@ -299,6 +318,14 @@ code{font-family:var(--mono);font-size:.85em;background:var(--bg2);padding:1px 5
       </div>
     </div>
 
+    <div class="lang-row" role="group" aria-label="reading language">
+      <span class="nav-group-label" style="padding:0">Language · 语言</span>
+      <div class="lang-btns">
+        <button class="lang-btn" data-lang-set="en" type="button">English</button>
+        <button class="lang-btn" data-lang-set="zh" type="button">中文</button>
+      </div>
+    </div>
+
     <nav aria-label="Sections">
       <div class="nav-group-label">Module 21a · Train</div>
       <button class="nav-link" data-target="home"><span class="nl-dot"></span>Start here</button>
@@ -471,17 +498,40 @@ var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: red
 var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link'));
 
 /* ---- build the sidebar checklist from sections ---- */
-var checklist = document.getElementById('checklist'), checkItems = {};
-secs.forEach(function(sec){
-  var key = sec.getAttribute('data-sec');
-  var title = sec.querySelector('.sec-h') ? sec.querySelector('.sec-h').textContent : key;
-  var num = sec.querySelector('.sec-num') ? sec.querySelector('.sec-num').textContent : '';
-  var li = document.createElement('li');
-  li.innerHTML = '<span class="box" aria-hidden="true"></span><span>'+num+' · '+shorten(title)+'</span>';
-  li.addEventListener('click', function(){ sec.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'}); });
-  checklist.appendChild(li);
-  checkItems[key] = li;
-});
+var checklist = document.getElementById('checklist'), checkItems = {}, _lblLang = null;
+function secLabel(sec){
+  /* A .sec-h can hold a paired <span class="lang-en">/<span class="lang-zh">. Reading
+     the whole node's textContent would splice BOTH languages into one label, e.g.
+     "The bend这个弯" — display:none hides a span visually but textContent still
+     returns it. So read the one span for the current language, falling back to
+     English, and to the whole node on a page with no pairs at all. */
+  var h = sec.querySelector('.sec-h');
+  if(!h) return sec.getAttribute('data-sec');
+  var cur = document.documentElement.getAttribute('data-lang') || 'en';
+  return (h.querySelector('.lang-'+cur) || h.querySelector('.lang-en') || h).textContent;
+}
+function buildChecklist(){
+  /* Returns true when it actually rebuilt, so the caller knows whether to
+     refresh. The language check lives HERE rather than in setLang because
+     setLang's text is shared verbatim with pages that have no checklist at all
+     (index.html, roadmap.html) — referencing _lblLang from there would throw. */
+  if(!checklist) return false;
+  var cur = document.documentElement.getAttribute('data-lang') || 'en';
+  if(_lblLang === cur && checklist.children.length) return false;
+  checklist.innerHTML = ''; checkItems = {};
+  secs.forEach(function(sec){
+    var key = sec.getAttribute('data-sec');
+    var num = sec.querySelector('.sec-num') ? sec.querySelector('.sec-num').textContent : '';
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="box" aria-hidden="true"></span><span>'+num+' · '+shorten(secLabel(sec))+'</span>';
+    li.addEventListener('click', function(){ sec.scrollIntoView({behavior:RM?'auto':'smooth', block:'start'}); });
+    checklist.appendChild(li);
+    checkItems[key] = li;
+  });
+  _lblLang = cur;
+  return true;
+}
+buildChecklist();
 function shorten(t){ return t.length>34 ? t.slice(0,32).trim()+'…' : t; }
 
 function markDone(sec, scrollNext){
@@ -525,6 +575,39 @@ function setTheme(t){
 }
 themeBtns.forEach(function(b){ b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme-set')); }); });
 setTheme(document.documentElement.getAttribute('data-theme') || 'dim');
+
+/* ---- reading-language switcher (English / 中文) ---- */
+/* Mirrors setTheme: flip an attribute on <html>, let CSS do the rest, remember the
+   choice. Two things it must get right that setTheme does not have to:
+     * <html lang> moves too, not just data-lang. A screen reader on a page marked
+       lang="en" reads CJK with an English voice, which is worse than not
+       translating it at all.
+     * a page with no Chinese content must NOT persist a forced fallback. Without
+       that guard, opening one untranslated day would silently reset the reader's
+       language for the whole site. */
+var langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
+var hasZh = !!document.querySelector('.lang-zh');
+function setLang(l, persist){
+  if(l==='zh' && !hasZh){ l='en'; persist=false; }
+  document.documentElement.setAttribute('data-lang', l);
+  document.documentElement.setAttribute('lang', l==='zh' ? 'zh-Hans' : 'en');
+  if(persist!==false){ try{ localStorage.setItem('frontier-lang', l); }catch(e){} }
+  langBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-lang-set')===l); });
+  /* Checklist labels are language-dependent. Both calls are guarded by typeof so
+     this exact block can also be pasted onto pages that have no checklist and no
+     refresh() at all (the hub and the roadmap) — one shared text, no variants. */
+  if(typeof buildChecklist === 'function' && buildChecklist()){
+    if(typeof refresh === 'function') refresh();
+  }
+}
+langBtns.forEach(function(b){
+  if(b.getAttribute('data-lang-set')==='zh' && !hasZh){
+    b.setAttribute('aria-disabled','true');
+    b.setAttribute('title','中文版尚未提供 — no Chinese on this page yet');
+  }
+  b.addEventListener('click', function(){ setLang(b.getAttribute('data-lang-set')); });
+});
+setLang(document.documentElement.getAttribute('data-lang') || 'en', false);
 
 /* ---- sidebar nav: click to scroll, scrollspy to highlight active ---- */
 navLinks.forEach(function(l){
