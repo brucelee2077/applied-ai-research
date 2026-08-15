@@ -153,10 +153,30 @@ def run(source_text, whitelist=None, manifest_covers=None):
     def note(m): msgs.append('warn ' + m)
 
     body, fm = _strip_frontmatter(source_text)
+
+    # ---- 0. no U+FFFD, checked on EVERY day, Chinese or not -------------------
+    # A literal replacement character means a byte sequence was mangled on its way
+    # into the file, and it ships straight to the reader as a black diamond. Found
+    # 22 of them in one freshly translated day and 21 in an already-PUBLISHED one,
+    # plus 3 in English-only prose (an em-dash in m02/day-04) — so this check must
+    # run before the Chinese early-return, not inside it. The file still decodes as
+    # valid UTF-8, which is why nothing else caught it: the corruption is a
+    # perfectly well-formed encoding OF the replacement character.
+    if '�' in source_text:
+        sites = [source_text[max(0, m.start() - 16):m.end() + 12].replace('\n', ' ')
+                 for m in re.finditer('�+', source_text)]
+        fail('%d U+FFFD replacement character(s) — text was corrupted on the way in '
+             'and will render as a black diamond. First: %r'
+             % (source_text.count('�'), sites[0]))
+    else:
+        pas('no U+FFFD corruption')
+
     if not _declares_chinese(source_text):
         msgs.append('n/a  this day declares no Chinese yet — nothing to check. The CSS '
                     'fallback shows English, and the 中文 button is disabled.')
-        return True, msgs
+        # ok[0], not a hardcoded True: check 0 runs above this return and applies to
+        # English-only days too, so returning True here would discard its verdict.
+        return ok[0], msgs
     terms = whitelist if whitelist is not None else _load_whitelist()
 
     # ---- 1. every concept carries Chinese, and no span is left untwinned ----

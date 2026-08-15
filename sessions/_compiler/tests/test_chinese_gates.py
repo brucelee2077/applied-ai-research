@@ -355,3 +355,50 @@ def test_the_chinese_checks_are_silent_on_an_english_only_day():
            + '@@@ produce id=produce tag=P title=P\npredict what you should see\n')
     ok, msgs = _rf(src)
     assert not any('Chinese' in m or 'zh_spine' in m for m in msgs), msgs
+
+
+# =============================================================================
+# check 0 — U+FFFD corruption, on every day
+# =============================================================================
+# Real defect: 22 replacement characters in a freshly translated day, 21 in one
+# already published, and 3 in English-only prose. The files decode as valid UTF-8
+# (they contain a well-formed encoding of U+FFFD), so nothing else could see them.
+
+def test_a_replacement_character_fails_even_with_no_chinese():
+    ok, msgs = parity.run(FM + '@@@ concept id=c1 tag=t title=t\nsame rule as yes/no � only x.\n',
+                          whitelist=WL)
+    assert not ok
+    assert any('U+FFFD' in m and m.startswith('FAIL') for m in msgs), msgs
+
+
+def test_a_replacement_character_inside_the_chinese_fails():
+    src = (FM + '@@@ concept id=c1 tag=t title=t\nA.\n~~~zh\n我们又该往哪边走才能学�东西。\n~~~\n')
+    ok, msgs = parity.run(src, whitelist=WL)
+    assert not ok
+    assert any('U+FFFD' in m for m in msgs), msgs
+
+
+def test_clean_text_passes_check_zero():
+    ok, msgs = parity.run(FM + '@@@ concept id=c1 tag=t title=t\nEnglish only.\n', whitelist=WL)
+    assert ok
+    assert any('no U+FFFD' in m and m.startswith('pass') for m in msgs), msgs
+
+
+def test_no_shipped_source_carries_a_replacement_character():
+    # The corpus-wide pin. All six affected files were repaired by hand; this stops
+    # the next authoring pass from re-introducing one silently.
+    bad = {}
+    for p in sorted(glob.glob(os.path.join(REPO, 'sessions', 'm*', 'day-*', 'source.md'))):
+        n = open(p, encoding='utf-8').read().count('�')
+        if n:
+            bad[os.path.relpath(p, os.path.join(REPO, 'sessions'))] = n
+    assert not bad, 'U+FFFD in shipped sources: %s' % bad
+
+
+def test_no_compiled_lesson_carries_a_replacement_character():
+    bad = {}
+    for p in sorted(glob.glob(os.path.join(REPO, 'sessions', 'm*', 'day-*', 'lesson.html'))):
+        n = open(p, encoding='utf-8').read().count('�')
+        if n:
+            bad[os.path.relpath(p, os.path.join(REPO, 'sessions'))] = n
+    assert not bad, 'U+FFFD in compiled lessons: %s' % bad

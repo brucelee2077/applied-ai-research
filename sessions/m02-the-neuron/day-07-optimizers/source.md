@@ -240,7 +240,7 @@ If the size of that gap startled you, good — it startles most people, and it i
 
 So the modern default is *mini-batch* SGD: sample a small batch, take the plain downhill step, repeat. You now know **what** tilt you are stepping on. Next we make the *step itself* smarter, by giving our marble some real rolling speed.
 ~~~zh
-**班级投票这个比喻对在哪里：** 声音越多方向越真但决定越慢，一个声音快但跳 —— 这个取舍是真的。**它在哪里不成立：** 真班里所有人可以同时喊；而网络的「问」意味着对每个样本做数学，所以��得越多真的越费时间和内存。正是这个成本让中间那个选项赢了。
+**班级投票这个比喻对在哪里：** 声音越多方向越真但决定越慢，一个声音快但跳 —— 这个取舍是真的。**它在哪里不成立：** 真班里所有人可以同时喊；而网络的「问」意味着对每个样本做数学，所以问得越多真的越费时间和内存。正是这个成本让中间那个选项赢了。
 
 #### 三种口味，用网络的话说
 每种口味只是在决定「走一步之前在多少个样本上测倾斜」。同一个班，三种投票规模：
@@ -331,7 +331,7 @@ why: 同时那个巨大的横向斜率把它从一面墙甩到另一面墙，于
 ~~~
 
 %%% svg
-<svg viewBox="0 0 520 200" role="img" aria-label="Before and after of a path down a narrow valley. Left, plain SGD: the path zig-zags sharply from one wall to the other while creeping slowly toward the bottom. Right, with momentum: the side-to-side bounces cancel and the path glides much more smoothly down toward the bottom."><g font-family="monospace" font-size="9.5"><text class="lang-en" x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Narrow valley: plain SGD zig-zags · Momentum glides through</text><text class="lang-zh" x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">窄山谷：plain SGD 走 Z 字形 · Momentum 一路滑过</text><text class="lang-en" x="130" y="34" text-anchor="middle" fill="#C93B3B" font-size="10">plain SGD</text><text class="lang-zh" x="130" y="34" text-anchor="middle" fill="#C93B3B" font-size="10">plain SGD</text><path d="M60 44 Q 130 120 200 44" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><path d="M60 60 Q 130 130 200 60" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><polyline points="80,52 182,66 90,82 176,96 100,110 168,122 118,134 150,142" fill="none" stroke="#C93B3B" stroke-width="2"/><circle cx="150" cy="142" r="4" fill="#C93B3B"/><text class="lang-en" x="130" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">bounces wall to wall,</text><text class="lang-zh" x="130" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">在两面墙之间弹跳，</text><text class="lang-en" x="130" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">creeps down slowly</text><text class="lang-zh" x="130" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">慢慢往下爬</text><line x1="260" y1="30" x2="260" y2="160" stroke="#E5DFD6" stroke-dasharray="4,3"/><text class="lang-en" x="390" y="34" text-anchor="middle" fill="#2D8B55" font-size="10">with Momentum</text><text class="lang-zh" x="390" y="34" text-anchor="middle" fill="#2D8B55" font-size="10">用 Momentum</text><path d="M320 44 Q 390 120 460 44" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><path d="M320 60 Q 390 130 460 60" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><polyline points="360,52 392,74 388,96 391,116 390,140" fill="none" stroke="#2D8B55" stroke-width="2"/><circle cx="390" cy="140" r="4" fill="#2D8B55"/><text class="lang-en" x="390" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">side tugs cancel →</text><text class="lang-zh" x="390" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">侧向的拽力互相抵消 →</text><text class="lang-en" x="390" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">glides down, much smoother</text><text class="lang-zh" x="390" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">���下滑，平顺得多</text></g></svg>
+<svg viewBox="0 0 520 200" role="img" aria-label="Before and after of a path down a narrow valley. Left, plain SGD: the path zig-zags sharply from one wall to the other while creeping slowly toward the bottom. Right, with momentum: the side-to-side bounces cancel and the path glides much more smoothly down toward the bottom."><g font-family="monospace" font-size="9.5"><text class="lang-en" x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">Narrow valley: plain SGD zig-zags · Momentum glides through</text><text class="lang-zh" x="260" y="15" text-anchor="middle" fill="#2C2A28" font-size="12">窄山谷：plain SGD 走 Z 字形 · Momentum 一路滑过</text><text class="lang-en" x="130" y="34" text-anchor="middle" fill="#C93B3B" font-size="10">plain SGD</text><text class="lang-zh" x="130" y="34" text-anchor="middle" fill="#C93B3B" font-size="10">plain SGD</text><path d="M60 44 Q 130 120 200 44" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><path d="M60 60 Q 130 130 200 60" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><polyline points="80,52 182,66 90,82 176,96 100,110 168,122 118,134 150,142" fill="none" stroke="#C93B3B" stroke-width="2"/><circle cx="150" cy="142" r="4" fill="#C93B3B"/><text class="lang-en" x="130" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">bounces wall to wall,</text><text class="lang-zh" x="130" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">在两面墙之间弹跳，</text><text class="lang-en" x="130" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">creeps down slowly</text><text class="lang-zh" x="130" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">慢慢往下爬</text><line x1="260" y1="30" x2="260" y2="160" stroke="#E5DFD6" stroke-dasharray="4,3"/><text class="lang-en" x="390" y="34" text-anchor="middle" fill="#2D8B55" font-size="10">with Momentum</text><text class="lang-zh" x="390" y="34" text-anchor="middle" fill="#2D8B55" font-size="10">用 Momentum</text><path d="M320 44 Q 390 120 460 44" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><path d="M320 60 Q 390 130 460 60" fill="none" stroke="#E5DFD6" stroke-width="1.6"/><polyline points="360,52 392,74 388,96 391,116 390,140" fill="none" stroke="#2D8B55" stroke-width="2"/><circle cx="390" cy="140" r="4" fill="#2D8B55"/><text class="lang-en" x="390" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">side tugs cancel →</text><text class="lang-zh" x="390" y="176" text-anchor="middle" fill="#6B645E" font-size="8.5">侧向的拽力互相抵消 →</text><text class="lang-en" x="390" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">glides down, much smoother</text><text class="lang-zh" x="390" y="188" text-anchor="middle" fill="#6B645E" font-size="8.5">一路下滑，平顺得多</text></g></svg>
 %%%
 
 Look at the right-hand path: that is the *whole* repair, and it comes from two things happening at once.
@@ -417,7 +417,7 @@ out: 第 1 步: velocity = 1.000   (plain SGD 会走 1.000)
      第 3 步: velocity = 2.710   (plain SGD 会走 1.000)
      第 4 步: velocity = 3.439   (plain SGD 会走 1.000)
      第 5 步: velocity = 4.095   (plain SGD 会走 1.000)
-take: <b>��定下坡 → 速度从 1.0 → 1.9 → 2.71 → 3.44 → 4.10。</b>Plain SGD 永远走同样的 1.0；Momentum 在一致的坡上会加速，所以它覆盖地面越来越快。现在换成每一步都把斜率的符号翻过来：那些项大部分互相抵消，速度停在接近零 —— 这正是它杀掉 Z 字形的方式。（和你今天实验里要用的 <b>v = keep·v + slope</b> 是同一条规则。）
+take: <b>稳定下坡 → 速度从 1.0 → 1.9 → 2.71 → 3.44 → 4.10。</b>Plain SGD 永远走同样的 1.0；Momentum 在一致的坡上会加速，所以它覆盖地面越来越快。现在换成每一步都把斜率的符号翻过来：那些项大部分互相抵消，速度停在接近零 —— 这正是它杀掉 Z 字形的方式。（和你今天实验里要用的 <b>v = keep·v + slope</b> 是同一条规则。）
 %%%
 
 如果你猜的是「大概 2」，你不孤单，而真实的 4.1 就是全部重点：一颗会记事的球，推力是不会记事那颗的*四倍*。很好 —— 你刚刚搞懂了今天大多数真实训练仍然靠着的那个升级。
@@ -583,7 +583,7 @@ predict: 一个 weight 斜率是 100，另一个是 0.01，两个共用 lr = 0.1
 code: lr = 0.1   # 单速率步长 = lr*slope ；自适应步长 = lr*slope/sqrt(slope**2)
 out: 大斜率  w:   单速率步长 = 10.000    自适应步长 = 0.100
      小斜率  w:   单速率步长 =  0.001    自适应步长 = 0.100
-take: <b>一个全局速率让大斜率的 weight 跳了 10.0，而小斜率的 weight 爬了 0.001</b> —— 一个共用的数字造��了一万倍的不公平���让每个都除以自己的斜率大小（RMSProp 的把戏），两个都走一个合理的 0.1。正是这个每 weight 的重新缩放，让 Adam 能在尺度失衡和稀疏的问题上平顺训练，而 plain SGD 在那里会卡住。
+take: <b>一个全局速率让大斜率的 weight 跳了 10.0，而小斜率的 weight 爬了 0.001</b> —— 一个共用的数字造成了一万倍的不公平。让每个都除以自己的斜率大小（RMSProp 的把戏），两个都走一个合理的 0.1。正是这个每 weight 的重新缩放，让 Adam 能在尺度失衡和稀疏的问题上平顺训练，而 plain SGD 在那里会卡住。
 %%%
 
 这就是全部的想法，而你刚刚看着它起作用：同样的 lr、同样的斜率，一个小小的除法，不公平就消失了。每个徒步的人都拿到了自己脚下地面该有的那个步幅。
@@ -759,7 +759,7 @@ One picture to keep: same hill, smarter ways down it.
 - **三种口味。** *Batch* 问全部数据（准、慢），*SGD* 问一个样本（快、吵），*mini-batch* 问一小把（日常的甜点）。我们抽样，因为很多粗糙的步子胜过一个完美的步子。
 - **Momentum。** 保留一个持续的速度，于是稳定的下坡会*攒速度*，左右的弹跳会*抵消* —— 它压住 Z 字形，也治好走得太慢的爬行。
 - **RMSProp 和 Adam。** 给每个 weight 自己的步幅，从它自己最近的斜率量出来。**Adam = Momentum + RMSProp**，你听过的大多数模型背后的默认选择。
-- **那些失败，和那道墙。** 速率太大 → 迈过头并炸掉（解药：更小的速率，或者一��让它衰减的 *schedule*）。太小 → 爬行（解药：更大的速率、momentum，或者一个自适应优化器）。以及那个天花板：优化器*只跟着它被给的 gradient 走* —— 它没法修一个糟糕的 loss、没法分开 XOR、也没法承诺全局最低点。
+- **那些失败，和那道墙。** 速率太大 → 迈过头并炸掉（解药：更小的速率，或者一个让它衰减的 *schedule*）。太小 → 爬行（解药：更大的速率、momentum，或者一个自适应优化器）。以及那个天花板：优化器*只跟着它被给的 gradient 走* —— 它没法修一个糟糕的 loss、没法分开 XOR、也没法承诺全局最低点。
 
 一张要留住的图：同一座山，更聪明的下山方式。
 ~~~

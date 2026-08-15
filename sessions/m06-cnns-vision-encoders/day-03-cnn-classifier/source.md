@@ -439,7 +439,7 @@ Then run it and paste the output at the bottom as a comment.
 - Cross-entropy is **small** when the true class got a high probability and **large** when it got a low one — the exact number training pushes down, over and over, to teach the funnel to see.
 
 !!! c-info 📓
-<b>5-minute research log · 5 分钟研究笔��:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in `sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/log.md`: (1) the two halves of a CNN classifier and what each one does; (2) what softmax and cross-entropy each do to the head's raw scores; (3) one of the three stacking traps and its fix, in your own words.
+<b>5-minute research log · 5 分钟研究笔记:</b> 关掉页面前，用自己的话写三行 — before you close the tab, write three lines in `sessions/m06-cnns-vision-encoders/day-03-cnn-classifier/log.md`: (1) the two halves of a CNN classifier and what each one does; (2) what softmax and cross-entropy each do to the head's raw scores; (3) one of the three stacking traps and its fix, in your own words.
 !!!
 
 @@@ fin

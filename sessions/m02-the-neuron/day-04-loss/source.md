@@ -392,7 +392,7 @@ why: just the last layer's untidied output. Nothing here is a percentage yet.
 step: **softmax slices the pizza** → [0.66, 0.24, 0.10]
 why: bigger score gets a bigger slice, all slices positive, and together they sum to 1
 step: read the slice you gave the CORRECT class — 0.66 for cat
-why: same rule as yes/no ��� only the truth's share matters
+why: same rule as yes/no — only the truth's share matters
 step: score it: −log(0.66) ≈ 0.416
 why: fat slice for the right answer → small loss. Thin sliver → big loss. Identical heart.
 %%%

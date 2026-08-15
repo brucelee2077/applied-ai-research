@@ -162,23 +162,29 @@ def apply(path, T, LAB):
     missing = set(T) - used_s
     assert not missing, 'translations with no matching span: %s' % sorted(missing)
 
-    out = []
-    for i, ln in enumerate(lines):
-        out.append(ln)
-        if i in ins:
-            for f in ins[i]:
-                out.append(f)
-    text = '\n'.join(out)
-
-    # labels
+    # -- labels, rewritten LINE-SCOPED and BEFORE the fences are inserted ---------
+    # Scoped to each drawing's own line range, for two reasons:
+    #   * an axis label repeats legitimately across figures. A whole-file
+    #     `count(whole) == 1` assert fired on day-06's `loss` y-axis, which appears
+    #     with byte-identical markup in four different charts — a correct page the
+    #     tool refused to translate.
+    #   * within one drawing, a duplicate IS ambiguous, so the uniqueness check
+    #     still runs — just against the right denominator.
+    # Pairing appends the twin on the SAME line, so the line count is preserved and
+    # the fence indices computed above stay valid.
     used_l = set()
     for bi, blk in enumerate(blocks):
         k = 0
         for it in blk['items']:
             if it['kind'] != 'draw':
                 continue
+            lo, hi = it['a'] + 1, it['b']            # the drawing's own lines
+            if hi <= lo:                             # a %%% viz has no body lines
+                continue
+            body = '\n'.join(lines[lo:hi])
+            edits = []
             for m in re.finditer(r'<text\b(?![^>]*class="lang-)[^>]*>(.*?)</text>',
-                                 '\n'.join(it['body']), re.S):
+                                 body, re.S):
                 if not re.search(r'[A-Za-z]{3,}', m.group(1)):
                     continue
                 key = 'L%d.%d' % (bi, k); k += 1
@@ -186,15 +192,33 @@ def apply(path, T, LAB):
                     continue
                 used_l.add(key)
                 whole = m.group(0)
-                assert text.count(whole) == 1, '%s: label appears %d times: %r' % (
-                    key, text.count(whole), whole[:70])
+                assert body.count(whole) == 1, (
+                    '%s: label appears %d times within this drawing: %r'
+                    % (key, body.count(whole), whole[:70]))
                 attrs = re.match(r'<text\s+([^>]*)>', whole).group(1)
-                text = text.replace(
-                    whole,
-                    whole.replace('<text ', '<text class="lang-en" ', 1)
-                    + '<text class="lang-zh" %s>%s</text>' % (attrs, LAB[key]), 1)
+                edits.append((whole,
+                              whole.replace('<text ', '<text class="lang-en" ', 1)
+                              + '<text class="lang-zh" %s>%s</text>' % (attrs, LAB[key])))
+            for whole, twinned in edits:
+                body = body.replace(whole, twinned, 1)
+            new = body.split('\n')
+            # The fence indices in `ins` were computed against these line numbers, so
+            # a rewrite that changes the line COUNT silently moves every later
+            # drawing and fence. It did: an empty range (a bodyless `%%% viz`) turned
+            # `lines[lo:lo] = ['']` into an INSERT, and the next drawing's labels
+            # then went unfound — reported as 31 "labels with no match".
+            assert len(new) == hi - lo, 'label rewrite changed the line count'
+            lines[lo:hi] = new
     missing_l = set(LAB) - used_l
     assert not missing_l, 'labels with no match: %s' % sorted(missing_l)
+
+    out = []
+    for i, ln in enumerate(lines):
+        out.append(ln)
+        if i in ins:
+            for f in ins[i]:
+                out.append(f)
+    text = '\n'.join(out)
     open(path, 'w', encoding='utf-8').write(text)
     print("  %s: +%d fences, +%d labels" % (path.split('/')[-2], len(used_s), len(used_l)))
 
