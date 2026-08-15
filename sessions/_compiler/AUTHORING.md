@@ -344,6 +344,117 @@ prefer the typed widgets above).
 
 ---
 
+## 5b. Chinese (the `~~~zh` twin)
+
+A lesson holds BOTH languages in one `source.md` and compiles to ONE `lesson.html`.
+The reader picks with the sidebar Language row; CSS shows one and hides the other.
+
+**The one rule that makes everything else safe:** a block with NEITHER language class
+shows under BOTH languages. So a day with no Chinese still reads in English, and a
+source with no `~~~zh` and no `zh_*` compiles byte-identically to before Chinese
+existed. Partial translation degrades to English, never to blank.
+
+### The fence
+
+```
+English paragraph one.
+
+English paragraph two.
+~~~zh
+中文第一段。
+
+中文第二段。
+~~~
+```
+
+A `~~~zh` fence is the Chinese twin of **every block since the previous fence**, not
+of "the block above". Write two or three English beats, then their twin together —
+that is what keeps the analogy identical in both languages. The fence body goes
+through the same renderer, so `%%% steps`, `%%% quiz`, `%%% demo`, `!!!` callouts and
+`[[term||gloss]]` all work inside it.
+
+The Chinese carries its OWN `[[term||gloss]]`, so each language has its own tooltips
+and there is no second attribute to keep in sync.
+
+### Drawings are SHARED, never translated
+
+A `%%% svg` / `%%% viz` block belongs to no span: it is emitted unwrapped and it
+CLOSES whatever span preceded it. One picture, two label sets:
+
+```
+%%% svg
+<svg viewBox="0 0 520 168">
+  <text class="lang-en" x="260" y="18" text-anchor="middle">Two rulers stacked = one straight edge</text>
+  <text class="lang-zh" x="260" y="18" text-anchor="middle">两把直尺叠起来 = 还是一条直线</text>
+  ...geometry, written once...
+</svg>
+%%%
+```
+
+The Chinese label may carry its own `x` / `font-size`: CJK is wider, and a label that
+fits in English can overflow the viewBox in Chinese. Labels with no 3-letter English
+word (`N = 7 000 000 000`, `5 × 3`, `✔`) need no twin and are exempt automatically.
+
+So the shape of a concept is: prose → fence → drawing → prose → fence.
+
+### Everything else that can be paired
+
+| Slot | How |
+|---|---|
+| front-matter | `zh_title` `zh_subtitle` `zh_module_label` `zh_fin_title` `zh_fin_body` `zh_nav_prev_label` `zh_nav_next_label` `zh_spine` |
+| hero | `@zh_lede` / `@zh_goal` markers |
+| `@@@ concept` / `quiz` / `produce` | `zh_tag=` `zh_title=` `zh_gotit=` |
+| `page_title` | NOT translatable — a browser tab shows one title |
+
+### What the words do and do not become
+
+Narration, analogies, headings, quiz, callouts and figure labels are Chinese. Code,
+identifiers, formula symbols and technical TERMS stay English, glossed once on first
+use: `neuron（神经元）`. Two reasons, both load-bearing: the same material serves
+Staff-level interview prep, where the English term is what the reader must be able to
+say; and `coverage_gate` matches spec keywords against the page, so an English term
+inside Chinese prose keeps breadth checkable in both languages.
+
+The allowed bare-Latin terms live in `sessions/_refactor/zh_terms.yaml`. Adding a word
+there is a curriculum decision — it says a beginner should learn to read that word in
+English. If it is not a term of art, translate it instead.
+
+### The same analogy, in both languages
+
+One analogy per concept, shared, because the two languages share one drawing. A
+Chinese twin that reaches for a different everyday object leaves the figure
+illustrating the English one, and the picture then contradicts the words in exactly
+one language. If an English analogy genuinely does not land in Chinese, record the
+substitution in the module manifest under `zh.analogy_exceptions` and draw the second
+figure — do not diverge silently.
+
+### Errors the compiler refuses
+
+* an unterminated fence (it would ship `~~~zh` as literal text)
+* a fence with no English above it (Chinese-only content is invisible to an English reader)
+* an empty fence
+* a nested fence
+
+### What checks it
+
+```bash
+python3 sessions/_compiler/gates/lang_parity_gate.py <source.md>     # exit 0 / 6
+```
+
+Inert until the source declares Chinese; from then on the day must be COMPLETE.
+Six checks: a fence per concept, no untwinned trailing prose, a twin per worded SVG
+label, a `zh_` twin per reader-visible front-matter key, **matching quiz answer
+indices** (a correctness red line, not a formatting nit), and every manifest `covers`
+topic reachable from the Chinese reading path.
+
+`beginner_language_gate` and `reader_flow_gate` grow Chinese lexicons and cue lists;
+the LLM floors are graded twice, once per language, with Chinese anchors; and
+`judge_translation_fidelity` reads the source to check the two languages teach the
+same lesson. Length thresholds are measured in ENGLISH-CHARACTER EQUIVALENTS via
+`v8lib.text_weight` — one Han character is worth about 2.3, measured — so the same
+calibrated number means the same thing in both languages.
+
+
 ## 6. The concept-unit pattern
 
 Every concept unit follows the same three beats, in this order:

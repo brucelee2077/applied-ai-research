@@ -244,6 +244,40 @@ Write for a 12-year-old encountering the topic for the first time, for whom Engl
 - **One idea per sentence.** Short sentences. Active voice. Use "you".
 - **No dismissive phrases.** Banned: "As you can see", "Trivially", "Obviously", "Recall that", "It is left as an exercise", "This is just".
 
+### Language — the Chinese version
+
+Lessons in `sessions/` ship in both languages: one `source.md` holds English and its
+Chinese twin, and the reader picks with the sidebar Language row. The Chinese is a
+**version**, not a gloss — it must teach the same lesson at the same depth. Grammar:
+`sessions/_compiler/AUTHORING.md` §5b.
+
+The four rules above have Chinese counterparts, because a literal translation of an
+English rule checks the wrong thing:
+
+- **Simple words** means everyday spoken Chinese, not 书面语. Avoid 收敛 / 泛化 / 单调 /
+  正交 unless glossed. A word a primary-school child would not use is a hard word.
+- **No idioms** means **no 成语**. For a 12-year-old these are the harder barrier: four
+  characters that assume a cultural reference and cannot be worked out from the parts.
+  Banned in the same spirit: 一举两得, 水到渠成, 事半功倍, 一蹴而就.
+- **One idea per sentence** is measured in 汉字, and the trap is different: Chinese
+  chains clauses with 逗号, so one "sentence" can hold six ideas. Break the chain.
+- **No dismissive phrases**: 显然, 众所周知, 不言而喻, 如你所见, 不难看出, 一目了然.
+
+**Technical terms stay English**, glossed once on first use as `attention（注意力）` —
+the same material serves Staff-level interview prep, where the English term is what
+the reader must be able to say. Code, identifiers and formula symbols are never
+translated. The allowed bare-Latin terms live in `sessions/_refactor/zh_terms.yaml`.
+
+**One analogy, shared.** Both languages use the same everyday analogy, because they
+share one drawing. Substituting a culturally-opaque analogy is allowed only as a
+recorded exception in the module manifest (`zh.analogy_exceptions`), and then the
+second figure has to be drawn too.
+
+Enforced by `sessions/_compiler/gates/lang_parity_gate.py` plus Chinese lexicons in
+`beginner_language_gate.py` and Chinese anchors in the LLM judges. Length thresholds
+are measured in English-character equivalents (`v8lib.text_weight`; one 汉字 ≈ 2.3),
+so one calibrated number means the same thing in both languages.
+
 ### Tone
 
 Write like a brilliant friend who is rooting for the reader. Not a professor. Not a textbook. If it sounds like an exam paper, rewrite it.

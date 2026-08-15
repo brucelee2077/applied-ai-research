@@ -483,7 +483,16 @@ coverage:
       - topic: screen-recording and microphone setup
         reason: the skill is spoken re-derivation, which needs no equipment; a reader with no microphone must be able to finish the day
       - topic: bilingual chinese glosses carried over from the legacy page
-        reason: standing user directive that study material is english, with chinese only when truly necessary
+        reason: >
+          SUPERSEDED 2026-08-15 by the full Chinese track. The old directive was
+          "study material is english, with chinese only when truly necessary", which
+          this entry recorded. The learner now asks for a real Chinese VERSION of each
+          lesson, selectable from the sidebar. So the legacy inline glosses are still
+          out of scope — but because they are the WRONG MECHANISM, not because Chinese
+          is. A day gets its Chinese as a ~~~zh twin (see AUTHORING.md s5b) and the
+          welded-in glosses are stripped to pure English at that point. m08 is not in
+          the current translation scope (m01 and m02 are), so this day stays
+          English-only for now.
 ```
 
 Validated copy at `/tmp/m08_coverage.yaml`. Paste target: `/Users/ruifengli/Desktop/applied-ai-research/sessions/m08-transformer-math/_refactor/manifest.yaml` (does not exist yet — m08 has no `_refactor/` dir; use `/Users/ruifengli/Desktop/applied-ai-research/sessions/m07-thinking-in-jax/_refactor/manifest.yaml` as the surrounding-keys template, and note m08 keeps the original week scheme: labels "Week 3", frozen quest-ids `w03-d01-arith`, `w03-d02-qkv`, `w03-d03-kv`, `w03-d04-prodcode`, `w03-d05-pretrain`, `w03-d06-examrehearsal`).

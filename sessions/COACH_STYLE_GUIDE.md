@@ -33,6 +33,19 @@ Write like a brilliant friend who is rooting for the reader — not a professor,
 
 ## 3. The bilingual rule (light touch)
 
+> **SUPERSEDED 2026-08-15 for any day that gets a Chinese twin.** This section
+> describes the V7 Coach-Layer scaffold: 2–4 short Chinese touches welded into English
+> sentences. The learner now asks for a full Chinese VERSION of each lesson, chosen
+> from the sidebar Language row, so Chinese is a MEDIUM and not a scaffold. The V9
+> grammar is `~~~zh` — see `sessions/_compiler/AUTHORING.md` §5b — and it is enforced
+> by `sessions/_compiler/gates/lang_parity_gate.py`.
+>
+> The rule below still governs the 100+ legacy pages that have no `source.md` and
+> therefore no Chinese twin yet, and its term policy survives unchanged into V9:
+> technical terms, formulas, variable names and code stay English. When a day gets its
+> twin, its welded-in Chinese is stripped back to pure English and the Chinese moves
+> into the fence.
+
 Chinese is a **learning scaffold**, not the medium. The learner reads mostly in English and prefers it that way. Use Chinese **only** where it lowers the emotional and intuitive barrier:
 
 - ✅ Use Chinese for: the one-line intuition, emotional orientation, and "why this is confusing".
