@@ -161,3 +161,107 @@ def test_default_language_is_english():
     m = re.search(r"getItem\('frontier-lang'\);if\(\['en','zh'\]\.indexOf\(l\)<0\)l='(\w+)'", donor.replace(' ', ''))
     assert m, 'could not find the language fallback in the pre-paint script'
     assert m.group(1) == 'en', "default reading language is %r, expected 'en'" % m.group(1)
+
+
+# =============================================================================
+# runtime UI strings
+# =============================================================================
+# These are the strings no CSS toggle can reach, because the code REPLACES
+# textContent instead of showing one of two nodes. Without them, a Chinese reader
+# would watch the page flip back to English the moment they pressed anything.
+
+UI_KEYS = ['reveal_done', 'all_answered', 'hints_end', 'hint_more',
+           'copied', 'copy_manual', 'reset_confirm', 'sections_done']
+
+
+def test_the_donor_ui_table_has_both_languages_for_every_key():
+    donor = open(DONOR, encoding='utf-8').read()
+    block = re.search(r'/\* frontier-lang:ui \*/(.*?)/\* /frontier-lang:ui \*/', donor, re.S)
+    assert block, 'no frontier-lang:ui block in the donor'
+    en = re.search(r'en:\s*\{(.*?)\},\s*\n?\s*zh:', block.group(1), re.S)
+    zh = re.search(r'zh:\s*\{(.*?)\}\s*\n?\};', block.group(1), re.S)
+    assert en and zh, block.group(1)[:200]
+    for k in UI_KEYS:
+        assert k + ':' in en.group(1), 'en table missing %r' % k
+        assert k + ':' in zh.group(1), 'zh table missing %r' % k
+
+
+def test_no_hardcoded_english_runtime_string_survives_on_any_page():
+    # Targets the ASSIGNMENTS, not the strings. The English wording still appears on
+    # every page — as the `en:` half of the UI table, which is the point. An earlier
+    # version of this test searched for the wording itself and flagged the table.
+    gone = [
+        "run.textContent = 'ran",
+        "g.textContent='All answered",
+        'btn.textContent = "— that\'s all the hints —"',
+        "btn.textContent=ok?'✓ copied'",
+        "confirm('Reset today",
+        "+' sections done'",
+        "btn.textContent = '💡 still stuck? another hint ('",
+    ]
+    offenders = []
+    for rel, path in SHELL_PAGES:
+        h = open(path, encoding='utf-8').read()
+        for g in gone:
+            if g in h:
+                offenders.append((rel, g))
+    assert not offenders, 'hardcoded runtime assignments left: %r' % offenders[:6]
+
+
+def test_every_page_that_can_write_those_strings_goes_through_ui():
+    # The complement of the test above: prove the replacement actually happened
+    # rather than the string merely being absent because the widget is absent.
+    # The marker is the demo ENGINE, not `var DEMOS` — v9 concept lessons drive the
+    # widget with a generic querySelector('.demo-run') loop and have no DEMOS array.
+    n = 0
+    for rel, path in SHELL_PAGES:
+        h = open(path, encoding='utf-8').read()
+        if "querySelector('.demo-run')" in h:
+            assert "ui('reveal_done')" in h, '%s runs the demo engine but not ui()' % rel
+            n += 1
+    assert n >= 40, 'expected ~47 pages to carry the demo engine, saw %d' % n
+
+
+def test_every_page_with_a_progress_count_goes_through_ui():
+    # Keyed on the donor's count-writing CODE, not on the wording: the wording now
+    # appears on every page as the UI table's `en:` value, and the hub has its own
+    # dashboard that says "lessons complete" from its own render(). Translating the
+    # hub's dashboard is a separate job — it also carries module names and
+    # capability labels, all English content.
+    n = 0
+    for rel, path in SHELL_PAGES:
+        h = open(path, encoding='utf-8').read()
+        if "count.innerHTML = '<b>'+done+'</b>/'+total+" in h:
+            assert "ui('sections_done')" in h, '%s writes the count but not via ui()' % rel
+            n += 1
+    assert n >= 280, 'expected ~291 pages with the donor progress count, saw %d' % n
+
+
+@pytest.mark.parametrize('rel,path', SHELL_PAGES, ids=[c[0] for c in SHELL_PAGES])
+def test_no_page_calls_ui_without_the_table(rel, path):
+    # The ordering trap: the sweep inserts the table and the controller at the same
+    # anchor, and the string substitutions rewrite call sites elsewhere in the file.
+    # A page with calls and no table throws on first interaction.
+    h = open(path, encoding='utf-8').read()
+    if "ui('" in h:
+        assert 'var UI = {' in h, 'calls ui() but has no string table'
+
+
+def test_the_ui_and_controller_sentinels_do_not_nest():
+    # They did: the ui block was inserted inside the controller's sentinel range, so
+    # parts['controller'] contained parts['ui']. The table still landed (as part of
+    # the controller refresh) but every sweep run reported a spurious
+    # "cannot refresh ui" and exited 1.
+    assert PARTS['ui'] not in PARTS['controller']
+    assert PARTS['controller'] not in PARTS['ui']
+
+
+def test_the_chrome_is_paired_not_replaced():
+    # Chrome is rendered once and never rewritten, so it stays a paired span rather
+    # than joining the JS table.
+    donor = open(DONOR, encoding='utf-8').read()
+    for en, zh in [('Appearance', '外观'), ('Progress checklist', '进度清单'),
+                   ('↺ Reset progress', '↺ 清空进度'), ('← Prev', '← 上一天'),
+                   ('Next →', '下一天 →'), ('▦ Map', '▦ 地图'),
+                   ('Back to curriculum', '回到课程地图')]:
+        assert '<span class="lang-en">%s</span><span class="lang-zh">%s</span>' % (en, zh) in donor, en

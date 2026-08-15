@@ -369,7 +369,9 @@ def render_hint(lines):
     items = ''.join('<div class="hint-tier" data-hint-tier="%d" hidden>%s</div>' % (i + 1, inline(t))
                     for i, t in enumerate(tiers))
     return ('<div class="hint" data-hint-total="%d">'
-            '<button class="hint-reveal" type="button">💡 Stuck? reveal a hint</button>'
+            '<button class="hint-reveal" type="button">'
+            '<span class="lang-en">💡 Stuck? reveal a hint</span>'
+            '<span class="lang-zh">💡 卡住了？看一条提示</span></button>'
             '%s</div>' % (len(tiers), items))
 
 def render_insight(lines):
@@ -443,7 +445,9 @@ def render_warmup(lines):
         optshtml = ''.join('<button class="q-opt" type="button" data-opt="%d"><span class="mark"></span><span>%s</span></button>' % (i, inline(o)) for i, o in enumerate(opts))
         blocks.append('<div class="q" data-correct="%d" data-concept="%s"><div class="q-ask">%s</div><div class="q-opts">%s</div><div class="q-fb" data-fb="%s"></div></div>'
                       % (ans, attr_esc(cid), inline(q), optshtml, attr_esc(fb)))
-    return ('<div class="warmup"><div class="warmup-h">🔁 Warm-up — do you still remember? (from earlier days)</div>'
+    return ('<div class="warmup"><div class="warmup-h">'
+            '<span class="lang-en">🔁 Warm-up — do you still remember? (from earlier days)</span>'
+            '<span class="lang-zh">🔁 热身 — 前几天的还记得吗？</span></div>'
             + ''.join(blocks) + '</div>')
 
 def render_widget(typ, args, lines):
@@ -836,8 +840,20 @@ def _compile_concept(meta, blocks, donor):
     H = sub_once(r'<div class="brand-sub">.*?</div>', '<div class="brand-sub">%s</div>' % meta.get('brand_sub', ''), H, 'brand-sub')
     H = H.replace('<!--V9_NAV-->', nav, 1)
     H = H.replace('<!--V9_CONTENT-->', content + '\n\n    ' + fin_html, 1)
-    H = sub_once(REGION_PATTERNS['nav_prev'], '<a class="lnav prev" href="%s"><span class="d">← Prev</span><span class="t">%s</span></a>' % (meta.get('nav_prev_href', ''), meta.get('nav_prev_label', '')), H, 'nav-prev')
-    H = sub_once(REGION_PATTERNS['nav_next'], '<a class="lnav next" href="%s"><span class="d">Next →</span><span class="t">%s</span></a>' % (meta.get('nav_next_href', ''), meta.get('nav_next_label', '')), H, 'nav-next')
+    # The direction words are SHELL strings and live in the donor as paired spans;
+    # the titles are lesson names, so they use the zh_nav_*_label front-matter twins.
+    H = sub_once(REGION_PATTERNS['nav_prev'],
+                 '<a class="lnav prev" href="%s"><span class="d">%s</span><span class="t">%s</span></a>'
+                 % (meta.get('nav_prev_href', ''),
+                    bilingual('← Prev', '← 上一天'),
+                    bilingual(meta.get('nav_prev_label', ''), meta.get('zh_nav_prev_label'))),
+                 H, 'nav-prev')
+    H = sub_once(REGION_PATTERNS['nav_next'],
+                 '<a class="lnav next" href="%s"><span class="d">%s</span><span class="t">%s</span></a>'
+                 % (meta.get('nav_next_href', ''),
+                    bilingual('Next →', '下一天 →'),
+                    bilingual(meta.get('nav_next_label', ''), meta.get('zh_nav_next_label'))),
+                 H, 'nav-next')
     return H
 
 

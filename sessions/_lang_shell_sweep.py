@@ -51,8 +51,48 @@ SENTINELS = {
     'css':        ('/* frontier-lang:css */', '/* /frontier-lang:css */'),
     'markup':     ('    <!-- frontier-lang:markup -->', '    <!-- /frontier-lang:markup -->'),
     'checklist':  ('/* frontier-lang:checklist */', '/* /frontier-lang:checklist */'),
+    'ui':         ('/* frontier-lang:ui */', '/* /frontier-lang:ui */'),
     'controller': ('/* frontier-lang:controller */', '/* /frontier-lang:controller */'),
 }
+
+# Strings the code REPLACES at runtime, or renders once as chrome. A CSS toggle
+# cannot reach a textContent assignment, so in Chinese mode the page would flip
+# back to English the moment the reader pressed anything. Unlike the sentinel
+# blocks these are edits IN PLACE, so the contract is different: measured across
+# the 293 shell pages, every one of these appears 0 or 1 times and never more —
+# the dynamic widget strings only exist on the 47 compiled pages, the chrome on
+# 261-293. So: replace when present, skip when absent, FAIL when duplicated.
+# Idempotent, because after the replacement the old text is gone.
+STRING_SUBS = [
+    ("run.textContent = 'ran ✓';", "run.textContent = ui('reveal_done');"),
+    ("g.textContent='All answered — check ✓';", "g.textContent=ui('all_answered');"),
+    ('btn.textContent = "— that\'s all the hints —";', "btn.textContent = ui('hints_end');"),
+    ("btn.textContent = '💡 still stuck? another hint ('+shown+'/'+tiers.length+')';",
+     "btn.textContent = ui('hint_more')+' ('+shown+'/'+tiers.length+')';"),
+    ("btn.textContent=ok?'✓ copied':'select & copy manually';",
+     "btn.textContent=ok?ui('copied'):ui('copy_manual');"),
+    ("if(!confirm('Reset today\\'s progress?')) return;",
+     "if(!confirm(ui('reset_confirm'))) return;"),
+    ("+total+' sections done';", "+total+ui('sections_done');"),
+    ('<span class="nav-group-label" style="padding:0">Appearance</span>',
+     '<span class="nav-group-label" style="padding:0"><span class="lang-en">Appearance</span>'
+     '<span class="lang-zh">外观</span></span>'),
+    ('<div class="nav-group-label">Progress checklist</div>',
+     '<div class="nav-group-label"><span class="lang-en">Progress checklist</span>'
+     '<span class="lang-zh">进度清单</span></div>'),
+    ('type="button">↺ Reset progress</button>',
+     'type="button"><span class="lang-en">↺ Reset progress</span>'
+     '<span class="lang-zh">↺ 清空进度</span></button>'),
+    ('<span class="d">← Prev</span>',
+     '<span class="d"><span class="lang-en">← Prev</span><span class="lang-zh">← 上一天</span></span>'),
+    ('<span class="d">Next →</span>',
+     '<span class="d"><span class="lang-en">Next →</span><span class="lang-zh">下一天 →</span></span>'),
+    ('<span class="d">▦ Map</span>',
+     '<span class="d"><span class="lang-en">▦ Map</span><span class="lang-zh">▦ 地图</span></span>'),
+    ('<span class="t">Back to curriculum</span>',
+     '<span class="t"><span class="lang-en">Back to curriculum</span>'
+     '<span class="lang-zh">回到课程地图</span></span>'),
+]
 
 
 def donor_parts(donor_text=None):
@@ -114,75 +154,92 @@ def shell_pages(root):
     return out
 
 
-def plan_page(rel, html, parts, problems):
-    """The rewritten page, or None if it needs no change or cannot be done.
-
-    Two jobs. On a page without the toggle: insert all five blocks. On a page that
-    already has it but whose blocks no longer match the donor: REFRESH those
-    blocks. Without the refresh half, every future donor edit would silently leave
-    293 pages behind, which is the exact drift this script exists to prevent —
-    and test_page_toggle_text_is_byte_identical_to_the_donor would go red with no
-    tool to make it green again.
-
-    Appends a message to `problems` for every anchor that is not unique — the
-    caller turns a non-empty `problems` into exit 1.
-    """
-    if 'class="lang-row"' in html:
-        return refresh_page(rel, html, parts, problems)
-
-    has_checklist = 'id="checklist"' in html
-    ok = True
-    for rx, name in CORE_ANCHORS + (CHECKLIST_ANCHORS if has_checklist else ()):
-        n = len(rx.findall(html))
-        if n != 1:
-            problems.append('%s: anchor %s matched %d times (expected 1)' % (rel, name, n))
-            ok = False
-    if not ok:
-        return None
-
-    out = html
-    # 1. the language pre-paint IIFE, right after the appearance one
-    m = A_PREPAINT.search(out); out = out[:m.end()] + '\n' + parts['prepaint'] + out[m.end():]
-    # 2. the CSS, right after the last .theme-btn rule
-    m = A_CSS.search(out);      out = out[:m.end()] + '\n' + parts['css'] + out[m.end():]
-    # 3. the sidebar row, right after the Appearance row
-    m = A_MARKUP.search(out);   out = out[:m.end()] + '\n\n' + parts['markup'] + out[m.end():]
-    # 4. the language-aware checklist builder — the donor's own text, because the
-    #    block it replaces is byte-identical on every page that has one
-    if has_checklist:
-        # the sentinel block carries the var line, secLabel, buildChecklist and its
-        # call, so the old var line becomes the whole block and the old forEach
-        # goes away. Doing it in that order handles both shipped layouts: 215 pages
-        # declare shorten() after the forEach, 29 review pages before it.
-        out = A_CHECKLIST_VAR.sub(lambda _m: parts['checklist'], out, count=1)
-        out = A_CHECKLIST_BLOCK.sub('', out, count=1)
-    # 5. the controller, right after setTheme's init call
-    m = A_SETTHEME.search(out); out = out[:m.end()] + '\n\n' + parts['controller'] + out[m.end():]
-    return out
+# Where a MISSING block gets inserted. One table serves both jobs — first sweep and
+# later refresh — because they are the same job: make the page match the donor. The
+# first version could only REPLACE an existing block, so adding the `ui` block left
+# 246 pages permanently reporting "cannot refresh ui" with no way to fix them.
+# 'controller' anchors on the ui CLOSE sentinel rather than on setTheme, so the two
+# cannot land in the wrong order when both are missing.
+INSERT_AT = {
+    'prepaint':   (lambda h: A_PREPAINT.search(h), '\n', ''),
+    'css':        (lambda h: A_CSS.search(h), '\n', ''),
+    'markup':     (lambda h: A_MARKUP.search(h), '\n\n', ''),
+    'ui':         (lambda h: A_SETTHEME.search(h), '\n\n', ''),
+    'controller': (lambda h: re.search(re.escape(SENTINELS['ui'][1]), h), '\n', ''),
+}
 
 
-def refresh_page(rel, html, parts, problems):
-    """Bring an already-swept page's blocks back to the donor's text.
-
-    Located by sentinel, so a donor edit INSIDE a block propagates to all 293
-    pages and an edit to a sentinel itself is reported rather than half-applied.
-    """
-    out = html
-    for name, (a_tok, b_tok) in SENTINELS.items():
-        if name == 'checklist' and 'id="checklist"' not in html:
-            continue
-        if parts[name] in out:
-            continue                                   # already current
-        if out.count(a_tok) != 1 or out.count(b_tok) != 1:
-            problems.append('%s: cannot refresh %s — sentinel %s appears %dx and %s %dx (want 1 each)'
-                            % (rel, name, a_tok, out.count(a_tok), b_tok, out.count(b_tok)))
-            continue
+def _sync_block(rel, out, name, parts, problems):
+    """Make `out` carry the donor's current text for one sentinel block."""
+    a_tok, b_tok = SENTINELS[name]
+    if parts[name] in out:
+        return out                                     # already current
+    na, nb = out.count(a_tok), out.count(b_tok)
+    if na == 1 and nb == 1:                            # present but stale -> replace
         a = out.find(a_tok)
         b = out.find(b_tok, a)
         if b < 0:
-            problems.append('%s: cannot refresh %s — close sentinel precedes the open one' % (rel, name))
+            problems.append('%s: %s close sentinel precedes the open one' % (rel, name))
+            return out
+        return out[:a] + parts[name] + out[b + len(b_tok):]
+    if na == 0 and nb == 0:                            # absent -> insert at its anchor
+        finder, pre, post = INSERT_AT[name]
+        m = finder(out)
+        if not m:
+            problems.append('%s: cannot insert %s — its anchor is missing' % (rel, name))
+            return out
+        return out[:m.end()] + pre + parts[name] + post + out[m.end():]
+    problems.append('%s: %s sentinels are unbalanced (%dx open, %dx close)'
+                    % (rel, name, na, nb))
+    return out
+
+
+def _localize_strings(rel, html, problems):
+    """Runtime strings that no CSS toggle can reach, because the code REPLACES
+    textContent. Measured across the 293 shell pages: each appears 0 or 1 times,
+    never more — the dynamic widget strings only exist on the 47 compiled pages,
+    the chrome on 261-293. So replace when present, skip when absent, report when
+    duplicated. Idempotent: after the replacement the old text is gone."""
+    out = html
+    for old, new in STRING_SUBS:
+        n = out.count(old)
+        if n == 0:
             continue
-        out = out[:a] + parts[name] + out[b + len(b_tok):]
+        if n > 1:
+            problems.append('%s: runtime string %r appears %d times (expected 0 or 1)'
+                            % (rel, old[:40], n))
+            continue
+        out = out.replace(old, new, 1)
+    return out
+
+
+def plan_page(rel, html, parts, problems):
+    """The rewritten page, or None if it already matches the donor.
+
+    Insert, replace and localize are all the same job: make this page carry what the
+    donor says. The checklist is the one special case — on a page that has never
+    been swept it must REPLACE the old builder rather than be inserted beside it.
+    """
+    out = html
+    has_checklist = 'id="checklist"' in html
+
+    # the never-swept case: the old checklist builder has to go
+    if has_checklist and SENTINELS['checklist'][0] not in out:
+        ok = True
+        for rx, name in CHECKLIST_ANCHORS:
+            n = len(rx.findall(out))
+            if n != 1:
+                problems.append('%s: anchor %s matched %d times (expected 1)' % (rel, name, n))
+                ok = False
+        if ok:
+            out = A_CHECKLIST_VAR.sub(lambda _m: parts['checklist'], out, count=1)
+            out = A_CHECKLIST_BLOCK.sub('', out, count=1)
+
+    for name in ('prepaint', 'css', 'markup', 'ui', 'controller'):
+        out = _sync_block(rel, out, name, parts, problems)
+    if has_checklist:
+        out = _sync_block(rel, out, 'checklist', parts, problems)
+    out = _localize_strings(rel, out, problems)
     return out if out != html else None
 
 

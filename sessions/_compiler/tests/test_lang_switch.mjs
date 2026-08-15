@@ -33,6 +33,8 @@ const langSrc = slice(
   "var langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));",
   "setLang(document.documentElement.getAttribute('data-lang') || 'en', false);",
   'language switcher')
+const uiSrc = slice('var UI = {', '\nfunction ui(k){', 'ui table').replace(/\nfunction ui\(k\)\{$/, '')
+const uiFnSrc = slice('function ui(k){', '\n}', 'ui lookup')
 
 // --- DOM stub ---------------------------------------------------------------
 function el(attrs = {}, text = '', children = []) {
@@ -273,6 +275,35 @@ t('the language controller works on a page with no checklist and no refresh', ()
   assert.equal(store['frontier-lang'], 'zh')
   api.setLang('en')
   assert.equal(htmlEl.getAttribute('data-lang'), 'en')
+})
+
+// --- runtime UI strings ------------------------------------------------------
+// The strings no CSS toggle can reach, because the code REPLACES textContent. If
+// these do not follow the language, the page flips back to English the moment the
+// reader presses anything.
+t('ui() returns the string for the current language', () => {
+  const htmlEl = el({ 'data-lang': 'en' })
+  const document = { documentElement: htmlEl }
+  const api = new Function('document', `${uiSrc}\n${uiFnSrc}\nreturn {ui: ui, UI: UI};`)(document)
+  const keys = ['reveal_done', 'all_answered', 'hints_end', 'hint_more',
+                'copied', 'copy_manual', 'reset_confirm', 'sections_done']
+  for (const k of keys) {
+    assert.ok(api.UI.en[k], `en table missing ${k}`)
+    assert.ok(api.UI.zh[k], `zh table missing ${k}`)
+    htmlEl.setAttribute('data-lang', 'en')
+    assert.equal(api.ui(k), api.UI.en[k], k)
+    htmlEl.setAttribute('data-lang', 'zh')
+    assert.equal(api.ui(k), api.UI.zh[k], k)
+    assert.notEqual(api.UI.en[k], api.UI.zh[k], `${k} is the same in both languages`)
+  }
+})
+
+t('ui() falls back to English for an unknown language or key', () => {
+  const htmlEl = el({ 'data-lang': 'de' })
+  const document = { documentElement: htmlEl }
+  const api = new Function('document', `${uiSrc}\n${uiFnSrc}\nreturn {ui: ui, UI: UI};`)(document)
+  assert.equal(api.ui('copied'), api.UI.en.copied)
+  assert.equal(api.ui('no_such_key'), undefined)
 })
 
 console.log(`ok: language switcher (${n} assertions groups, extracted live from v9-base.donor)`)
