@@ -45,22 +45,37 @@ def _slice(donor, start, end, label):
     return donor[a:b + len(end)]
 
 
+SENTINELS = {
+    # name        (open sentinel, close sentinel)
+    'prepaint':   ('<!-- frontier-lang:prepaint -->', '<!-- /frontier-lang:prepaint -->'),
+    'css':        ('/* frontier-lang:css */', '/* /frontier-lang:css */'),
+    'markup':     ('    <!-- frontier-lang:markup -->', '    <!-- /frontier-lang:markup -->'),
+    'checklist':  ('/* frontier-lang:checklist */', '/* /frontier-lang:checklist */'),
+    'controller': ('/* frontier-lang:controller */', '/* /frontier-lang:controller */'),
+}
+
+
 def donor_parts(donor_text=None):
-    """The five blocks the toggle is made of, verbatim from the donor."""
+    """The five blocks the toggle is made of, verbatim from the donor.
+
+    Delimited by SENTINEL COMMENTS, not by their own content. The first version of
+    this keyed the boundaries off the first and last line of each block, which
+    works for inserting and is useless for refreshing: locating an OLD block needs
+    a marker that exists in the old text, and the natural end marker is exactly
+    what a content edit changes. Adding one CSS rule made 293 pages unrefreshable
+    with "end marker missing". Sentinels never change, so anything between them
+    can.
+    """
     d = donor_text if donor_text is not None else open(DONOR, encoding='utf-8').read()
-    return {
-        'prepaint':   _slice(d, '<script>/* set reading language before paint', '</script>', 'prepaint'),
-        'css':        _slice(d, '/* ---- reading language (EN / 中文), mirroring .theme-* one-for-one ---- */',
-                             'html[data-lang="zh"] .sec-h,html[data-lang="zh"] h1,html[data-lang="zh"] h4{letter-spacing:0}',
-                             'css'),
-        'markup':     _slice(d, '    <div class="lang-row" role="group" aria-label="reading language">',
-                             '      </div>\n    </div>', 'markup'),
-        'checklist':  _slice(d, 'function secLabel(sec){', '\nbuildChecklist();', 'checklist'),
-        'controller': _slice(d, '/* ---- reading-language switcher (English / 中文) ---- */',
-                             "setLang(document.documentElement.getAttribute('data-lang') || 'en', false);",
-                             'controller'),
-        'var_line':   _slice(d, "var checklist = document.getElementById('checklist')", ';', 'var_line'),
-    }
+    parts = {}
+    for name, (a_tok, b_tok) in SENTINELS.items():
+        a = d.find(a_tok)
+        b = d.find(b_tok, a) if a >= 0 else -1
+        if a < 0 or b < 0:
+            raise SystemExit('donor is missing the %s sentinel pair (%s ... %s)'
+                             % (name, a_tok, b_tok))
+        parts[name] = d[a:b + len(b_tok)]
+    return parts
 
 
 # --- anchors on the target pages ---------------------------------------------
@@ -102,11 +117,18 @@ def shell_pages(root):
 def plan_page(rel, html, parts, problems):
     """The rewritten page, or None if it needs no change or cannot be done.
 
+    Two jobs. On a page without the toggle: insert all five blocks. On a page that
+    already has it but whose blocks no longer match the donor: REFRESH those
+    blocks. Without the refresh half, every future donor edit would silently leave
+    293 pages behind, which is the exact drift this script exists to prevent —
+    and test_page_toggle_text_is_byte_identical_to_the_donor would go red with no
+    tool to make it green again.
+
     Appends a message to `problems` for every anchor that is not unique — the
     caller turns a non-empty `problems` into exit 1.
     """
     if 'class="lang-row"' in html:
-        return None                                  # already swept — idempotent
+        return refresh_page(rel, html, parts, problems)
 
     has_checklist = 'id="checklist"' in html
     ok = True
@@ -128,11 +150,40 @@ def plan_page(rel, html, parts, problems):
     # 4. the language-aware checklist builder — the donor's own text, because the
     #    block it replaces is byte-identical on every page that has one
     if has_checklist:
-        out = A_CHECKLIST_VAR.sub(parts['var_line'], out, count=1)
-        out = A_CHECKLIST_BLOCK.sub(lambda _m: parts['checklist'], out, count=1)
+        # the sentinel block carries the var line, secLabel, buildChecklist and its
+        # call, so the old var line becomes the whole block and the old forEach
+        # goes away. Doing it in that order handles both shipped layouts: 215 pages
+        # declare shorten() after the forEach, 29 review pages before it.
+        out = A_CHECKLIST_VAR.sub(lambda _m: parts['checklist'], out, count=1)
+        out = A_CHECKLIST_BLOCK.sub('', out, count=1)
     # 5. the controller, right after setTheme's init call
     m = A_SETTHEME.search(out); out = out[:m.end()] + '\n\n' + parts['controller'] + out[m.end():]
     return out
+
+
+def refresh_page(rel, html, parts, problems):
+    """Bring an already-swept page's blocks back to the donor's text.
+
+    Located by sentinel, so a donor edit INSIDE a block propagates to all 293
+    pages and an edit to a sentinel itself is reported rather than half-applied.
+    """
+    out = html
+    for name, (a_tok, b_tok) in SENTINELS.items():
+        if name == 'checklist' and 'id="checklist"' not in html:
+            continue
+        if parts[name] in out:
+            continue                                   # already current
+        if out.count(a_tok) != 1 or out.count(b_tok) != 1:
+            problems.append('%s: cannot refresh %s — sentinel %s appears %dx and %s %dx (want 1 each)'
+                            % (rel, name, a_tok, out.count(a_tok), b_tok, out.count(b_tok)))
+            continue
+        a = out.find(a_tok)
+        b = out.find(b_tok, a)
+        if b < 0:
+            problems.append('%s: cannot refresh %s — close sentinel precedes the open one' % (rel, name))
+            continue
+        out = out[:a] + parts[name] + out[b + len(b_tok):]
+    return out if out != html else None
 
 
 def main():
@@ -148,8 +199,7 @@ def main():
     for rel, path, html in pages:
         new = plan_page(rel, html, parts, problems)
         if new is None:
-            if 'class="lang-row"' in html:
-                already.append(rel)
+            already.append(rel)
             continue
         changed.append(rel)
         if a.apply:
@@ -160,7 +210,7 @@ def main():
 
     print('== language shell sweep — %s ==' % ('APPLY' if a.apply else 'CHECK, no writes'))
     print('   shell pages         : %d' % len(pages))
-    print('   already carrying it : %d' % len(already))
+    print('   already current     : %d' % len(already))
     print('   %-19s : %d' % ('rewritten' if a.apply else 'would rewrite', len(changed)))
     if a.verbose:
         for r in changed:
