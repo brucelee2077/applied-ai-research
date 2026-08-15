@@ -20,6 +20,24 @@ FRONTIER_TOKENS = ["GPT-3", "49,152", "49152", "billions of", "frontier model", 
 HUMAN_TOKENS    = ["your brain", "brain", "you "]
 
 # ---------------------------------------------------------------------------
+# bilingual pairing
+# ---------------------------------------------------------------------------
+def bilingual(en, zh, tag='span'):
+    """A paired language node, or the English alone when there is no twin.
+
+    Returning the English UNWRAPPED when `zh` is empty is what makes the CSS
+    fallback work: the donor hides `.lang-zh` under data-lang="en" and `.lang-en`
+    under data-lang="zh", so a node carrying NEITHER class shows under both. A day
+    with no Chinese still reads in English instead of going blank, and — the
+    property the whole rollout leans on — a source with no `zh_*` keys and no
+    `~~~zh` fences compiles byte-identically to before this existed.
+    """
+    if zh is None or str(zh).strip() == '':
+        return en
+    return ('<{t} class="lang-en">{en}</{t}><{t} class="lang-zh">{zh}</{t}>'
+            .format(t=tag, en=en, zh=zh))
+
+# ---------------------------------------------------------------------------
 # parsing
 # ---------------------------------------------------------------------------
 def split_frontmatter(text):
@@ -423,11 +441,49 @@ def is_special(line):
     return (s.startswith('!!! ') or s.startswith('~~~') or s.startswith('%%%')
             or s.startswith('#### ') or s.startswith('- ') or bool(re.match(r'^\d+\.\s', s)))
 
-def render_md(text):
+def render_md(text, _in_zh=False):
+    """Block-level markdown-lite.
+
+    `~~~zh … ~~~` is the Chinese twin of every block emitted since the previous
+    fence in this call. That span gets wrapped in `.lang-en` and the fence's own
+    body — rendered by this same function, so the full widget grammar works inside
+    it — becomes a sibling `.lang-zh`. Blocks with no fence after them are emitted
+    UNWRAPPED and therefore show under both languages, which is the fallback.
+
+    Pairing by span rather than per block is what lets an author write two or three
+    English paragraphs and then their Chinese twin together, which is how the
+    analogy stays identical in both languages. It is also unambiguous: the span
+    boundary is the previous fence, never "the block above".
+    """
     lines = text.split('\n')
     out, i = [], 0
+    span_start = 0            # index in `out` where the current unpaired span begins
     while i < len(lines):
         s = lines[i].strip()
+        if s.startswith('~~~zh'):                        # Chinese twin of the span above
+            if _in_zh:
+                raise ValueError('~~~zh cannot nest inside another ~~~zh fence')
+            i += 1
+            buf = []
+            while i < len(lines) and lines[i].strip() != '~~~':
+                buf.append(lines[i]); i += 1
+            if i >= len(lines):
+                raise ValueError('unterminated ~~~zh fence — it needs a closing ~~~ line. '
+                                 'Without one the marker ships as literal text.')
+            i += 1
+            en_blocks = out[span_start:]
+            if not en_blocks:
+                raise ValueError('a ~~~zh fence has no English blocks above it to pair with. '
+                                 'Chinese-only content would be invisible to an English '
+                                 'reader; write the English first, then its twin.')
+            zh_html = render_md('\n'.join(buf), _in_zh=True)
+            if not zh_html.strip():
+                raise ValueError('empty ~~~zh fence — delete it or write the twin')
+            del out[span_start:]
+            out.append('<div class="lang-en">%s</div>' % '\n      '.join(en_blocks))
+            out.append('<div class="lang-zh">%s</div>' % zh_html)
+            span_start = len(out)
+            continue
         if s.startswith('~~~html'):                      # raw-HTML escape (kept as a fallback)
             i += 1; buf = []
             while i < len(lines) and lines[i].strip() != '~~~':
@@ -477,6 +533,34 @@ def render_md(text):
 # ---------------------------------------------------------------------------
 # region renderers
 # ---------------------------------------------------------------------------
+def _hero_fields(txt):
+    """Split a hero body on its @lede / @goal / @zh_lede / @zh_goal markers.
+
+    A positional split ('@lede' then partition on '@goal') cannot express four
+    markers in any order, and the author writes the Chinese twin right next to the
+    English it mirrors.
+
+    What keeps `@zh_lede` from being read as `@lede` is the `@` anchor, not the
+    order of the alternation: after the `@`, the text is `zh_lede`, which does not
+    begin with `lede`. The trailing `\\b` is the other load-bearing part — it stops
+    a longer word (`@ledex`, `@goals`) from matching a shorter marker, and it stops
+    the word "lede" appearing in ordinary prose from being taken as a marker
+    unless it is `@`-prefixed.
+    """
+    marks = [(m.start(), m.end(), m.group(1))
+             for m in re.finditer(r'@(zh_lede|zh_goal|lede|goal)\b', txt)]
+    fields = {}
+    for n, (a, b, name) in enumerate(marks):
+        end = marks[n + 1][0] if n + 1 < len(marks) else len(txt)
+        fields[name] = txt[b:end]
+    return fields
+
+
+def _flat(s):
+    """One-line inline HTML from a possibly multi-line marker body."""
+    return inline(' '.join(l.strip() for l in (s or '').strip().split('\n') if l.strip()))
+
+
 def render_hero(meta, block):
     txt = '\n'.join(block['lines'])
     # Optional %%% warmup ... %%% recall block (retention): extract BEFORE the lede/goal
@@ -486,61 +570,81 @@ def render_hero(meta, block):
     if mw:
         warm_html = render_warmup(mw.group(1).split('\n'))
         txt = txt[:mw.start()] + txt[mw.end():]
-    lede = goal = ''
-    if '@lede' in txt:
-        after = txt.split('@lede', 1)[1]
-        lede, _, goal = after.partition('@goal')
-    lede = inline(' '.join(l.strip() for l in lede.strip().split('\n') if l.strip()))
-    goal = inline(' '.join(l.strip() for l in goal.strip().split('\n') if l.strip()))
+    f = _hero_fields(txt)
+    lede = bilingual(_flat(f.get('lede')), _flat(f.get('zh_lede')))
+    goal = bilingual(_flat(f.get('goal')), _flat(f.get('zh_goal')))
     warm_line = ('\n      ' + warm_html) if warm_html else ''
+    # meta.get(), not meta[...]: the zh_ twins are optional, and render_hero used
+    # bracket access on the English keys, which exits the compiler with a bare
+    # KeyError BEFORE any gate runs. A missing twin must never do that.
     return ('<section id="home" class="hero">\n'
             '      <span class="kicker">%s</span>\n'
             '      <h1>%s<span class="sub">%s</span></h1>\n'
             '      <p class="lede">%s</p>\n'
             '      <div class="goal"><span class="gic" aria-hidden="true">🎯</span><div>%s</div></div>%s\n'
-            '    </section>' % (meta['module_label'], meta['title'], meta['subtitle'], lede, goal, warm_line))
+            '    </section>'
+            % (bilingual(meta.get('module_label', ''), meta.get('zh_module_label')),
+               bilingual(meta.get('title', ''), meta.get('zh_title')),
+               bilingual(meta.get('subtitle', ''), meta.get('zh_subtitle')),
+               lede, goal, warm_line))
 
 def render_section(block):
     a = block['args']
     disabled = a.get('gotit_disabled', 'false') == 'true'
     body = render_md('\n'.join(block['lines']))
     btn = ('<button class="gotit" type="button"%s>%s</button>'
-           % (' disabled' if disabled else '', a.get('gotit', 'Done')))
+           % (' disabled' if disabled else '',
+              bilingual(a.get('gotit', 'Done'), a.get('zh_gotit'))))
     return ('<section class="module-section" id="%s" data-sec="%s">\n'
             '  <div class="sec-head"><span class="sec-num %s">%s</span>'
             '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
-            % (a['id'], a['data_sec'], a['numclass'], a['num'], a['title'], a['tag'], body, btn))
+            % (a['id'], a['data_sec'], a['numclass'], a['num'],
+               bilingual(a['title'], a.get('zh_title')),
+               bilingual(a['tag'], a.get('zh_tag')), body, btn))
 
 def render_concept(block):
     """V9 concept unit: a tracked .module-section (intro -> inline visual -> build-up) with one gotit."""
     a = block['args']
     body = render_md('\n'.join(block['lines']))
     num = a.get('num', ''); numclass = a.get('numclass', 's-study')
-    btn = '<button class="gotit" type="button">%s</button>' % a.get('gotit', 'Got it')
+    btn = ('<button class="gotit" type="button">%s</button>'
+           % bilingual(a.get('gotit', 'Got it'), a.get('zh_gotit')))
     return ('<section class="module-section" id="%s" data-sec="%s">\n'
             '  <div class="sec-head"><span class="sec-num %s">%s</span>'
             '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
-            % (a['id'], a['id'], numclass, num, a.get('title', ''), a.get('tag', ''), body, btn))
+            % (a['id'], a['id'], numclass, num,
+               bilingual(a.get('title', ''), a.get('zh_title')),
+               bilingual(a.get('tag', ''), a.get('zh_tag')), body, btn))
 
 def concept_nav_items(blocks):
     """V9 sidebar nav: auto-number concept units in source order; keep quiz/produce."""
+    # "Start here" is a SHELL string, not lesson content, so the compiler does not
+    # invent a Chinese twin for it: doing so made all 47 lessons drift on recompile
+    # and broke the property this whole change rests on — no Chinese authored means
+    # byte-identical output. Shell strings are handled in the donor, not here.
     items = [{'target': 'home', 'label': 'Start here'}]
     n = 0
     for b in blocks:
+        a = b['args']
         if b['type'] == 'concept':
             n += 1
-            items.append({'target': b['args']['id'], 'label': '%d · %s' % (n, b['args'].get('tag') or b['args'].get('title', ''))})
+            zh = a.get('zh_tag') or a.get('zh_title')
+            items.append({'target': a['id'],
+                          'label': '%d · %s' % (n, a.get('tag') or a.get('title', '')),
+                          'zh_label': ('%d · %s' % (n, zh)) if zh else None})
         elif b['type'] in ('quiz', 'produce'):
-            items.append({'target': b['args']['id'], 'label': b['args'].get('tag') or b['args'].get('title', b['type'].title())})
+            items.append({'target': a['id'],
+                          'label': a.get('tag') or a.get('title', b['type'].title()),
+                          'zh_label': a.get('zh_tag') or a.get('zh_title')})
     return items
 
 def render_sidebar_nav(meta):
     rows = ['      <div class="nav-group-label">Module 02 · Train</div>']
     for it in meta['sidebar']:
         rows.append('      <button class="nav-link" data-target="%s"><span class="nl-dot"></span>%s</button>'
-                    % (it['target'], it['label']))
+                    % (it['target'], bilingual(it['label'], it.get('zh_label'))))
     return '<nav aria-label="Sections">\n' + '\n'.join(rows) + '\n    </nav>'
 
 def render_fin(meta):
@@ -548,7 +652,8 @@ def render_fin(meta):
             '      <span class="em" aria-hidden="true">🎉</span>\n'
             '      <h3>%s</h3>\n'
             '      <p>%s</p>\n'
-            '    </div>' % (meta['fin_title'], meta['fin_body']))
+            '    </div>' % (bilingual(meta.get('fin_title', ''), meta.get('zh_fin_title')),
+                            bilingual(meta.get('fin_body', ''), meta.get('zh_fin_body'))))
 
 # ---------------------------------------------------------------------------
 # compile: donor + source -> lesson.html   (marker-based region replacement)
@@ -693,28 +798,36 @@ def _compile_concept(meta, blocks, donor):
 def render_quiz_section(block):
     a = block['args']
     body = render_md('\n'.join(block['lines']))
-    btn = '<button class="gotit" type="button" disabled>%s</button>' % a.get('gotit', 'answer all first')
+    btn = ('<button class="gotit" type="button" disabled>%s</button>'
+           % bilingual(a.get('gotit', 'answer all first'), a.get('zh_gotit')))
     return ('<section class="module-section" id="%s" data-sec="%s">\n'
             '  <div class="sec-head"><span class="sec-num s-quiz">%s</span>'
             '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
-            % (a['id'], a['id'], a.get('num', ''), a.get('title', ''), a.get('tag', 'Quiz'), body, btn))
+            % (a['id'], a['id'], a.get('num', ''),
+               bilingual(a.get('title', ''), a.get('zh_title')),
+               bilingual(a.get('tag', 'Quiz'), a.get('zh_tag')), body, btn))
 
 
 def render_produce_section(block):
     a = block['args']
     body = render_md('\n'.join(block['lines']))
-    btn = '<button class="gotit" type="button">%s</button>' % a.get('gotit', 'Done')
+    btn = ('<button class="gotit" type="button">%s</button>'
+           % bilingual(a.get('gotit', 'Done'), a.get('zh_gotit')))
     return ('<section class="module-section" id="%s" data-sec="%s">\n'
             '  <div class="sec-head"><span class="sec-num s-produce">%s</span>'
             '<span class="sec-h">%s</span><span class="sec-tag">%s</span></div>\n'
             '  <div class="sec-body">\n      %s\n      %s\n    </div>\n</section>'
-            % (a['id'], a['id'], a.get('num', ''), a.get('title', ''), a.get('tag', 'Produce'), body, btn))
+            % (a['id'], a['id'], a.get('num', ''),
+               bilingual(a.get('title', ''), a.get('zh_title')),
+               bilingual(a.get('tag', 'Produce'), a.get('zh_tag')), body, btn))
 
 
 def render_sidebar_nav_items(meta, items):
-    rows = ['      <div class="nav-group-label">%s</div>' % meta.get('module_label', '')]
+    rows = ['      <div class="nav-group-label">%s</div>'
+            % bilingual(meta.get('module_label', ''), meta.get('zh_module_label'))]
     for it in items:
-        rows.append('      <button class="nav-link" data-target="%s"><span class="nl-dot"></span>%s</button>' % (it['target'], it['label']))
+        rows.append('      <button class="nav-link" data-target="%s"><span class="nl-dot"></span>%s</button>'
+                    % (it['target'], bilingual(it['label'], it.get('zh_label'))))
     return '\n'.join(rows)
 
