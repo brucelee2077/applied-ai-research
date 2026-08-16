@@ -125,8 +125,15 @@ def main():
         # page which looks finished and teaches less.
         try:
             import lang_parity_gate
+            # enforce_declaration=False: a day that has not been translated YET must
+            # still compile. Failing here deadlocks the build — the English author
+            # cannot fix a Chinese finding, so its fix rounds burn and the lesson
+            # never converges, which blocks the translate phase that would fix it.
+            # A HALF-translated day still fails every other parity check, which is
+            # the state that actually breaks a page.
             pok, pmsgs = lang_parity_gate.run(
-                open(args.source, encoding='utf-8').read(), source_path=args.source)
+                open(args.source, encoding='utf-8').read(), source_path=args.source,
+                enforce_declaration=False)
             log('\n-- Language Parity Gate --')
             for m in pmsgs: log('  ', m)
             if not pok:

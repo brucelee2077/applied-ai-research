@@ -348,6 +348,30 @@ prefer the typed widgets above).
 
 ### Declaring a module bilingual (`zh.require`)
 
+Once a module declares it, `lesson_build.js` produces the Chinese itself. Its
+**Translate** phase runs *after* the English lesson converges — never interleaved,
+because the two languages share one drawing (so the SVG must be final before its
+labels can be paired) and the analogy must be identical (so translating against a
+lesson still being rewritten throws the work away each round).
+
+    Coverage -> Author -> Compile -> Evaluate (7 English lenses) -> Route
+             -> Translate (translator + 4 Chinese lenses, up to maxZhRounds)
+
+It skips **loudly** and builds exactly as before when the module has not opted in,
+when the English lesson never converged, or when the declaration cannot be read.
+`zh_status` comes back on the workflow result and in the per-module summary from
+`build_module.js`, so "no Chinese" is always visible rather than assumed.
+
+One deliberate asymmetry to know about: `zh.require` is **advisory inside
+`compile_lesson.py`** and a **hard failure at the gate CLI and in the publish
+gate**. Failing the compile would deadlock the build — the English author cannot
+satisfy a Chinese finding, so its fix rounds burn, the lesson never converges, and
+the Translate phase that would have fixed it never runs. Completeness is therefore
+enforced by `test_every_day_its_module_requires_is_actually_bilingual`, which runs
+in the `compiler-tests` publish gate: a declared-bilingual day cannot reach the
+site in English.
+
+
 The Chinese checks are **inert until a day declares Chinese** — that is what lets
 the language toggle ship on a page whose content is still English-only. The cost of
 that inertness is that silence looks like success: an untranslated day passes every

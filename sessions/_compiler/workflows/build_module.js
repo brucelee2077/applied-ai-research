@@ -29,10 +29,20 @@ for (const day of days) {
     skill_proposal: !!(r && r.skill_proposal),
     concepts: (r && r.final_compile) ? r.final_compile.concept_count : null,
     error: err,
+    // Copied through so the module summary can report the Chinese outcome. The
+    // first version read r.zh_status off THIS object, which never carried it, so
+    // the summary always said "Chinese 0 converged, 0 not required".
+    zh_status: r && r.zh_status,
+    zh_rounds: r && r.zh_rounds,
   })
   log(`=== ${day}: converged=${!!(r && r.converged)} rounds=${r ? r.rounds : '?'} concepts=${(r && r.final_compile) ? r.final_compile.concept_count : '?'} ===`)
 }
 
 const done = results.filter(x => x.converged).length
-log(`build-module ${module_}: ${done}/${results.length} days converged`)
+const zhDone = results.filter(r => r && r.zh_status === 'converged').length
+const zhSkip = results.filter(r => r && r.zh_status === 'not-required').length
+log(`build-module ${module_}: ${done}/${results.length} days converged; Chinese ${zhDone} converged, ${zhSkip} not required`)
+if (zhSkip === results.length && results.length) {
+  log(`NOTE: no day produced a Chinese twin because this module never opted in. Add zh.require to sessions/${module_}/_refactor/manifest.yaml to make the build bilingual.`)
+}
 return { module: module_, results, converged_count: done, total: results.length }

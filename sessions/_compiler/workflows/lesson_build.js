@@ -1,6 +1,6 @@
 export const meta = {
   name: 'lesson-build',
-  description: 'Self-correcting per-lesson engine: draft coverage (skill-blind) -> author V9 concept source -> compile -> judge panel -> regenerate until pass -> checkpoint. args {module, day}. Writes source.md; compiles; reports.',
+  description: 'Self-correcting per-lesson engine: draft coverage (skill-blind) -> author V9 concept source -> compile -> judge panel -> regenerate until pass -> TRANSLATE to Chinese if the module manifest declares zh.require -> checkpoint. args {module, day, maxRounds, maxZhRounds}. Writes source.md; compiles; reports.',
   whenToUse: 'To (re)generate one lesson-day into the V9 concept structure with an autonomous judge-gated fix loop.',
   phases: [
     { title: 'Coverage' },
@@ -8,6 +8,7 @@ export const meta = {
     { title: 'Compile' },
     { title: 'Evaluate' },
     { title: 'Route' },
+    { title: 'Translate', detail: 'Chinese twin — only if the module manifest declares zh.require' },
   ],
 }
 
@@ -132,7 +133,15 @@ const LENSES = [
   { key: 'interest', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Cultivating a beginner's INTEREST is the #1 goal, so GATE on it — parse TWO sections. (A) "Absolute Interest Floor (no notebook — runs on EVERY lesson)": this runs on EVERY lesson regardless of notebook. If its overall is BELOW_FLOOR, emit ONE P0 finding kind="interest" ("lesson does not clear the absolute interest floor"; use its top_fixes as the fix); ALSO report each WEAK/MISSING lever (aspiration_hook / relevance / invites_play / momentum / breadth_spark / delight_voice / payoff) as a P1 interest finding. If this section reads status N/A (bridge unavailable), verdict PASS but NOTE explicitly that interest was UNENFORCED this round (never a silent pass). (B) "Interest / Curiosity Judge" (present ONLY when a notebook_yardstick exists): if its overall is BELOW_NOTEBOOK or WORSE_THAN_NOTEBOOK, ALSO emit a P0 finding kind="interest" (notebook ceiling); report each BELOW/WORSE lever as a P1. Bridge unavailable -> verdict PASS, note it.` },
   { key: 'structure', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Concept-Structure Judge" section (per-concept intuition_first / analogy / buildup / buildup_visualized). Beginner-friendliness is the bar, so grade strictly: report analogy MISSING or WEAK as a P0 analogy finding (every concept needs a concrete everyday analogy WITH where-it-breaks-down); intuition_first MISSING as P0, WEAK as P1; buildup MISSING/WEAK as P1. ALSO parse buildup_visualized: MISSING as a P0 finding kind="buildup" (a heavy/multi-step build-up left as text+equations with no build-up visual — the user's #1 ask 2026-07-20 is to VISUALIZE the build-up, not just the opening intuition), WEAK as a P1 finding kind="buildup"; NA and GOOD emit NO finding. Bridge unavailable -> verdict PASS, note it.` },
   { key: 'body', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the "Concept Body Engagement" section (per-concept build-up VOICE — the user's #1 ask 2026-07-24: each concept's BODY must be as engaging as its intro, never a cold textbook dump). For each concept: body_engagement MISSING -> a P0 finding kind="body_engagement" (a genuinely cold mechanism/symbol dump — opening analogy dropped, no re-hook / "why this bites", no narration, no discovery); WEAK -> a P1 finding kind="body_engagement"; GOOD and NA emit NO finding. If the section reads status N/A or BRIDGE_UNAVAILABLE, verdict PASS but NOTE explicitly that body-engagement was UNENFORCED this round (never a silent pass).` },
-  // --- the Chinese track. These four lenses are INERT on an English-only day: the
+  { key: 'correctness', prompt: `Adversarially read ${lesson} (strip HTML) for TECHNICAL errors, numeric self-inconsistency, and broken narrative spine. Report each as a correctness finding (P0). Default to reporting if unsure.` },
+  ]
+
+// --- the Chinese track ------------------------------------------------------
+// Split OUT of LENSES. They used to run on every English round while being
+// inert by design, which burned four judge calls a round to print n/a. They now
+// run only in the Translate phase, after the English lesson has converged.
+const ZH_LENSES = [
+  // These four are INERT on an English-only day: the
   // parity gate reports n/a, and every judge returns N/A when the source has no
   // ~~~zh fence. They only bite once a day declares Chinese, which is the point —
   // half-Chinese is the failure mode that ships a page looking finished.
@@ -140,14 +149,13 @@ const LENSES = [
   { key: 'zh-language', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the CHINESE plain-language floor (the language_absolute_zh result — present only when the source has a ~~~zh fence). Same rules as the English 'language' lens and the same severities: BELOW_FLOOR is ONE P0 kind="tone", each WEAK/MISSING lever a P1. The anchors differ on purpose — hard words are 书面语 like 收敛/泛化/单调, sentences are counted in 汉字 and flagged for 逗号 chains, and no_idioms means 成语. LENGTH IS NOT A DEFECT. If the result is absent or N/A, verdict PASS but NOTE explicitly that Chinese plain language was UNENFORCED this round (never a silent pass).` },
   { key: 'zh-interest', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse interest_absolute_zh and structure_zh (present only on a bilingual day). BELOW_FLOOR on the Chinese interest floor is a P0 kind="interest"; analogy MISSING or WEAK in structure_zh is a P0 kind="analogy" exactly as in English — a translated hook must still ASK the reader something, and a translated concept must still open on a concrete everyday thing a Chinese 12-year-old has actually done. Absent or N/A -> verdict PASS with an explicit UNENFORCED note.` },
   { key: 'fidelity', prompt: `Run: python3 sessions/_compiler/gates/coverage_judge.py ${lesson} --source ${source}. Parse the translation-fidelity result. This is the ONLY check that can see the two languages teaching different lessons — the parity gate proves the Chinese exists, it cannot read. FIDELITY_BROKEN is a P0 finding kind="fidelity"; quote the mismatched en/zh pair from its "mismatches" list as the fix. same_analogy MISSING is the worst case and always a P0: the two languages share ONE drawing, so a diverged analogy leaves the figure illustrating the English one and the picture contradicts the words. A term glossed twice, never, or two different ways is a P1. status N/A means the day has no Chinese -> verdict PASS, no findings.` },
-  { key: 'correctness', prompt: `Adversarially read ${lesson} (strip HTML) for TECHNICAL errors, numeric self-inconsistency, and broken narrative spine. Report each as a correctness finding (P0). Default to reporting if unsure.` },
 ]
 
-async function evaluate() {
-  const results = await parallel(LENSES.map(l => () =>
+async function evaluate(panel, ph) {
+  const results = await parallel((panel || LENSES).map(l => () =>
     agent(`You are the ${l.key.toUpperCase()} evaluator (read-only). ${l.prompt}
 Return findings[], a verdict (PASS iff no P0), and lens="${l.key}".`,
-      { label: `judge:${l.key}`, phase: 'Evaluate', schema: JUDGE_SCHEMA })))
+      { label: `judge:${l.key}`, phase: ph || 'Evaluate', schema: JUDGE_SCHEMA })))
   return results.filter(Boolean)
 }
 
@@ -210,6 +218,156 @@ if (!compileRes) {
 const converged = !!(routing && routing.pass && compileRes.compiled)
 if (!converged) log(`NOT converged after ${round} rounds — blocker report at checkpoint`)
 
+// ===========================================================================
+// Phase 5: the CHINESE round.
+// ===========================================================================
+// Deliberately AFTER the English loop converges, not interleaved with it:
+//   * the two languages share ONE drawing, so the SVG must exist and be final
+//     before its labels can be paired;
+//   * the analogy must be identical in both languages, and translating against a
+//     lesson the author is still rewriting throws that work away every round.
+// It is skipped, loudly, unless the module's manifest OPTS IN via zh.require —
+// the same declaration lang_parity_gate check 0b enforces. A module that never
+// opted in builds exactly as it did before this phase existed.
+phase('Translate')
+let zhStatus = 'skipped'
+let zhRounds = 0
+let zhRouting = null
+
+const zhDecl = converged ? await agent(
+  `Read the bilingual DECLARATION for this day and report it. Do not edit anything.
+Run:
+  python3 -c "import sys; sys.path.insert(0,'sessions/_compiler/gates'); import lang_parity_gate as g; print(g._load_requirement('${source}'))"
+It prints a (required, why) tuple. Map it EXACTLY, and never guess:
+  True  -> verdict "required"     (this day MUST be bilingual)
+  False -> verdict "excluded"     (the module names other days, not this one)
+  None  -> verdict "undeclared"   (the module never declared a requirement)
+If the command RAISES -> verdict "error" with the traceback in why. A broken
+manifest is a blocker for the parity gate to report, not something to guess past.
+Copy the "why" text from what the command printed. Do not paraphrase it.`,
+  { label: 'zh: declaration', phase: 'Translate', schema: {
+      type: 'object',
+      properties: {
+        // An enum, not a boolean. `_load_requirement` returns True / False / None,
+        // and a boolean field left the model to invent an encoding for None — five
+        // live cases return it. Guessing `true` there would translate a module that
+        // never opted in, and the parity gate only WARNS in that state, so nothing
+        // downstream would have stopped it.
+        verdict: { type: 'string', enum: ['required', 'excluded', 'undeclared', 'error'] },
+        why: { type: 'string' } },
+      required: ['verdict', 'why'] } }) : null
+
+if (!converged) {
+  log('Translate: SKIPPED — the English lesson never converged. Translating a lesson that is still being rewritten throws the work away.')
+} else if (!zhDecl) {
+  log('Translate: SKIPPED — could not read the bilingual declaration (agent died).')
+  zhStatus = 'unknown'
+} else if (zhDecl.verdict !== 'required') {
+  // Fail CLOSED: anything that is not an explicit "required" skips. An `error`
+  // verdict must not translate — a manifest we cannot read is a blocker, and the
+  // parity gate reports it.
+  const advice = zhDecl.verdict === 'excluded'
+    ? 'zh.require already exists but does not name this day — add it to that list to include it.'
+    : zhDecl.verdict === 'error'
+      ? 'FIX THE MANIFEST: the declaration could not be read at all.'
+      : 'To make this module bilingual, add zh.require (all, or a list of day-dir names) to its _refactor/manifest.yaml.'
+  log(`Translate: SKIPPED (${zhDecl.verdict}) — ${zhDecl.why}. ${advice}`)
+  zhStatus = zhDecl.verdict === 'error' ? 'declaration-unreadable' : 'not-required'
+} else {
+  log(`Translate: REQUIRED — ${zhDecl.why}`)
+  const MAX_ZH_ROUNDS = A.maxZhRounds || 3
+
+  async function translate(zr, findings) {
+    const fix = findings
+      ? `\n\nThis is ZH FIX ROUND ${zr}. Address these findings. Do NOT re-translate from scratch — repair in place:\n${JSON.stringify(findings, null, 2)}`
+      : ''
+    return await agent(
+      `You are the TRANSLATOR sub-agent. Add the CHINESE twin to the finished English lesson at ${source} (module "${module_}", day "${day}").
+The English is DONE and correct. You are writing a VERSION, not a gloss: it must teach the same lesson, at the same depth, with the SAME analogy, to the same reader.
+
+READ FIRST: sessions/_compiler/AUTHORING.md section 5b — the \`~~~zh\` grammar, the \`zh_*\` front-matter keys, paired \`<text class="lang-en|lang-zh">\` SVG labels, and the zh.require declaration. Also read ONE finished bilingual day to match voice and see the shapes in practice: sessions/m02-the-neuron/day-06-training-loop/source.md (10 concepts) or day-08-learning-rate/source.md (6).
+
+USE THE TOOL, do not hand-edit the source:
+  python3 sessions/_compiler/zh_worksheet.py ${source}
+prints every span and SVG label still needing a twin. Then write a SHORT python script per block that calls wk.front_matter / wk.block_args / wk.apply.
+
+⚠️ ONE BLOCK PER TOOL CALL. Five agents on this exact task were once killed for "no progress" after each tried to translate a whole day in one giant call, costing 5.7M tokens for zero output. Page through the worksheet with sed; re-run it between apply calls because span ids re-index as fences land; keep every tool call small and make steady visible progress.
+
+LANGUAGE RULES (gates enforce these):
+  * EVERYDAY SPOKEN CHINESE, not 书面语. A word a primary-school child would not say is a hard word.
+  * NO 成语. NO 显然 / 众所周知 / 不言而喻 / 如你所见 / 不难看出 / 一目了然.
+  * ONE IDEA PER SENTENCE: <= 60 汉字 AND <= 4 逗号 each. Chinese chains clauses with commas, so break the chain with 。 aggressively. This is the most-violated rule.
+  * Technical terms STAY ENGLISH, glossed in Chinese on FIRST use in the day only: \`gradient（梯度）\`. Bare English term after that — do not re-gloss.
+  * NEVER translate code, printed output, identifiers, formula symbols, numbers, file paths, or anything in backticks / <code> / <pre>.
+  * Keep the SAME analogy — one drawing serves both languages, so a substituted analogy leaves the figure contradicting the words.
+  * SVG labels are PLAIN TEXT (no markdown — \`**bold**\` ships literally) and must be SHORT: one 汉字 is ~2.3 English characters wide and a long label overflows the drawing.
+
+TRAPS, each of which has cost a real failure here:
+  * A span translation must NOT contain its own \`~~~zh\` — apply() adds the outer fence and an inner one nests, which the compiler refuses. Asserted in code.
+  * The HERO is the ONE exception: inserted RAW, it supplies \`@zh_lede\` / \`@zh_goal\` itself and fences ONLY its \`%%% warmup\`.
+  * MIRROR THE ENGLISH NODE TYPE. Worksheet \`(w:insight)\` means \`%%% insight\`; \`(callout)\` means the same \`!!! c-xxx <emoji>\` class the English uses — grep it. Never invent a class.
+  * A quiz twin MUST keep the SAME \`a:\` index. A mismatch tells a Chinese reader the wrong option is right — the correctness red line.
+  * U+FFFD: writing Chinese through a shell heredoc has SILENTLY dropped characters (43 across 6 files, 3 of them already published). Use the Write tool. Afterwards \`python3 -c "print(open('${source}',encoding='utf-8').read().count(chr(0xFFFD)))"\` must print 0.
+  * A PARTIAL translation is worse than none: one \`zh_\` key or fence flips the day to "declares Chinese", so every parity check activates and the compile refuses to write. Finish the day or leave it untouched.
+
+BEFORE reporting done, run and pass BOTH:
+  python3 sessions/_compiler/gates/lang_parity_gate.py ${source}
+  python3 sessions/_compiler/compile_lesson.py ${source}
+The parity gate must report "all N concept units carry Chinese" with N > 0 — an early PASS saying "declares no Chinese yet" means you have not started. Report translated=true only if BOTH exit 0.${fix}`,
+      { label: `translate r${zr}`, phase: 'Translate', agentType: 'general-purpose', schema: {
+          type: 'object',
+          properties: {
+            translated: { type: 'boolean' },
+            parity_exit: { type: 'integer' }, compile_exit: { type: 'integer' },
+            fences: { type: 'integer' }, labels_paired: { type: 'integer' },
+            fffd: { type: 'integer' },
+            gate_output: { type: 'string' },
+          },
+          required: ['translated', 'gate_output'] } })
+  }
+
+  let zhRes = await translate(0, null)
+  while (zhRounds < MAX_ZH_ROUNDS) {
+    if (!zhRes) {
+      // Do not claim nothing was written. On a fix round the day may already be
+      // fully bilingual and compiling, with known judge findings — reporting
+      // 'translator-died' there reads as "no Chinese exists", which is false.
+      zhStatus = zhRounds > 0 ? 'translated-fixes-incomplete' : 'translator-died'
+      log(`zh r${zhRounds}: translator died -> ${zhStatus}`)
+      break
+    }
+    if (!zhRes.translated) {
+      log(`zh r${zhRounds}: gates failed (parity ${zhRes.parity_exit}, compile ${zhRes.compile_exit}) -> repair`)
+      zhRounds += 1
+      if (zhRounds >= MAX_ZH_ROUNDS) { zhStatus = 'gates-failing'; break }
+      zhRes = await translate(zhRounds, [{ kind: 'compile_gate', severity: 'P0', why: zhRes.gate_output }])
+      continue
+    }
+    const zhEvals = await evaluate(ZH_LENSES, 'Translate')
+    // evaluate() drops dead agents, so an empty panel routes to pass=true and would
+    // mint zh_status:'converged' having verified nothing. `parity` is the
+    // deterministic lens that exists to remove silent passes, so require IT
+    // specifically to have reported.
+    if (!zhEvals.some(e => e.lens === 'parity')) {
+      log(`zh r${zhRounds}: the parity lens did not report (agent died) — refusing to call this converged`)
+      zhStatus = 'judges-died'
+      break
+    }
+    zhRouting = route(zhEvals)
+    log(`zh r${zhRounds}: P0=${zhRouting.p0.length} fixable=${zhRouting.fixable.length} pass=${zhRouting.pass}`)
+    if (zhRouting.pass) { zhStatus = 'converged'; break }
+    zhRounds += 1
+    if (zhRounds >= MAX_ZH_ROUNDS) { zhStatus = 'not-converged'; break }
+    zhRes = await translate(zhRounds, zhRouting.fixable)
+  }
+  // Reachable only for a nonsensical args.maxZhRounds (< 0), where translate(0)
+  // has already mutated source.md and no gate was ever checked. Say that, rather
+  // than reporting a clean 'not-converged'.
+  if (zhStatus === 'skipped') zhStatus = 'aborted-before-any-gate'
+}
+log(`Translate: ${zhStatus} (rounds ${zhRounds})`)
+
+
 let skillProposal = null
 if (routing && routing.skillGaps.length) {
   phase('Route')
@@ -235,6 +393,16 @@ const report = [
     ? `\n## Hard-gate blocker (lesson never compiled — the LLM judge panel did NOT run)\n\`\`\`\n${(compileRes.gate_output || '(no gate output captured)').slice(-2000)}\n\`\`\``
     : '',
   `- Residual P0 (if any): ${routing ? routing.p0.length : 'n/a (lesson never compiled)'}`,
+  `- Chinese: ${zhStatus}${zhRounds ? ` (rounds ${zhRounds})` : ''}`,
+  zhStatus === 'not-required'
+    ? `  (this module has not opted in. Add zh.require to ${'sessions/' + module_}/_refactor/manifest.yaml — 'all', or a list of day-dir names — and the build will produce and gate the Chinese twin too.)`
+    : '',
+  zhRouting && zhRouting.p0.length
+    ? `\n## Residual Chinese P0\n${zhRouting.p0.map(f => `- [${f.severity}/${f.lens}] ${f.kind}: ${f.why}`).join('\n')}`
+    : '',
+  zhRouting && zhRouting.fixable.filter(f => f.severity !== 'P0').length
+    ? `\n## Chinese advisory findings (P1/P2)\n${zhRouting.fixable.filter(f => f.severity !== 'P0').map(f => `- [${f.severity}/${f.lens}] ${f.kind}: ${f.why}`).join('\n')}`
+    : '',
   routing && routing.p0.length ? `\n## Residual findings\n${routing.p0.map(f => `- [${f.severity}/${f.lens}] ${f.kind}: ${f.why}`).join('\n')}` : `\n(no residual P0)`,
   routing && routing.fixable.filter(f => f.severity !== 'P0').length ? `\n## Advisory findings (P1/P2 — surfaced, not looped this run)\n${routing.fixable.filter(f => f.severity !== 'P0').map(f => `- [${f.severity}/${f.lens}] ${f.kind}${f.concept ? ' (' + f.concept + ')' : ''}: ${f.why}`).join('\n')}` : '',
   skillProposal ? `\n## Skill-gap proposal (needs your approval)\n${skillProposal.rationale}\n\n\`\`\`diff\n${skillProposal.proposal_diff}\n\`\`\`` : `\n(no skill-gap proposals)`,
@@ -244,6 +412,7 @@ log(report)
 
 return {
   module: module_, day, source, lesson, converged, rounds: round,
+  zh_status: zhStatus, zh_rounds: zhRounds, zh_routing: zhRouting,
   blind_draft: draft, final_compile: compileRes,
   evaluations: lastEvals, routing, skill_proposal: skillProposal, report,
 }

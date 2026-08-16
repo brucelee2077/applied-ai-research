@@ -828,3 +828,29 @@ def test_the_real_m01_and_m02_days_are_all_declared_and_required():
         for sp in sorted(glob.glob(os.path.join(REPO, 'sessions', mod, 'day-*', 'source.md'))):
             req, why = parity._load_requirement(sp)
             assert req is True, '%s not required: %s' % (sp, why)
+
+
+def test_every_day_its_module_requires_is_actually_bilingual():
+    """The real enforcement point for zh.require.
+
+    check 0b is ADVISORY inside compile_lesson.py, because failing a compile on an
+    untranslated day deadlocks the build: the English author cannot satisfy a
+    Chinese finding, so its fix rounds burn, the lesson never converges, and the
+    translate phase that would have fixed it never runs. An untranslated day is a
+    rollout-completeness problem, not a page-validity one.
+
+    So completeness is enforced HERE instead — this test runs in the `compiler-tests`
+    publish gate, which means a declared-bilingual day cannot reach the site in
+    English. Verified both directions: the gate CLI still exits 6 on such a day.
+    """
+    missing = []
+    for p in sorted(glob.glob(os.path.join(REPO, 'sessions', 'm*', 'day-*', 'source.md'))):
+        req, _why = parity._load_requirement(p)
+        if req is not True:
+            continue
+        if not parity._declares_chinese(open(p, encoding='utf-8').read()):
+            missing.append(os.path.relpath(p, os.path.join(REPO, 'sessions')))
+    assert not missing, (
+        '%d day(s) whose module declares zh.require carry NO Chinese: %s. Either '
+        'translate them or narrow zh.require in the module manifest.'
+        % (len(missing), missing))

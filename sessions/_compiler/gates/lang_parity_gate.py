@@ -237,7 +237,8 @@ def _load_requirement(source_path):
                         'got %r' % (mf, req))
 
 
-def run(source_text, whitelist=None, manifest_covers=None, source_path=None):
+def run(source_text, whitelist=None, manifest_covers=None, source_path=None,
+        enforce_declaration=True):
     msgs, ok = [], [True]
     def fail(m): ok[0] = False; msgs.append('FAIL ' + m)
     def pas(m): msgs.append('pass ' + m)
@@ -271,7 +272,19 @@ def run(source_text, whitelist=None, manifest_covers=None, source_path=None):
         # touching content), so it is kept for undeclared modules and REMOVED only
         # where a manifest has explicitly opted in.
         required, why = _load_requirement(source_path)
-        if required:
+        if required and not enforce_declaration:
+            # ADVISORY here by caller's request. An untranslated day is a
+            # ROLLOUT-COMPLETENESS problem, not a page-validity one: the page is
+            # valid and renders correctly in English. compile_lesson.py passes
+            # enforce_declaration=False because failing the compile deadlocks
+            # authoring — the English author cannot satisfy a Chinese finding, so
+            # every fix round burns and the lesson never converges, which in turn
+            # prevents the translate phase that would have fixed it. Enforcement
+            # lives at the CLI (exit 6) and in the published-corpus test.
+            note('this day carries no Chinese and its module declares it must (%s). '
+                 'ADVISORY at compile time; it is a hard failure at the CLI and in '
+                 'the publish gate, so it cannot ship untranslated.' % why)
+        elif required:
             fail('this day carries NO Chinese, but its module declares it must '
                  '(%s). An English-only day inside a declared-bilingual module is '
                  'the silence this check exists to remove: every other check below '
