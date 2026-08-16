@@ -104,27 +104,136 @@ _ZH_ANCHOR = ("reset_confirm:'\\u8981\\u6e05\\u7a7a\\u4eca\\u5929\\u7684\\u8fdb\
 
 
 def _patch_runtime(text, path):
-    """Add the 4 keys to UI.en / UI.zh and route the JS through ui()."""
-    if "ui('saw_all_three')" in text:
-        return text, 0                      # idempotent
-    en_add = ', '.join("%s:%r" % (k, en) for k, en, _zh, _js in RUNTIME)
-    zh_add = ', '.join("%s:%r" % (k, zh) for k, _en, zh, _js in RUNTIME)
-    for anchor, add in ((_EN_ANCHOR, en_add), (_ZH_ANCHOR, zh_add)):
-        if text.count(anchor) != 1:
-            raise SystemExit('FAIL %s: UI table anchor matched %d time(s), expected 1. '
-                             'The table changed — re-measure.'
-                             % (os.path.basename(path), text.count(anchor)))
-        text = text.replace(anchor, anchor[:-1] + ', ' + add + '}', 1)
-    for key, _en, _zh, js in RUNTIME:
-        if text.count(js) != 1:
-            raise SystemExit('FAIL %s: %r appears %d time(s), expected 1.'
-                             % (os.path.basename(path), js[:44], text.count(js)))
-        if js.endswith("+item.fb"):
-            new = "fb.innerHTML=ui('wrong_prefix')+item.fb"
+    """Add the 4 keys to UI.en / UI.zh and route the JS through ui().
+
+    Two-stage on purpose. An earlier version of this function emitted a bare
+    `g.textContent=ui(key)` and guarded idempotency on `ui('saw_all_three')` being
+    present. When the stale-string fix below was added, that guard short-circuited
+    and the IMPROVED form never landed — the re-stamp loop shipped with nothing
+    tagged for it to find, i.e. a fix that looked applied and did nothing. So the
+    guard now keys on the data-ui tag, which is what actually makes it work, and
+    the already-routed-but-untagged form is upgraded in place.
+    """
+    n = 0
+    if "ui('saw_all_three')" not in text:
+        en_add = ', '.join("%s:%r" % (k, en) for k, en, _zh, _js in RUNTIME)
+        zh_add = ', '.join("%s:%r" % (k, zh) for k, _en, zh, _js in RUNTIME)
+        for anchor, add in ((_EN_ANCHOR, en_add), (_ZH_ANCHOR, zh_add)):
+            if text.count(anchor) != 1:
+                raise SystemExit('FAIL %s: UI table anchor matched %d time(s), '
+                                 'expected 1. The table changed — re-measure.'
+                                 % (os.path.basename(path), text.count(anchor)))
+            text = text.replace(anchor, anchor[:-1] + ', ' + add + '}', 1)
+        for key, _en, _zh, js in RUNTIME:
+            if text.count(js) != 1:
+                raise SystemExit('FAIL %s: %r appears %d time(s), expected 1.'
+                                 % (os.path.basename(path), js[:44], text.count(js)))
+            text = text.replace(js, js.split('=', 1)[0] + "=ui('%s')" % key, 1)
+            n += 1
+    # -- upgrade the routed-but-untagged form so setLang can refresh it ---------
+    for key, _en, _zh, _js in RUNTIME:
+        if key == 'wrong_prefix':
+            old = "fb.innerHTML=ui('wrong_prefix')+item.fb"
+            new = ("fb.innerHTML='<span data-ui=\"wrong_prefix\">'+ui('wrong_prefix')"
+                   "+'</span>'+item.fb")
         else:
-            new = js.split('=', 1)[0] + "=ui('%s')" % key
-        text = text.replace(js, new, 1)
-    return text, len(RUNTIME)
+            old = "g.textContent=ui('%s')" % key
+            new = "g.setAttribute('data-ui','%s');g.textContent=ui('%s')" % (key, key)
+        if new in text:
+            continue
+        if text.count(old) != 1:
+            raise SystemExit('FAIL %s: cannot upgrade %r — %r appears %d time(s), '
+                             'expected 1.' % (os.path.basename(path), key, old,
+                                              text.count(old)))
+        text = text.replace(old, new, 1)
+        n += 1
+    return text, n
+
+
+# -- two defects the adversarial reviewers found in the patches above ---------
+# Both are mine, introduced by this script, and both are invisible until a reader
+# does something specific — which is exactly why they needed a reviewer.
+
+# (a) The shared copy handler saves and restores btn.textContent. Once the button
+#     holds a lang-en/lang-zh PAIR, that round-trip flattens the pair to plain
+#     text, so after one click the button reads '📋 copy📋 复制' in BOTH languages.
+#     Reading and restoring innerHTML preserves the markup. Not currently live on
+#     m01 only because a source region happens to overwrite that button unpaired —
+#     luck, not design, and it would fire the moment that region changed.
+COPY_FIX = [
+    ('var o=btn.textContent;', 'var o=btn.innerHTML;'),
+    ('btn.textContent=o;', 'btn.innerHTML=o;'),
+]
+
+# (b) setLang() rebuilt only the sidebar checklist, so a ui() string already
+#     stamped into the DOM went STALE on a mid-lesson language switch: answer a
+#     quiz question wrong in English, press 中文, and the English 'The correct
+#     answer is the green one.' stayed. The same bug existed in v9-base.donor for
+#     its own four ui() write sites, so the fix went THERE and is canonical.
+#
+#     This function does not re-implement it. An earlier version did, with slightly
+#     different comment wording, and the two copies were then not byte-identical —
+#     which broke `test_page_toggle_text_is_byte_identical_to_the_donor` the moment
+#     _lang_shell_sweep.py refreshed m01's pages from v9-base. One canonical text,
+#     sliced from v9-base, is the only arrangement that survives both tools.
+V9 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                  '_compiler', 'shells', 'v9-base.donor')
+CONTROLLER = ('/* frontier-lang:controller */', '/* /frontier-lang:controller */')
+
+
+def _canonical_controller():
+    src = open(V9, encoding='utf-8').read()
+    a, b = CONTROLLER
+    i, j = src.find(a), src.find(b)
+    if i < 0 or j < 0:
+        raise SystemExit('FAIL v9-base.donor: controller sentinels not found')
+    return src[i:j + len(b)]
+
+
+def _patch_fixes(text, path):
+    """Copy-button fix, plus the canonical controller block from v9-base."""
+    n = 0
+    for old, new in COPY_FIX:
+        if new in text:
+            continue
+        if text.count(old) != 1:
+            raise SystemExit('FAIL %s: copy-handler anchor %r appears %d time(s), '
+                             'expected 1.' % (os.path.basename(path), old, text.count(old)))
+        text = text.replace(old, new, 1)
+        n += 1
+    canon = _canonical_controller()
+    a, b = CONTROLLER
+    i, j = text.find(a), text.find(b)
+    if i < 0 or j < 0:
+        raise SystemExit('FAIL %s: controller sentinels not found' % os.path.basename(path))
+    cur = text[i:j + len(b)]
+    if cur != canon:
+        text = text[:i] + canon + text[j + len(b):]
+        n += 1
+    return text, n
+
+
+# (c) Cross-day tone drift the reviewers measured on one sentence: the simulated
+#     terminal was 假的 on three days, 假装出来的 on a fourth, 假装的 on a fifth.
+#     Beyond the inconsistency, 假 means "fake", which is stronger than
+#     "simulated" and invites a 12-year-old to distrust the printed outputs — and
+#     those outputs are genuine, right down to a real TypeError message. The
+#     window is a copy of a terminal; what it prints is real.
+TERMINAL_DRIFT = [
+    ('一个假的 Python 终端',       '一个长得像 Python 终端的窗口'),
+    ('一个假装出来的 Python 终端', '一个长得像 Python 终端的窗口'),
+    ('一个假装的 Python 终端',     '一个长得像 Python 终端的窗口'),
+]
+
+
+def _patch_drift(text):
+    n = 0
+    for old, new in TERMINAL_DRIFT:
+        if old in text:
+            text = text.replace(old, new)
+            n += 1
+    return text, n
+
 
 
 
@@ -168,10 +277,12 @@ def main():
             continue
         out, n = patch(src, d)
         out, r = _patch_runtime(out, d)
+        out, x = _patch_fixes(out, d)
+        out, y = _patch_drift(out)
         if out != src:
             open(d, 'w', encoding='utf-8').write(out)
-        print('  %-38s %d shared + %d runtime paired%s'
-              % (os.path.basename(d), n, r, '' if out != src else ' (already current)'))
+        print('  %-38s %d shared + %d runtime + %d fixes + %d drift%s'
+              % (os.path.basename(d), n, r, x, y, '' if out != src else ' (already current)'))
     sys.exit(1 if bad else 0)
 
 
