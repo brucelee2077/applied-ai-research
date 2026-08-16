@@ -346,6 +346,41 @@ prefer the typed widgets above).
 
 ## 5b. Chinese (the `~~~zh` twin)
 
+### Declaring a module bilingual (`zh.require`)
+
+The Chinese checks are **inert until a day declares Chinese** — that is what lets
+the language toggle ship on a page whose content is still English-only. The cost of
+that inertness is that silence looks like success: an untranslated day passes every
+Chinese check.
+
+So a module states its intent, machine-readably, in `<module>/_refactor/manifest.yaml`:
+
+```yaml
+zh:
+  langs: [en, zh]
+  require: all            # or: [day-01-arrays, day-02-indexing-slicing]
+```
+
+`lang_parity_gate` reads `zh.require`, and from then on **a day it covers that has
+no Chinese is a P0**, not an inert pass. `zh.scope` is prose and is deliberately
+NOT read — it was prose in every manifest that had it, which is how a module came to
+declare `langs: [en, zh]` and ship entirely English with a green board.
+
+Three states, and each says which one it is rather than passing quietly:
+
+| manifest | day has Chinese | verdict |
+|---|---|---|
+| no `zh:` block (m03–m08 today) | no | `n/a … NOT ENFORCED: …` |
+| `require` covers the day | no | **FAIL** — translate it, or narrow `require` |
+| `require` covers the day | yes | full parity check runs |
+
+A day that *is* bilingual in a module with no `require` gets a **warning**: nothing
+would have caught it being dropped back to English.
+
+An unreadable or malformed `zh.require` **raises**. Degrading it to "nothing
+declared" would restore exactly the silent pass the field exists to remove.
+
+
 A lesson holds BOTH languages in one `source.md` and compiles to ONE `lesson.html`.
 The reader picks with the sidebar Language row; CSS shows one and hides the other.
 

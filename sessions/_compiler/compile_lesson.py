@@ -125,13 +125,25 @@ def main():
         # page which looks finished and teaches less.
         try:
             import lang_parity_gate
-            pok, pmsgs = lang_parity_gate.run(open(args.source, encoding='utf-8').read())
+            pok, pmsgs = lang_parity_gate.run(
+                open(args.source, encoding='utf-8').read(), source_path=args.source)
             log('\n-- Language Parity Gate --')
             for m in pmsgs: log('  ', m)
             if not pok:
                 sok = False; log('   language parity FAILED')
+        except lang_parity_gate.ManifestError as e:
+            # A declared requirement we cannot READ must not degrade to "not
+            # declared" — that is the silent pass this gate exists to remove.
+            sok = False
+            log('\n-- Language Parity Gate --')
+            log('   FAIL unreadable bilingual declaration:', e)
         except Exception as e:
-            log('   language parity gate skipped:', e)
+            # Anything else still fails the build rather than vanishing. The old
+            # `skipped` branch meant a typo in the gate silently removed it from
+            # every compile, with one indented line of log to show for it.
+            sok = False
+            log('\n-- Language Parity Gate --')
+            log('   FAIL language parity gate errored:', repr(e))
         # -- Visual Integrity Gate (HARD) : block a visual that would render blank --
         # Catches viz embeds whose file/JS-dep is missing, whose height-sender
         # protocol drifted, or inline SVGs that draw nothing — the "compiles green

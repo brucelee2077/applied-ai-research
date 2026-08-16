@@ -183,7 +183,61 @@ def _quiz_rows(text):
     return rows
 
 
-def run(source_text, whitelist=None, manifest_covers=None):
+class ManifestError(Exception):
+    """A declared bilingual requirement could not be read. Never swallowed."""
+
+
+def _load_requirement(source_path):
+    """Return (required: bool|None, why: str) for the day at `source_path`.
+
+    None means "no module-level declaration" — the day keeps the historical inert
+    behaviour. True means the module's manifest names this day as one that must be
+    bilingual, so having no Chinese is a FAILURE rather than a pass.
+
+    Reads `zh.require` from `<module>/_refactor/manifest.yaml`: either the string
+    `all`, or a list of day-directory names. `zh.scope` is deliberately NOT read —
+    it is free prose in every existing manifest and nothing machine-readable could
+    be derived from it, which is precisely how a module came to declare itself
+    bilingual while shipping entirely English with a green board.
+    """
+    if not source_path:
+        return None, 'no source path supplied, so no manifest could be located'
+    day = os.path.basename(os.path.dirname(os.path.abspath(source_path)))
+    mod = os.path.dirname(os.path.dirname(os.path.abspath(source_path)))
+    mf = os.path.join(mod, '_refactor', 'manifest.yaml')
+    if not os.path.exists(mf):
+        return None, 'module has no _refactor/manifest.yaml, so nothing is declared'
+    try:
+        import yaml
+        data = yaml.safe_load(open(mf, encoding='utf-8').read()) or {}
+    except Exception as e:
+        # Raise, never return None. A parse error that silently downgraded to
+        # "nothing declared" would turn this whole check into the inert pass it
+        # exists to remove — the same failure shape as the whitelist loader,
+        # which used to `except: pass` into an empty set and made check 5 lie.
+        raise ManifestError('%s: %s' % (mf, e))
+    zh = data.get('zh')
+    if not isinstance(zh, dict):
+        return None, 'manifest has no zh: block, so bilingual output is not declared'
+    langs = zh.get('langs') or []
+    if 'zh' not in langs:
+        return None, "manifest zh.langs does not include 'zh'"
+    req = zh.get('require')
+    if req is None:
+        return None, ("manifest declares zh.langs %s but has no machine-readable "
+                      "zh.require, so nothing can be enforced" % (langs,))
+    if req == 'all':
+        return True, "manifest zh.require is 'all'"
+    if isinstance(req, (list, tuple)):
+        if day in req:
+            return True, 'manifest zh.require names this day'
+        return False, ('manifest zh.require covers %d other day(s) but not this one'
+                       % len(req))
+    raise ManifestError('%s: zh.require must be "all" or a list of day-dir names, '
+                        'got %r' % (mf, req))
+
+
+def run(source_text, whitelist=None, manifest_covers=None, source_path=None):
     msgs, ok = [], [True]
     def fail(m): ok[0] = False; msgs.append('FAIL ' + m)
     def pas(m): msgs.append('pass ' + m)
@@ -209,11 +263,38 @@ def run(source_text, whitelist=None, manifest_covers=None):
         pas('no U+FFFD corruption')
 
     if not _declares_chinese(source_text):
-        msgs.append('n/a  this day declares no Chinese yet — nothing to check. The CSS '
-                    'fallback shows English, and the 中文 button is disabled.')
+        # ---- 0b. a DECLARED bilingual day with no Chinese is a failure ---------
+        # Until this existed, the branch below was an unconditional pass, so a
+        # module could set zh.langs: [en, zh] and ship every day in English with a
+        # green board — silence was indistinguishable from success. The inertness
+        # itself is load-bearing (it let the toggle reach 293 pages without
+        # touching content), so it is kept for undeclared modules and REMOVED only
+        # where a manifest has explicitly opted in.
+        required, why = _load_requirement(source_path)
+        if required:
+            fail('this day carries NO Chinese, but its module declares it must '
+                 '(%s). An English-only day inside a declared-bilingual module is '
+                 'the silence this check exists to remove: every other check below '
+                 'is inert without a twin, so the board would go green on an '
+                 'untranslated page. Either translate the day, or narrow zh.require '
+                 'in the module manifest to a list that excludes it.' % why)
+        elif required is False:
+            msgs.append('n/a  this day declares no Chinese and its module '
+                        'deliberately excludes it (%s).' % why)
+        else:
+            msgs.append('n/a  this day declares no Chinese yet — nothing to check. '
+                        'The CSS fallback shows English, and the 中文 button is '
+                        'disabled. NOT ENFORCED: %s.' % why)
         # ok[0], not a hardcoded True: check 0 runs above this return and applies to
         # English-only days too, so returning True here would discard its verdict.
         return ok[0], msgs
+    required, why = _load_requirement(source_path)
+    if required:
+        pas('module declares this day bilingual (%s)' % why)
+    elif required is None:
+        note('this day IS bilingual, but no module manifest requires it (%s) — so '
+             'nothing would have caught it being dropped. Add zh.require to the '
+             'module manifest.' % why)
     terms = whitelist if whitelist is not None else _load_whitelist()
 
     # ---- 1. every concept carries Chinese, and no span is left untwinned ----
@@ -454,7 +535,8 @@ def main():
     ap.add_argument('--terms', help='path to zh_terms.yaml (default: sessions/_refactor/zh_terms.yaml)')
     a = ap.parse_args()
     ok, msgs = run(open(a.source, encoding='utf-8').read(),
-                   whitelist=_load_whitelist(a.terms) if a.terms else None)
+                   whitelist=_load_whitelist(a.terms) if a.terms else None,
+                   source_path=a.source)
     print('== Language Parity Gate:', os.path.relpath(a.source), '==')
     for m in msgs:
         print('  ', m)

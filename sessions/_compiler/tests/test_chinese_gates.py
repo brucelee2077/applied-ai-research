@@ -716,3 +716,115 @@ def test_a_clause_chain_that_also_holds_a_list_is_still_caught():
             '再训一遍，最后比一比，你说是不是。' + PLAY)
     ok, msgs = _run(body)
     assert any('逗号' in m for m in msgs), msgs
+
+
+# =============================================================================
+# check 0b — a DECLARED bilingual day with no Chinese must FAIL
+# =============================================================================
+# The gap this closes: every Chinese check is inert until a day declares Chinese,
+# so a module could set `zh.langs: [en, zh]` and ship every day in English with a
+# green board — silence was indistinguishable from success. `zh.scope` could not
+# help: it is free prose in every manifest that has it. So enforcement reads a
+# machine-readable `zh.require`, which is either "all" or a list of day-dir names.
+#
+# The inertness itself is load-bearing (it let the toggle reach 293 pages without
+# touching content), so it is preserved for modules that never opted in.
+
+import tempfile, textwrap
+
+
+def _day_tree(manifest_yaml, day='day-01-thing', source=None):
+    """Build <root>/mod/<day>/source.md plus <root>/mod/_refactor/manifest.yaml."""
+    root = tempfile.mkdtemp()
+    mod = os.path.join(root, 'mod')
+    os.makedirs(os.path.join(mod, day))
+    os.makedirs(os.path.join(mod, '_refactor'))
+    if manifest_yaml is not None:
+        open(os.path.join(mod, '_refactor', 'manifest.yaml'), 'w',
+             encoding='utf-8').write(textwrap.dedent(manifest_yaml))
+    sp = os.path.join(mod, day, 'source.md')
+    open(sp, 'w', encoding='utf-8').write(
+        source if source is not None
+        else FM + '@@@ concept id=c1 tag=t title=t\nEnglish only.\n')
+    return sp
+
+
+def test_a_declared_bilingual_day_with_no_chinese_fails():
+    sp = _day_tree('zh:\n  langs: [en, zh]\n  require: all\n')
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert not ok
+    assert any(m.startswith('FAIL') and 'declares it must' in m for m in msgs), msgs
+
+
+def test_a_day_excluded_by_a_require_list_stays_inert():
+    sp = _day_tree('zh:\n  langs: [en, zh]\n  require: [day-99-other]\n')
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert ok
+    assert any('deliberately excludes it' in m for m in msgs), msgs
+
+
+def test_a_day_named_in_a_require_list_fails():
+    sp = _day_tree('zh:\n  langs: [en, zh]\n  require: [day-01-thing]\n')
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert not ok, msgs
+
+
+def test_a_module_with_no_manifest_stays_inert_and_says_so():
+    # m03-m08 are in this state on purpose; they must not start failing.
+    sp = _day_tree(None)
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert ok
+    assert any('NOT ENFORCED' in m and 'no _refactor/manifest.yaml' in m for m in msgs), msgs
+
+
+def test_a_manifest_without_a_zh_block_stays_inert():
+    sp = _day_tree('coverage_topics: []\n')
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert ok
+    assert any('NOT ENFORCED' in m and 'no zh: block' in m for m in msgs), msgs
+
+
+def test_declaring_langs_without_require_is_reported_as_unenforceable():
+    # The exact prior state of m02: zh.langs said [en, zh] and nothing could act.
+    sp = _day_tree('zh:\n  langs: [en, zh]\n  scope: "prose a gate cannot read"\n')
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert ok
+    assert any('no machine-readable' in m for m in msgs), msgs
+
+
+def test_an_unreadable_require_raises_rather_than_degrading():
+    # Degrading to "nothing declared" would restore the exact silent pass this
+    # check removes — the same shape as the whitelist loader's old `except: pass`.
+    sp = _day_tree('zh:\n  langs: [en, zh]\n  require: {oops: 1}\n')
+    with pytest.raises(parity.ManifestError):
+        parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+
+
+def test_malformed_manifest_yaml_raises():
+    sp = _day_tree('zh:\n  langs: [en, zh\n  require: all\n')     # unclosed bracket
+    with pytest.raises(parity.ManifestError):
+        parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+
+
+def test_run_without_a_source_path_keeps_the_old_behaviour():
+    # Callers that predate source_path must not change verdict.
+    ok, msgs = parity.run(FM + '@@@ concept id=c1 tag=t title=t\nEnglish.\n', whitelist=WL)
+    assert ok
+    assert any('NOT ENFORCED' in m for m in msgs), msgs
+
+
+def test_a_bilingual_day_in_an_unrequiring_module_is_warned_not_failed():
+    sp = _day_tree(None, source=(
+        FM + '@@@ concept id=c1 tag=t title=t\nA.\n~~~zh\n甲。\n~~~\n'))
+    ok, msgs = parity.run(open(sp, encoding='utf-8').read(), whitelist=WL, source_path=sp)
+    assert any(m.startswith('warn') and 'no module manifest requires it' in m
+               for m in msgs), msgs
+
+
+def test_the_real_m01_and_m02_days_are_all_declared_and_required():
+    # The point of the whole change: these 15 days can no longer be silently
+    # dropped back to English.
+    for mod in ('m01-shape-of-data', 'm02-the-neuron'):
+        for sp in sorted(glob.glob(os.path.join(REPO, 'sessions', mod, 'day-*', 'source.md'))):
+            req, why = parity._load_requirement(sp)
+            assert req is True, '%s not required: %s' % (sp, why)
