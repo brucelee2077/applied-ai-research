@@ -316,7 +316,7 @@ why: 因为现在有了一个数字，你就可以*画*它。perceptron 什么�
 %%%
 
 %% insight
-注意这个故事的形状，因为它在整个机器学习里反复出现：有人把一条硬邦邦的是/否规则换成一个你能测量的平滑数字，然后你突然就能求导、能走小步、能看见进展。「把它变平滑，这样你就能挪它」大概是这个领域里被复用得最多的一个想法。
+注意这个故事的形状，因为它在整个机器学习里反复出现：有人把一条硬邦邦的是/否规则换成一个你能测量的平滑数字。然后你突然就能求导、能走小步、能看见进展。「把它变平滑，这样你就能挪它」大概是这个领域里被复用得最多的一个想法。
 %%
 
 到这里：一下没脑子的推，对比一次分级的挪动。下面是这个差别在六次练习投篮上长什么样。
@@ -601,7 +601,7 @@ take: <b>很接近，但从不正好是 0。</b>看行号 —— 每一行之间
 @@@ concept id=c6 zh_tag="两个白拿的好处" tag="Two free wins" zh_title="两行代码的习惯，让每次训练都可信" title="Two one-line habits that make every run trustworthy" zh_gotit="看懂清零和打乱了" gotit="Got reset & shuffle"
 Good news first: this section is two **free wins**. Two habits, one line of code each, and once you've met them you will never lose an afternoon to either again — which is more than most people can say, because these two bite *everybody* exactly once. Think of an **Etch A Sketch**: the red toy where two knobs draw a line and you shake it to erase. Start a new drawing without shaking the old one off and your fresh clean line lands on top of yesterday's scribble. In the loop, the "old drawing" is last lap's gradient.
 ~~~zh
-先说好消息：这一节是两个**白拿的好处**。两个习惯，各一行代码，认识了它们你就再也不会为其中任何一个赔上一个下午 —— 这已经比大多数人强了，因为这两个坑*每个人*都正好踩一次。想一想**画画板**：那种红色玩具，两个旋钮画出一条线，摇一摇就擦干净。不摇掉旧的画就开始新的，你干净的新线会落在昨天的乱涂上面。在循环里，那个「旧的画」就是上一圈的 gradient。
+先说好消息：这一节是两个**白拿的好处**。两个习惯，各一行代码，认识了它们你就再也不会为其中任何一个赔上一个下午。这已经比大多数人强了，因为这两个坑*每个人*都正好踩一次。想一想**画画板**：那种红色玩具，两个旋钮画出一条线，摇一摇就擦干净。不摇掉旧的画就开始新的，你干净的新线会落在昨天的乱涂上面。在循环里，那个「旧的画」就是上一圈的 gradient。
 ~~~
 
 %%% svg
@@ -688,7 +688,7 @@ take: <b>2 → 4 → 6。</b>忘了清零，到第 3 圈这次挪动就大了三
 %%%
 
 #### 好处 2 · 别只在一个点上练 —— 把数据打乱
-第二个好处讲的是*顺序*，也同样是一行。在地板上同一个点上一次又一次投**罚球**，会让你在那一个点上很厉害，在别的地方一无是处。每个 epoch 都按**同样固定的顺序**喂例子，挪动就会**被这个顺序带偏** —— 而**从不打乱**在你的数据刚好是排好序的时候（先是全部 class-0 的行，再是全部 class-1 的行）咬得最狠，因为一段圈把 weight 往一边拽，下一段又把它拽回来。
+第二个好处讲的是*顺序*，也同样是一行。在地板上同一个点上一次又一次投**罚球**，会让你在那一个点上很厉害，在别的地方一无是处。每个 epoch 都按**同样固定的顺序**喂例子，挪动就会**被这个顺序带偏**。而**从不打乱**在你的数据刚好是排好序的时候（先是全部 class-0 的行，再是全部 class-1 的行）咬得最狠，因为一段圈把 weight 往一边拽，下一段又把它拽回来。
 
 处方便宜得让人开心：[[把数据打乱||每个 epoch 之前把训练例子的顺序混一混，这样网络锁不住顺序本身]] —— **每个 epoch 重新打乱一次**。**把顺序混开**，问题就直接没了。
 ~~~
@@ -900,7 +900,7 @@ That's the Goldilocks rule in one image: run *enough* to converge, stop *before*
 ~~~zh
 这就是一张图里的「刚刚好」规则：跑*够久*让它收敛，在红线转头向上*之前*停下。
 
-🎉 **胜利一圈。**你现在能读一条 loss curve，并说出这次训练哪里不对 —— 太大胆、太胆小、没清零、顺序固定、停得太早、练得太久。**六个陷阱，每个配一行的解法**，而说实话，这就是一个工程师在糟糕的一天里做的大部分事情。还剩一个诚实的事实，而且是有意思的那一种：无论你调得多完美，这个循环*做不到*的事。
+🎉 **胜利一圈。**你现在能读一条 loss curve，并说出这次训练哪里不对 —— 太大胆、太胆小。没清零、顺序固定。停得太早、练得太久。**六个陷阱，每个配一行的解法**，而说实话，这就是一个工程师在糟糕的一天里做的大部分事情。还剩一个诚实的事实，而且是有意思的那一种：无论你调得多完美，这个循环*做不到*的事。
 ~~~
 
 @@@ concept id=c9 zh_tag="它撞墙的地方" tag="Where it hits a wall" zh_title="诚实的边界 —— 什么时候调参救不了你" title="The honest limit — when tuning cannot help" zh_gotit="看懂这些边界了" gotit="Got the limits"
@@ -973,7 +973,7 @@ why: 加 neuron（一个 hidden layer），它们两个一起切出两条线，�
 One more honest line, and it's a short one. Our valley picture assumed a single clean bowl; a lumpy landscape with several dips is called [[non-convex||a bumpy landscape with more than one dip, so the lowest nearby point may not be the lowest point overall]]. Because the gradient only feels the ground under your boots, the loop can roll into a small dip, find uphill in every direction, and stop there — a [[local minimum||a spot where every direction is uphill nearby, so the loop stops, even though a deeper valley exists elsewhere]], like a hiker who settles in a roadside ditch and announces "this is the bottom!" The curve flattens, so it *looks* converged: you did find the bottom of *this* dip, and that is **not the global best**.
 ~~~zh
 #### 一个小小的脚注 —— 那个浅坑
-还有一句诚实的话，很短。我们那幅山谷的画假设了只有一个干净的碗；一片有好几个坑的坑坑洼洼的地形叫 [[non-convex（非凸）||坑坑洼洼、有不止一个坑的地形，所以附近最低的那一点不一定是整体最低的点]]。因为 gradient 只感觉得到你靴子底下的地面，循环可能滚进一个小坑里，发现每个方向都是上坡，然后就停在那儿 —— 这叫 [[local minimum（局部最小值）||一个附近每个方向都是上坡的点，所以循环会停下，尽管别处还有更深的谷]]，就像一个徒步的人在路边的沟里安顿下来，然后宣布「这就是底了！」曲线变平了，所以它*看起来*收敛了：你确实找到了*这个*坑的底，而那**不是全局最好**。
+还有一句诚实的话，很短。我们那幅山谷的画假设了只有一个干净的碗；一片有好几个坑的坑坑洼洼的地形叫 [[non-convex（非凸）||坑坑洼洼、有不止一个坑的地形，所以附近最低的那一点不一定是整体最低的点]]。因为 gradient 只感觉得到你靴子底下的地面，循环可能滚进一个小坑里，发现每个方向都是上坡，然后就停在那儿 —— 这叫 [[local minimum（局部最小值）||一个附近每个方向都是上坡的点，所以循环会停下，尽管别处还有更深的谷]]。就像一个徒步的人在路边的沟里安顿下来，然后宣布「这就是底了！」曲线变平了，所以它*看起来*收敛了：你确实找到了*这个*坑的底，而那**不是全局最好**。
 ~~~
 
 %%% svg
@@ -1177,7 +1177,7 @@ Then run it and paste the output at the bottom as a comment.
 
 #### 你应该看到什么（这个循环，在学）
 - 用 `lr = 0.01`，loss 从 `1.000000` 开始，每 10 圈的打印大致读作 `0.1216 → 0.0148 → 0.0018 → 0.00022`，最后停在 `0.00003` 附近。这就是 concept 5 里那个健康的形状：**陡降、缓滑，然后**在接近零处**变平** —— 收敛了。**注意看**每圈的降幅怎么随着差距变小而自己变小，而 `lr` 一个字都没动。
-- 用 `lr = 1.5`，**prediction 每圈变一次正负号，同时 loss 炸开** —— 猜测在 `0 → 15 → -195 → 2745 → …` 之间越过目标又弹回来，而因为 loss 是这个偏差的平方，它只会一直变大：到最后一次打印时它是一个天文数字（大约 `10¹¹²`），如果你继续循环，它会变成 `inf`，然后变成 `NaN`。这就是太大胆的设置，活的：每一步落得都比出发时离谷底更远。解药是更小的 `lr`。
+- 用 `lr = 1.5`，**prediction 每圈变一次正负号，同时 loss 炸开**。猜测在 `0 → 15 → -195 → 2745 → …` 之间越过目标又弹回来。而因为 loss 是这个偏差的平方，它只会一直变大：到最后一次打印时它是一个天文数字（大约 `10¹¹²`）。如果你继续循环，它会变成 `inf`，然后变成 `NaN`。这就是太大胆的设置，活的：每一步落得都比出发时离谷底更远。解药是更小的 `lr`。
 - 用 `lr = 0.00005`，loss 在 50 圈里只从 `1.000` 走到大约 `0.952` —— 它**几乎不动**。这是太胆小的设置；解药是更大的 `lr`。把这三种连着看一遍，正是工程师用眼睛挑 learning rate 的方法。
 
 !!! c-info 📓

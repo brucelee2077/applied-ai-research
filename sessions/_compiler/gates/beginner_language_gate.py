@@ -90,6 +90,15 @@ _MAX_SENTENCE_WORDS = 45   # generous: flags genuine run-ons, not normal prose
 # comma-chain is counted too.
 _MAX_ZH_SENTENCE_CHARS = 60
 _MAX_ZH_COMMAS = 4
+
+# A run of SHORT list items joined by `、` — numbers, identifiers, or one-to-three
+# character words: （1.0、0.1、0.01、0.001） or 「太大胆、太胆小」. Such a run is one
+# idea, so its separators must not count toward the clause-chain limit. Anchored on
+# item shape rather than on the surrounding brackets, because the same enumeration
+# appears bare in prose as often as it appears parenthesised.
+_ENUM_RE = re.compile(
+    r'(?:[0-9A-Za-z_.·%\-]{1,10}|[一-鿿]{1,3})'
+    r'(?:、(?:[0-9A-Za-z_.·%\-]{1,10}|[一-鿿]{1,3})){2,}')
 _MAX_MAIN_WALL = 600       # matches _density_scan.py's walls_over_600 threshold
                            # (both are ENGLISH-CHARACTER EQUIVALENTS — see
                            #  v8lib.text_weight, which _density_scan now applies)
@@ -169,7 +178,14 @@ def _prose_only(body):
     t = _mask(t, r'(?m)^\s*\|.*$', re.M)             # table rows
     t = _mask(t, r'`[^`]*`')                         # code spans
     t = _mask(t, r'<[^>]+>', re.S)                   # any other html tag
-    t = _mask(t, r'\[\[[^\|\]]+\|\|[^\]]*\]\]')      # gloss bodies (tooltips)
+    # A gloss body is a TOOLTIP — it is hover-only, so it must not count toward the
+    # main-line sentence length. `[^\]]*` could not cross a `]` INSIDE the gloss, so
+    # a gloss like `[[epsilon clipping||clamp to [ε, 1−ε] before the log]]` failed to
+    # match at all and its whole body was measured as main-line prose. That produced
+    # phantom "sentence over 60 汉字" reports on m02/day-04 that authors then
+    # "fixed" by splitting sentences that were never long. Allow a single `]`, stop
+    # only at `]]`.
+    t = _mask(t, r'\[\[[^\|\]]+\|\|(?:[^\]]|\](?!\]))*\]\]')   # gloss bodies (tooltips)
     t = _mask(t, r'(?m)^%%%.*$', re.M)               # widget fences/headers
     t = _mask(t, r'(?m)^@@@.*$', re.M)               # block headers
     t = _mask(t, r'(?m)^@\w+.*$', re.M)              # @lede / @goal markers
@@ -301,7 +317,15 @@ def run(source_text, notebook_exists=False, source_path=None):
         han = len(_CJK_RE.findall(seg))
         if han < 8:                       # not a Chinese sentence; the English rule owns it
             continue
-        commas = seg.count('，') + seg.count('、')
+        # `、` is the Chinese ENUMERATION comma, not a clause joint. Counting it as
+        # one over-reported a 29-汉字 sentence on m02/day-08 as a 5-comma chain,
+        # because 3 of the 5 were separators in the numeric list （1.0、0.1、0.01、
+        # 0.001）— a list is ONE idea, however many items it has. The rule exists to
+        # catch clause chaining, so only count a `、` whose neighbours look like
+        # prose rather than list items.
+        enum = _ENUM_RE.findall(seg)
+        commas = seg.count('，') + seg.count('、') - sum(s.count('、') for s in enum)
+
         if han > _MAX_ZH_SENTENCE_CHARS:
             zh_long.append(('%d 汉字' % han, seg[:16]))
         elif commas > _MAX_ZH_COMMAS:

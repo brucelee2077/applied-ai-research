@@ -648,3 +648,71 @@ def test_no_compiled_lesson_carries_a_replacement_character():
         if n:
             bad[os.path.relpath(p, os.path.join(REPO, 'sessions'))] = n
     assert not bad, 'U+FFFD in compiled lessons: %s' % bad
+
+
+# =============================================================================
+# gloss-body masking — a tooltip must not count as main-line prose
+# =============================================================================
+# Real defect: the mask regex was `\[\[[^\|\]]+\|\|[^\]]*\]\]`, whose `[^\]]*`
+# cannot cross a `]` inside the gloss. A gloss body containing brackets — e.g.
+# `clamp to [ε, 1−ε] before the log` — made the pattern fail to match AT ALL, so
+# the whole hover-only body was measured as main-line prose. That produced phantom
+# "Chinese sentence over 60 汉字" findings on m02/day-04 which an author then
+# "fixed" by splitting sentences that were never long.
+
+def test_a_gloss_body_is_masked_out_of_the_measured_prose():
+    body = ('把每个概率挤进 [[epsilon clipping||把概率夹到 [ε, 1−ε] 这个小区间里，'
+            '这样 −log 永远不会炸到无穷，也不会污染后面每一步]] 就行了。' + PLAY)
+    ok, msgs = _run(body)
+    assert not any('Chinese' in m and '汉字' in m for m in msgs), \
+        'a bracketed gloss body leaked into the main-line sentence measurement: %s' % msgs
+
+
+def test_a_gloss_without_brackets_is_still_masked():
+    body = '这是一个 [[gradient||loss 上升最快的方向]] 的例子。' + PLAY
+    ok, msgs = _run(body)
+    assert not any('Chinese' in m and '汉字' in m for m in msgs), msgs
+
+
+def test_a_genuinely_long_chinese_sentence_is_still_caught_outside_a_gloss():
+    # The fix must not become a way to hide real run-ons.
+    long_zh = ('在给任何东西定价之前我们需要一个可以数的东西这就是我们要数的而且它比你'
+               '想象的要小得多一次乘法或者一次加法就是全部了不是一整个求和也不是一行代码。')
+    ok, msgs = _run(long_zh + PLAY)
+    assert any('Chinese' in m and '汉字' in m for m in msgs), msgs
+
+
+# =============================================================================
+# `、` is the enumeration comma, not a clause joint
+# =============================================================================
+# Real defect: counting 、 as a clause comma reported a 29-汉字 sentence on
+# m02/day-08 as a 5-comma chain, because 3 of the 5 were separators inside the
+# numeric list （1.0、0.1、0.01、0.001）. A list is ONE idea however many items it
+# has, and the rule exists to catch clause chaining.
+
+def test_a_numeric_enumeration_does_not_count_as_a_comma_chain():
+    body = '我们扫四个速率（1.0、0.1、0.01、0.001），然后读每一条曲线。' + PLAY
+    ok, msgs = _run(body)
+    assert not any('逗号' in m for m in msgs), \
+        'enumeration separators were counted as clause commas: %s' % msgs
+
+
+def test_a_short_word_enumeration_does_not_count_either():
+    body = '六个陷阱是太大胆、太胆小、没清零、顺序固定、停得太早、练得太久。' + PLAY
+    ok, msgs = _run(body)
+    assert not any('逗号' in m for m in msgs), msgs
+
+
+def test_a_real_clause_chain_is_still_caught():
+    # The fix must not become a way to hide clause chaining.
+    body = '我们先看这个，然后看那个，接着再看第三个，最后还要看第四个，这样才算完整，你说是不是。' + PLAY
+    ok, msgs = _run(body)
+    assert any('逗号' in m for m in msgs), msgs
+
+
+def test_a_clause_chain_that_also_holds_a_list_is_still_caught():
+    # An enumeration must not launder the clauses around it.
+    body = ('我们先扫四个速率（1.0、0.1、0.01、0.001），然后读曲线，接着挑一个，'
+            '再训一遍，最后比一比，你说是不是。' + PLAY)
+    ok, msgs = _run(body)
+    assert any('逗号' in m for m in msgs), msgs

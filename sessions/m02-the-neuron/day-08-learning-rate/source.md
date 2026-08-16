@@ -141,7 +141,7 @@ take: <b>只有学习率在缩放这一跳。</b>`old_weight = 2.0`、`gradient 
 %%%
 
 %%% insight
-为什么这一个小数字值得这么多注意？因为它是网络里*每一个* weight、*每一步*、整个训练过程用的**同一个**跨度。两个人可以共用同一个模型、同一份数据、同一份代码，只改这一个数字，结果一个是「学得漂亮」，另一个是「根本没学」。这就是为什么训练出问题时，有经验的工程师第一个检查的就是它 —— 也是为什么它值一整天。
+为什么这一个小数字值得这么多注意？因为它是网络里*每一个* weight、*每一步*、整个训练过程用的**同一个**跨度。两个人可以共用同一个模型、同一份数据、同一份代码，只改这一个数字。结果一个是「学得漂亮」，另一个是「根本没学」。这就是为什么训练出问题时，有经验的工程师第一个检查的就是它 —— 也是为什么它值一整天。
 %%%
 
 同样这个「一跳」的故事画成图 —— 一个 weight、一个 gradient、三个学习率、三种跨度：
@@ -250,7 +250,7 @@ So: **too small → the loss barely drops, the curve looks flat. Cause:** each h
 @@@ concept id=c3 zh_tag="太大 = 迈过头" tag="Too big = overshoot" zh_title="太大 —— 迈过头、弹跳、然后炸掉" title="Too big — overshoot, bounce, and blow up" zh_gotit="懂了迈过头" gotit="Got the overshoot"
 Now the opposite failure, and it is the dramatic one. Back on the stream, imagine hopping so hard that you sail clean *over* the next **stepping stone** and land in the water past it — then you leap back the other way even harder and overshoot again, splashing back and forth and getting *wetter* each time instead of crossing. That is a learning rate set **too big**. Each hop is longer than the distance to the bottom of the valley, so you jump *past* the lowest point and land higher up the far wall. The loss, instead of going down, bounces around — and if the hops keep growing, it shoots up to infinity. The word for a number that has grown past infinity in the computer is [[NaN||"not a number" — what a computer prints when a calculation blew up past any real value, like infinity times infinity. Seeing NaN in your loss means training exploded]], and a loss of `NaN` is the classic sign of a learning rate set way too high.
 ~~~zh
-现在说反过来那个失败，而它是戏剧性的那个。回到小溪上，想象你跳得那么用力，干净地飞*过*了下一块**垫脚石**，落在它后面的水里 —— 然后你更用力地往回跳，又跳过头，来回噗通，一次比一次*更湿*，而不是过河。那就是学习率设得**太大**。每一跳都比到谷底的距离更长，所以你跳*过*了最低点，落在对面墙上更高的地方。loss 不往下走，反而在乱弹 —— 而如果跨度一直变大，它会冲到无穷。计算机里一个长过无穷的数字有个词叫 [[NaN||「not a number」—— 一个计算炸过任何实数值时计算机打印的东西，比如无穷乘无穷。在你的 loss 里看到 NaN 就意味着训练爆了]]，而一个 `NaN` 的 loss 是学习率设得远远太高的经典标志。
+现在说反过来那个失败，而它是戏剧性的那个。回到小溪上，想象你跳得那么用力，干净地飞*过*了下一块**垫脚石**，落在它后面的水里 —— 然后你更用力地往回跳。又跳过头，来回噗通，一次比一次*更湿*，而不是过河。那就是学习率设得**太大**。每一跳都比到谷底的距离更长，所以你跳*过*了最低点，落在对面墙上更高的地方。loss 不往下走，反而在乱弹 —— 而如果跨度一直变大，它会冲到无穷。计算机里一个长过无穷的数字有个词叫 [[NaN||「not a number」—— 一个计算炸过任何实数值时计算机打印的东西，比如无穷乘无穷。在你的 loss 里看到 NaN 就意味着训练爆了]]，而一个 `NaN` 的 loss 是学习率设得远远太高的经典标志。
 ~~~
 
 %%% svg
@@ -465,7 +465,7 @@ Notice what you did *not* need there: no derivation, no closed form, no theory o
 When you plot loss-versus-step for each rate, the *shape* tells you the regime at a glance. Keep these three silhouettes in your head — they are how every practitioner eyeballs a learning rate:
 ~~~zh
 %%% insight
-注意你在那里*不*需要什么：没有推导、没有闭式解、没有关于 loss 表面的理论。你试了五个数字，看了五张图。真实的实验室里速率就是这么挑的 —— 扫、看、留下最好的 —— 而这是整个机器学习里最友好的事实之一：那个最重要的旋钮是靠*看*调出来的，而你已经会看了。
+注意你在那里*不*需要什么：没有推导、没有闭式解、没有关于 loss 表面的理论。你试了五个数字，看了五张图。真实的实验室里速率就是这么挑的 —— 扫、看、留下最好的。而这是整个机器学习里最友好的事实之一：那个最重要的旋钮是靠*看*调出来的，而你已经会看了。
 %%%
 
 #### 读曲线形状来诊断
@@ -560,7 +560,7 @@ why: 因此你用小而稳的碎步收尾，稳稳落*进*谷底，而不是在�
 
 Real training often adds one more flourish at the very start: instead of jumping straight to the big rate on step one, it ramps *up* to it over the first few steps — a **warmup**, so training does not lurch on the first update — then decays. Here is that full shape, warmup up then decay down:
 ~~~zh
-真实训练常常在最开头再加一个花样：不是第一步就跳到那个大速率，而是在最前面几步*爬升*到它 —— 这叫 **warmup（预热）**，让训练不会在第一次更新时猛地一顿 —— 然后再衰减。下面是那个完整的形状，先预热上去再衰减下来：
+真实训练常常在最开头再加一个花样：不是第一步就跳到那个大速率，而是在最前面几步*爬升*到它。这叫 **warmup（预热）**，让训练不会在第一次更新时猛地一顿 —— 然后再衰减。下面是那个完整的形状，先预热上去再衰减下来：
 ~~~
 
 %%% svg
@@ -597,7 +597,7 @@ One picture to keep — the same knob, three outcomes:
 - **它是什么。** 在 *新 weight = 老 weight − learning rate × gradient* 里，gradient 挑*方向*（下坡），learning rate 挑*你跨多远*。它就是那个在同一个循环里乘着 gradient、训练你神经元 weight 和 bias 的数字。
 - **太小 → 爬。** 每一跳是一粒沙子；loss 几乎不降，曲线看起来是平的。**解药：** 提高学习率。
 - **太大 → 迈过头、弹跳、炸掉。** 比山谷更长的跨度会跳过谷底、每一步变大，最后以 `NaN` 收场。**解药：** 降低学习率（或者裁剪）。
-- **靠看去找一个好的。** 按十的幂次扫速率（1.0、0.1、0.01、0.001），画 loss-对-步数，挑那条平滑下降的曲线。平 → 提高；带尖刺/在升 → 降低。
+- **靠看去找一个好的。** 按十的幂次扫速率（1.0、0.1、0.01、0.001）。画 loss-对-步数，挑那条平滑下降的曲线。平 → 提高；带尖刺/在升 → 降低。
 - **用 schedule 打败固定速率。** 从大开始求早期速度，然后把它 *decay* 到一个小而稳的速率，在谷底附近做温柔精确的落地。
 
 一张要留住的图 —— 同一个旋钮，三种结果：
